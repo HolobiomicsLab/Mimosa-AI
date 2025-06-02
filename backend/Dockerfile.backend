@@ -1,0 +1,103 @@
+
+FROM --platform=linux/amd64 python:3.11-slim
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install essential packages and Chrome dependencies
+RUN apt-get update -y && apt-get install -y \
+    wget \
+    gnupg2 \
+    ca-certificates \
+    unzip \
+    xvfb \
+    libxss1 \
+    libappindicator1 \
+    fonts-liberation \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    dbus \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+      apt-get install -y \
+      gcc \
+      g++ \
+      gfortran \
+      libportaudio2 \
+      portaudio19-dev \
+      ffmpeg \
+      libavcodec-dev \
+      libavformat-dev \
+      libavutil-dev \
+      gnupg2 \
+      wget \
+      unzip \
+      python3 \
+      python3-pip \
+      libasound2 \
+      libatk-bridge2.0-0 \
+      libgtk-4-1 \
+      libnss3 \
+      xdg-utils \
+      wget \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN apt-get update -y && \
+apt-get install -y \
+  alsa-utils \
+&& rm -rf /var/lib/apt/lists/*
+
+ENV CHROME_TESTING_VERSION=134.0.6998.88
+ENV DISPLAY=:99
+
+WORKDIR /app
+
+RUN set -eux; \
+    wget -qO /tmp/chrome.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_TESTING_VERSION}/linux64/chrome-linux64.zip"; \
+    unzip -q /tmp/chrome.zip -d /opt; \
+    rm /tmp/chrome.zip; \
+    ln -s /opt/chrome-linux64/chrome /usr/local/bin/google-chrome; \
+    ln -s /opt/chrome-linux64/chrome /usr/local/bin/chrome; \
+    mkdir -p /opt/chrome; \
+    ln -s /opt/chrome-linux64/chrome /opt/chrome/chrome; \
+    google-chrome --version
+
+RUN set -eux; \
+    wget -qO /tmp/chromedriver.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_TESTING_VERSION}/linux64/chromedriver-linux64.zip"; \
+    unzip -q /tmp/chromedriver.zip -d /tmp; \
+    mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin; \
+    rm /tmp/chromedriver.zip; \
+    chmod +x /usr/local/bin/chromedriver; \
+    chromedriver --version
+
+RUN chmod +x /opt/chrome/chrome
+
+RUN pip3 install --upgrade pip setuptools wheel
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN mkdir -p /opt/workspace
+RUN mkdir -p /tmp && chmod 1777 /tmp
+
+# Copy application code
+COPY api.py .
+COPY sources/ ./sources/
+COPY prompts/ ./prompts/
+COPY crx/ crx/
+COPY llm_router/ llm_router/
+COPY config.ini .
+
+EXPOSE 8000
+
+# Run the application
+CMD ["python3", "api.py"]
