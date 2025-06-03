@@ -11,11 +11,84 @@ import os
 import json
 from typing import Dict, Any, List
 from e2b_code_interpreter import Sandbox
+from anthropic import Anthropic
 import openai
 from openai import OpenAI
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+model_choice = "openai"  # Change to "deepseek" or "anthropic" as needed
+
+deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+
+def deepseek_fn(history, verbose=False):
+    """
+    Use deepseek api to generate text.
+    """
+    client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=history,
+            stream=False
+        )
+        thought = response.choices[0].message.content
+        if verbose:
+            print(thought)
+        return thought
+    except Exception as e:
+        raise Exception(f"Deepseek API error: {str(e)}") from e
+
+def openai_fn(history, verbose=False):
+    """
+    Use openai to generate text.
+    """
+    client = OpenAI(api_key=openai_api_key)
+
+    try:
+        response = client.chat.completions.create(
+            model="o3-2025-04-16",
+            messages=history,
+        )
+        if response is None:
+            raise Exception("OpenAI response is empty.")
+        thought = response.choices[0].message.content
+        if verbose:
+            print(thought)
+        return thought
+    except Exception as e:
+        raise Exception(f"OpenAI API error: {str(e)}") from e
+
+def anthropic_fn(history, verbose=False):
+    """
+    Use Anthropic to generate text with streaming.
+    """
+    client = Anthropic(api_key=anthropic_api_key)
+    system_message = None
+    messages = []
+    for message in history:
+        clean_message = {'role': message['role'], 'content': message['content']}
+        if message['role'] == 'system':
+            system_message = message['content']
+        else:
+            messages.append(clean_message)
+
+    try:
+        response = client.messages.create(
+            model="claude-opus-4-20250514",
+            max_tokens=12000,
+            messages=messages,
+            system=system_message
+        )
+        if response is None:
+            raise Exception("Anthropic response is empty.")
+        thought = response.content[0].text
+        if verbose:
+            print(thought)
+        return thought
+    except Exception as e:
+        raise Exception(f"Anthropic API error: {str(e)}") from e
+
 
 def create_sandbox_with_dependencies():
     """Create and configure the sandbox with all required dependencies"""
@@ -29,6 +102,7 @@ def create_sandbox_with_dependencies():
     sandbox.commands.run("pip install langchain-core")
     sandbox.commands.run("pip install requests")
     sandbox.commands.run("pip install beautifulsoup4")
+    sandbox.commands.run("pip install grandalf")
     
     return sandbox
 
@@ -194,12 +268,7 @@ class WorkflowState(TypedDict):
     next_action: str
     error_count: int
 
-# 2. Define Tools if and only if no available tools can be used
-@tool
-def example_tool(param: str) -> str:
-    return f"processed: {param}"
-
-# 4. Create SmolAgent Node Factory
+# 2. Create SmolAgent Node Factory
 def create_smolagent_node(tools: list, agent_name: str, instructions_template: str):
     agent = CodeAgent(
         tools=tools,
@@ -229,7 +298,7 @@ def create_smolagent_node(tools: list, agent_name: str, instructions_template: s
     
     return node_function
 
-# 5. Build Workflow
+# 3. Build Workflow
 workflow = StateGraph(WorkflowState)
 
 # Add nodes
@@ -239,6 +308,9 @@ workflow.add_node("agent1", node1)
 # Add edges and routing
 workflow.add_edge(START, "agent1")
 workflow.add_edge("agent1", END)
+
+# draw graph
+Image(workflow.get_graph().draw_mermaid_png())
 
 # 6. Compile and Execute
 app = workflow.compile()
@@ -250,6 +322,10 @@ result = app.invoke({
     "error_count": 0
 })
 
+7. print the result
+print("Workflow result:", result)
+
+
 ## Available Tools for smolagent:
 - go_to_url(url: str) -> bool: Navigate to URL
 - get_page_text() -> str: Get page text content  
@@ -258,6 +334,7 @@ result = app.invoke({
 - get_form_inputs() -> List[str]: Get form input fields
 - fill_form(values: List[str]) -> bool: Fill form with values
 - screenshot() -> str: Take page screenshot
+These tool are fully available, do not redefine.
 
 ## Requirements:
 1. Create a complete, runnable Python script
@@ -275,22 +352,17 @@ Include all necessary imports
 Use the exact tool signatures provided
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Create a workflow for this task: {task_prompt}"}
-        ],
-        temperature=0.1,
-        max_tokens=2000
-    )
-    
-    return response.choices[0].message.content.strip()
+    history = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': task_prompt}]
+    if model_choice == "deepseek":
+        return deepseek_fn(history)
+    elif model_choice == "anthropic":
+        return anthropic_fn(history)
+    return openai_fn(history)
 
 def create_mock_tools_setup() -> str:
     """Create mock tools setup code for the sandbox"""
     # NOTE make all tools as MCP server ?
-    return """
+    return '''
 # Mock tools for demonstration (replace with actual browser tools in production)
 from smolagents import tool
 from typing import List
@@ -299,26 +371,40 @@ import random
 
 @tool
 def go_to_url(url: str) -> bool:
-    '''Navigate to a specified URL'''
+    """Navigate to a specified URL in the mock browser.
+    
+    Args:
+        url: The URL to navigate to
+        
+    Returns:
+        bool: True if navigation was successful (always True in mock implementation)
+        
+    Side effects:
+        Prints navigation message and simulates delay
+    """
     print(f"Navigating to: {url}")
     time.sleep(0.5)  # Simulate navigation delay
     return True
 
 @tool
 def get_page_text() -> str:
-    '''Get text content of current page'''
-    mock_content = '''
-    Welcome to Example Website
-    This is a sample page with some content.
-    Here you can find information about our services.
-    Contact us for more details.
-    '''
-    print("Extracted page text")
-    return mock_content.strip()
+    """Get the text content of the current mock webpage.
+    
+    Returns:
+        str: The mock webpage content as a formatted string
+    """
+    return None
 
 @tool  
 def get_navigable_links() -> List[str]:
-    '''Get navigable links from current page'''
+    """Get all clickable links from the current mock webpage.
+    
+    Returns:
+        List[str]: A list of mock URLs that would be found on a webpage
+        
+    Side effects:
+        Prints the number of links found
+    """
     mock_links = [
         "https://example.com/about",
         "https://example.com/services", 
@@ -329,30 +415,64 @@ def get_navigable_links() -> List[str]:
 
 @tool
 def is_link_valid(url: str) -> bool:
-    '''Check if a link is valid'''
+    """Check if a URL is valid in the mock browser.
+    
+    Args:
+        url: The URL to validate
+        
+    Returns:
+        bool: True if URL is valid (not ending with "/broken"), False otherwise
+        
+    Side effects:
+        Prints validation message
+    """
     print(f"Validating link: {url}")
     return not url.endswith("/broken")
 
 @tool
 def get_form_inputs() -> List[str]:
-    '''Get form inputs from current page'''
+    """Get all input fields from the current mock webpage form.
+    
+    Returns:
+        List[str]: A list of mock form input field names
+        
+    Side effects:
+        Prints the number of inputs found
+    """
     mock_inputs = ["[email]()", "[name]()", "[message]()"]
     print(f"Found {len(mock_inputs)} form inputs")
     return mock_inputs
 
 @tool
 def fill_form(values: List[str]) -> bool:
-    '''Fill form with provided values'''
+    """Fill the mock webpage form with provided values.
+    
+    Args:
+        values: List of values to fill into form inputs
+        
+    Returns:
+        bool: True if form was filled successfully (always True in mock implementation)
+        
+    Side effects:
+        Prints number of values being filled
+    """
     print(f"Filling form with {len(values)} values")
     return True
 
 @tool
 def screenshot() -> str:
-    '''Take screenshot of current page'''
+    """Take a screenshot of the current mock webpage.
+    
+    Returns:
+        str: Path to the saved screenshot file
+        
+    Side effects:
+        Prints the path where screenshot was saved
+    """
     screenshot_path = "/tmp/screenshot.png"
     print(f"Screenshot saved to: {screenshot_path}")
     return screenshot_path
-"""
+'''
 
 def main():
     """Main execution function"""
@@ -389,41 +509,19 @@ Create a complete LangGraph workflow where each major step is handled by a speci
     print("🧠 Generating workflow code with LLM...")
     try:
         agent_code = llm_generate_code(task_prompt)
-        print("=" * 50)
-        print(agent_code)
-        print("=" * 50)
+        if agent_code is None or agent_code.strip() == "":
+            raise ValueError("LLM did not return any code")
         complete_code = f"""
+# pre-defined tools
 {mock_tools}
 
+# LLM generated graph code
 {agent_code}
-
-try:
-    print("\\n🔄 Executing generated workflow...")
-    if 'workflow' in locals() or 'app' in locals():
-        # Use the compiled workflow
-        workflow_app = locals().get('app') or locals().get('workflow')
-        if hasattr(workflow_app, 'invoke'):
-            initial_state = {{
-                "messages": [],
-                "current_url": "https://example.com",
-                "extracted_data": {{}},
-                "next_action": "start"
-            }}
-            
-            print("Initial state:", initial_state)
-            result = workflow_app.invoke(initial_state)
-            print("\\n✅ Workflow execution completed!")
-            print("Final result:", result)
-        else:
-            print("✅ Workflow structure created successfully!")
-            print("Workflow object:", type(workflow_app))
-    else:
-        print("⚠️  Workflow not found in generated code")
-except Exception as e:
-    print(f"❌ Workflow execution error: {{e}}")
-    import traceback
-    traceback.print_exc()
 """
+        print("=" * 50)
+        print(complete_code)
+        print("=" * 50)
+        exit(1)
         
         print("\n🔧 Executing generated workflow in sandbox...")
         execution_logs = run_code_raise_errors(sandbox, complete_code, verbose=True)

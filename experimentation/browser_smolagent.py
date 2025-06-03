@@ -244,6 +244,14 @@ class Browser:
             pass
 
     def human_move(element):
+        """Simulate human-like mouse movement to click an element.
+        
+        Args:
+            element: The web element to click on
+            
+        The method creates random small mouse movements before clicking
+        to appear more human-like and avoid detection as automation.
+        """
         actions = ActionChains(driver)
         x_offset = random.randint(-5,5)
         for _ in range(random.randint(2,5)):
@@ -795,6 +803,3 @@ if __name__ == "__main__":
             break
         agent_output = agent.run(instruct+search_request)
         print(agent_output)
-    
-
-    
