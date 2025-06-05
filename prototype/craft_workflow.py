@@ -33,9 +33,7 @@ agent = CodeAgent(
     max_steps=10,
 )
 instruct = "You are a SmolAgent that can perform web searches, navigate pages, and fill forms. Use the tools provided to achieve your goal."
-output = agent.run(
-    instructions=f"Your goal is {goal_prompt}.",
-    )
+output = agent.run(f"Your goal is {goal_prompt}.")
 return output
     """
     return smolagent_code, uuid_str
