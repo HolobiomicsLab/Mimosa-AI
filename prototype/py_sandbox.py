@@ -1,28 +1,32 @@
-import os
 import sys
-import signal
-import time
 import contextlib
 import traceback
 import threading
 from io import StringIO
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import logging
+import os
+import math
+import json
+import datetime
+import re
+import builtins
+import importlib
 
 
 class ExecutionTimeout(Exception):
     """Raised when code execution exceeds timeout."""
     pass
 
+
 class PySandbox:
     """
-    A sandboxed Python code interpreter with execution control and safety features.
-    Inspired by E2B but running locally with better control over the environment.
+    A sandboxed Python code interpreter with full import system support.
     """
     
     def __init__(self, 
                  timeout: int = 30, 
-                 max_output_size: int = 1024 * 1024,  # 1MB
+                 max_output_size: int = 1024 * 1024,
                  logger: Optional[logging.Logger] = None):
         self.timeout = timeout
         self.max_output_size = max_output_size
@@ -42,35 +46,30 @@ class PySandbox:
         return logger
     
     def _create_safe_globals(self) -> Dict[str, Any]:
-        """Create a controlled global environment."""
-        # Start with minimal builtins
-        safe_builtins = {
-            # Safe built-ins
-            'abs', 'all', 'any', 'bin', 'bool', 'bytearray', 'bytes',
-            'chr', 'dict', 'dir', 'divmod', 'enumerate', 'filter',
-            'float', 'format', 'frozenset', 'getattr', 'hasattr',
-            'hash', 'hex', 'id', 'int', 'isinstance', 'issubclass',
-            'iter', 'len', 'list', 'map', 'max', 'min', 'next',
-            'oct', 'ord', 'pow', 'print', 'range', 'repr', 'reversed',
-            'round', 'set', 'setattr', 'slice', 'sorted', 'str',
-            'sum', 'tuple', 'type', 'vars', 'zip',
-            # Exception types
-            'Exception', 'ValueError', 'TypeError', 'KeyError',
-            'IndexError', 'AttributeError', 'RuntimeError',
-        }
-        
-        restricted_builtins = {name: getattr(__builtins__, name) 
-                             for name in safe_builtins 
-                             if hasattr(__builtins__, name)}
-        
-        return {
-            '__builtins__': restricted_builtins,
+        """Create a controlled but complete global environment."""
+        # Start with full builtins to support proper imports
+        safe_globals = {
+            '__builtins__': builtins,
             '__name__': '__main__',
-            'math': __import__('math'),
-            'json': __import__('json'),
-            'datetime': __import__('datetime'),
-            're': __import__('re'),
+            '__doc__': None,
+            '__package__': None,
+            '__spec__': None,
+            '__annotations__': {},
+            '__loader__': None,
+            '__cached__': None,
         }
+        
+        # Add common modules directly to avoid import overhead
+        safe_globals.update({
+            'os': os,
+            'sys': sys,
+            'math': math,
+            'json': json,
+            'datetime': datetime,
+            're': re,
+        })
+        
+        return safe_globals
     
     def add_tool(self, name: str, func: callable):
         """Add a tool function to the interpreter's global scope."""
@@ -82,9 +81,17 @@ class PySandbox:
         self.global_vars[name] = module
         self.logger.info(f"Added module: {name}")
     
-    def _timeout_handler(self, signum, frame):
-        """Handle execution timeout."""
-        raise ExecutionTimeout(f"Code execution exceeded {self.timeout} seconds")
+    def preload_module(self, module_name: str, alias: str = None):
+        """Preload a module into the global namespace."""
+        try:
+            module = importlib.import_module(module_name)
+            name = alias or module_name
+            self.global_vars[name] = module
+            self.logger.info(f"Preloaded module: {module_name} as {name}")
+            return True
+        except ImportError as e:
+            self.logger.error(f"Failed to preload {module_name}: {e}")
+            return False
     
     @contextlib.contextmanager
     def _capture_output(self):
@@ -102,7 +109,7 @@ class PySandbox:
             sys.stderr = old_stderr
     
     def _run_code_with_timeout(self, code: str, globals_dict: Dict[str, Any]) -> Any:
-        """run_code code with timeout protection."""
+        """Execute code with timeout protection."""
         result = None
         exception = None
         
@@ -110,10 +117,13 @@ class PySandbox:
             nonlocal result, exception
             try:
                 try:
+                    # Try eval first for expressions
                     result = eval(code, globals_dict)
                 except SyntaxError:
+                    # Fall back to exec for statements
                     exec(code, globals_dict)
                     result = None
+                    
             except Exception as e:
                 exception = e
         
@@ -133,28 +143,21 @@ class PySandbox:
                 safety: bool = False, 
                 verbose: bool = False,
                 reset_globals: bool = False) -> Dict[str, Any]:
-        """
-        run_code Python code and return comprehensive results.
-        
-        Args:
-            code: Python code to run_code
-            safety: If True, prompt user for confirmation
-            reset_globals: If True, reset global variables before execution
-            
-        Returns:
-            Dict containing execution results, output, errors, etc.
-        """
-        if safety and input(f"run_code code?\n{code}\n(y/n): ").lower() != 'y':
+        """Execute Python code and return comprehensive results."""
+        if safety and input(f"Execute code?\n{code}\n(y/n): ").lower() != 'y':
             return {
                 'success': False,
                 'output': '',
                 'error': 'Code execution rejected by user',
                 'execution_count': self.execution_count
             }
+            
         if reset_globals:
             self.global_vars = self._create_safe_globals()
+            
         self.execution_count += 1
         code = code.strip()
+        
         if not code:
             return {
                 'success': False,
@@ -163,14 +166,18 @@ class PySandbox:
                 'execution_count': self.execution_count
             }
         
-        self.logger.info(f"Executing code (#{self.execution_count}):\n{code}")
+        if verbose:
+            self.logger.info(f"Executing code (#{self.execution_count}):\n{code}")
+        
         with self._capture_output() as (stdout_buffer, stderr_buffer):
             try:
                 result = self._run_code_with_timeout(code, self.global_vars)
                 stdout_content = stdout_buffer.getvalue()
                 stderr_content = stderr_buffer.getvalue()
+                
                 if len(stdout_content) > self.max_output_size:
                     stdout_content = stdout_content[:self.max_output_size] + "\n... (output truncated)"
+                
                 output_parts = []
                 if stdout_content:
                     output_parts.append(stdout_content)
@@ -198,8 +205,10 @@ class PySandbox:
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
                 traceback_str = traceback.format_exc()
-                print(f"Code execution failed:\n{error_msg}")
-                print(f"Full traceback:\n{traceback_str}")
+                if verbose:
+                    print(f"Code execution failed:\n{error_msg}")
+                    print(f"Full traceback:\n{traceback_str}")
+                
                 return {
                     'success': False,
                     'output': stdout_buffer.getvalue(),
@@ -212,18 +221,20 @@ class PySandbox:
         """Reset the interpreter state."""
         self.global_vars = self._create_safe_globals()
         self.execution_count = 0
+        self.logger.info("Sandbox reset")
     
     def get_variables(self) -> Dict[str, str]:
-        """Get current variables in the global scope (for debugging)."""
+        """Get current variables in the global scope."""
+        excluded = {'__builtins__', '__name__', '__doc__', '__package__', 
+                   '__spec__', '__annotations__', '__loader__', '__cached__',
+                   'os', 'sys', 'math', 'json', 'datetime', 're'}
+        
         user_vars = {k: repr(v) for k, v in self.global_vars.items() 
-                    if not k.startswith('__') and k not in ['math', 'json', 'datetime', 're']}
+                    if k not in excluded and not k.startswith('_')}
         return user_vars
     
     def install_package(self, package: str) -> Dict[str, Any]:
-        """
-        Install a package using pip (use cautiously).
-        This breaks the sandbox but might be needed for some tools.
-        """
+        """Install a package using pip."""
         try:
             import subprocess
             result = subprocess.run([sys.executable, '-m', 'pip', 'install', package], 
@@ -239,13 +250,31 @@ class PySandbox:
             return {'success': False, 'error': error_msg}
     
     def close(self):
+        """Cleanup resources."""
         pass
 
+
 if __name__ == "__main__":
-    sandbox = PySandbox(timeout=10)
+    sandbox = PySandbox(timeout=30)
+    
     test_code = """
-x = 5 + 3
-print(f"Math: {x}")
+import json
+import datetime
+print(f"Current time: {datetime.datetime.now()}")
+data = {"test": True, "timestamp": str(datetime.datetime.now())}
+print(json.dumps(data, indent=2))
 """
-    result = sandbox.run_code(test_code)
-    print("Execution result:", result)
+    
+    result = sandbox.run_code(test_code, verbose=True)
+    print("Basic test result:", result['success'])
+    
+    smolagents_test = """
+try:
+    import smolagents
+    print("smolagents imported successfully!")
+except ImportError as e:
+    print(f"smolagents not available: {e}")
+"""
+    
+    result = sandbox.run_code(smolagents_test, verbose=True)
+    print("Smolagents test result:", result['success'])

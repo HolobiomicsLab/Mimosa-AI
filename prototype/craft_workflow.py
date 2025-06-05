@@ -14,6 +14,7 @@ def craft_smolagent_node(goal_prompt: str) -> str:
     tools_code = get_tools_code()
     smolagent_code = f"""
 {tools_code}
+
 from smolagents import CodeAgent, tool
 from smolagents import (
     HfApiModel,
@@ -34,7 +35,7 @@ agent = CodeAgent(
 )
 instruct = "You are a SmolAgent that can perform web searches, navigate pages, and fill forms. Use the tools provided to achieve your goal."
 output = agent.run(f"Your goal is {goal_prompt}.")
-return output
+print(output)
     """
     return smolagent_code, uuid_str
 
@@ -154,6 +155,7 @@ initial_state: WorkflowState = {{
 }}
 
 result_state = app.invoke(initial_state)
+print(result_state)
     """
     print("\nGenerated code for the workflow:")
     print("=" * 50)
