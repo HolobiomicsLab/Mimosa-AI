@@ -1,0 +1,13 @@
+selenium>=4.27.0
+selenium_stealth>=1.0.6
+fake_useragent>=2.1.0
+requests>=2.31.0
+chromedriver-autoinstaller>=0.6.4
+undetected-chromedriver>=3.5.5
+markdownify>=1.1.0
+certifi==2025.4.26
+python_a2a
+smolagents
+langgraph>=0.4.7
+matplotlib>=3.9.0
+numpy>=2.0.0

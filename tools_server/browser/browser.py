@@ -243,7 +243,7 @@ class Browser:
         except Exception as e:
             pass
 
-    def human_move(element):
+    def human_move(self, element):
         """Simulate human-like mouse movement to click an element.
         
         Args:
@@ -252,7 +252,7 @@ class Browser:
         The method creates random small mouse movements before clicking
         to appear more human-like and avoid detection as automation.
         """
-        actions = ActionChains(driver)
+        actions = ActionChains(self.driver)
         x_offset = random.randint(-5,5)
         for _ in range(random.randint(2,5)):
             actions.move_by_offset(x_offset, random.randint(-2,2))
@@ -532,7 +532,7 @@ class Browser:
                     if not checkbox.is_selected():
                         try:
                             checkbox.click()
-                        except ElementClickInterceptedException:
+                        except Exception as e:
                             self.driver.execute_script("arguments[0].click();", checkbox)
                 except TimeoutException:
                     continue
@@ -653,153 +653,3 @@ class Browser:
         """
         script = self.load_js("inject_safety_script.js")
         self.driver.execute_script(script)
-
-if __name__ == "__main__":
-    from smolagents import CodeAgent, tool
-    from smolagents.agents import ActionStep
-    from smolagents import (
-        HfApiModel,
-        DuckDuckGoSearchTool
-    )
-    driver = create_driver(headless=False, stealth_mode=True, crx_path="../crx/nopecha.crx")
-    browser = Browser(driver, anticaptcha_manual_install=False)
-
-    @tool
-    def go_to_url(url: str) -> bool:
-        """Navigate to a specified URL.
-        Args:
-            url (str): The URL to navigate to.
-        Returns:
-            bool: True if navigation was successful, False otherwise.
-        """
-        return browser.go_to(url)
-
-    @tool
-    def get_page_text() -> str:
-        """
-        Retrieves the text content from the current web page using the browser instance.
-
-        Returns:
-            str: The text content of the current page, or "No text found on the page." if no text is available.
-        """
-        """Get the text content of the current page."""
-        return browser.get_text() or "No text found on the page."
-    
-    @tool
-    def get_navigable_links() -> List[str]:
-        """
-        Retrieves a list of navigable links from the browser.
-
-        Returns:
-            List[str]: A list of URLs or link texts that can be navigated to from the current browser context.
-        """
-        return browser.get_navigable()
-    
-    @tool
-    def is_link_valid(url: str) -> bool:
-        """
-        Check if a link is valid for navigation.
-
-        Args:
-            url (str): The URL to check.
-
-        Returns:
-            bool: True if the link is valid, False otherwise.
-        """
-        return browser.is_link_valid(url)
-    
-    @tool
-    def get_form_inputs() -> List[str]:
-        """
-        Get all input fields from the current page.
-
-        Returns:
-            List[str]: A list of input fields in the format [name](value).
-        """
-        return browser.get_form_inputs()
-    
-    @tool
-    def fill_form(values: List[str]) -> bool:
-        """
-        Fill the form with provided values.
-
-        Args:
-            values (List[str]): A list of input fields in the format [name](value).
-
-        Returns:
-            bool: True if the form was filled successfully, False otherwise.
-        """
-        return browser.fill_form(values)
-
-    @tool
-    def screenshot() -> str:
-        """
-        Take a screenshot of the current page.
-
-        Returns:
-            str: The path to the saved screenshot.
-        """
-        return browser.get_screenshot()
-
-    engine = HfApiModel(
-        model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
-        token="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",
-        max_tokens=5000,
-    )
-
-    agent = CodeAgent(
-        tools=[DuckDuckGoSearchTool(), go_to_url, get_page_text, get_navigable_links, is_link_valid, get_form_inputs, fill_form, screenshot],
-        model=engine,
-        max_steps=10,
-    )
-
-    instruct = """
-    You are a web browsing agent. Your task is to navigate to the provided URL and extract relevant information based on the search request.
-    You should use the tools provided to navigate, click on elements, and extract text from the page.
-    To navigate to the URL provided in the search request, you might use go_to_url function:
-    ```py
-    go_to_url(<url>)
-    ```<end_code>
-    To get the page text you might use get_page_text function:
-    ```py
-    get_page_text()
-    ```<end_code>
-    To get navigation links on the page you could use the get_navigable function:
-    ```py
-    get_navigable_links()
-    ```<end_code>
-
-    To check if a link is valid you could use the is_link_valid function:
-    ```py
-    is_link_valid(<url>)
-    ```<end_code>
-
-    To check for any input form on the page you might use get_form_inputs function:
-    ```py
-    inputs = get_form_inputs()
-    ```<end_code>
-    You will then see a list of input like:
-    [username_field](david@gmail.com)
-    [password_field](superpassword77)
-
-    Then you might fill the form using fill_form function:
-    ```py
-    values = ["[username_field](david@gmail.com)", "[password_field](superpassword77)"]
-    fill_form(values)
-    ```<end_code>
-
-    You can take screenshot with get_screenshot function:
-    ```py
-    get_screenshot()
-    ```<end_code>
-
-    You should use the tools in the order that makes sense for the task.
-    You could write a custom logic using different tools for navigation.
-    Question: 
-    """
-    while True:
-        search_request = input("Enter search request (or 'exit' to quit): ")
-        if search_request.lower() == 'exit':
-            break
-        agent_output = agent.run(instruct+search_request)
-        print(agent_output)
