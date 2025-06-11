@@ -659,7 +659,8 @@ if __name__ == "__main__":
     from smolagents.agents import ActionStep
     from smolagents import (
         HfApiModel,
-        DuckDuckGoSearchTool
+        DuckDuckGoSearchTool,
+        GradioUI
     )
     driver = create_driver(headless=False, stealth_mode=True, crx_path="../crx/nopecha.crx")
     browser = Browser(driver, anticaptcha_manual_install=False)
@@ -765,62 +766,10 @@ if __name__ == "__main__":
         max_steps=10,
     )
 
-    instruct = """
-    You are a web browsing agent. Your task is to navigate to the provided URL and extract relevant information based on the search request.
-    You should use the tools provided to navigate, click on elements, and extract text from the page.
-    To navigate to the URL provided in the search request, you might use go_to_url function:
-    Do not stop until you have explored many links and found the information you need.
-    ```py
-    go_to_url(<url>)
-    ```<end_code>
-
-    You can take notes using take_note function:
-    ```py
-    take_note("Your note here")
-    ```
-
-    To get the page text you might use get_page_text function:
-    ```py
-    get_page_text()
-    ```<end_code>
-
-    To get navigation links on the page you could use the get_navigable function:
-    ```py
-    get_navigable_links()
-    ```<end_code>
-
-    To check if a link is valid you could use the is_link_valid function:
-    ```py
-    is_link_valid(<url>)
-    ```<end_code>
-
-    To check for any input form on the page you might use get_form_inputs function:
-    ```py
-    inputs = get_form_inputs()
-    ```<end_code>
-    You will then see a list of input like:
-    [username_field](david@gmail.com)
-    [password_field](superpassword77)
-
-    Then you might fill the form using fill_form function:
-    ```py
-    values = ["[username_field](david@gmail.com)", "[password_field](superpassword77)"]
-    fill_form(values)
-    ```<end_code>
-
-    You can take screenshot with get_screenshot function:
-    ```py
-    get_screenshot()
-    ```<end_code>
-
-    You should use the tools in the order that makes sense for the task.
-    You could write a custom logic using different tools for navigation.
-    Your final_answer should be long and detailed, explaining the steps you took to find the information.
-    Question: 
-    """
     while True:
         search_request = input("Enter search request (or 'exit' to quit): ")
         if search_request.lower() == 'exit':
             break
-        agent_output = agent.run(instruct+search_request)
-        print(agent_output)
+        GradioUI(agent).launch()
+        #agent_output = agent.run(search_request)
+        #print(agent_output)

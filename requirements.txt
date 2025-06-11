@@ -7,7 +7,7 @@ undetected-chromedriver>=3.5.5
 markdownify>=1.1.0
 certifi==2025.4.26
 python_a2a
-smolagents
+smolagents[all]
 langgraph>=0.4.7
 matplotlib>=3.9.0
 numpy>=2.0.0

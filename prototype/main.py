@@ -14,11 +14,12 @@ from anthropic import Anthropic
 import openai
 from openai import OpenAI
 
-from craft_workflow import craft_workflow, craft_smolagent_node
-from e2b_sandbox import E2BSandbox
-from py_sandbox import PySandbox
+from craft_workflow import craft_workflow, craft_smolagent
+#from smolagents.local_python_executor import LocalPythonExecutor
+import subprocess
 
-model_choice = "openai"  # Change to "deepseek" or "anthropic" as needed
+
+model_choice = "deepseek"  # Change to "deepseek" or "anthropic" as needed
 
 deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -31,11 +32,11 @@ def deepseek_fn(history, verbose=False):
     client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=history,
             stream=False
         )
-        thought = response.choices[0].messag.econtent
+        thought = response.choices[0].message.content
         if verbose:
             print(thought)
         return thought
@@ -110,41 +111,36 @@ def main():
     """Main execution function"""
     print("🚀 Starting Meta-Agent Prototype...")
     
-    goal_prompt = "Search the web for the latest news on AI advancements and summarize the findings."
+    goal_prompt = "Goal: Search the web for the latest news on AI advancements and summarize the findings."
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
 
-    #sandbox = E2BSandbox()
-    sandbox = PySandbox()
     print("🧠 Generating workflow code with LLM...")
     try:
         # llm make langraph workflow given prompt workflow_creator.md and list of tools
-        #llm_output = llm_make_workflow(tools_prompt)
-        #workflow_llm = extract_python_code(llm_output)
-        #if workflow_llm is None or workflow_llm.strip() == "":
-        #    raise ValueError("LLM did not return any code")
+        llm_output = llm_make_workflow(goal_prompt)
+        workflow_llm = extract_python_code(llm_output)
+        print("\n💡 LLM :")
+        print(llm_output)
+        if workflow_llm is None or workflow_llm.strip() == "":
+            raise ValueError("LLM did not return any code")
         print("\n🔧 Executing generated workflow in sandbox...")
-        exec_code, uuid_str = craft_smolagent_node(
-            goal_prompt
+        exec_code, uuid_str = craft_workflow(
+            workflow_llm,
+            goal_prompt=goal_prompt
         )
-        #exec_code, uuid_str = craft_workflow(
-        #    workflow_llm,
-        #    goal_prompt=goal_prompt
-        #)
+        result = subprocess.run(["python", "-c", exec_code], capture_output=True, text=True)
         save_code_to_file(exec_code, filename=f"workflow_{uuid_str}.py")
-        execution_logs = sandbox.run_code(exec_code)
         print("\n📊 Execution Results:")
-        print(execution_logs)
+        print(result.stdout)
+        print("\n🔍 Errors (if any):")
+        print(result.stderr)
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         import traceback
         traceback.print_exc()
     finally:
         print("\n🧹 Cleaning up sandbox...")
-        try:
-            sandbox.close()
-        except:
-            pass
 
 if __name__ == "__main__":
     main()

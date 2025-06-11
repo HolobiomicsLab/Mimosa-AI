@@ -13,6 +13,7 @@ config.ini
 .screenshots/*.png
 .screenshots/*.jpg
 conversations/
+mimosa-experimental-env/
 mimosa-env/*
 .env
 */.env
