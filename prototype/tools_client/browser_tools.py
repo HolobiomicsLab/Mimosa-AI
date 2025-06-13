@@ -15,30 +15,14 @@ from smolagents import (
 
 API_BASE_URL = 'http://localhost:5000'
 
-def print_action(args: List[Any]) -> None:
-    '''
-    Print the action being performed.
-    Args:
-        name (str): The name of the action.
-        args (List[Any]): The arguments for the action.
-    '''
-    print("action:", args)
-
-def print_observation(observation: str) -> None:
-    '''
-    Print the observation made.
-    Args:
-        observation (str): The observation to print.
-    '''
-    print("observation:", observation)
-
-def print_reward(reward: float) -> None:
-    '''
-    Print the reward received.
-    Args:
-        reward (float): The reward value to print.
-    '''
-    print("reward:", reward)
+def build_formatted_output(action: str, observation: str, reward: float) -> str:
+    action_formatted = action[:256].strip().replace('\n', ' - ')
+    observation_formatted = observation[:2048].strip().replace('\n', ' - ')
+    return f"""
+action: {action_formatted}
+observation: {observation_formatted}
+reward: {reward}
+"""
 
 class SearchTool(Tool):
     name = "search_tool"
@@ -49,7 +33,6 @@ class SearchTool(Tool):
     def forward(self, query: str) -> str:
         obs = ''
         action = "search:" + query
-        print_action([action])
         try:
             search_tool = DuckDuckGoSearchTool()  # Instantiate the tool
             obs = search_tool(query)              # Call the instance
@@ -57,9 +40,7 @@ class SearchTool(Tool):
         except Exception:
             obs = "error"
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, obs, reward)
 
 class GoToUrlTool(Tool):
     name = "go_to_url_tool"
@@ -69,7 +50,6 @@ class GoToUrlTool(Tool):
 
     def forward(self, url: str) -> str:
         action = "go_to_url: " + url
-        print_action([action])
         obs = None
         try:
             route = API_BASE_URL + '/api/browser/navigate'
@@ -83,9 +63,7 @@ class GoToUrlTool(Tool):
         except Exception:
             obs = obs if obs else 'failed to navigate to ' + url
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, obs, reward)
 
 class GetPageTextTool(Tool):
     name = "get_page_text_tool"
@@ -95,7 +73,6 @@ class GetPageTextTool(Tool):
 
     def forward(self) -> str:
         action = 'get_page_text()'
-        print_action([action])
         try:
             route = API_BASE_URL + '/api/browser/content'
             response = requests.get(route)
@@ -105,9 +82,7 @@ class GetPageTextTool(Tool):
         except Exception:
             obs = 'Error getting page text'
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, obs, reward)
 
 class GetNavigableLinksTool(Tool):
     name = "get_navigable_links_tool"
@@ -117,7 +92,6 @@ class GetNavigableLinksTool(Tool):
 
     def forward(self) -> str:
         action = 'get_navigable_links()'
-        print_action([action])
         try:
             route = API_BASE_URL + '/api/browser/links'
             response = requests.get(route)
@@ -127,9 +101,7 @@ class GetNavigableLinksTool(Tool):
         except Exception:
             obs = 'Error getting navigable links'
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, obs, reward)
 
 class IsLinkValidTool(Tool):
     name = "is_link_valid_tool"
@@ -139,7 +111,6 @@ class IsLinkValidTool(Tool):
 
     def forward(self, url: str) -> str:
         action = "IsLinkValidTool: " + url
-        print_action([action])
         try:
             route = API_BASE_URL + '/api/browser/link_valid'
             response = requests.post(
@@ -152,9 +123,7 @@ class IsLinkValidTool(Tool):
         except Exception:
             obs = 'Error checking link validity'
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, str(obs), reward)
 
 class ScreenshotTool(Tool):
     name = "screenshot_tool"
@@ -164,7 +133,6 @@ class ScreenshotTool(Tool):
 
     def forward(self) -> str:
         action = 'screenshot()'
-        print_action([action])
         try:
             route = API_BASE_URL + '/api/browser/screenshot'
             response = requests.get(route)
@@ -174,31 +142,13 @@ class ScreenshotTool(Tool):
         except Exception:
             obs = 'Error taking screenshot'
             reward = 0.0
-        print_observation(obs)
-        print_reward(reward)
-        return obs
-
-class TakeNoteTool(Tool):
-    name = "take_note_tool"
-    description = "Take a notes of the current page."
-    inputs = {"note": {"type": "string", "description": "The note you want to take."}}
-    output_type = "string"
-
-    def forward(self, note: str) -> str:
-        reward = 1.0
-        action = "taking note."
-        obs = note
-        print_action([action])
-        print_observation(obs)
-        print_reward(reward)
-        return obs
+        return build_formatted_output(action, obs, reward)
 
 search_tool = SearchTool()
 go_to_url_tool = GoToUrlTool()
 get_page_text_tool = GetPageTextTool()
 get_navigable_links_tool = GetNavigableLinksTool()
 is_link_valid_tool = IsLinkValidTool()
-take_note_tool = TakeNoteTool()
 screenshot_tool = ScreenshotTool()
 
 tools = [
@@ -207,6 +157,7 @@ tools = [
     get_page_text_tool,
     get_navigable_links_tool,
     is_link_valid_tool,
-    take_note_tool,
     screenshot_tool
 ]
+
+tools_name = [tool.name for tool in tools]

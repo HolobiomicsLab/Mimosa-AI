@@ -333,7 +333,7 @@ class Browser:
                     lines.append(cleaned)
             result = "[Start of page]\n\n" + "\n\n".join(lines) + "\n\n[End of page]"
             result = re.sub(r'!\[(.*?)\]\(.*?\)', r'[IMAGE: \1]', result)
-            return result[:32768]
+            return result[:4096]
         except Exception as e:
             return None
     

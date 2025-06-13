@@ -1,4 +1,51 @@
 import uuid
+import os
+from provider import openai_fn, deepseek_fn
+
+def get_system_prompt() -> str:
+    try:
+        with open("prompts/workflow_creator.md", 'r') as f:
+            return f.read()
+    except Exception as e:
+        raise ValueError(f"get_system_prompt: Error:\n{str(e)}")
+
+def llm_make_workflow(goal_prompt: str, existing_tool_prompt: str) -> str:
+    """
+    Use LLM to generate LangGraph workflow code with SmolAgent nodes
+    """
+    system_prompt = get_system_prompt()
+    prompt = f"""
+You are an expert in generating LangGraph workflows using SmolAgent nodes.
+
+The following set of tools are availables for agents, it replaces EXISTING_TOOLS with more tailored package of tools.
+A set of tools is a LIST of tools that could be used by an agent. Be careful not to put them within a list (list within list cause error). 
+
+{existing_tool_prompt}
+
+You could however combine tool set like so:
+MY_TOOLS = COFFEE_MACHINE_TOOL + CLEANING_TOOL + DUMMY_TOOL
+
+Your task is to create a LangGraph workflow that achieves the following goal:
+
+{goal_prompt}
+    """
+    history = [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': prompt}]
+    return openai_fn(history)
+
+def extract_python_code(code: str) -> str:
+    """Extract Python code blocks from the given text."""
+    code_blocks = []
+    in_code_block = False
+    for line in code.splitlines():
+        if line.startswith("```python"):
+            in_code_block = True
+            continue
+        if line.startswith("```") and in_code_block:
+            in_code_block = False
+            continue
+        if in_code_block:
+            code_blocks.append(line)
+    return "\n".join(code_blocks)
 
 def get_codefile(path = "") -> str:
     """Create tools setup code for the sandbox"""
@@ -8,87 +55,84 @@ def get_codefile(path = "") -> str:
     except Exception as e:
         raise ValueError(f"Error reading file at {path}: {str(e)}")
 
-def craft_workflow(workflow_code: str, goal_prompt: str) -> tuple[str, str]:
-    uuid_str = str(uuid.uuid4()).replace("-", "")
-    tools_code = get_codefile("tools_client/browser_tools.py")
-    schema_code = get_codefile("./schema_factory.py")
-    smolagent_code = get_codefile("./smolagent_factory.py")
+def load_tools_client() -> str:
+    """Load the tools client code from all Python files in the tools_client directory"""
+    tools_code = ""
+    existing_tool_prompt = ""
+    tools_client_dir = "tools_client"
+    
+    if not os.path.exists(tools_client_dir):
+        return tools_code
+    
+    for filename in os.listdir(tools_client_dir):
+        if not filename.endswith('.py'):
+            continue
+        filepath = os.path.join(tools_client_dir, filename)
+        base_name = os.path.splitext(filename)[0]
+        # Add the file content
+        tools_code += get_codefile(filepath)
+        # Add a tool variable for this file
+        tool_var_name = f"{base_name.upper()}_TOOL"
+        tools_code += f"\n{tool_var_name} = tools\n"
+        existing_tool_prompt += f"{tool_var_name}\n"
+    
+    return tools_code, existing_tool_prompt
+
+def load_factory_code() -> str:
+    """Load the SmolAgent factory code"""
+    return get_codefile("./smolagent_factory.py")
+
+def save_code_to_file(code: str, filename: str = "workflow0.py") -> None:
+    folder_path = "generated/"
+    os.makedirs(folder_path, exist_ok=True)
+    file_path = os.path.join(folder_path, filename)
+    try:
+        with open(file_path, 'w') as f:
+            f.write(code)
+    except Exception as e:
+        raise ValueError(f"save_code_to_file: Error saving code to file '{file_path}': {str(e)}")
+    print(f"✅ Code saved to {file_path}")
+
+def create_workflow_code(goal_prompt, existing_tool_prompt) -> str:
+    print("🧠 Generating workflow code with LLM...")
+    llm_output = llm_make_workflow(goal_prompt, existing_tool_prompt)
+    workflow_llm = extract_python_code(llm_output)
+    save_code_to_file(workflow_llm, "workflow0.py")
+    if workflow_llm is None or workflow_llm.strip() == "":
+        raise ValueError("LLM did not return any code")
+    print("✅ LLM generated workflow code successfully.")
+    return workflow_llm
+
+def craft_workflow(goal_prompt: str) -> tuple[str, str]:
+    tools_code, existing_tool_prompt = load_tools_client()
+    factory_code = load_factory_code()
+    workflow_code = create_workflow_code(goal_prompt, existing_tool_prompt)
     complete_code = f'''
 from smolagents import CodeAgent, tool, HfApiModel
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 import json
 
-# pre-defined tools
+# load tools client code
 {tools_code}
 
-# schema for the workflow state
-{schema_code}
-
-# smolagent factory
-{smolagent_code}
+# smolagent + state schema factory
+{factory_code}
 
 # LLM generated logical multi-agent graph
 {workflow_code}
 
 initial_state: WorkflowState = {{
-    "goal": ["{{goal_prompt}}"],
+    "goal": ["{goal_prompt}"],
     "actions": [],
     "observations": [],
     "rewards": [],
+    "success": []
 }}
 
 result_state = app.invoke(initial_state)
 print(result_state)
     '''
-    print("\nGenerated code for the workflow:")
-    print("=" * 50)
-    print(complete_code)
-    print("=" * 50)
-    print()
-    return complete_code, uuid_str
-
-
-
-
-
-##########
-# Testing Functions
-##########
-
-
-
-def craft_smolagent(goal_prompt: str) -> str:
-    """Create simple SmolAgent for testing purposes"""
     uuid_str = str(uuid.uuid4()).replace("-", "")
-    tools_code = get_codefile()
-    smolagent_code = f"""
-from typing import List, Any
-import requests
-from smolagents import (
-    HfApiModel,
-    CodeAgent,
-    Tool
-)
-
-model = "Qwen/Qwen2.5-Coder-32B-Instruct"
-
-{tools_code}
-
-engine = HfApiModel(
-    model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
-    token="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",
-    max_tokens=5000,
-)
-agent = CodeAgent(
-    tools=tools, # tools list declared in browser_tools.py
-    model=engine,
-    name="agent",
-    description="A code agent to assist with the task.",
-    max_steps=3,
-)
-instructions = "Browse the web for cheap flights to Paris and summarize the findings."
-result = agent.run(instructions)
-
-    """
-    return smolagent_code, uuid_str
+    save_code_to_file(complete_code, f"workflow_{uuid_str}.py")
+    return complete_code
