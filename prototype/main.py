@@ -21,7 +21,7 @@ def executor(code: str) -> str:
 
 def main():
     """Main execution function"""
-    goal_prompt = "Draft an agent flow for making a web agent that can search the web, navigate to a URL, and extract information from it."
+    goal_prompt = "Draft an agent flow for making a web agent to search for latest football events and save in a csv file. it should not stop running unless there is no event in the last 24 hours."
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
     try:

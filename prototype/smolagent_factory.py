@@ -5,6 +5,7 @@ from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
     CodeAgent,
     HfApiModel,
+    InferenceClientModel,
     ActionStep,
     TaskStep
 )
@@ -33,10 +34,11 @@ class SmolAgentFactory:
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
-            self.engine = HfApiModel(
-                model_id=model_id,
+            self.engine = InferenceClientModel(
+                model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
+                provider="nebius",
                 token=self.token,
-                max_tokens=4096,
+                max_tokens=5000,
             )
 
             self.agent = CodeAgent(
@@ -44,6 +46,7 @@ class SmolAgentFactory:
                 model=self.engine,
                 name="agent",
                 max_steps=max_steps,
+                additional_authorized_imports=["*"]
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
@@ -80,14 +83,11 @@ class SmolAgentFactory:
         for line in lines:
             line = line.strip()
             if line.startswith('action:'):
-                action = {
-                    "tool": line[7:].strip(),
-                }
+                action = line[7:].strip()
                 actions.append(action)
             elif line.startswith('observation:'):
                 obs_str = line[12:].strip()
-                observation = {"data": obs_str}
-                observations.append(observation)
+                observations.append(obs_str)
             elif line.startswith('reward:'):
                 reward_str = line[7:].strip()
                 reward = float(reward_str)
@@ -95,7 +95,7 @@ class SmolAgentFactory:
                 success.append(reward > 0)
         return ('\n'.join(actions),
                 '\n'.join(observations),
-                sum(rewards) / len(rewards),
+                (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
                 any(success)
         )
 
@@ -119,7 +119,7 @@ class SmolAgentFactory:
         result = self.agent.run(instructions)
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = {
-            "tool": actions[-1]["tool"] if actions else "unknown"
+            "tool": actions[-1] if actions else "unknown"
             #"inputs": actions[-1]["inputs"] if actions else {},
         }
         obs: Observation = {

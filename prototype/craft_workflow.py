@@ -82,10 +82,7 @@ def load_factory_code() -> str:
     """Load the SmolAgent factory code"""
     return get_codefile("./smolagent_factory.py")
 
-def save_code_to_file(code: str, filename: str = "workflow0.py") -> None:
-    folder_path = "generated/"
-    os.makedirs(folder_path, exist_ok=True)
-    file_path = os.path.join(folder_path, filename)
+def save_code_to_file(code: str, file_path: str = "workflow0.py") -> None:
     try:
         with open(file_path, 'w') as f:
             f.write(code)
@@ -103,7 +100,17 @@ def create_workflow_code(goal_prompt, existing_tool_prompt) -> str:
     print("✅ LLM generated workflow code successfully.")
     return workflow_llm
 
+def create_folder_structure(uuid_str: str) -> None:
+    """Create the necessary folder structure for the workflow"""
+    workflow_save_path = f"workflows/{uuid_str}/"
+    os.makedirs("workflows", exist_ok=True)
+    os.makedirs(f"workflows/{uuid_str}/", exist_ok=True)
+    print(f"✅ Folder structure created: workflows/{uuid_str}/")
+    return workflow_save_path
+
 def craft_workflow(goal_prompt: str) -> tuple[str, str]:
+    uuid_str = str(uuid.uuid4()).replace("-", "")
+    path = create_folder_structure(uuid_str)
     tools_code, existing_tool_prompt = load_tools_client()
     factory_code = load_factory_code()
     workflow_code = create_workflow_code(goal_prompt, existing_tool_prompt)
@@ -132,7 +139,19 @@ initial_state: WorkflowState = {{
 
 result_state = app.invoke(initial_state)
 print(result_state)
-    '''
-    uuid_str = str(uuid.uuid4()).replace("-", "")
-    save_code_to_file(complete_code, f"workflow_{uuid_str}.py")
+
+path_json = os.path.join("{path}", "state_result.json")
+
+try:
+    with open(path_json, "w") as f:
+        json.dump(result_state, f, indent=2)
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("{path}", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow data: {{e}}")
+'''
+    code_path = os.path.join(path, f"workflow_code.py")
+    save_code_to_file(complete_code, code_path)
     return complete_code

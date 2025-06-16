@@ -25,8 +25,8 @@ class CreateCSVTool(Tool):
     description = "Create a new CSV dataset with optional columns and initial data."
     inputs = {
         "name": {"type": "string", "description": "Name for the dataset."},
-        "columns": {"type": "list", "description": "List of column names (optional)."},
-        "rows": {"type": "list", "description": "List of row data (optional)."}
+        "columns": {"type": "array", "description": "List of column names (optional).", "nullable": True},
+        "rows": {"type": "array", "description": "List of row data (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -59,7 +59,7 @@ class LoadCSVTool(Tool):
     description = "Load CSV data from a file path into a named dataset."
     inputs = {
         "file_path": {"type": "string", "description": "Path to the CSV file."},
-        "name": {"type": "string", "description": "Name for the dataset (optional, uses filename if not provided)."}
+        "name": {"type": "string", "description": "Name for the dataset (optional, uses filename if not provided).", "nullable": True}
     }
     output_type = "string"
 
@@ -116,8 +116,8 @@ class GetCSVDataTool(Tool):
     description = "Get data from a dataset with optional filtering and pagination."
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
-        "limit": {"type": "integer", "description": "Maximum number of rows to return (optional)."},
-        "columns": {"type": "list", "description": "List of column names to return (optional)."}
+        "limit": {"type": "integer", "description": "Maximum number of rows to return (optional).", "nullable": True},
+        "columns": {"type": "array", "description": "List of column names to return (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -153,7 +153,7 @@ class AddCSVRowTool(Tool):
     description = "Add a new row to a dataset."
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
-        "row": {"type": "dict", "description": "Dictionary of column:value pairs for the new row."}
+        "row": {"type": "object", "description": "Dictionary of column:value pairs for the new row."}
     }
     output_type = "string"
 
@@ -181,7 +181,7 @@ class UpdateCSVRowTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "index": {"type": "integer", "description": "Row index to update."},
-        "row": {"type": "dict", "description": "Dictionary of column:value pairs to update."}
+        "row": {"type": "object", "description": "Dictionary of column:value pairs to update."}
     }
     output_type = "string"
 
@@ -236,7 +236,7 @@ class AddCSVColumnTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "column_name": {"type": "string", "description": "Name of the new column."},
-        "default_value": {"type": "string", "description": "Default value for the new column (optional)."}
+        "default_value": {"type": "string", "description": "Default value for the new column (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -268,8 +268,8 @@ class QueryCSVTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "operation": {"type": "string", "description": "Type of operation: 'describe', 'value_counts', 'groupby', 'filter'."},
-        "column": {"type": "string", "description": "Column name for operations that require it (optional)."},
-        "conditions": {"type": "dict", "description": "Filter conditions as column:value pairs (for filter operation)."}
+        "column": {"type": "string", "description": "Column name for operations that require it (optional).", "nullable": True},
+        "conditions": {"type": "object", "description": "Filter conditions as column:value pairs (for filter operation).", "nullable": True}
     }
     output_type = "string"
 

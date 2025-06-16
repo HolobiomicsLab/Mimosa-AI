@@ -37,8 +37,8 @@ class SearchTool(Tool):
             search_tool = DuckDuckGoSearchTool()  # Instantiate the tool
             obs = search_tool(query)              # Call the instance
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = "error"
+        except Exception as e:
+            obs = "Search failed for query: " + query + " due to error: " + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -60,8 +60,8 @@ class GoToUrlTool(Tool):
             data = response.json()
             obs = f'navigated to ' + url if data.get('status') == 'success' else f'failed to navigate to ' + url
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = obs if obs else 'failed to navigate to ' + url
+        except Exception as e:
+            obs = obs if obs else 'failed to navigate to ' + url + ' due to error: ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -79,8 +79,8 @@ class GetPageTextTool(Tool):
             data = response.json()
             obs = data.get('content', 'No text found on the page.')
             reward = 1.0 if obs != 'No text found on the page.' else 0.0
-        except Exception:
-            obs = 'Error getting page text'
+        except Exception as e:
+            obs = 'Error getting page text due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -98,8 +98,8 @@ class GetNavigableLinksTool(Tool):
             data = response.json()
             obs = data.get('links', [])
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error getting navigable links'
+        except Exception as e:
+            obs = 'Error getting navigable links due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -120,8 +120,8 @@ class IsLinkValidTool(Tool):
             data = response.json()
             obs = data.get('valid', False)
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error checking link validity'
+        except Exception as e:
+            obs = 'Error checking link validity due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, str(obs), reward)
 
@@ -139,8 +139,8 @@ class ScreenshotTool(Tool):
             data = response.json()
             obs = data.get('filename', '')
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error taking screenshot'
+        except Exception as e:
+            obs = 'Error taking screenshot due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 

@@ -32,8 +32,8 @@ class CreateCSVTool(Tool):
     description = "Create a new CSV dataset with optional columns and initial data."
     inputs = {
         "name": {"type": "string", "description": "Name for the dataset."},
-        "columns": {"type": "list", "description": "List of column names (optional)."},
-        "rows": {"type": "list", "description": "List of row data (optional)."}
+        "columns": {"type": "array", "description": "List of column names (optional).", "nullable": True},
+        "rows": {"type": "array", "description": "List of row data (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -66,7 +66,7 @@ class LoadCSVTool(Tool):
     description = "Load CSV data from a file path into a named dataset."
     inputs = {
         "file_path": {"type": "string", "description": "Path to the CSV file."},
-        "name": {"type": "string", "description": "Name for the dataset (optional, uses filename if not provided)."}
+        "name": {"type": "string", "description": "Name for the dataset (optional, uses filename if not provided).", "nullable": True}
     }
     output_type = "string"
 
@@ -123,8 +123,8 @@ class GetCSVDataTool(Tool):
     description = "Get data from a dataset with optional filtering and pagination."
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
-        "limit": {"type": "integer", "description": "Maximum number of rows to return (optional)."},
-        "columns": {"type": "list", "description": "List of column names to return (optional)."}
+        "limit": {"type": "integer", "description": "Maximum number of rows to return (optional).", "nullable": True},
+        "columns": {"type": "array", "description": "List of column names to return (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -160,7 +160,7 @@ class AddCSVRowTool(Tool):
     description = "Add a new row to a dataset."
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
-        "row": {"type": "dict", "description": "Dictionary of column:value pairs for the new row."}
+        "row": {"type": "object", "description": "Dictionary of column:value pairs for the new row."}
     }
     output_type = "string"
 
@@ -188,7 +188,7 @@ class UpdateCSVRowTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "index": {"type": "integer", "description": "Row index to update."},
-        "row": {"type": "dict", "description": "Dictionary of column:value pairs to update."}
+        "row": {"type": "object", "description": "Dictionary of column:value pairs to update."}
     }
     output_type = "string"
 
@@ -243,7 +243,7 @@ class AddCSVColumnTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "column_name": {"type": "string", "description": "Name of the new column."},
-        "default_value": {"type": "string", "description": "Default value for the new column (optional)."}
+        "default_value": {"type": "string", "description": "Default value for the new column (optional).", "nullable": True}
     }
     output_type = "string"
 
@@ -275,8 +275,8 @@ class QueryCSVTool(Tool):
     inputs = {
         "name": {"type": "string", "description": "Name of the dataset."},
         "operation": {"type": "string", "description": "Type of operation: 'describe', 'value_counts', 'groupby', 'filter'."},
-        "column": {"type": "string", "description": "Column name for operations that require it (optional)."},
-        "conditions": {"type": "dict", "description": "Filter conditions as column:value pairs (for filter operation)."}
+        "column": {"type": "string", "description": "Column name for operations that require it (optional).", "nullable": True},
+        "conditions": {"type": "object", "description": "Filter conditions as column:value pairs (for filter operation).", "nullable": True}
     }
     output_type = "string"
 
@@ -452,8 +452,8 @@ class SearchTool(Tool):
             search_tool = DuckDuckGoSearchTool()  # Instantiate the tool
             obs = search_tool(query)              # Call the instance
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = "error"
+        except Exception as e:
+            obs = "Search failed for query: " + query + " due to error: " + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -475,8 +475,8 @@ class GoToUrlTool(Tool):
             data = response.json()
             obs = f'navigated to ' + url if data.get('status') == 'success' else f'failed to navigate to ' + url
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = obs if obs else 'failed to navigate to ' + url
+        except Exception as e:
+            obs = obs if obs else 'failed to navigate to ' + url + ' due to error: ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -494,8 +494,8 @@ class GetPageTextTool(Tool):
             data = response.json()
             obs = data.get('content', 'No text found on the page.')
             reward = 1.0 if obs != 'No text found on the page.' else 0.0
-        except Exception:
-            obs = 'Error getting page text'
+        except Exception as e:
+            obs = 'Error getting page text due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -513,8 +513,8 @@ class GetNavigableLinksTool(Tool):
             data = response.json()
             obs = data.get('links', [])
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error getting navigable links'
+        except Exception as e:
+            obs = 'Error getting navigable links due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -535,8 +535,8 @@ class IsLinkValidTool(Tool):
             data = response.json()
             obs = data.get('valid', False)
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error checking link validity'
+        except Exception as e:
+            obs = 'Error checking link validity due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, str(obs), reward)
 
@@ -554,8 +554,8 @@ class ScreenshotTool(Tool):
             data = response.json()
             obs = data.get('filename', '')
             reward = 1.0 if obs else 0.0
-        except Exception:
-            obs = 'Error taking screenshot'
+        except Exception as e:
+            obs = 'Error taking screenshot due to error ' + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
 
@@ -587,6 +587,7 @@ from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
     CodeAgent,
     HfApiModel,
+    InferenceClientModel,
     ActionStep,
     TaskStep
 )
@@ -615,10 +616,11 @@ class SmolAgentFactory:
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
-            self.engine = HfApiModel(
-                model_id=model_id,
+            self.engine = InferenceClientModel(
+                model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
+                provider="nebius",
                 token=self.token,
-                max_tokens=4096,
+                max_tokens=5000,
             )
 
             self.agent = CodeAgent(
@@ -626,6 +628,7 @@ class SmolAgentFactory:
                 model=self.engine,
                 name="agent",
                 max_steps=max_steps,
+                additional_authorized_imports=["*"]
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
@@ -662,14 +665,11 @@ class SmolAgentFactory:
         for line in lines:
             line = line.strip()
             if line.startswith('action:'):
-                action = {
-                    "tool": line[7:].strip(),
-                }
+                action = line[7:].strip()
                 actions.append(action)
             elif line.startswith('observation:'):
                 obs_str = line[12:].strip()
-                observation = {"data": obs_str}
-                observations.append(observation)
+                observations.append(obs_str)
             elif line.startswith('reward:'):
                 reward_str = line[7:].strip()
                 reward = float(reward_str)
@@ -677,7 +677,7 @@ class SmolAgentFactory:
                 success.append(reward > 0)
         return ('\n'.join(actions),
                 '\n'.join(observations),
-                sum(rewards) / len(rewards),
+                (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
                 any(success)
         )
 
@@ -701,7 +701,7 @@ class SmolAgentFactory:
         result = self.agent.run(instructions)
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = {
-            "tool": actions[-1]["tool"] if actions else "unknown"
+            "tool": actions[-1] if actions else "unknown"
             #"inputs": actions[-1]["inputs"] if actions else {},
         }
         obs: Observation = {
@@ -730,91 +730,74 @@ class WorkflowNodeFactory:
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
 
-# ----- TOOLSETS -----
-SEARCH_TOOLS = BROWSER_TOOLS_TOOL
-EXTRACTION_TOOLS = BROWSER_TOOLS_TOOL + CSV_TOOLS_TOOL
+# --------- Agent Instructions ---------
+instruct_web = """You are a specialized web research agent.
 
-# ----- AGENT INSTRUCTIONS -----
-instruct_search = """
-You are a dedicated Web Research Agent.
+## OBJECTIVE
+- Search the open web for football (soccer) events that occurred in the last 24 hours.
+- Gather each event’s title, date-time (with timezone), participating teams, competition name, and a reliable source URL.
+- Return the gathered events as a list of dictionaries in the ‘data’ field of your observation.
+- If NO events are found in the last 24 hours, set the success flag to TRUE; otherwise set it to FALSE.
 
-GOAL
-- Discover authoritative web sources for the given user goal.
-
-CAPABILITIES
-1. Issue search queries using search tools
-2. Collect top relevant URLs with short descriptions
-3. Validate each URL’s relevance to the goal
-4. Store findings in observations
-
-OUTPUT FORMAT
-Return a Python list of dicts, each dict containing:
-- "url": the link
-- "snippet": brief reason for relevance
-Ensure the list is neither empty nor exceeds 5 items.
+## CONSIDERATIONS
+- Use web browsing tools one page at a time to stay within context limits.
+- Focus only on events within the past 24 hours from the current time.
 """
 
-instruct_extract = """
-You are a Web Extraction Agent.
+instruct_csv = """You are a CSV-writing agent.
 
-GOAL
-- Navigate to the provided URL and extract concise, relevant information that answers the user goal.
+## OBJECTIVE
+- Read the latest observation’s ‘data’ field (a list of event dictionaries) provided by the previous agent.
+- Append those events to an existing CSV file named ‘latest_football_events.csv’; create the file with headers if it does not exist.
+- Ensure no duplicate rows are written (check URL or unique combination of date & teams).
+- After writing:
+  • If the list of events was empty, set the success flag to TRUE (workflow should end).
+  • If events were written, set the success flag to FALSE (workflow should continue).
 
-CAPABILITIES
-1. Open the URL using browser tools
-2. Read page content
-3. Extract key facts, statistics, and insights
-4. Structure extracted data into a CSV-friendly string (comma-separated values)
-
-INPUT
-The most recent observation contains a list of candidate URLs. Choose the best one (first if unsure).
-
-OUTPUT FORMAT
-Return a dict with:
-- "chosen_url": the URL visited
-- "extracted_info": CSV-compatible string summarizing key information
+## CONSIDERATIONS
+- Write CSV rows atomically to avoid data corruption.
 """
 
-# ----- WORKFLOW INITIALIZATION -----
+# --------- Agent Construction ---------
+smolagent_web  = SmolAgentFactory(instruct_web,  BROWSER_TOOLS_TOOL)
+smolagent_csv  = SmolAgentFactory(instruct_csv,  CSV_TOOLS_TOOL)
+
+# --------- Workflow Setup -------------
 workflow = StateGraph(WorkflowState)
 
-# ----- AGENT CREATION -----
-smol_search = SmolAgentFactory(instruct_search, SEARCH_TOOLS)
-smol_extract = SmolAgentFactory(instruct_extract, EXTRACTION_TOOLS)
+# Add agent nodes
+workflow.add_node("web_researcher", WorkflowNodeFactory.create_agent_node(smolagent_web))
+workflow.add_node("csv_writer",    WorkflowNodeFactory.create_agent_node(smolagent_csv))
 
-# ----- NODE ADDITIONS -----
-workflow.add_node("web_searcher", WorkflowNodeFactory.create_agent_node(smol_search))
-workflow.add_node("info_extractor", WorkflowNodeFactory.create_agent_node(smol_extract))
-
-# ----- ROUTING FUNCTION -----
-def route_after_search(state: WorkflowState) -> str:
+# --------- Routing Logic --------------
+def continue_router(state: WorkflowState) -> str:
     try:
-        # Success only if last success flag exists and True, and at least one URL returned
-        urls_found = "url" in state["observations"][-1].get("data", "")
-        if state["success"] and state["success"][-1] and urls_found:
-            return "continue"
-        else:
-            return "stop"
+        success_list = state.get("success", [])
+        if success_list and success_list[-1] is True:
+            return END
+        return "web_researcher"
     except Exception:
-        return "stop"
+        # On any unexpected error, default to continuing the loop
+        return "web_researcher"
 
-# ----- EDGES -----
-workflow.add_edge(START, "web_searcher")
+# --------- Edge Definitions -----------
+workflow.add_edge(START, "web_researcher")
+workflow.add_edge("web_researcher", "csv_writer")
+
 workflow.add_conditional_edges(
-    "web_searcher",
-    route_after_search,
+    "csv_writer",
+    continue_router,
     {
-        "continue": "info_extractor",
-        "stop": END
+        "web_researcher": "web_researcher",
+        END: END
     }
 )
-workflow.add_edge("info_extractor", END)
 
-# ----- COMPILE WORKFLOW -----
+# --------- Compile Workflow -----------
 app = workflow.compile()
 
 initial_state: WorkflowState = {
-    "goal": ["Draft an agent flow for making a web agent that can search the web, navigate to a URL, and extract information from it."],
+    "goal": ["Draft an agent flow for making a web agent to search for latest football events and save in a csv file. it should not stop running unless there is no event in the last 24 hours."],
     "actions": [],
     "observations": [],
     "rewards": [],
@@ -823,4 +806,15 @@ initial_state: WorkflowState = {
 
 result_state = app.invoke(initial_state)
 print(result_state)
-    
+
+path_json = os.path.join("workflows/27507a5452064cca9ebae6df01fa854e/", "state_result.json")
+
+try:
+    with open(path_json, "w") as f:
+        json.dump(result_state, f, indent=2)
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("workflows/27507a5452064cca9ebae6df01fa854e/", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow data: {e}")
