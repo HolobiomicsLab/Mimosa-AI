@@ -5,10 +5,15 @@ from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
     CodeAgent,
     HfApiModel,
+    MLXModel,
     InferenceClientModel,
     ActionStep,
     TaskStep
 )
+from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+BASE_PYTHON_TOOLS["open"] = open
+DANGEROUS_FUNCTIONS = {}
+DANGEROUS_MODULES = {}
 
 class Action(TypedDict):
     name: str
@@ -25,21 +30,17 @@ class WorkflowState(TypedDict):
     success: List[bool]
 
 class SmolAgentFactory:
-    def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-Coder-32B-Instruct", max_steps=3):
+    def __init__(self, instruct_prompt, tools, model_id="mlx-community/Devstral-Small-2505-4bit", max_steps=5):
         self.model_id = model_id
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
+        self.local = False
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
-            self.engine = InferenceClientModel(
-                model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
-                provider="nebius",
-                token=self.token,
-                max_tokens=5000,
-            )
+            self.engine = self.get_engine()
 
             self.agent = CodeAgent(
                 tools=self.tools,
@@ -50,6 +51,19 @@ class SmolAgentFactory:
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
+    
+    def get_engine(self):
+        if self.local:
+            return MLXModel(
+                model_id=self.model_id,
+                max_tokens=5000,
+            )
+        return HfApiModel(
+            model_id=self.model_id,
+            provider="nebius",
+            token=self.token,
+            max_tokens=5000,
+        )
         
     def build_worflow_step_prompt(self, state: WorkflowState) -> str:
         state_actions = state.get("actions", [])
@@ -62,14 +76,12 @@ class SmolAgentFactory:
             state_success
         )
         trajectories_prompt = "\n".join(
-            f"Action: {action['tool']}, Observation: {observation['data'][:256]}"
-            for action, observation, success in trajectories
+            f"\n\nStep {i}:\nAction: {action['tool']}\nObservation: {observation['data'][:256]}\nSuccess: {success}"
+            for i, (action, observation, success) in enumerate(trajectories)
         )
         return f"""
         You previously performed the following actions:
         {trajectories_prompt}
-        The end goal is to:
-        {state["goal"][-1] if len(state["goal"]) > 0 else "complete the task"}.
         Your need to follow instructions:
         {self.instruct_prompt}
         """
@@ -126,7 +138,7 @@ class SmolAgentFactory:
             "data": observations
         }
         reward = sum(rewards) if rewards else 0.0
-        success = any(success) if success else False
+        success = success[-1] if success else False
         return {
             **state,
             "goal": state["goal"],

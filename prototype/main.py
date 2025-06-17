@@ -8,7 +8,7 @@ LangGraph workflows that use SmolAgent instances as nodes.
 """
 
 import os
-from craft_workflow import craft_workflow
+from core.craft_workflow import craft_workflow
 import subprocess
 
 def executor(code: str) -> str:
@@ -21,7 +21,7 @@ def executor(code: str) -> str:
 
 def main():
     """Main execution function"""
-    goal_prompt = "Draft an agent flow for making a web agent to search for latest football events and save in a csv file. it should not stop running unless there is no event in the last 24 hours."
+    goal_prompt = "I want to do a trip to japan, can you help me with that? I want to visit Tokyo, Kyoto and Osaka. I want to know the best places to visit, the best time to go, and how to get there. I would like a strucutred result with activities, choice, hotel, and so on..."
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
     try:

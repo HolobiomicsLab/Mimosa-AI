@@ -7,7 +7,6 @@ The multi-agent workflow is a graph of agents where nodes are either functions o
 ### 1. Task Decomposition Strategy
 - Break complex tasks into specialized sub-agents with clear, single responsibilities
 - Each agent should have one well-defined purpose with minimal overlap
-- Prefer sequential over parallel execution for better error handling
 
 ### 2. State Flow Design
 - Use conditional routing with custom functions for state-dependent decisions
@@ -252,19 +251,15 @@ app = workflow.compile()
 - Code must be wrapped in ```python<code>```tags
 - Must be immediately runnable without modifications
 
-### Quality Checklist
+### Checklist
 - [ ] All nodes have clear, specific purposes
-- [ ] State transitions are logical and minimal
-- [ ] Error handling covers common failure modes  
 - [ ] Conditional routing handles different execution paths
 - [ ] Tool selection matches agent capabilities
 - [ ] Instruction templates provide sufficient context
 - [ ] Workflow has clear start and end conditions
 - [ ] Add try-catch fall mechanism, make sure dict field exist before using.
 - [ ] Add conditional retry mechanism to check the state success after an agent node.
-
-### Performance Optimization
-- Minimize redundant state updates
-- Use only one agent with multiple tools when possible.
+- [ ] You might use multiple agent with same tools but different prompt, as part of your task decomposition strategy.
+- [ ] Decompose task as much as possible, a web task could use multiple successive agent with different goal, same for any task requirement multiple steps.
 
 Generate workflow code for the task requirements to reach the goal.

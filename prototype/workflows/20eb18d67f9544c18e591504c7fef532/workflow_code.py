@@ -1,5 +1,5 @@
 
-from smolagents import CodeAgent, tool, HfApiModel, LiteLLMModel
+from smolagents import CodeAgent, tool, HfApiModel
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 import json
@@ -432,7 +432,7 @@ API_BASE_URL = 'http://localhost:5000'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:2048].strip().replace('\n', ' - ')
+    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
     return f"""
 action: {action_formatted}
 observation: {observation_formatted}
@@ -589,9 +589,12 @@ from smolagents import (
     HfApiModel,
     InferenceClientModel,
     ActionStep,
-    TaskStep,
-    LiteLLMModel
+    TaskStep
 )
+from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+BASE_PYTHON_TOOLS["open"] = open
+DANGEROUS_FUNCTIONS = {}
+DANGEROUS_MODULES = {}
 
 class Action(TypedDict):
     name: str
@@ -607,29 +610,22 @@ class WorkflowState(TypedDict):
     rewards: List[float]
     success: List[bool]
 
-from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
-BASE_PYTHON_TOOLS["open"] = open
-DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
-
-from dataclasses import dataclass
-from typing import List, Dict, Optional, Any
-import mlx_lm
-from enum import Enum
-
-from smolagents import MLXModel
 class SmolAgentFactory:
     def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-Coder-32B-Instruct", max_steps=5):
         self.model_id = model_id
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
-        self.local = False
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
-            self.engine = self.get_engine()
+            self.engine = InferenceClientModel(
+                model_id=self.model_id,
+                provider="nebius",
+                token=self.token,
+                max_tokens=5000,
+            )
 
             self.agent = CodeAgent(
                 tools=self.tools,
@@ -640,19 +636,6 @@ class SmolAgentFactory:
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-
-    def get_engine(self):
-        if self.local:
-            return MLXModel(
-                model_id=self.model_id,
-                max_tokens=5000,
-            )
-        return HfApiModel(
-            model_id=self.model_id,
-            provider="together",
-            token=self.token,
-            max_tokens=5000,
-        )
         
     def build_worflow_step_prompt(self, state: WorkflowState) -> str:
         state_actions = state.get("actions", [])
@@ -717,7 +700,6 @@ class SmolAgentFactory:
 
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_worflow_step_prompt(state)
-        print(f"Agent Instructions:\n{instructions}\n")
         result = self.agent.run(instructions)
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = {
@@ -729,9 +711,6 @@ class SmolAgentFactory:
         }
         reward = sum(rewards) if rewards else 0.0
         success = success[-1] if success else False
-        print(f"Action: {action['tool']}\nObservation: {obs['data'][:256]}...\nReward: {reward}\nSuccess: {success}")
-        print("\nFinal answer:\n", result)
-        print()
         return {
             **state,
             "goal": state["goal"],
@@ -752,99 +731,104 @@ class WorkflowNodeFactory:
 
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
-from dataclasses import dataclass, asdict
-from typing import Optional, Any
 
-# --------- Agent Instructions ---------
-instruct_web = """You are a specialized web research agent.
+# Instruction templates
+instruct_web = """You are a travel research agent.
 
-## OBJECTivE
-- Search the open web for football (soccer) events that occurred in the last 24 hours.
-- Gather each event’s title, date-time (with timezone), participating teams, competition name, and a reliable source URL.
-- Return the gathered events as a list of dictionaries in the ‘data’ field of your observation.
-- If NO events are found in the last 24 hours, set the success flag to TRUE; otherwise set it to FALSE.
+## TASK
+- Search the web for up-to-date travel information about Japan, specifically Tokyo, Kyoto, and Osaka.
+- Collect best attractions, recommended travel periods, transportation options between the cities, and hotel recommendations.
+- Provide concise notes and reliable sources for each piece of information.
 
 ## CONSIDERATIONS
-- Use web browsing tools one page at a time to stay within context limits.
-- Focus only on events within the past 24 hours from the current time.
+- Query one web page per tool call to avoid context overload.
+- Focus on high-quality official or reputable travel sites.
 """
 
-instruct_csv = """You are a CSV-writing agent.
+instruct_struct = """You are a trip-planning structuring agent.
 
-## OBJECTIVE
-- Read the latest observation’s ‘data’ field (a list of event dictionaries) provided by the previous agent.
-- Append those events to an existing CSV file named ‘latest_football_events.csv’; create the file with headers if it does not exist.
-- Act one step at a time, checking the CSV file after each action.
+## TASK
+- Using the gathered research, create a structured itinerary covering:
+  • City (Tokyo, Kyoto, Osaka)
+  • Recommended travel period
+  • Top attractions / activities
+  • Hotel options
+  • Transportation details between cities
+- Output the itinerary in a clear tabular (CSV-like) format.
+
+## CONSIDERATIONS
+- Organize data so that each row represents one city with columns for the required fields.
 """
 
-# --------- Agent Construction ---------
-smolagent_web  = SmolAgentFactory(instruct_web,  BROWSER_TOOLS_TOOL)
-smolagent_csv  = SmolAgentFactory(instruct_csv,  CSV_TOOLS_TOOL)
+# Agent creation
+smolagent_web = SmolAgentFactory(instruct_web, BROWSER_TOOLS_TOOL)
+smolagent_struct = SmolAgentFactory(instruct_struct, CSV_TOOLS_TOOL)
 
-# --------- Workflow Setup -------------
+# Router functions
+def route_after_web(state: WorkflowState) -> str:
+    try:
+        last_success = state.get("success", [])[-1]
+        return "structurer" if last_success else "web_researcher"
+    except Exception:
+        return "web_researcher"
+
+def route_after_struct(state: WorkflowState) -> str:
+    try:
+        last_success = state.get("success", [])[-1]
+        return END if last_success else "web_researcher"
+    except Exception:
+        return "web_researcher"
+
+# Workflow construction
 workflow = StateGraph(WorkflowState)
 
-# Add agent nodes
 workflow.add_node("web_researcher", WorkflowNodeFactory.create_agent_node(smolagent_web))
-workflow.add_node("csv_writer",    WorkflowNodeFactory.create_agent_node(smolagent_csv))
+workflow.add_node("structurer", WorkflowNodeFactory.create_agent_node(smolagent_struct))
 
-# --------- Routing Logic --------------
-def continue_router(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            return END
-        return "web_researcher"
-    except Exception as e:
-        print(str(e))
-        # On any unexpected error, default to continuing the loop
-        return "web_researcher"
-
-# --------- Edge Definitions -----------
 workflow.add_edge(START, "web_researcher")
-workflow.add_edge("web_researcher", "csv_writer")
 
 workflow.add_conditional_edges(
     "web_researcher",
-    continue_router,
+    route_after_web,
     {
-        "web_researcher": "web_researcher",
-        END: "csv_writer"
+        "structurer": "structurer",
+        "web_researcher": "web_researcher"
     }
 )
 
 workflow.add_conditional_edges(
-    "csv_writer",
-    continue_router,
+    "structurer",
+    route_after_struct,
     {
-        "web_researcher": "web_researcher",
-        END: END
+        END: END,
+        "web_researcher": "web_researcher"
     }
 )
 
-# --------- Compile Workflow -----------
 app = workflow.compile()
 
 initial_state: WorkflowState = {
-    "goal": ["Search the latest news event for football and save in a CSV file."],
+    "goal": ["I want to do a trip to japan, can you help me with that? I want to visit Tokyo, Kyoto and Osaka. I want to know the best places to visit, the best time to go, and how to get there. I would like a strucutred result with activities, choice, hotel, and so on..."],
     "actions": [],
     "observations": [],
     "rewards": [],
     "success": []
 }
 
-png = app.get_graph().draw_mermaid_png()
-path_graph = os.path.join("./", "workflow_graph.png")
-with open(path_graph, "wb") as f:
-    f.write(png)
+try:
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("./", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow graph.")
 
 result_state = app.invoke(initial_state)
 print(result_state)
 
-path_json = os.path.join("./", "state_result.json")
-
+path_json = os.path.join("workflows/20eb18d67f9544c18e591504c7fef532/", "state_result.json")
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)
 except Exception as e:
-    print(f"Could not save workflow data: {str(e)}")
+    print(f"Could not save workflow data: {e}")

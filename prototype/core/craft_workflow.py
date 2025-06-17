@@ -1,6 +1,6 @@
 import uuid
 import os
-from provider import openai_fn, deepseek_fn
+from core.provider import openai_fn, deepseek_fn
 
 def get_system_prompt() -> str:
     try:
@@ -59,7 +59,7 @@ def load_tools_client() -> str:
     """Load the tools client code from all Python files in the tools_client directory"""
     tools_code = ""
     existing_tool_prompt = ""
-    tools_client_dir = "tools_client"
+    tools_client_dir = "core/tools_client"
     
     if not os.path.exists(tools_client_dir):
         return tools_code
@@ -80,7 +80,7 @@ def load_tools_client() -> str:
 
 def load_factory_code() -> str:
     """Load the SmolAgent factory code"""
-    return get_codefile("./smolagent_factory.py")
+    return get_codefile("core/smolagent_factory.py")
 
 def save_code_to_file(code: str, file_path: str = "workflow0.py") -> None:
     try:
@@ -94,7 +94,6 @@ def create_workflow_code(goal_prompt, existing_tool_prompt) -> str:
     print("🧠 Generating workflow code with LLM...")
     llm_output = llm_make_workflow(goal_prompt, existing_tool_prompt)
     workflow_llm = extract_python_code(llm_output)
-    save_code_to_file(workflow_llm, "workflow0.py")
     if workflow_llm is None or workflow_llm.strip() == "":
         raise ValueError("LLM did not return any code")
     print("✅ LLM generated workflow code successfully.")
@@ -137,18 +136,21 @@ initial_state: WorkflowState = {{
     "success": []
 }}
 
+try:
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("./", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow graph.")
+
 result_state = app.invoke(initial_state)
 print(result_state)
 
 path_json = os.path.join("{path}", "state_result.json")
-
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)
-    png = app.get_graph().draw_mermaid_png()
-    path_graph = os.path.join("{path}", "workflow_graph.png")
-    with open(path_graph, "wb") as f:
-        f.write(png)
 except Exception as e:
     print(f"Could not save workflow data: {{e}}")
 '''

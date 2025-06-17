@@ -1,5 +1,5 @@
 
-from smolagents import CodeAgent, tool, HfApiModel, LiteLLMModel
+from smolagents import CodeAgent, tool, HfApiModel
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 import json
@@ -432,7 +432,7 @@ API_BASE_URL = 'http://localhost:5000'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:2048].strip().replace('\n', ' - ')
+    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
     return f"""
 action: {action_formatted}
 observation: {observation_formatted}
@@ -587,11 +587,15 @@ from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
     CodeAgent,
     HfApiModel,
+    MLXModel,
     InferenceClientModel,
     ActionStep,
-    TaskStep,
-    LiteLLMModel
+    TaskStep
 )
+from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+BASE_PYTHON_TOOLS["open"] = open
+DANGEROUS_FUNCTIONS = {}
+DANGEROUS_MODULES = {}
 
 class Action(TypedDict):
     name: str
@@ -607,17 +611,6 @@ class WorkflowState(TypedDict):
     rewards: List[float]
     success: List[bool]
 
-from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
-BASE_PYTHON_TOOLS["open"] = open
-DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
-
-from dataclasses import dataclass
-from typing import List, Dict, Optional, Any
-import mlx_lm
-from enum import Enum
-
-from smolagents import MLXModel
 class SmolAgentFactory:
     def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-Coder-32B-Instruct", max_steps=5):
         self.model_id = model_id
@@ -640,7 +633,7 @@ class SmolAgentFactory:
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-
+    
     def get_engine(self):
         if self.local:
             return MLXModel(
@@ -649,7 +642,7 @@ class SmolAgentFactory:
             )
         return HfApiModel(
             model_id=self.model_id,
-            provider="together",
+            provider="nebius",
             token=self.token,
             max_tokens=5000,
         )
@@ -665,8 +658,8 @@ class SmolAgentFactory:
             state_success
         )
         trajectories_prompt = "\n".join(
-            f"Action: {action['tool']}, Observation: {observation['data'][:256]}"
-            for action, observation, success in trajectories
+            f"\n\nStep {i}:\nAction: {action['tool']}\nObservation: {observation['data'][:256]}\nSuccess: {success}"
+            for i, (action, observation, success) in enumerate(trajectories)
         )
         return f"""
         You previously performed the following actions:
@@ -717,7 +710,6 @@ class SmolAgentFactory:
 
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_worflow_step_prompt(state)
-        print(f"Agent Instructions:\n{instructions}\n")
         result = self.agent.run(instructions)
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = {
@@ -729,9 +721,6 @@ class SmolAgentFactory:
         }
         reward = sum(rewards) if rewards else 0.0
         success = success[-1] if success else False
-        print(f"Action: {action['tool']}\nObservation: {obs['data'][:256]}...\nReward: {reward}\nSuccess: {success}")
-        print("\nFinal answer:\n", result)
-        print()
         return {
             **state,
             "goal": state["goal"],
@@ -752,99 +741,186 @@ class WorkflowNodeFactory:
 
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
-from dataclasses import dataclass, asdict
-from typing import Optional, Any
 
-# --------- Agent Instructions ---------
-instruct_web = """You are a specialized web research agent.
+# WorkflowState, Action, Observation classes, SmolAgentFactory, WorkflowNodeFactory,
+# and the tool lists CSV_TOOLS_TOOL, BROWSER_TOOLS_TOOL are assumed to be pre-defined
+# and available in the current scope as per system specification.
 
-## OBJECTivE
-- Search the open web for football (soccer) events that occurred in the last 24 hours.
-- Gather each event’s title, date-time (with timezone), participating teams, competition name, and a reliable source URL.
-- Return the gathered events as a list of dictionaries in the ‘data’ field of your observation.
-- If NO events are found in the last 24 hours, set the success flag to TRUE; otherwise set it to FALSE.
+# ----------------------------------------------------------------------
+# Agent instructions
+# ----------------------------------------------------------------------
+instruct_tokyo = """
+You are a web research agent focused exclusively on Tokyo travel planning.
 
-## CONSIDERATIONS
-- Use web browsing tools one page at a time to stay within context limits.
-- Focus only on events within the past 24 hours from the current time.
+YOUR TASK
+- Identify top attractions, cultural experiences, and food spots in Tokyo
+- Determine the best seasons/months to visit based on weather and events
+- Gather information on transportation options to reach Tokyo from abroad and move within the city
+- Provide hotel recommendations in various budgets
+- Return concise, well-sourced findings for each category
+
+CONSIDERATIONS
+- Use one web page per tool call
+- Prioritize authoritative travel sources, official tourism sites, and recent blog posts
 """
 
-instruct_csv = """You are a CSV-writing agent.
+instruct_kyoto = """
+You are a web research agent focused exclusively on Kyoto travel planning.
 
-## OBJECTIVE
-- Read the latest observation’s ‘data’ field (a list of event dictionaries) provided by the previous agent.
-- Append those events to an existing CSV file named ‘latest_football_events.csv’; create the file with headers if it does not exist.
-- Act one step at a time, checking the CSV file after each action.
+YOUR TASK
+- Identify top temples, gardens, cultural districts, and experiences in Kyoto
+- Determine the best seasons/months to visit based on weather and festivals
+- Gather information on transportation options from Tokyo to Kyoto and moving within Kyoto
+- Provide hotel or ryokan recommendations in various budgets
+- Return concise, well-sourced findings for each category
+
+CONSIDERATIONS
+- Use one web page per tool call
+- Prioritize authoritative travel sources, official tourism sites, and recent blog posts
 """
 
-# --------- Agent Construction ---------
-smolagent_web  = SmolAgentFactory(instruct_web,  BROWSER_TOOLS_TOOL)
-smolagent_csv  = SmolAgentFactory(instruct_csv,  CSV_TOOLS_TOOL)
+instruct_osaka = """
+You are a web research agent focused exclusively on Osaka travel planning.
 
-# --------- Workflow Setup -------------
+YOUR TASK
+- Identify major attractions, food districts, and nightlife spots in Osaka
+- Determine the best seasons/months to visit based on weather and local events
+- Gather information on transportation options from Kyoto to Osaka and moving within Osaka
+- Provide hotel recommendations in various budgets
+- Return concise, well-sourced findings for each category
+
+CONSIDERATIONS
+- Use one web page per tool call
+- Prioritize authoritative travel sources, official tourism sites, and recent blog posts
+"""
+
+instruct_aggregator = """
+You are a trip-planning aggregation agent.
+
+YOUR TASK
+- Combine all previous city research observations into a unified, structured itinerary
+- Produce a table (CSV format) with columns: City, Recommended Activities, Best Time to Visit, Transportation Tips, Hotel Options
+- Ensure information is clearly separated per city and easy to read
+- Summarize any overarching tips for travelling between the cities
+- Use CSV creation tools to output the structured data; include a brief narrative summary after the table
+
+CONSIDERATIONS
+- Do not perform additional web searches unless data appears missing
+- The final output must contain the CSV first, then the narrative summary
+"""
+
+# ----------------------------------------------------------------------
+# Agent creation
+# ----------------------------------------------------------------------
+tokyo_agent      = SmolAgentFactory(instruct_tokyo,  BROWSER_TOOLS_TOOL)
+kyoto_agent      = SmolAgentFactory(instruct_kyoto,  BROWSER_TOOLS_TOOL)
+osaka_agent      = SmolAgentFactory(instruct_osaka,  BROWSER_TOOLS_TOOL)
+aggregator_tools = CSV_TOOLS_TOOL + BROWSER_TOOLS_TOOL
+aggregator_agent = SmolAgentFactory(instruct_aggregator, aggregator_tools)
+
+# ----------------------------------------------------------------------
+# Routing functions with retry logic
+# ----------------------------------------------------------------------
+def route_tokyo(state):
+    try:
+        last_success = state.get("success", [])[-1]
+        return "kyoto_researcher" if last_success else "tokyo_researcher"
+    except Exception:
+        return "tokyo_researcher"
+
+def route_kyoto(state):
+    try:
+        last_success = state.get("success", [])[-1]
+        return "osaka_researcher" if last_success else "kyoto_researcher"
+    except Exception:
+        return "kyoto_researcher"
+
+def route_osaka(state):
+    try:
+        last_success = state.get("success", [])[-1]
+        return "aggregator" if last_success else "osaka_researcher"
+    except Exception:
+        return "osaka_researcher"
+
+def route_aggregator(state):
+    try:
+        last_success = state.get("success", [])[-1]
+        return END if last_success else "aggregator"
+    except Exception:
+        return "aggregator"
+
+# ----------------------------------------------------------------------
+# Workflow construction
+# ----------------------------------------------------------------------
 workflow = StateGraph(WorkflowState)
 
-# Add agent nodes
-workflow.add_node("web_researcher", WorkflowNodeFactory.create_agent_node(smolagent_web))
-workflow.add_node("csv_writer",    WorkflowNodeFactory.create_agent_node(smolagent_csv))
+workflow.add_node("tokyo_researcher",  WorkflowNodeFactory.create_agent_node(tokyo_agent))
+workflow.add_node("kyoto_researcher",  WorkflowNodeFactory.create_agent_node(kyoto_agent))
+workflow.add_node("osaka_researcher",  WorkflowNodeFactory.create_agent_node(osaka_agent))
+workflow.add_node("aggregator",        WorkflowNodeFactory.create_agent_node(aggregator_agent))
 
-# --------- Routing Logic --------------
-def continue_router(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            return END
-        return "web_researcher"
-    except Exception as e:
-        print(str(e))
-        # On any unexpected error, default to continuing the loop
-        return "web_researcher"
-
-# --------- Edge Definitions -----------
-workflow.add_edge(START, "web_researcher")
-workflow.add_edge("web_researcher", "csv_writer")
+workflow.add_edge(START, "tokyo_researcher")
 
 workflow.add_conditional_edges(
-    "web_researcher",
-    continue_router,
+    "tokyo_researcher",
+    route_tokyo,
     {
-        "web_researcher": "web_researcher",
-        END: "csv_writer"
+        "kyoto_researcher": "kyoto_researcher",
+        "tokyo_researcher": "tokyo_researcher"
     }
 )
 
 workflow.add_conditional_edges(
-    "csv_writer",
-    continue_router,
+    "kyoto_researcher",
+    route_kyoto,
     {
-        "web_researcher": "web_researcher",
-        END: END
+        "osaka_researcher": "osaka_researcher",
+        "kyoto_researcher": "kyoto_researcher"
     }
 )
 
-# --------- Compile Workflow -----------
+workflow.add_conditional_edges(
+    "osaka_researcher",
+    route_osaka,
+    {
+        "aggregator": "aggregator",
+        "osaka_researcher": "osaka_researcher"
+    }
+)
+
+workflow.add_conditional_edges(
+    "aggregator",
+    route_aggregator,
+    {
+        END: END,
+        "aggregator": "aggregator"
+    }
+)
+
 app = workflow.compile()
 
 initial_state: WorkflowState = {
-    "goal": ["Search the latest news event for football and save in a CSV file."],
+    "goal": ["I want to do a trip to japan, can you help me with that? I want to visit Tokyo, Kyoto and Osaka. I want to know the best places to visit, the best time to go, and how to get there. I would like a strucutred result with activities, choice, hotel, and so on..."],
     "actions": [],
     "observations": [],
     "rewards": [],
     "success": []
 }
 
-png = app.get_graph().draw_mermaid_png()
-path_graph = os.path.join("./", "workflow_graph.png")
-with open(path_graph, "wb") as f:
-    f.write(png)
+try:
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("./", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow graph.")
 
 result_state = app.invoke(initial_state)
 print(result_state)
 
-path_json = os.path.join("./", "state_result.json")
-
+path_json = os.path.join("workflows/e2f4d704eb55492aaf4e4e8bd4284fd5/", "state_result.json")
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)
 except Exception as e:
-    print(f"Could not save workflow data: {str(e)}")
+    print(f"Could not save workflow data: {e}")

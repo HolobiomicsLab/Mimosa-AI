@@ -17,7 +17,7 @@ API_BASE_URL = 'http://localhost:5000'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:2048].strip().replace('\n', ' - ')
+    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
     return f"""
 action: {action_formatted}
 observation: {observation_formatted}
