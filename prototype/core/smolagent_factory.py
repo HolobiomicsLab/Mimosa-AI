@@ -32,20 +32,24 @@ class WorkflowState(TypedDict):
 # good models:
 #Qwen/Qwen2.5-72B-Instruct
 #Qwen/Qwen2.5-Coder-32B-Instruct
+# deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-72B-Instruct", max_steps=5):
+    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="mlx", max_steps=5):
         self.model_id = model_id
+        self.max_tokens = 1024
+        self.provider = "novita"
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
         self.local = False
+        self.engine_name = engine_name
+        self.engine = None
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
             self.engine = self.get_engine()
-
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
@@ -57,17 +61,28 @@ class SmolAgentFactory:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
     
     def get_engine(self):
-        if self.local:
+        if self.engine_name == "mlx":
+            self.local = True
             return MLXModel(
                 model_id=self.model_id,
-                max_tokens=5000,
+                max_tokens=self.max_tokens,
             )
-        return HfApiModel(
-            model_id=self.model_id,
-            provider="nebius",
-            token=self.token,
-            max_tokens=5000,
-        )
+        elif self.engine_name == "hf_api":
+            return HfApiModel(
+                model_id=self.model_id,
+                provider=self.provider,
+                token=self.token,
+                max_tokens=self.max_tokens,
+            )
+        elif self.engine_name == "inference_client":
+            return InferenceClientModel(
+                model_id=self.model_id,
+                provider=self.provider,
+                token=self.token,
+                max_tokens=self.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
         
     def build_worflow_step_prompt(self, state: WorkflowState) -> str:
         state_steps = state.get("step_name", [])
@@ -135,7 +150,18 @@ class SmolAgentFactory:
 
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_worflow_step_prompt(state)
-        result = self.agent.run(instructions)
+        try:
+            result = self.agent.run(instructions)
+        except Exception as e:
+            print(f"Error running agent: {e}")
+            return {
+                **state,
+                "actions": state["actions"] + ["LLM request"],
+                "observations": state["observations"] + [str(e)],
+                "rewards": state["rewards"] + [0.0],
+                "success": state["success"] + [False],
+                "answers": state["answers"] + ["Error in step execution."],
+            }
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = { # Only the last action matters for the state
             "tool": actions[-1] if actions else "No action",

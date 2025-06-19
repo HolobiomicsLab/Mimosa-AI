@@ -369,6 +369,8 @@ class ListCSVDatasetsTool(Tool):
         try:
             async def _list_csv_datasets():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("list_csv_datasets", {})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -515,14 +517,13 @@ class GoToUrlTool(Tool):
         try:
             result = asyncio.run(self._async_navigate(url))
         except Exception as e:
+            print(str(e))
             obs = f'failed to navigate to {url} due to error: {str(e)}'
             return build_formatted_output(action, obs, reward)
         
         if not result or 'error' in result.get('status', {}):
             return build_formatted_output(action, obs, reward)
         
-        print(result)
-        exit()
         title = result.get('title', 'No title found')
         content = result.get('content', 'No content found')
         obs = f'''Tile: {title}
@@ -551,6 +552,7 @@ class GetNavigableLinksTool(Tool):
         try:
             result = asyncio.run(self._async_get_links())
         except Exception as e:
+            print(str(e))
             obs = 'Error getting navigable links due to error ' + str(e)
             return build_formatted_output(action, obs, reward)
         
@@ -580,6 +582,7 @@ class ScreenshotTool(Tool):
         try:
             result = asyncio.run(self._async_screenshot())
         except Exception as e:
+            print(str(e))
             obs = 'Error taking screenshot due to error ' + str(e)
             reward = 0.0
             return build_formatted_output(action, obs, reward)
@@ -651,8 +654,10 @@ class WorkflowState(TypedDict):
 #Qwen/Qwen2.5-Coder-32B-Instruct
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-72B-Instruct", max_steps=5):
+    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", max_steps=5):
         self.model_id = model_id
+        self.provider = "novita"
+        self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
@@ -677,13 +682,13 @@ class SmolAgentFactory:
         if self.local:
             return MLXModel(
                 model_id=self.model_id,
-                max_tokens=5000,
+                max_tokens=self.max_tokens,
             )
         return HfApiModel(
             model_id=self.model_id,
-            provider="nebius",
+            provider=self.provider,
             token=self.token,
-            max_tokens=5000,
+            max_tokens=self.max_tokens,
         )
         
     def build_worflow_step_prompt(self, state: WorkflowState) -> str:
@@ -708,7 +713,6 @@ class SmolAgentFactory:
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
-        Using time.sleep() is advised.
         """
     
     def parse_tool_output(self, output: str):
@@ -753,7 +757,18 @@ class SmolAgentFactory:
 
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_worflow_step_prompt(state)
-        result = self.agent.run(instructions)
+        try:
+            result = self.agent.run(instructions)
+        except Exception as e:
+            print(f"Error running agent: {e}")
+            return {
+                **state,
+                "actions": state["actions"] + ["LLM request"],
+                "observations": state["observations"] + [str(e)],
+                "rewards": state["rewards"] + [0.0],
+                "success": state["success"] + [False],
+                "answers": state["answers"] + ["Error in step execution."],
+            }
         actions, observations, rewards, success = self.parse_memory_output()
         action: Action = { # Only the last action matters for the state
             "tool": actions[-1] if actions else "No action",
@@ -783,138 +798,103 @@ class WorkflowNodeFactory:
 
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List, Callable
-# Assuming SmolAgentFactory, WorkflowNodeFactory, WorkflowState, Action, Observation are pre-defined
-# Tool sets provided
-WEB_TOOLS = BROWSER_TOOLS_TOOL
-CSV_TOOLS = CSV_TOOLS_TOOL
 
-# ----------------------- AGENT INSTRUCTIONS ----------------------- #
-instruct_webresearch = """
-You are an expert web research agent focused on discovering the latest state-of-the-art techniques in AI and ML.
+# ----------- Agent Instructions -----------
 
-YOUR TASK
-1. Search reputable sources (papers, articles, conference proceedings) for cutting-edge AI/ML techniques.
-2. For each technique, capture:
-   - Technique name
-   - Concise description
-   - Paper link (preferred: arXiv, journal, or conference site)
-   - Publication date (year-month or year).
-3. Output findings as a numbered list, one technique per line, in the following pipe-separated format:
-   Technique | Description | Paper Link | Date
+instruct_web_researcher = """
+You are an AI/ML research agent.
 
-CONSIDERATIONS
-- One browsing tool call per article/paper to avoid context overload.
-- Focus on the most recent 2-3 years.
-"""
+GOAL
+- Identify state-of-the-art AI & ML techniques (at least 8 distinct items)
+- For each technique collect:
+    • Technique name
+    • Brief description (1-2 sentences)
+    • Primary paper link (preferably arXiv or publisher)
+    • Publication date (YYYY-MM or YYYY)
 
-instruct_summarizer = """
-You are a summarization agent that converts raw research findings into structured data.
+OUTPUT FORMAT
+Return a Python list of dicts called findings, e.g.:
+findings = [
+  {"Technique": "...", "Description": "...", "Paper Link": "...", "Date": "..."},
+  ...
+]
 
-YOUR TASK
-1. Read the latest observation containing pipe-separated research findings.
-2. Transform each line into a JSON object with keys:
-   - "Technique"
-   - "Description"
-   - "Paper Link"
-   - "Date"
-3. Output a JSON array containing these objects.
-
-CONSIDERATIONS
-- Preserve important details but keep descriptions concise.
-- Do NOT perform additional web searches.
+CONSTRAINTS
+- Use one browsing call per paper (avoid huge contexts)
+- Ensure dates are captured accurately from paper metadata
 """
 
 instruct_csv_writer = """
-You are a CSV creation agent.
+You are a CSV report generator.
 
-YOUR TASK
-1. Take the JSON array from the previous observation.
-2. Generate CSV text with header:
-   Technique,Description,Paper Link,Date
-3. Ensure proper CSV escaping for commas and quotes.
-4. Return ONLY the CSV text.
+INPUT
+- Previous observation contains a Python list named findings (list[dict])
 
-CONSIDERATIONS
-- Do not add commentary.
-- Keep column order exactly as specified.
+TASK
+- Create a CSV file named 'ai_ml_state_of_art.csv' with columns:
+    Technique, Description, Paper Link, Date
+- Use CSV writing tools ONLY ONCE to write all rows
+
+SUCCESS CRITERIA
+- File is created with correct header and rows equal to len(findings)
 """
 
-# ----------------------- AGENT CREATION ----------------------- #
-smolagent_webresearch = SmolAgentFactory(instruct_webresearch, WEB_TOOLS)
-smolagent_summarizer = SmolAgentFactory(instruct_summarizer, WEB_TOOLS)  # summarizer needs no extra tools, reuse web tools
-smolagent_csv_writer = SmolAgentFactory(instruct_csv_writer, CSV_TOOLS)
+# ----------- Agents & Nodes -----------
 
-# ----------------------- ROUTING FUNCTIONS ----------------------- #
-def route_after_web(state: "WorkflowState") -> str:
+smolagent_web_researcher = SmolAgentFactory(instruct_web_researcher, BROWSER_TOOLS_TOOL)
+smolagent_csv_writer   = SmolAgentFactory(instruct_csv_writer,   CSV_TOOLS_TOOL)
+
+# Node factory wrapper (already provided by system)
+web_researcher_node = WorkflowNodeFactory.create_agent_node(smolagent_web_researcher)
+csv_writer_node     = WorkflowNodeFactory.create_agent_node(smolagent_csv_writer)
+
+# ----------- Routing Functions -----------
+
+def post_research_router(state: WorkflowState) -> str:
     try:
         success_list = state.get("success", [])
-        last_success = success_list[-1] if success_list else False
-        if last_success:
-            return "summarizer"
-        return "web_research"  # retry
-    except Exception:
-        return "web_research"
-
-def route_after_summary(state: "WorkflowState") -> str:
-    try:
-        success_list = state.get("success", [])
-        last_success = success_list[-1] if success_list else False
-        if last_success:
+        if success_list and success_list[-1]:
             return "csv_writer"
-        return "summarizer"  # retry
+        return "web_researcher"
     except Exception:
-        return "summarizer"
+        return "web_researcher"
 
-def route_after_csv(state: "WorkflowState") -> str:
+def post_csv_router(state: WorkflowState) -> str:
     try:
         success_list = state.get("success", [])
-        last_success = success_list[-1] if success_list else False
-        if last_success:
+        if success_list and success_list[-1]:
             return END
-        return "csv_writer"  # retry
+        return "csv_writer"
     except Exception:
         return "csv_writer"
 
-# ----------------------- WORKFLOW BUILD ----------------------- #
+# ----------- Workflow Definition -----------
+
 workflow = StateGraph(WorkflowState)
 
-# Add nodes
-workflow.add_node("web_research", WorkflowNodeFactory.create_agent_node(smolagent_webresearch))
-workflow.add_node("summarizer", WorkflowNodeFactory.create_agent_node(smolagent_summarizer))
-workflow.add_node("csv_writer", WorkflowNodeFactory.create_agent_node(smolagent_csv_writer))
+workflow.add_node("web_researcher", web_researcher_node)
+workflow.add_node("csv_writer",     csv_writer_node)
 
-# Edges
-workflow.add_edge(START, "web_research")
+workflow.add_edge(START, "web_researcher")
 
 workflow.add_conditional_edges(
-    "web_research",
-    route_after_web,
-    {
-        "summarizer": "summarizer",
-        "web_research": "web_research",
-    }
-)
-
-workflow.add_conditional_edges(
-    "summarizer",
-    route_after_summary,
+    "web_researcher",
+    post_research_router,
     {
         "csv_writer": "csv_writer",
-        "summarizer": "summarizer",
+        "web_researcher": "web_researcher"
     }
 )
 
 workflow.add_conditional_edges(
     "csv_writer",
-    route_after_csv,
+    post_csv_router,
     {
         END: END,
-        "csv_writer": "csv_writer",
+        "csv_writer": "csv_writer"
     }
 )
 
-# Compile
 app = workflow.compile()
 
 initial_state: WorkflowState = {
@@ -937,7 +917,7 @@ except Exception as e:
 result_state = app.invoke(initial_state)
 print(result_state)
 
-path_json = os.path.join("workflows/e19f759303774b06980404aef4700f50/", "state_result.json")
+path_json = os.path.join("workflows/b9a6baeb9cff412f92f552db2ab33f7a/", "state_result.json")
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)
