@@ -21,7 +21,15 @@ def executor(code: str) -> str:
 
 def main():
     """Main execution function"""
-    goal_prompt = "I want to do a trip to japan, can you help me with that? I want to visit Tokyo, Kyoto and Osaka. I want to know the best places to visit, the best time to go, and how to get there. I would like a strucutred result with activities, choice, hotel, and so on..."
+    goal_prompt = """I want to do analysis of the state of the art techniques in AI and ML.
+    You will need to browse the web, read papers, and summarize the findings.
+    Then you will need to create a report with the findings as CSV.
+    The report should include the following columns:
+    - Technique
+    - Description
+    - Paper Link
+    - Date
+    """
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
     try:

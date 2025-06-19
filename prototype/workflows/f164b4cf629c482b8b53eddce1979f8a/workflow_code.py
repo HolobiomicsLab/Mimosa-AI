@@ -1,3 +1,10 @@
+
+from smolagents import CodeAgent, tool, HfApiModel
+from langgraph.graph import StateGraph, START, END
+from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
+import json
+
+# load tools client code
 '''
 This module provides a set of tools for interacting with a CSV management API.
 It is loaded in a sandbox python environment as part of the crafted workflow.
@@ -437,3 +444,503 @@ tools = [
 ]
 
 tools_name = [tool.name for tool in tools]
+
+CSV_TOOLS_TOOL = tools
+'''
+This module provides a set of tools for interacting with a web browser instance.
+It is loaded in a sandbox python environment as part of the crafted workflow.
+'''
+
+from typing import List, Any
+import requests
+import asyncio
+
+from fastmcp import Client
+from smolagents import (
+    Tool
+)
+import json
+
+API_BASE_URL = 'http://localhost:5002'
+
+
+def build_formatted_output(action: str, observation: str, reward: float) -> str:
+    action_formatted = action[:256].strip().replace('\n', ' - ')
+    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
+    return f"""
+action: {action_formatted}
+observation: {observation_formatted}
+reward: {reward}
+"""
+
+class SearchTool(Tool):
+    name = "search_tool"
+    description = "Perform a search using DuckDuckGo and return the results."
+    inputs = {"query": {"type": "string", "description": "The search query."}}
+    output_type = "string"
+
+    async def _async_search(self, query: str) -> dict:
+        async with Client(f"{API_BASE_URL}/mcp") as client:
+            buffer = await client.call_tool("search", {"query": query})
+            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
+
+    def forward(self, query: str) -> str:
+        obs = ''
+        action = "search:" + query
+        try:
+            result = asyncio.run(self._async_search(query))
+            obs = result.get('result', 'No results found')
+            reward = 1.0 if obs else 0.0
+        except Exception as e:
+            print(str(e))
+            obs = "Search failed for query: " + query + " due to error: " + str(e)
+            reward = 0.0
+        return build_formatted_output(action, obs, reward)
+
+class GoToUrlTool(Tool):
+    name = "go_to_url_tool"
+    description = "Navigate to a specified URL and return the page content."
+    inputs = {"url": {"type": "string", "description": "The URL to navigate to."}}
+    output_type = "string"
+
+    async def _async_navigate(self, url: str) -> dict:
+        async with Client(f"{API_BASE_URL}/mcp") as client:
+            buffer = await client.call_tool("navigate", {"url": url})
+            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
+
+    def forward(self, url: str) -> str:
+        action = "go_to_url_tool(" + url + ")"
+        obs = ''
+        reward = 0.0
+        try:
+            result = asyncio.run(self._async_navigate(url))
+        except Exception as e:
+            print(str(e))
+            obs = f'failed to navigate to {url} due to error: {str(e)}'
+            return build_formatted_output(action, obs, reward)
+        
+        if not result or 'error' in result.get('status', {}):
+            return build_formatted_output(action, obs, reward)
+        
+        title = result.get('title', 'No title found')
+        content = result.get('content', 'No content found')
+        obs = f'''Tile: {title}
+            Start of page:
+            {content}
+            End of page.
+        '''
+        reward = 1.0
+        return build_formatted_output(action, obs, reward)
+
+class GetNavigableLinksTool(Tool):
+    name = "get_navigable_links_tool"
+    description = "Retrieves a list of navigable links from the browser."
+    inputs = {}
+    output_type = "string"
+
+    async def _async_get_links(self) -> dict:
+        async with Client(f"{API_BASE_URL}/mcp") as client:
+            buffer = await client.call_tool("get_links")
+            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
+
+    def forward(self) -> str:
+        action = 'get_navigable_links_tool()'
+        obs = ''
+        reward = 0.0
+        try:
+            result = asyncio.run(self._async_get_links())
+        except Exception as e:
+            print(str(e))
+            obs = 'Error getting navigable links due to error ' + str(e)
+            return build_formatted_output(action, obs, reward)
+        
+        if 'error' in result.get('status', {}):
+            obs = 'Error getting navigable links: ' + result['status']['error']
+            return build_formatted_output(action, obs, reward)
+        
+        obs = result.get('links', [])
+        reward = 1.0 if obs else 0.0
+        return build_formatted_output(action, obs, reward)
+
+class ScreenshotTool(Tool):
+    name = "screenshot_tool"
+    description = "Take a screenshot of the current page."
+    inputs = {}
+    output_type = "string"
+
+    async def _async_screenshot(self) -> dict:
+        async with Client(f"{API_BASE_URL}/mcp") as client:
+            buffer = await client.call_tool("screenshot")
+            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
+
+    def forward(self) -> str:
+        action = 'screenshot()'
+        obs = ''
+        reward = 0.0
+        try:
+            result = asyncio.run(self._async_screenshot())
+        except Exception as e:
+            print(str(e))
+            obs = 'Error taking screenshot due to error ' + str(e)
+            reward = 0.0
+            return build_formatted_output(action, obs, reward)
+        
+        if 'error' in result.get('status', {}):
+            return build_formatted_output(action, obs, reward)
+        
+        filename = result.get('filename', 'No screenshot available')
+        obs = f'Screenshot saved as {filename}'
+        reward = 1.0
+        return build_formatted_output(action, obs, reward)
+
+search_tool = SearchTool()
+go_to_url_tool = GoToUrlTool()
+get_navigable_links_tool = GetNavigableLinksTool()
+screenshot_tool = ScreenshotTool()
+
+tools = [
+    search_tool,
+    go_to_url_tool,
+    get_navigable_links_tool,
+    screenshot_tool
+]
+
+tools_name = [tool.name for tool in tools]
+
+if __name__ == "__main__":
+    print("Available tools:")
+    for tool in tools:
+        print(f"- {tool.name}: {tool.description}")
+    print
+BROWSER_TOOLS_TOOL = tools
+
+
+# smolagent + state schema factory
+
+import os
+from typing import Callable
+from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
+from smolagents import (
+    CodeAgent,
+    HfApiModel,
+    MLXModel,
+    InferenceClientModel,
+    ActionStep,
+    TaskStep
+)
+from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+BASE_PYTHON_TOOLS["open"] = open
+DANGEROUS_FUNCTIONS = {}
+DANGEROUS_MODULES = {}
+
+class Action(TypedDict):
+    tool: str
+
+class Observation(TypedDict):
+    data: str
+
+class WorkflowState(TypedDict):
+    step_name: List[str]
+    actions: List[Action]
+    observations: List[Observation]
+    rewards: List[float]
+    answers: List[str]
+    success: List[bool]
+
+# good models:
+#Qwen/Qwen2.5-72B-Instruct
+#Qwen/Qwen2.5-Coder-32B-Instruct
+class SmolAgentFactory:
+
+    def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-72B-Instruct", max_steps=5):
+        self.model_id = model_id
+        self.token = os.getenv("HF_TOKEN")
+        self.tools = tools or []
+        self.instruct_prompt = instruct_prompt
+        self.local = False
+
+        if not self.token:
+            raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
+        try:
+            self.engine = self.get_engine()
+
+            self.agent = CodeAgent(
+                tools=self.tools,
+                model=self.engine,
+                name="agent",
+                max_steps=max_steps,
+                additional_authorized_imports=["*"]
+        )
+        except Exception as e:
+            raise ValueError(f"Error initializing SmolAgent: {e}") from e
+    
+    def get_engine(self):
+        if self.local:
+            return MLXModel(
+                model_id=self.model_id,
+                max_tokens=5000,
+            )
+        return HfApiModel(
+            model_id=self.model_id,
+            provider="nebius",
+            token=self.token,
+            max_tokens=5000,
+        )
+        
+    def build_worflow_step_prompt(self, state: WorkflowState) -> str:
+        state_steps = state.get("step_name", [])
+        state_actions = state.get("actions", [])
+        state_observations = state.get("observations", [])
+        state_success = state.get("success", [])
+        state_rewards = state.get("rewards", [])
+        trajectories = zip(
+            state_actions, 
+            state_observations, 
+            state_success
+        )
+        state_answers = state.get("answers", [])
+        prev_infos = state_answers[-1] if state_answers else "No information yet"
+        return f"""
+        You are an AI agent designed to assist with a specific task.
+        Previous agents have provided the following information:
+        {prev_infos}
+        Your need to follow instructions:
+        {self.instruct_prompt}
+        Avoid making overly complex code for simple tasks. Be patient and thorough.
+        Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
+        If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
+        """
+    
+    def parse_tool_output(self, output: str):
+        actions = []
+        observations = []
+        rewards = []
+        success = []
+        lines = output.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith('action:'):
+                action = line[7:].strip()
+                actions.append(action)
+            elif line.startswith('observation:'):
+                obs_str = line[12:].strip()
+                observations.append(obs_str)
+            elif line.startswith('reward:'):
+                reward_str = line[7:].strip()
+                reward = float(reward_str)
+                rewards.append(reward)
+                success.append(reward > 0)
+        return ('\n'.join(actions),
+                '\n'.join(observations),
+                (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
+                any(success)
+        )
+
+    def parse_memory_output(self):
+        actions, observations, rewards, success = [], [], [], []
+        for idx, step in enumerate(self.agent.memory.steps):
+            if isinstance(step, ActionStep):
+                error, feedback = step.error, step.observations
+                step_output = error if error else feedback
+                if not isinstance(step_output, str):
+                    continue
+                action_step, obs_step, reward_step, success_step = self.parse_tool_output(step_output)
+                actions.append(action_step)
+                observations.append(obs_step)
+                rewards.append(reward_step)
+                success.append(success_step)
+        return actions, observations, rewards, success
+
+    def run(self, state: WorkflowState) -> dict:
+        instructions = self.build_worflow_step_prompt(state)
+        result = self.agent.run(instructions)
+        actions, observations, rewards, success = self.parse_memory_output()
+        action: Action = { # Only the last action matters for the state
+            "tool": actions[-1] if actions else "No action",
+        }
+        obs: Observation = { # Only the last observation matters for the state
+            "data": observations[-1] if observations else "No observation"
+        }
+        reward = sum(rewards) if rewards else 0.0
+        success_bool = success[-1] if len(success) > 0 else True # return True if final answer was called (no tool called, so array is empty).
+        return {
+            **state,
+            "actions": state["actions"] + [action],
+            "observations": state["observations"] + [obs],
+            "rewards": state["rewards"] + [reward],
+            "success": state["success"] + [success_bool],
+            "answers": state["answers"] + [result],
+        }
+
+class WorkflowNodeFactory:
+    @staticmethod
+    def create_agent_node(agent_factory: SmolAgentFactory) -> Callable[[WorkflowState], dict]:
+        def node_function(state: WorkflowState) -> dict:
+            return agent_factory.run(state)
+        return node_function
+
+
+
+# LLM generated logical multi-agent graph
+from langgraph.graph import StateGraph, START, END
+
+# ===== Instruction Templates =====
+instruct_web_research = """
+You are a web research agent specialized in discovering state-of-the-art AI/ML techniques.
+
+## YOUR TASK
+1. Search reputable sources (arXiv, Google Scholar, journals, technical blogs) for the most recent and influential AI/ML techniques.
+2. For each technique, collect:
+   - Technique name
+   - Authoritative paper link (original or highly cited)
+   - Publication date
+3. Read one page or paper per tool call to avoid context overload.
+4. Provide the gathered data as a structured list for downstream agents.
+"""
+
+instruct_paper_analysis = """
+You are a paper analysis agent.
+
+## YOUR TASK
+1. For each technique and paper link provided, read or skim the paper (one per tool call).
+2. Produce a concise 2-3 sentence description explaining:
+   - The core idea
+   - Novelty and significance
+3. Return a list of dictionaries with keys:
+   - Technique
+   - Description
+   - Paper Link
+   - Date
+"""
+
+instruct_csv_report = """
+You are a CSV report generation agent.
+
+## YOUR TASK
+1. Take the structured list of techniques, descriptions, links, and dates.
+2. Generate a CSV file (or CSV-formatted text) with exactly these columns:
+   - Technique
+   - Description
+   - Paper Link
+   - Date
+3. Use the CSV tools provided to write or output the final CSV.
+4. Ensure the CSV is clean, well-formatted, and ready for download.
+"""
+
+# ===== Agent Creation =====
+smolagent_web_research = SmolAgentFactory(instruct_web_research, BROWSER_TOOLS_TOOL)
+smolagent_paper_analysis = SmolAgentFactory(instruct_paper_analysis, BROWSER_TOOLS_TOOL)
+smolagent_csv_report = SmolAgentFactory(instruct_csv_report, CSV_TOOLS_TOOL)
+
+# ===== Workflow Graph =====
+workflow = StateGraph(WorkflowState)
+
+# ----- Nodes -----
+workflow.add_node("web_research", WorkflowNodeFactory.create_agent_node(smolagent_web_research))
+workflow.add_node("paper_analysis", WorkflowNodeFactory.create_agent_node(smolagent_paper_analysis))
+workflow.add_node("csv_reporter", WorkflowNodeFactory.create_agent_node(smolagent_csv_report))
+
+# ----- Routing Functions -----
+def router_after_web(state: WorkflowState) -> str:
+    state.setdefault("step_name", [])
+    state.setdefault("success", [])
+    last_success = state["success"][-1] if state["success"] else True
+    if last_success:
+        state["step_name"].append("paper_analysis")
+        return "paper_analysis"
+    attempts = state["step_name"].count("web_research")
+    if attempts < 2:
+        state["step_name"].append("web_research")
+        return "web_research"
+    state["step_name"].append("paper_analysis")
+    return "paper_analysis"
+
+def router_after_analysis(state: WorkflowState) -> str:
+    state.setdefault("step_name", [])
+    state.setdefault("success", [])
+    last_success = state["success"][-1] if state["success"] else True
+    if last_success:
+        state["step_name"].append("csv_reporter")
+        return "csv_reporter"
+    attempts = state["step_name"].count("paper_analysis")
+    if attempts < 2:
+        state["step_name"].append("paper_analysis")
+        return "paper_analysis"
+    state["step_name"].append("csv_reporter")
+    return "csv_reporter"
+
+def router_after_csv(state: WorkflowState) -> str:
+    state.setdefault("step_name", [])
+    state.setdefault("success", [])
+    last_success = state["success"][-1] if state["success"] else True
+    if last_success:
+        state["step_name"].append("end")
+        return END
+    attempts = state["step_name"].count("csv_reporter")
+    if attempts < 2:
+        state["step_name"].append("csv_reporter")
+        return "csv_reporter"
+    state["step_name"].append("end")
+    return END
+
+# ----- Edges -----
+workflow.add_edge(START, "web_research")
+
+workflow.add_conditional_edges(
+    "web_research",
+    router_after_web,
+    {
+        "web_research": "web_research",
+        "paper_analysis": "paper_analysis",
+        END: END,
+    },
+)
+
+workflow.add_conditional_edges(
+    "paper_analysis",
+    router_after_analysis,
+    {
+        "paper_analysis": "paper_analysis",
+        "csv_reporter": "csv_reporter",
+        END: END,
+    },
+)
+
+workflow.add_conditional_edges(
+    "csv_reporter",
+    router_after_csv,
+    {
+        "csv_reporter": "csv_reporter",
+        END: END,
+    },
+)
+
+# ----- Compile Workflow -----
+app = workflow.compile()
+
+initial_state: WorkflowState = {
+    "step_name": ["Initial Step"],
+    "actions": [],
+    "observations": [],
+    "rewards": [],
+    "answers": [],
+    "success": []
+}
+
+try:
+    png = app.get_graph().draw_mermaid_png()
+    path_graph = os.path.join("./", "workflow_graph.png")
+    with open(path_graph, "wb") as f:
+        f.write(png)
+except Exception as e:
+    print(f"Could not save workflow graph.")
+
+result_state = app.invoke(initial_state)
+print(result_state)
+
+path_json = os.path.join("workflows/f164b4cf629c482b8b53eddce1979f8a/", "state_result.json")
+try:
+    with open(path_json, "w") as f:
+        json.dump(result_state, f, indent=2)
+except Exception as e:
+    print(f"Could not save workflow data: {e}")

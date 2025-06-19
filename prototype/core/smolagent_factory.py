@@ -16,21 +16,25 @@ DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {}
 
 class Action(TypedDict):
-    name: str
-    inputs: dict
+    tool: str
 
 class Observation(TypedDict):
     data: str
 
 class WorkflowState(TypedDict):
-    goal: List[str]
+    step_name: List[str]
     actions: List[Action]
     observations: List[Observation]
     rewards: List[float]
+    answers: List[str]
     success: List[bool]
 
+# good models:
+#Qwen/Qwen2.5-72B-Instruct
+#Qwen/Qwen2.5-Coder-32B-Instruct
 class SmolAgentFactory:
-    def __init__(self, instruct_prompt, tools, model_id="mlx-community/Devstral-Small-2505-4bit", max_steps=5):
+
+    def __init__(self, instruct_prompt, tools, model_id="Qwen/Qwen2.5-72B-Instruct", max_steps=5):
         self.model_id = model_id
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
@@ -66,24 +70,27 @@ class SmolAgentFactory:
         )
         
     def build_worflow_step_prompt(self, state: WorkflowState) -> str:
+        state_steps = state.get("step_name", [])
         state_actions = state.get("actions", [])
         state_observations = state.get("observations", [])
-        state_rewards = state.get("rewards", [])
         state_success = state.get("success", [])
+        state_rewards = state.get("rewards", [])
         trajectories = zip(
             state_actions, 
             state_observations, 
             state_success
         )
-        trajectories_prompt = "\n".join(
-            f"\n\nStep {i}:\nAction: {action['tool']}\nObservation: {observation['data'][:256]}\nSuccess: {success}"
-            for i, (action, observation, success) in enumerate(trajectories)
-        )
+        state_answers = state.get("answers", [])
+        prev_infos = state_answers[-1] if state_answers else "No information yet"
         return f"""
-        You previously performed the following actions:
-        {trajectories_prompt}
+        You are an AI agent designed to assist with a specific task.
+        Previous agents have provided the following information:
+        {prev_infos}
         Your need to follow instructions:
         {self.instruct_prompt}
+        Avoid making overly complex code for simple tasks. Be patient and thorough.
+        Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
+        If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
     
     def parse_tool_output(self, output: str):
@@ -130,22 +137,21 @@ class SmolAgentFactory:
         instructions = self.build_worflow_step_prompt(state)
         result = self.agent.run(instructions)
         actions, observations, rewards, success = self.parse_memory_output()
-        action: Action = {
-            "tool": actions[-1] if actions else "unknown"
-            #"inputs": actions[-1]["inputs"] if actions else {},
+        action: Action = { # Only the last action matters for the state
+            "tool": actions[-1] if actions else "No action",
         }
-        obs: Observation = {
-            "data": observations
+        obs: Observation = { # Only the last observation matters for the state
+            "data": observations[-1] if observations else "No observation"
         }
         reward = sum(rewards) if rewards else 0.0
-        success = success[-1] if success else False
+        success_bool = success[-1] if len(success) > 0 else True # return True if final answer was called (no tool called, so array is empty).
         return {
             **state,
-            "goal": state["goal"],
             "actions": state["actions"] + [action],
             "observations": state["observations"] + [obs],
             "rewards": state["rewards"] + [reward],
-            "success": state["success"] + [success],
+            "success": state["success"] + [success_bool],
+            "answers": state["answers"] + [result],
         }
 
 class WorkflowNodeFactory:

@@ -129,10 +129,11 @@ import json
 {workflow_code}
 
 initial_state: WorkflowState = {{
-    "goal": ["{goal_prompt}"],
+    "step_name": ["Initial Step"],
     "actions": [],
     "observations": [],
     "rewards": [],
+    "answers": [],
     "success": []
 }}
 

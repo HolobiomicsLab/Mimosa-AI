@@ -33,10 +33,11 @@ class Observation(TypedDict):
 
 # WorkflowState is passed between langraph node
 class WorkflowState(TypedDict):
-    goal: List[str]
+    step_name: List[str]
     actions: List[Action]
     observations: List[Observation]
     rewards: List[float]
+    answers: List[str]
     success: List[bool]
 
 
@@ -99,23 +100,15 @@ This was just an example, you might use more complex custom routing function. Yo
 A node could be and should be in most case an agent, but it could also be a function as long as it take
 
 ```python
-    def data_transformation_node(self, state: WorkflowState) -> dict:
-        state_goal = state.get("goal", [])
-        state_actions = state.get("actions", [])
-        state_observations = state.get("observations", [])
-        state_rewards = state.get("rewards", [])
-        state_success = state.get("success", [])
-        # transform the data in observations
-        state_observations[-1] = parsing_function(state_observations)
+def data_transformation_node(self, state: WorkflowState) -> dict:
+    state_observations = state.get("observations", [])
+    # transform the data in last observation
+    state_observations[-1] = parsing_function(state_observations)
 
-        return {
-            **state,
-            "goal": state_goal,
-            "actions": state_actions,
-            "observations": state_observations,
-            "rewards": state_rewards,
-            "success": state_success,
-        }
+    return {
+        **state,
+        "observations": state_observations,
+    }
 ```
 
 A node function would be inserted in the graph just like a node agent:
@@ -157,7 +150,7 @@ Keep in mind your agents context window limitations:
 
 **What this means for workflow design**:
 - Agents cannot inspect `state["success"][-1]` or access state arrays directly
-- Agents receive only the current goal and relevant context through their instructions
+- Agents receive only their instructions and relevant context
 
 ## MAKING WORKFLOW
 
@@ -200,19 +193,34 @@ smolagent_web = SmolAgentFactory(instruct_web, EXISTING_TOOLS_WEB)
 smolagent_chart = SmolAgentFactory(instruct_chart, EXISTING_TOOLS_CHART)
 
 # Simple routing function with error handling
+```python
 def simple_router(state: WorkflowState) -> str:
+    print("======== ROUTING DECISION ========")
+    print(f"📊 Current state keys: {list(state.keys())}")
+    
     try:
         success_list = state.get("success", [])
         if not success_list:
+            print("⚠️  No success history found - routing to chart_maker")
+            # IMPORTANT add step name to state
+            state["step_name"].append("chart_maker")
+            # OPTIONAL: Pass informations from previous node
+             
             return "chart_maker"
-        
         last_success = success_list[-1]
         if last_success:
+            print("🎉 Task completed successfully - ending workflow")
             return END
         else:
+            print("❌ Previous task failed - retrying with web_surfer")
+            # IMPORTANT add step name to state
+            state["step_name"].append("web_surfer")
             return "web_surfer"
-    except (KeyError, IndexError):
-        return "chart_maker"
+    except (KeyError, IndexError) as e:
+        print(f"🚨 Error accessing state: {e}, Fallback to chart_maker...")
+    finally:
+        print("📍 ======== END ROUTING ========\n")
+```
 
 # MANDATORY: Add nodes to workflow
 workflow.add_node("web_surfer", WorkflowNodeFactory.create_agent_node(smolagent_web))
