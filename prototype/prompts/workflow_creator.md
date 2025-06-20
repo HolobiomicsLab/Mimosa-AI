@@ -4,14 +4,19 @@ The multi-agent workflow is a graph of agents where nodes are either functions o
 
 ## CORE ARCHITECTURE PRINCIPLES
 
-### 1. Task Decomposition Strategy
-- Break complex tasks into specialized sub-agents with clear, single responsibilities
-- Each agent should have one well-defined purpose with minimal overlap
+### 1. Task Decomposition Strategy (CRITICAL)
+- **Divide and Conquer**: Break complex tasks into the smallest possible specialized sub-agents
+- Each agent should handle ONE atomic operation with zero overlap
+- Create sequential chains of simple agents rather than complex multi-purpose ones
+- **Minimum 3+ agents** for any non-trivial task to ensure proper decomposition
+- Example: Instead of "web_research_agent", use: "search_agent" → "content_extraction_agent" → "data_validation_agent"
 
-### 2. State Flow Design
+### 2. State Flow Design with Robust Error Handling
 - Use conditional routing with custom functions for state-dependent decisions
-- Implement robust error recovery and retry mechanisms
-- Design for graceful degradation when agents fail
+- **MANDATORY**: Implement multiple fallback paths for every possible failure
+- Design retry mechanisms with exponential backoff where appropriate
+- Create alternative execution paths when primary agents fail
+- Ensure graceful degradation with partial results when complete failure occurs
 
 ### 3. Agent Limitations
 - Agents cannot access WorkflowState history or structure directly
@@ -39,6 +44,7 @@ class WorkflowState(TypedDict):
     rewards: List[float]
     answers: List[str]
     success: List[bool]
+```
 
 
 # SmolAgent creation
@@ -47,9 +53,11 @@ class WorkflowState(TypedDict):
 
 Agents tools are already declared as a list of tools set, you will be given these list, all you need is to choose one.
 
+# For example you might have these tools:
+```python
 EXISTING_TOOLS_WEB = [...] # A list of existing tools for web browing, accesible in program scope
-
 EXISTING_TOOLS_CHART = [...] # A list of tool for making visualization chart
+```
 
 **Example declaration of SmolAgent**:
 ```python
@@ -79,25 +87,35 @@ workflow.add_node("chart_maker", WorkflowNodeFactory.create_agent_node(smolagent
 
 Do not redefine function or class, Do not write dummy functions. Everything is ready for use.
 
-### Conditional Routing Function
+### Conditional Routing Function with Error Handling
 
-You could add conditional edges using routing function for example:
+You could add conditional edges using routing function with comprehensive error handling:
 
 Example:
 
 ```python
 def routing_function(state: WorkflowState) -> str:
-    if state["success"][-1] == True:
-        return "success"
-    else:
-        return "failure"
+    try:
+        success_list = state.get("success", [])
+        if not success_list:
+            print("⚠️ No success history - routing to fallback")
+            state["step_name"].append("fallback_agent")
+            return "fallback_agent"
+        
+        if state["success"][-1]:
+            return "next_agent"
+        else:
+            return "retry_agent"
+    except Exception as e:
+        print(f"🚨 Routing error: {e} - using emergency fallback")
+        return "emergency_fallback"
 ```
 
-This was just an example, you might use more complex custom routing function. You should however not make assumption about the content of observations, avoid using observations for conditions.
+This was just an example, you should implement robust routing with multiple fallback paths. Avoid using observations for conditions, if you really need pattern in the observations you will have to prompt agent when to the pattern in it's instruction.
 
 ### Custom Node
 
-A node could be and should be in most case an agent, but it could also be a function as long as it take
+A node could be and should be in most case an agent, but it could also be a function:
 
 ```python
 def data_transformation_node(self, state: WorkflowState) -> dict:
@@ -131,25 +149,17 @@ instruct_web = """You are a web research agent that searches and analyzes online
 - Search the web for information on given topics
 - Extract relevant data from web pages and articles
 - Provide clear, well-sourced findings
-
-# CONSIDERATION
-
-- Avoid reading multiple informations source as one, read one information at a time, avoid getting multiple pages text at once.
 """
 
 **Reminder for agents**
 
 Keep in mind your agents context window limitations:
-- Do not use information retrieval tools in loops or repetitive sequences, as this would overload the context window
+- Do not use information retrieval tools in loops or repetitive sequences, as this would overload the context window or limit to a number of characters (eg: pdf_text[:512])
 - Break large information gathering tasks into focused, sequential steps
 
 ### IMPORTANT: Agent State Access Limitations
 
 **Critical Constraint**: Agents do not have direct access to the WorkflowState object. They can only access the current values of individual state fields, not the complete state history or structure.
-
-**What this means for workflow design**:
-- Agents cannot inspect `state["success"][-1]` or access state arrays directly
-- Agents receive only their instructions and relevant context
 
 ## MAKING WORKFLOW
 
@@ -169,10 +179,6 @@ instruct_web = """You are a web research agent that searches and analyzes online
 - Search the web for information on given topics
 - Extract relevant data from web pages and articles
 - Provide clear, well-sourced findings
-
-## CONSIDERATIONS
-- Read one information source at a time to avoid context window overload
-- Focus on gathering specific, relevant information for the current goal
 """
 
 instruct_chart = """You are a data visualization agent that creates charts and graphs.
@@ -191,32 +197,45 @@ instruct_chart = """You are a data visualization agent that creates charts and g
 smolagent_web = SmolAgentFactory(instruct_web, EXISTING_TOOLS_WEB)
 smolagent_chart = SmolAgentFactory(instruct_chart, EXISTING_TOOLS_CHART)
 
-# Simple routing function with error handling
+# Advanced routing with multiple fallback paths
 ```python
-def simple_router(state: WorkflowState) -> str:
+def advanced_router(state: WorkflowState) -> str:
     print("======== ROUTING DECISION ========")
     print(f"📊 Current state keys: {list(state.keys())}")
     
     try:
         success_list = state.get("success", [])
+        step_name_list = state.get("step_name", [])
+        
         if not success_list:
             print("⚠️  No success history found - routing to chart_maker")
-            # IMPORTANT add step name to state
             state["step_name"].append("chart_maker")
-            # OPTIONAL: Pass informations from previous node
-             
             return "chart_maker"
+            
         last_success = success_list[-1]
+        current_step = step_name_list[-1] if step_name_list else "unknown"
+        
         if last_success:
-            print("🎉 Task completed successfully - ending workflow")
-            return END
+            print(f"🎉 Step '{current_step}' completed successfully")
+            return "next_step"
         else:
-            print("❌ Previous task failed - retrying with web_surfer")
-            # IMPORTANT add step name to state
-            state["step_name"].append("web_surfer")
-            return "web_surfer"
+            retry_count = step_name_list.count(current_step)
+            if retry_count < 3:
+                print(f"🔄 Retrying '{current_step}' (attempt {retry_count + 1}/3)")
+                state["step_name"].append(f"{current_step}_retry")
+                return "retry_path"
+            else:
+                print(f"❌ Max retries reached for '{current_step}' - using fallback")
+                state["step_name"].append("fallback_agent")
+                return "fallback_path"
+                
     except (KeyError, IndexError) as e:
-        print(f"🚨 Error accessing state: {e}, Fallback to chart_maker...")
+        print(f"🚨 Error accessing state: {e}")
+        state["step_name"].append("emergency_fallback")
+        return "emergency_fallback"
+    except Exception as e:
+        print(f"💥 Unexpected error: {e}")
+        return END
     finally:
         print("📍 ======== END ROUTING ========\n")
 ```
@@ -225,24 +244,28 @@ def simple_router(state: WorkflowState) -> str:
 workflow.add_node("web_surfer", WorkflowNodeFactory.create_agent_node(smolagent_web))
 workflow.add_node("chart_maker", WorkflowNodeFactory.create_agent_node(smolagent_chart))
 
-# MANDATORY: Edge definitions
+# MANDATORY: Edge definitions with fallback paths
 workflow.add_edge(START, "web_surfer")
 
 workflow.add_conditional_edges(
     "web_surfer",
-    simple_router,
+    advanced_router,
     {
         "chart_maker": "chart_maker",
-        "web_surfer": "web_surfer"
+        "retry_path": "web_surfer",
+        "fallback_path": "chart_maker",
+        "emergency_fallback": END
     }
 )
 
 workflow.add_conditional_edges(
     "chart_maker",
-    simple_router,
+    advanced_router,
     {
         END: END,
-        "web_surfer": "web_surfer"
+        "retry_path": "chart_maker",
+        "fallback_path": END,
+        "emergency_fallback": END
     }
 )
 
@@ -250,24 +273,38 @@ workflow.add_conditional_edges(
 app = workflow.compile()
 ```
 
-## OUTPUT REQUIREMENTS
+## QUALITY REQUIREMENTS & CHECKLIST
 
-### Response Format
-- Provide ONLY executable Python code
-- No explanations, comments, or markdown outside code blocks
-- Code must be wrapped in ```python<code>```tags
-- Must be immediately runnable without modifications
+### MANDATORY Task Decomposition Requirements
+- [ ] **Minimum 4+ specialized agents** for complex tasks (search → extract → validate → format)
+- [ ] Each agent has ONE atomic responsibility with zero functional overlap
+- [ ] Sequential chains of simple agents instead of complex multi-purpose ones
+- [ ] Clear data handoff between consecutive specialized agents
+- [ ] Task broken down to smallest logical units (divide and conquer principle)
 
-### Checklist
-- [ ] All nodes have clear, specific purposes
-- [ ] Conditional routing handles different execution paths
-- [ ] Tool selection matches agent capabilities
-- [ ] Instruction templates provide sufficient context
-- [ ] Workflow has clear start and end conditions
-- [ ] Add try-catch fall mechanism, make sure dict field exist before using.
-- [ ] Add conditional retry mechanism to check the state success after an agent node.
-- [ ] You might use multiple agent with same tools but different prompt, as part of your task decomposition strategy.
-- [ ] Add extensive print in routing function. For example: print("No success history found - routing to chart_maker")
-- [ ] Decompose task as much as possible, a web task could use multiple successive agent with different goal, same for any task requirement multiple steps.
+### MANDATORY Error Handling & Fallback Requirements
+- [ ] **Every agent has 2+ fallback paths** (retry, alternative agent, graceful degradation)
+- [ ] Retry mechanisms with attempt counters (max 3 retries per agent)
+- [ ] Alternative execution paths when primary agents fail
+- [ ] Emergency fallback routes that always lead to END or safe completion
+- [ ] Comprehensive try-catch blocks in ALL routing functions
+- [ ] State validation before every routing decision
 
-Generate workflow code for the task requirements to reach the goal.
+### MANDATORY Technical Requirements
+- [ ] All nodes have clear, specific purposes with atomic operations
+- [ ] Conditional routing handles ALL possible execution paths
+- [ ] Tool selection perfectly matches individual agent capabilities  
+- [ ] Instruction templates provide sufficient context for single-purpose tasks
+- [ ] Workflow has clear start and guaranteed end conditions
+- [ ] Extensive logging in routing functions for debugging
+- [ ] Dict field existence validation before access
+- [ ] Multiple agents can share tools but have different specialized prompts
+
+### MANDATORY Output Requirements
+- [ ] **Minimum 4+ agents** demonstrating proper task decomposition
+- [ ] **At least 3 fallback mechanisms** implemented across the workflow
+- [ ] Executable Python code with zero explanations outside code blocks
+- [ ] Code wrapped in ```python``` tags and immediately runnable
+- [ ] Comprehensive error handling with graceful degradation paths
+
+Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
