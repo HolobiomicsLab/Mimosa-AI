@@ -436,7 +436,8 @@ import asyncio
 
 from fastmcp import Client
 from smolagents import (
-    Tool
+    Tool,
+    DuckDuckGoSearchTool
 )
 import json
 
@@ -444,13 +445,12 @@ API_BASE_URL = 'http://localhost:5002'
 
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
-    action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
-    return f"""
-action: {action_formatted}
-observation: {observation_formatted}
-reward: {reward}
-"""
+    output = {
+        "action": action[:256].strip().replace('\n', ' - '),
+        "observation": observation[:4096],
+        "reward": reward
+    }
+    return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
 class SearchTool(Tool):
     name = "search_tool"
@@ -465,8 +465,9 @@ class SearchTool(Tool):
 
     def forward(self, query: str) -> str:
         obs = ''
-        action = "search:" + query
+        action = f"search_tool(query='{query}')"
         try:
+            result = DuckDuckGoSearchTool
             result = asyncio.run(self._async_search(query))
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
@@ -478,7 +479,7 @@ class SearchTool(Tool):
 
 class GoToUrlTool(Tool):
     name = "go_to_url_tool"
-    description = "Navigate to a specified URL and return the page content."
+    description = "Navigate to a specified URL and return the page content as Markdown."
     inputs = {"url": {"type": "string", "description": "The URL to navigate to."}}
     output_type = "string"
 
@@ -488,7 +489,7 @@ class GoToUrlTool(Tool):
             return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
     def forward(self, url: str) -> str:
-        action = "go_to_url_tool(" + url + ")"
+        action = f"go_to_url_tool(url='{url}')"
         obs = ''
         reward = 0.0
         try:
@@ -498,22 +499,21 @@ class GoToUrlTool(Tool):
             obs = f'failed to navigate to {url} due to error: {str(e)}'
             return build_formatted_output(action, obs, reward)
         
-        if not result or 'error' in result.get('status', {}):
+        if not result or not 'success' in result.get('status', {}):
+            obs = f'Error navigating to {url}: ' + result.get('message', 'Unknown error')
             return build_formatted_output(action, obs, reward)
         
         title = result.get('title', 'No title found')
         content = result.get('content', 'No content found')
         obs = f'''Tile: {title}
-            Start of page:
             {content}
-            End of page.
         '''
         reward = 1.0
         return build_formatted_output(action, obs, reward)
 
 class GetNavigableLinksTool(Tool):
     name = "get_navigable_links_tool"
-    description = "Retrieves a list of navigable links from the browser."
+    description = "Retrieves a list of navigable links on the current page."
     inputs = {}
     output_type = "string"
 
@@ -608,6 +608,8 @@ from smolagents import (
     TaskStep
 )
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+import json
+import re
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {}
@@ -659,12 +661,14 @@ class SmolAgentFactory:
     
     def get_engine(self):
         if self.engine_name == "mlx":
+            print("Using MLXModel for local execution.")
             self.local = True
             return MLXModel(
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "hf_api":
+            print("Using HfApiModel for Hugging Face API execution.")
             return HfApiModel(
                 model_id=self.model_id,
                 provider=self.provider,
@@ -672,6 +676,7 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "inference_client":
+            print("Using InferenceClientModel for inference client execution.")
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
@@ -680,8 +685,8 @@ class SmolAgentFactory:
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
-        
-    def build_worflow_step_prompt(self, state: WorkflowState) -> str:
+
+    def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_steps = state.get("step_name", [])
         state_actions = state.get("actions", [])
         state_observations = state.get("observations", [])
@@ -692,6 +697,15 @@ class SmolAgentFactory:
             state_observations, 
             state_success
         )
+        trajectory_str = ""
+        for idx, (action, observation, success) in enumerate(trajectories):
+            trajectory_str += f"""
+        ### Step {idx + 1}:
+        Action: {action['tool']}
+        Observation: {observation['data'][:128]}... (truncated for brevity)
+        Success: {success}
+        ---
+            """
         state_answers = state.get("answers", [])
         prev_infos = state_answers[-1] if state_answers else "No information yet"
         return f"""
@@ -700,42 +714,51 @@ class SmolAgentFactory:
         {prev_infos}
         Your need to follow instructions:
         {self.instruct_prompt}
+        You conducted the previous actions and observations:
+        {trajectory_str}
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
-    
     def parse_tool_output(self, output: str):
+        
         actions = []
         observations = []
         rewards = []
         success = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            line = line.strip()
-            if line.startswith('action:'):
-                action = line[7:].strip()
-                actions.append(action)
-            elif line.startswith('observation:'):
-                obs_str = line[12:].strip()
-                observations.append(obs_str)
-            elif line.startswith('reward:'):
-                reward_str = line[7:].strip()
-                reward = float(reward_str)
-                rewards.append(reward)
-                success.append(reward > 0)
-        return ('\n'.join(actions),
-                '\n'.join(observations),
-                (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
-                any(success)
+        
+        # Look for ```json blocks in the output
+        json_blocks = re.findall(r"```json\n(.*?)\n```", output, re.DOTALL)
+        
+        for block in json_blocks:
+            try:
+                data = json.loads(block)
+                if "action" in data:
+                    actions.append(data["action"])
+                if "observation" in data:
+                    observations.append(data["observation"])
+                if "reward" in data:
+                    reward = float(data["reward"])
+                    rewards.append(reward)
+                    success.append(reward > 0)
+            except json.JSONDecodeError:
+                continue
+        
+        return (
+            "\n".join(actions),
+            "\n".join(observations),
+            (sum(rewards) / len(rewards)) if len(rewards) > 0 else 0,
+            any(success) or len(success) == 0
         )
 
     def parse_memory_output(self):
+        text_memory_length = 0 
         actions, observations, rewards, success = [], [], [], []
         for idx, step in enumerate(self.agent.memory.steps):
             if isinstance(step, ActionStep):
                 error, feedback = step.error, step.observations
                 step_output = error if error else feedback
+                text_memory_length += len(step_output)
                 if not isinstance(step_output, str):
                     continue
                 action_step, obs_step, reward_step, success_step = self.parse_tool_output(step_output)
@@ -743,10 +766,12 @@ class SmolAgentFactory:
                 observations.append(obs_step)
                 rewards.append(reward_step)
                 success.append(success_step)
+        print(f"Parsed {len(actions)} actions, {len(observations)} observations, {len(rewards)} rewards, and {len(success)} success flags from memory.")
+        print(f"Total text memory length: {text_memory_length} characters.")
         return actions, observations, rewards, success
 
     def run(self, state: WorkflowState) -> dict:
-        instructions = self.build_worflow_step_prompt(state)
+        instructions = self.build_workflow_step_prompt(state)
         try:
             result = self.agent.run(instructions)
         except Exception as e:
@@ -766,7 +791,7 @@ class SmolAgentFactory:
         obs: Observation = { # Only the last observation matters for the state
             "data": observations[-1] if observations else "No observation"
         }
-        reward = sum(rewards) if rewards else 0.0
+        reward = sum(rewards) / len(rewards) if rewards else 0.0
         success_bool = success[-1] if len(success) > 0 else True # return True if final answer was called (no tool called, so array is empty).
         return {
             **state,
@@ -789,112 +814,293 @@ class WorkflowNodeFactory:
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
 
-# ---------- Agent Instructions ----------
+# --------------------------------------------------------------------
+# Tool sets (already available in global scope)
+WEB_TOOLS = BROWSER_TOOLS_TOOL       # tools for web browsing & scraping
+CSV_TOOLS = CSV_TOOLS_TOOL           # tools for csv creation / editing
+WEB_AND_CSV_TOOLS = WEB_TOOLS + CSV_TOOLS
+# --------------------------------------------------------------------
 
-instruct_event_finder = """
-You are an Event Research Agent focused on identifying high-value opportunities for a food-truck vendor.
-
-YOUR TASK
-1. Search the web for upcoming community events in Austin, TX happening in July and August 2025.
-2. Collect AT LEAST 15 events.  Each event must include:
-   • Event Name  
-   • Date (include full date span if multi-day)  
-   • Location (venue + city)  
-   • Estimated Attendance  
-   • Vendor Application Deadline  
-   • Vendor Application Fee (use “Free” or “Unknown” if not stated)  
-   • Direct Link to the vendor application or information page  
-3. Deliver a JSON list where every element is a dict with the exact keys:
-   ["event_name","date","location","estimated_attendance",
-    "vendor_deadline","application_fee","application_link"]
-
-CONSIDERATIONS
-- Use one browsing tool call per information source; avoid overloading context.
-- Prefer official event or city pages for accurate data.
-- If estimated attendance is not listed, search news articles or prior-year stats.
-- Stop once you have ≥15 fully-detailed events.
-- Append `{"success": true}` as final observation line if the task is completed.
-"""
-
-instruct_csv_maker = """
-You are a CSV Creation Agent.
+# --------------------------------------------------------------------
+# Agent PROMPT DEFINITIONS
+# --------------------------------------------------------------------
+instruct_planner = """
+You are an event-planning strategy agent.
 
 YOUR TASK
-1. Read the most recent observation (JSON list of event dictionaries).
-2. Add a new field “high_potential” for each event:
-   • Set to “Yes” if estimated_attendance ≥ 10000 or description suggests large crowds.
-   • Otherwise set to “No”.
-3. Produce a CSV file named “austin_community_events_2025.csv” with columns:
-   Event Name, Date, Location, Estimated Attendance,
-   Vendor Application Deadline, Application Fee,
-   Application Link, High Potential
-4. Save the CSV and return its path in your answer.
-5. Append `{"success": true}` as final observation line if the CSV was created successfully.
+1. Devise a comprehensive research plan to locate AT LEAST 15 community events taking place in Austin, TX during July & August 2025 where a food-truck vendor can participate.
+2. Output a numbered checklist of specific web search queries and websites to visit (e.g. “Austin city calendar July 2025 vendor events”, “Pecan Street Festival vendor application 2025”).
+3. Do NOT execute the searches yourself; only produce the search plan so that the next agent can follow it.
+
+FORMAT
+Return your plan as bullet points.
 """
 
-# ---------- Agents ----------
+instruct_web_search = """
+You are a focused web research agent.
 
-smolagent_event_finder = SmolAgentFactory(instruct_event_finder, BROWSER_TOOLS_TOOL)
-smolagent_csv_maker   = SmolAgentFactory(instruct_csv_maker,   CSV_TOOLS_TOOL)
+CONTEXT
+You will receive a list of search queries and target websites from the previous planner step.
 
-# ---------- Workflow Graph ----------
+YOUR TASK
+1. Execute ONE search query or visit ONE suggested website at a time.
+2. Extract event names and URLs for events in Austin, TX that occur in July or August 2025.
+3. For each event found, return a JSON array with objects: {event_name, event_page_url}.
+4. Avoid gathering more than 10 events per single tool call to keep context small.
+"""
 
+instruct_event_details = """
+You are an event-details extraction agent.
+
+INPUT
+You will receive a JSON list of event_page_url values.
+
+YOUR TASK
+For EACH event page:
+• Extract: event name, exact date(s), location, estimated attendance (if published), vendor application deadline, application fee, direct link to vendor application form.
+• Return a JSON list containing an object for every event with the specified fields.
+• If a particular field is not available, leave its value empty.
+• Do not fetch more than 5 pages per tool call.
+"""
+
+instruct_missing_data = """
+You are a data-completion agent.
+
+YOUR TASK
+Review the current dataset (provided in observation) and identify fields still missing
+(estimated attendance, fees, deadlines, etc.).
+For each missing field, perform targeted searches or page visits to fill the gaps.
+Return only the updated records in JSON with completed fields.
+"""
+
+instruct_attendance_estimator = """
+You are an attendance-estimation agent.
+
+CONTEXT
+Some events may not publish attendance numbers.
+
+YOUR TASK
+1. For any event lacking an 'estimated attendance', generate a reasonable estimate using publicly
+   available information (news articles, past years, social media follower counts, etc.).
+2. Provide updated JSON objects only for events where you add an estimate.
+Explain briefly the rationale in a 'notes' key inside each object.
+"""
+
+instruct_classifier = """
+You are a vendor-potential classification agent.
+
+CRITERIA for 'High Potential':
+• Estimated attendance ≥ 10,000 OR event is well-known city festival.
+• Vendor application fee ≤ $500.
+• Deadline not passed (assume today's date is Jan 1 2025).
+
+YOUR TASK
+Add a boolean field high_potential to every event object based on the criteria.
+Return full JSON array with the new field included.
+"""
+
+instruct_csv_builder = """
+You are a CSV construction agent.
+
+YOUR TASK
+1. Convert the JSON event list into a CSV with columns:
+   event_name, date, location, estimated_attendance, vendor_application_deadline,
+   application_fee, application_link, high_potential
+2. Ensure there are at least 15 rows (not counting header).
+3. Return the CSV text as your final answer (include header as first line).
+"""
+
+instruct_csv_saver = """
+You are a file-saving agent.
+
+YOUR TASK
+Use the CSV tool to write the provided CSV text to disk as
+'austin_food_truck_events_JulAug2025.csv'.
+Return confirmation of file path.
+"""
+
+instruct_final_checker = """
+You are a final QA agent.
+
+YOUR TASK
+1. Confirm that the CSV file path exists and file has ≥ 15 data rows.
+2. Summarize findings: number of events, count marked 'High Potential'.
+3. Append 'WORKFLOW SUCCESS' if everything is correct, else 'WORKFLOW FAILURE'.
+"""
+
+# --------------------------------------------------------------------
+# AGENT CREATION
+# --------------------------------------------------------------------
+smolagent_planner            = SmolAgentFactory(instruct_planner, WEB_TOOLS)
+smolagent_web_search         = SmolAgentFactory(instruct_web_search, WEB_TOOLS)
+smolagent_event_details      = SmolAgentFactory(instruct_event_details, WEB_TOOLS)
+smolagent_missing_data       = SmolAgentFactory(instruct_missing_data, WEB_TOOLS)
+smolagent_attendance_est     = SmolAgentFactory(instruct_attendance_estimator, WEB_TOOLS)
+smolagent_classifier         = SmolAgentFactory(instruct_classifier, [])
+smolagent_csv_builder        = SmolAgentFactory(instruct_csv_builder, CSV_TOOLS)
+smolagent_csv_saver          = SmolAgentFactory(instruct_csv_saver, CSV_TOOLS)
+smolagent_final_checker      = SmolAgentFactory(instruct_final_checker, [])
+
+# --------------------------------------------------------------------
+# HELPER: Create router factory
+# --------------------------------------------------------------------
+def make_router(next_node: str, retry_node: str):
+    def router(state):
+        print("\n=========== ROUTER ===========")
+        # ensure lists exist
+        state.setdefault("step_name", [])
+        state.setdefault("success", [])
+        current = state["step_name"][-1] if state["step_name"] else "UNKNOWN"
+        print(f"Current step   : {current}")
+        last_success = state["success"][-1] if state["success"] else False
+        print(f"Last success   : {last_success}")
+        if last_success:
+            print(f"Routing next   : {next_node}")
+            state["step_name"].append(next_node)
+            return next_node
+        else:
+            print(f"Retrying node  : {retry_node}")
+            state["step_name"].append(retry_node)
+            return retry_node
+    return router
+
+# --------------------------------------------------------------------
+# CUSTOM VALIDATION NODE
+# --------------------------------------------------------------------
+def csv_validation_node(state):
+    print("\n=========== CSV VALIDATION NODE ===========")
+    state.setdefault("observations", [])
+    state.setdefault("success", [])
+    state.setdefault("step_name", [])
+    csv_text = ""
+    if state["observations"]:
+        csv_text = state["observations"][-1].get("data", "")
+    lines = [l for l in csv_text.split("\n") if l.strip()]
+    valid = len(lines) - 1 >= 15  # minus header
+    print(f"Rows detected (excluding header): {len(lines)-1}")
+    state["success"].append(valid)
+    state["step_name"].append("csv_validator")
+    state.setdefault("answers", []).append(
+        "CSV validation passed" if valid else "CSV validation failed"
+    )
+    return state
+
+# --------------------------------------------------------------------
+# BUILD WORKFLOW
+# --------------------------------------------------------------------
 workflow = StateGraph(WorkflowState)
 
-workflow.add_node(
-    "event_finder",
-    WorkflowNodeFactory.create_agent_node(smolagent_event_finder)
+# Add agent nodes
+workflow.add_node("planner"          , WorkflowNodeFactory.create_agent_node(smolagent_planner))
+workflow.add_node("web_search"       , WorkflowNodeFactory.create_agent_node(smolagent_web_search))
+workflow.add_node("event_details"    , WorkflowNodeFactory.create_agent_node(smolagent_event_details))
+workflow.add_node("missing_data"     , WorkflowNodeFactory.create_agent_node(smolagent_missing_data))
+workflow.add_node("attendance_est"   , WorkflowNodeFactory.create_agent_node(smolagent_attendance_est))
+workflow.add_node("classifier"       , WorkflowNodeFactory.create_agent_node(smolagent_classifier))
+workflow.add_node("csv_builder"      , WorkflowNodeFactory.create_agent_node(smolagent_csv_builder))
+workflow.add_node("csv_validator"    , csv_validation_node)
+workflow.add_node("csv_saver"        , WorkflowNodeFactory.create_agent_node(smolagent_csv_saver))
+workflow.add_node("final_checker"    , WorkflowNodeFactory.create_agent_node(smolagent_final_checker))
+
+# --------------------------------------------------------------------
+# EDGE DEFINITIONS
+# --------------------------------------------------------------------
+# START ➜ planner
+workflow.add_edge(START, "planner")
+
+# planner ➜ router
+workflow.add_conditional_edges(
+    "planner",
+    make_router("web_search", "planner"),
+    {"web_search": "web_search", "planner": "planner"}
 )
 
-workflow.add_node(
-    "csv_maker",
-    WorkflowNodeFactory.create_agent_node(smolagent_csv_maker)
+# web_search ➜ router
+workflow.add_conditional_edges(
+    "web_search",
+    make_router("event_details", "web_search"),
+    {"event_details": "event_details", "web_search": "web_search"}
 )
 
-# ---------- Routing Functions ----------
+# event_details ➜ router
+workflow.add_conditional_edges(
+    "event_details",
+    make_router("missing_data", "event_details"),
+    {"missing_data": "missing_data", "event_details": "event_details"}
+)
 
-def route_after_event_finder(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            return "csv_maker"
-        return "event_finder"   # retry if not successful
-    except Exception:
-        return "event_finder"   # fallback retry
+# missing_data ➜ router
+workflow.add_conditional_edges(
+    "missing_data",
+    make_router("attendance_est", "missing_data"),
+    {"attendance_est": "attendance_est", "missing_data": "missing_data"}
+)
 
-def route_after_csv_maker(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            return END
-        return "event_finder"   # go back to research if CSV failed
-    except Exception:
-        return "event_finder"   # fallback to research
+# attendance_est ➜ router
+workflow.add_conditional_edges(
+    "attendance_est",
+    make_router("classifier", "attendance_est"),
+    {"classifier": "classifier", "attendance_est": "attendance_est"}
+)
 
-# ---------- Edges ----------
+# classifier ➜ router
+workflow.add_conditional_edges(
+    "classifier",
+    make_router("csv_builder", "classifier"),
+    {"csv_builder": "csv_builder", "classifier": "classifier"}
+)
 
-workflow.add_edge(START, "event_finder")
+# csv_builder ➜ router
+workflow.add_conditional_edges(
+    "csv_builder",
+    make_router("csv_validator", "csv_builder"),
+    {"csv_validator": "csv_validator", "csv_builder": "csv_builder"}
+)
+
+# csv_validator ➜ router (if fail, back to missing_data)
+def validator_router(state):
+    print("\n=========== VALIDATOR ROUTER ===========")
+    state.setdefault("success", [])
+    state.setdefault("step_name", [])
+    passed = state["success"][-1] if state["success"] else False
+    if passed:
+        print("Validation passed ➜ csv_saver")
+        state["step_name"].append("csv_saver")
+        return "csv_saver"
+    else:
+        print("Validation failed ➜ missing_data (retry cycle)")
+        state["step_name"].append("missing_data")
+        return "missing_data"
 
 workflow.add_conditional_edges(
-    "event_finder",
-    route_after_event_finder,
-    {
-        "csv_maker": "csv_maker",
-        "event_finder": "event_finder"
-    }
+    "csv_validator",
+    validator_router,
+    {"csv_saver": "csv_saver", "missing_data": "missing_data"}
 )
+
+# csv_saver ➜ router
+workflow.add_conditional_edges(
+    "csv_saver",
+    make_router("final_checker", "csv_saver"),
+    {"final_checker": "final_checker", "csv_saver": "csv_saver"}
+)
+
+# final_checker ➜ END router
+def final_router(state):
+    print("\n=========== FINAL ROUTER ===========")
+    state.setdefault("success", [])
+    succeeded = "WORKFLOW SUCCESS" in (state.get("answers", [])[-1] if state.get("answers") else "")
+    return END if succeeded else "final_checker"
 
 workflow.add_conditional_edges(
-    "csv_maker",
-    route_after_csv_maker,
-    {
-        END: END,
-        "event_finder": "event_finder"
-    }
+    "final_checker",
+    final_router,
+    {END: END, "final_checker": "final_checker"}
 )
 
-# ---------- Compile App ----------
-
+# --------------------------------------------------------------------
+# COMPILE APP
+# --------------------------------------------------------------------
 app = workflow.compile()
 
 initial_state: WorkflowState = {
@@ -917,7 +1123,7 @@ except Exception as e:
 result_state = app.invoke(initial_state)
 print(result_state)
 
-path_json = os.path.join("workflows/72d76b1655f54ef0a6f34216ccb423b2/", "state_result.json")
+path_json = os.path.join("workflows/ce16f4a74130408fab5874330684ee36/", "state_result.json")
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)

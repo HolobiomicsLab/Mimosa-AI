@@ -140,7 +140,6 @@ instruct_web = """You are a web research agent that searches and analyzes online
 **Reminder for agents**
 
 Keep in mind your agents context window limitations:
-- Avoid reading multiple documents or web pages in a single tool call
 - Do not use information retrieval tools in loops or repetitive sequences, as this would overload the context window
 - Break large information gathering tasks into focused, sequential steps
 
@@ -272,4 +271,3 @@ app = workflow.compile()
 - [ ] Decompose task as much as possible, a web task could use multiple successive agent with different goal, same for any task requirement multiple steps.
 
 Generate workflow code for the task requirements to reach the goal.
-The Flow need to have at least 10 node, otherwise you are probably not decomposing the task into simple enought steps.

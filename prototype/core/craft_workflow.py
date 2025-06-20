@@ -107,12 +107,15 @@ def create_folder_structure(uuid_str: str) -> None:
     print(f"✅ Folder structure created: workflows/{uuid_str}/")
     return workflow_save_path
 
-def craft_workflow(goal_prompt: str) -> tuple[str, str]:
+def craft_workflow(goal_prompt: str, template_workflow=None) -> tuple[str, str]:
     uuid_str = str(uuid.uuid4()).replace("-", "")
     path = create_folder_structure(uuid_str)
     tools_code, existing_tool_prompt = load_tools_client()
     factory_code = load_factory_code()
-    workflow_code = create_workflow_code(goal_prompt, existing_tool_prompt)
+    if template_workflow is None:
+        workflow_code = create_workflow_code(goal_prompt, existing_tool_prompt)
+    else:
+        workflow_code = template_workflow
     complete_code = f'''
 from smolagents import CodeAgent, tool, HfApiModel
 from langgraph.graph import StateGraph, START, END

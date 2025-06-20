@@ -46,6 +46,8 @@ class CreateCSVTool(Tool):
         try:
             async def _create_csv():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     payload = {"name": name}
                     if columns:
                         payload["columns"] = columns
@@ -83,6 +85,8 @@ class LoadCSVTool(Tool):
         try:
             async def _load_csv():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     payload = {"source_path": file_path}
                     if name:
                         payload["name"] = name
@@ -123,6 +127,8 @@ class GetCSVDataTool(Tool):
         try:
             async def _get_csv_data():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     payload = {"name": name}
                     if limit:
                         payload["limit"] = limit
@@ -161,6 +167,8 @@ class AddCSVRowTool(Tool):
         try:
             async def _add_csv_row():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("add_csv_row", {"name": name, "row": row})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -195,6 +203,8 @@ class UpdateCSVRowTool(Tool):
         try:
             async def _update_csv_row():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("update_csv_row", {"name": name, "index": index, "row": row})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -228,6 +238,8 @@ class DeleteCSVRowTool(Tool):
         try:
             async def _delete_csv_row():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("delete_csv_row", {"name": name, "index": index})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -262,6 +274,8 @@ class AddCSVColumnTool(Tool):
         try:
             async def _add_csv_column():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     payload = {"name": name, "column_name": column_name}
                     if default_value is not None:
                         payload["default_value"] = default_value
@@ -300,6 +314,8 @@ class QueryCSVTool(Tool):
         try:
             async def _query_csv():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     payload = {"name": name, "operation": operation}
                     buffer = await client.call_tool("query_csv", payload)
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
@@ -332,6 +348,8 @@ class ListCSVDatasetsTool(Tool):
         try:
             async def _list_csv_datasets():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("list_csv_datasets", {})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -362,6 +380,8 @@ class DeleteCSVDatasetTool(Tool):
         try:
             async def _delete_csv_dataset():
                 async with Client(f"{API_BASE_URL}/mcp") as client:
+                    tools = await client.list_tools()
+                    print(f"Available tools: {tools}")
                     buffer = await client.call_tool("delete_csv_dataset", {"name": name})
                     return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
@@ -416,7 +436,8 @@ import asyncio
 
 from fastmcp import Client
 from smolagents import (
-    Tool
+    Tool,
+    DuckDuckGoSearchTool
 )
 import json
 
@@ -424,13 +445,12 @@ API_BASE_URL = 'http://localhost:5002'
 
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
-    action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
-    return f"""
-action: {action_formatted}
-observation: {observation_formatted}
-reward: {reward}
-"""
+    output = {
+        "action": action[:256].strip().replace('\n', ' - '),
+        "observation": observation[:4096],
+        "reward": reward
+    }
+    return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
 class SearchTool(Tool):
     name = "search_tool"
@@ -445,8 +465,9 @@ class SearchTool(Tool):
 
     def forward(self, query: str) -> str:
         obs = ''
-        action = "search:" + query
+        action = f"search_tool(query='{query}')"
         try:
+            result = DuckDuckGoSearchTool
             result = asyncio.run(self._async_search(query))
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
@@ -458,7 +479,7 @@ class SearchTool(Tool):
 
 class GoToUrlTool(Tool):
     name = "go_to_url_tool"
-    description = "Navigate to a specified URL and return the page content."
+    description = "Navigate to a specified URL and return the page content as Markdown."
     inputs = {"url": {"type": "string", "description": "The URL to navigate to."}}
     output_type = "string"
 
@@ -468,7 +489,7 @@ class GoToUrlTool(Tool):
             return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
     def forward(self, url: str) -> str:
-        action = "go_to_url_tool(" + url + ")"
+        action = f"go_to_url_tool(url='{url}')"
         obs = ''
         reward = 0.0
         try:
@@ -478,22 +499,21 @@ class GoToUrlTool(Tool):
             obs = f'failed to navigate to {url} due to error: {str(e)}'
             return build_formatted_output(action, obs, reward)
         
-        if not result or 'error' in result.get('status', {}):
+        if not result or not 'success' in result.get('status', {}):
+            obs = f'Error navigating to {url}: ' + result.get('message', 'Unknown error')
             return build_formatted_output(action, obs, reward)
         
         title = result.get('title', 'No title found')
         content = result.get('content', 'No content found')
         obs = f'''Tile: {title}
-            Start of page:
             {content}
-            End of page.
         '''
         reward = 1.0
         return build_formatted_output(action, obs, reward)
 
 class GetNavigableLinksTool(Tool):
     name = "get_navigable_links_tool"
-    description = "Retrieves a list of navigable links from the browser."
+    description = "Retrieves a list of navigable links on the current page."
     inputs = {}
     output_type = "string"
 
@@ -588,6 +608,8 @@ from smolagents import (
     TaskStep
 )
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+import json
+import re
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {}
@@ -612,10 +634,10 @@ class WorkflowState(TypedDict):
 # deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="hf_api", max_steps=5):
+    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="hf_api", max_steps=10):
         self.model_id = model_id
         self.max_tokens = 1024
-        self.provider = "novita"
+        self.provider = "fireworks-ai"
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
@@ -639,12 +661,14 @@ class SmolAgentFactory:
     
     def get_engine(self):
         if self.engine_name == "mlx":
+            print("Using MLXModel for local execution.")
             self.local = True
             return MLXModel(
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "hf_api":
+            print("Using HfApiModel for Hugging Face API execution.")
             return HfApiModel(
                 model_id=self.model_id,
                 provider=self.provider,
@@ -652,6 +676,7 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "inference_client":
+            print("Using InferenceClientModel for inference client execution.")
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
@@ -660,8 +685,9 @@ class SmolAgentFactory:
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
-        
-    def build_worflow_step_prompt(self, state: WorkflowState) -> str:
+
+    def build_workflow_step_prompt(self, state: WorkflowState) -> str:
+        assert isinstance(state, dict), "State must be a dictionary"
         state_steps = state.get("step_name", [])
         state_actions = state.get("actions", [])
         state_observations = state.get("observations", [])
@@ -672,6 +698,17 @@ class SmolAgentFactory:
             state_observations, 
             state_success
         )
+        trajectory_str = ""
+        for idx, (action, observation, success) in enumerate(trajectories):
+            if not action or action == {}:
+                continue
+            trajectory_str += f"""
+        ### Step {idx + 1}:
+        Action: {action['tool']}
+        Observation: {observation['data'][:128]}... (truncated for brevity)
+        Success: {success}
+        ---
+            """
         state_answers = state.get("answers", [])
         prev_infos = state_answers[-1] if state_answers else "No information yet"
         return f"""
@@ -680,42 +717,53 @@ class SmolAgentFactory:
         {prev_infos}
         Your need to follow instructions:
         {self.instruct_prompt}
+        You conducted the previous actions and observations:
+        {trajectory_str}
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
-    
+
     def parse_tool_output(self, output: str):
+        assert isinstance(output, str), "Output must be a string"
         actions = []
         observations = []
         rewards = []
         success = []
-        lines = output.strip().split('\n')
-        for line in lines:
-            line = line.strip()
-            if line.startswith('action:'):
-                action = line[7:].strip()
-                actions.append(action)
-            elif line.startswith('observation:'):
-                obs_str = line[12:].strip()
-                observations.append(obs_str)
-            elif line.startswith('reward:'):
-                reward_str = line[7:].strip()
-                reward = float(reward_str)
-                rewards.append(reward)
-                success.append(reward > 0)
-        return ('\n'.join(actions),
-                '\n'.join(observations),
-                (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
-                any(success)
+        
+        # Look for ```json blocks in the output
+        json_blocks = re.findall(r"```json\n(.*?)\n```", output, re.DOTALL)
+        if not json_blocks:
+            return (output, "Completed", 0.0, True)  # No valid JSON blocks found
+        for block in json_blocks:
+            try:
+                data = json.loads(block)
+                if "action" in data:
+                    actions.append(data["action"])
+                if "observation" in data:
+                    observations.append(data["observation"])
+                if "reward" in data:
+                    reward = float(data["reward"])
+                    rewards.append(reward)
+                    success.append(reward > 0)
+            except json.JSONDecodeError:
+                continue
+        
+        return (
+            "\n".join(actions),
+            "\n".join(observations),
+            (sum(rewards) / len(rewards)) if len(rewards) > 0 else 0,
+            any(success) or len(success) == 0
         )
 
     def parse_memory_output(self):
+        text_memory_length = 0 
         actions, observations, rewards, success = [], [], [], []
         for idx, step in enumerate(self.agent.memory.steps):
             if isinstance(step, ActionStep):
                 error, feedback = step.error, step.observations
                 step_output = error if error else feedback
+                text_memory_length += len(step_output)
                 if not isinstance(step_output, str):
                     continue
                 action_step, obs_step, reward_step, success_step = self.parse_tool_output(step_output)
@@ -723,10 +771,13 @@ class SmolAgentFactory:
                 observations.append(obs_step)
                 rewards.append(reward_step)
                 success.append(success_step)
+        print(f"Parsed {len(actions)} actions, {len(observations)} observations, {len(rewards)} rewards, and {len(success)} success flags from memory.")
+        print(f"Total text memory length: {text_memory_length} characters.")
         return actions, observations, rewards, success
 
     def run(self, state: WorkflowState) -> dict:
-        instructions = self.build_worflow_step_prompt(state)
+        assert isinstance(state, dict), "State must be a dictionary"
+        instructions = self.build_workflow_step_prompt(state)
         try:
             result = self.agent.run(instructions)
         except Exception as e:
@@ -746,7 +797,7 @@ class SmolAgentFactory:
         obs: Observation = { # Only the last observation matters for the state
             "data": observations[-1] if observations else "No observation"
         }
-        reward = sum(rewards) if rewards else 0.0
+        reward = sum(rewards) / len(rewards) if rewards else 0.0
         success_bool = success[-1] if len(success) > 0 else True # return True if final answer was called (no tool called, so array is empty).
         return {
             **state,
@@ -769,154 +820,184 @@ class WorkflowNodeFactory:
 # LLM generated logical multi-agent graph
 from langgraph.graph import StateGraph, START, END
 
-# === Tool Sets ===
-BROWSER_TOOLS = BROWSER_TOOLS_TOOL          # pre-defined list
-CSV_TOOLS = CSV_TOOLS_TOOL                  # pre-defined list
-
-# === Agent Instructions ===
-instruct_startup_finder = """
-You are an expert technology research agent.
+# ---------- Agent Instructions ----------
+instruct_researcher = """
+You are an event research agent.
 
 GOAL
-- Identify AI startups headquartered in San Francisco that have announced new funding rounds in 2025 within the last 6 months.
+- Identify community events in Austin, TX occurring in July or August 2025.
+- Collect at least 25 candidate events (provide name and a link).
 
-TASKS
-1. Use web search to compile a list of AT LEAST 12 such startups to ensure a buffer in case of data gaps.
-2. For each startup, capture a URL that contains the funding announcement details.
-
-CONSTRAINTS
-- Focus only on AI/ML startups.
-- Headquarters must be San Francisco (or immediate Bay Area if explicitly stated).
-- Funding announcement must be dated in 2025 and within the most recent 6 months from today.
-
-OUTPUT EXPECTATION
-Return a structured list of {company name, announcement URL}.
+OUTPUT
+Return a Python dictionary keyed by event name with URL links.
 """
 
-instruct_details_collector = """
-You are a detail extraction agent.
+instruct_details = """
+You are an event detail extraction agent.
 
 INPUT
-- You will receive a list of {company name, announcement URL} pairs (from previous agent).
+- A dictionary of event names and URLs from previous observations.
 
-TASKS
-For EACH startup:
-1. Open the provided URL.
-2. Extract:
-   - Company name
-   - Headquarters location
-   - Funding amount in USD (numeric)
-   - Funding round type (Seed, Series A, etc.)
-   - Date of funding announcement (ISO format YYYY-MM-DD)
-   - Primary investor(s) (comma-separated list)
-
-CONSTRAINTS
-- One web page per tool call.
-- If any required field is missing on that page, perform one additional focused search for that specific missing detail only.
-
-OUTPUT EXPECTATION
-Return a JSON-compatible list of dictionaries with the exact keys:
-["company","hq","amount_usd","round_type","date","investors"]
-Ensure at least 10 fully-populated entries.
+TASK
+For each event:
+- Extract: event name, date, location, estimated attendance, vendor application deadline, application fee, application page link.
+Return a list[dict] with the above keys.
 """
 
-instruct_csv_builder = """
-You are a CSV generation and data-processing agent.
+instruct_csv = """
+You are a CSV compilation agent.
 
 INPUT
-- A list of dictionaries with keys:
-  ["company","hq","amount_usd","round_type","date","investors"]
+- A list[dict] where each dict contains event details.
 
-TASKS
-1. Convert the list into a CSV with the following columns in this order:
-   company, hq, amount_usd, round_type, date, investors, pct_of_total
-2. Calculate total funding across all startups, then create 'pct_of_total' for each row:
-      pct_of_total = (amount_usd / total_funding) * 100  (rounded to 2 decimals)
-3. Sort rows by 'amount_usd' in DESCENDING order.
-4. Save the CSV to disk named "sf_ai_startup_funding_2025.csv".
-
-CONSTRAINTS
-- Use provided CSV tools for all file operations.
-- Ensure numeric columns have no currency symbols or commas (pure numbers).
-
-SUCCESS CRITERIA
-- File "sf_ai_startup_funding_2025.csv" exists and meets all column and sorting specifications.
+TASK
+- Produce a CSV file called 'austin_events_jul_aug_2025.csv'
+- Columns: Event Name, Date, Location, Estimated Attendance, Vendor Deadline, Application Fee, Application Link
 """
 
-# === Agent Creation ===
-smol_startup_finder = SmolAgentFactory(instruct_startup_finder, BROWSER_TOOLS)
-smol_details_collector = SmolAgentFactory(instruct_details_collector, BROWSER_TOOLS)
-smol_csv_builder = SmolAgentFactory(instruct_csv_builder, CSV_TOOLS)
+instruct_analyzer = """
+You are an event potential analysis agent.
 
-# === Routing Functions ===
-def router_after_finder(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            state.setdefault("step_name", []).append("startup_details_collector")
-            return "startup_details_collector"
-    except Exception:
-        pass
-    state.setdefault("step_name", []).append("startup_finder")
-    return "startup_finder"
+CRITERIA
+- Mark High Potential = TRUE if Estimated Attendance ≥ 5000 or Application Fee ≤ $150.
+- Otherwise FALSE.
 
-def router_after_details(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            state.setdefault("step_name", []).append("csv_builder")
-            return "csv_builder"
-    except Exception:
-        pass
-    state.setdefault("step_name", []).append("startup_details_collector")
-    return "startup_details_collector"
+TASK
+- Read the CSV produced earlier.
+- Add a column 'High Potential' based on criteria.
+- Save the updated CSV (overwrite).
+"""
 
-def router_after_csv(state: WorkflowState) -> str:
-    try:
-        success_list = state.get("success", [])
-        if success_list and success_list[-1] is True:
-            return END
-    except Exception:
-        pass
-    state.setdefault("step_name", []).append("csv_builder")
-    return "csv_builder"
+# ---------- Agent Creation ----------
+smolagent_researcher = SmolAgentFactory(instruct_researcher, BROWSER_TOOLS_TOOL)
+smolagent_details = SmolAgentFactory(instruct_details, BROWSER_TOOLS_TOOL)
+smolagent_csv = SmolAgentFactory(instruct_csv, CSV_TOOLS_TOOL)
+smolagent_analyzer = SmolAgentFactory(instruct_analyzer, CSV_TOOLS_TOOL)
 
-# === Workflow Construction ===
+# ---------- Workflow ----------
 workflow = StateGraph(WorkflowState)
 
-workflow.add_node("startup_finder", WorkflowNodeFactory.create_agent_node(smol_startup_finder))
-workflow.add_node("startup_details_collector", WorkflowNodeFactory.create_agent_node(smol_details_collector))
-workflow.add_node("csv_builder", WorkflowNodeFactory.create_agent_node(smol_csv_builder))
+workflow.add_node("event_researcher", WorkflowNodeFactory.create_agent_node(smolagent_researcher))
+workflow.add_node("details_extractor", WorkflowNodeFactory.create_agent_node(smolagent_details))
+workflow.add_node("csv_compiler", WorkflowNodeFactory.create_agent_node(smolagent_csv))
+workflow.add_node("potential_analyzer", WorkflowNodeFactory.create_agent_node(smolagent_analyzer))
 
-workflow.add_edge(START, "startup_finder")
+# ---------- Routing Functions ----------
+def route_from_researcher(state: WorkflowState) -> str:
+    print("=== ROUTE: researcher ===")
+    success_list = state.get("success", [])
+    if "step_name" not in state:
+        state["step_name"] = []
+    try:
+        if success_list and success_list[-1]:
+            print("Research succeeded -> details_extractor")
+            state["step_name"].append("details_extractor")
+            return "details_extractor"
+        else:
+            print("Research failed or first run -> event_researcher (retry)")
+            state["step_name"].append("event_researcher")
+            return "event_researcher"
+    except Exception as e:
+        print(f"Error routing from researcher: {e}")
+        state["step_name"].append("event_researcher")
+        return "event_researcher"
+
+def route_from_details(state: WorkflowState) -> str:
+    print("=== ROUTE: details_extractor ===")
+    success_list = state.get("success", [])
+    if "step_name" not in state:
+        state["step_name"] = []
+    try:
+        if success_list and success_list[-1]:
+            print("Details extraction succeeded -> csv_compiler")
+            state["step_name"].append("csv_compiler")
+            return "csv_compiler"
+        else:
+            print("Details extraction failed -> details_extractor (retry)")
+            state["step_name"].append("details_extractor")
+            return "details_extractor"
+    except Exception as e:
+        print(f"Error routing from details: {e}")
+        state["step_name"].append("details_extractor")
+        return "details_extractor"
+
+def route_from_csv(state: WorkflowState) -> str:
+    print("=== ROUTE: csv_compiler ===")
+    success_list = state.get("success", [])
+    if "step_name" not in state:
+        state["step_name"] = []
+    try:
+        if success_list and success_list[-1]:
+            print("CSV compiled -> potential_analyzer")
+            state["step_name"].append("potential_analyzer")
+            return "potential_analyzer"
+        else:
+            print("CSV compilation failed -> csv_compiler (retry)")
+            state["step_name"].append("csv_compiler")
+            return "csv_compiler"
+    except Exception as e:
+        print(f"Error routing from csv: {e}")
+        state["step_name"].append("csv_compiler")
+        return "csv_compiler"
+
+def route_from_analyzer(state: WorkflowState) -> str:
+    print("=== ROUTE: potential_analyzer ===")
+    success_list = state.get("success", [])
+    if "step_name" not in state:
+        state["step_name"] = []
+    try:
+        if success_list and success_list[-1]:
+            print("Analysis complete -> END")
+            return END
+        else:
+            print("Analysis failed -> potential_analyzer (retry)")
+            state["step_name"].append("potential_analyzer")
+            return "potential_analyzer"
+    except Exception as e:
+        print(f"Error routing from analyzer: {e}")
+        state["step_name"].append("potential_analyzer")
+        return "potential_analyzer"
+
+# ---------- Edges ----------
+workflow.add_edge(START, "event_researcher")
 
 workflow.add_conditional_edges(
-    "startup_finder",
-    router_after_finder,
+    "event_researcher",
+    route_from_researcher,
     {
-        "startup_details_collector": "startup_details_collector",
-        "startup_finder": "startup_finder"
+        "details_extractor": "details_extractor",
+        "event_researcher": "event_researcher"
     }
 )
 
 workflow.add_conditional_edges(
-    "startup_details_collector",
-    router_after_details,
+    "details_extractor",
+    route_from_details,
     {
-        "csv_builder": "csv_builder",
-        "startup_details_collector": "startup_details_collector"
+        "csv_compiler": "csv_compiler",
+        "details_extractor": "details_extractor"
     }
 )
 
 workflow.add_conditional_edges(
-    "csv_builder",
-    router_after_csv,
+    "csv_compiler",
+    route_from_csv,
+    {
+        "potential_analyzer": "potential_analyzer",
+        "csv_compiler": "csv_compiler"
+    }
+)
+
+workflow.add_conditional_edges(
+    "potential_analyzer",
+    route_from_analyzer,
     {
         END: END,
-        "csv_builder": "csv_builder"
+        "potential_analyzer": "potential_analyzer"
     }
 )
 
+# ---------- Compile ----------
 app = workflow.compile()
 
 initial_state: WorkflowState = {
@@ -939,7 +1020,7 @@ except Exception as e:
 result_state = app.invoke(initial_state)
 print(result_state)
 
-path_json = os.path.join("workflows/c16313ec34254e78ab9e005d789c8dad/", "state_result.json")
+path_json = os.path.join("workflows/2553acb7a9064fd48d2cde3bcf185e95/", "state_result.json")
 try:
     with open(path_json, "w") as f:
         json.dump(result_state, f, indent=2)

@@ -9,7 +9,8 @@ import asyncio
 
 from fastmcp import Client
 from smolagents import (
-    Tool
+    Tool,
+    DuckDuckGoSearchTool
 )
 import json
 
@@ -17,13 +18,12 @@ API_BASE_URL = 'http://localhost:5002'
 
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
-    action_formatted = action[:256].strip().replace('\n', ' - ')
-    observation_formatted = observation[:1024].strip().replace('\n', ' - ')
-    return f"""
-action: {action_formatted}
-observation: {observation_formatted}
-reward: {reward}
-"""
+    output = {
+        "action": action[:256].strip().replace('\n', ' - '),
+        "observation": observation[:4096],
+        "reward": reward
+    }
+    return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
 class SearchTool(Tool):
     name = "search_tool"
@@ -38,8 +38,9 @@ class SearchTool(Tool):
 
     def forward(self, query: str) -> str:
         obs = ''
-        action = "search:" + query
+        action = f"search_tool(query='{query}')"
         try:
+            result = DuckDuckGoSearchTool
             result = asyncio.run(self._async_search(query))
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
@@ -51,7 +52,7 @@ class SearchTool(Tool):
 
 class GoToUrlTool(Tool):
     name = "go_to_url_tool"
-    description = "Navigate to a specified URL and return the page content."
+    description = "Navigate to a specified URL and return the page content as Markdown."
     inputs = {"url": {"type": "string", "description": "The URL to navigate to."}}
     output_type = "string"
 
@@ -61,7 +62,7 @@ class GoToUrlTool(Tool):
             return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
 
     def forward(self, url: str) -> str:
-        action = "go_to_url_tool(" + url + ")"
+        action = f"go_to_url_tool(url='{url}')"
         obs = ''
         reward = 0.0
         try:
@@ -71,22 +72,21 @@ class GoToUrlTool(Tool):
             obs = f'failed to navigate to {url} due to error: {str(e)}'
             return build_formatted_output(action, obs, reward)
         
-        if not result or 'error' in result.get('status', {}):
+        if not result or not 'success' in result.get('status', {}):
+            obs = f'Error navigating to {url}: ' + result.get('message', 'Unknown error')
             return build_formatted_output(action, obs, reward)
         
         title = result.get('title', 'No title found')
         content = result.get('content', 'No content found')
         obs = f'''Tile: {title}
-            Start of page:
             {content}
-            End of page.
         '''
         reward = 1.0
         return build_formatted_output(action, obs, reward)
 
 class GetNavigableLinksTool(Tool):
     name = "get_navigable_links_tool"
-    description = "Retrieves a list of navigable links from the browser."
+    description = "Retrieves a list of navigable links on the current page."
     inputs = {}
     output_type = "string"
 
