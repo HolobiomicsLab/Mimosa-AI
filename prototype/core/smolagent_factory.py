@@ -35,7 +35,7 @@ class WorkflowState(TypedDict):
 # deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="mlx", max_steps=5):
+    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="hf_api", max_steps=10):
         self.model_id = model_id
         self.max_tokens = 1024
         self.provider = "novita"
@@ -130,7 +130,7 @@ class SmolAgentFactory:
         return ('\n'.join(actions),
                 '\n'.join(observations),
                 (sum(rewards) / len(rewards)) if len(rewards) > 0 else sum(rewards),
-                any(success)
+                any(success) or len(success) == 0
         )
 
     def parse_memory_output(self):

@@ -13,22 +13,29 @@ import subprocess
 
 def executor(code: str) -> str:
     print("\n🔧 Executing generated workflow in sandbox...")
-    result = subprocess.run(["python", "-c", code], capture_output=True, text=True)
-    print("\n📊 Execution Results:")
-    print(result.stdout)
-    print("\n🔍 Errors (if any):")
-    print(result.stderr)
+    
+    # Create a process and stream output in real-time
+    process = subprocess.Popen(
+        ["python", "-c", code], 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1
+    )
+    
+    print("\n📊 Execution Progress:")
+    for line in iter(process.stdout.readline, ''):
+        print(line, end='')
+    stderr_output = process.stderr.read()
+    process.wait()
+    print("\nExited.\n🔍 Errors (if any):")
+    print(stderr_output)
+    return process.returncode
 
 def main():
     """Main execution function"""
-    goal_prompt = """I want to do analysis of the state of the art techniques in AI and ML.
-    You will need to browse the web, read papers, and summarize the findings.
-    Then you will need to create a report with the findings as CSV.
-    The report should include the following columns:
-    - Technique
-    - Description
-    - Paper Link
-    - Date
+    goal_prompt = """
+Compile a CSV file listing upcoming community events in Austin, TX, for July and August 2025, suitable for a food truck vendor to participate in. For each event, include the event name, date, location, estimated attendance, vendor application deadline, application fee (if any), and a link to the application page. Collect data for at least 15 events. Add a column indicating whether the event is ‘High Potential’
     """
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")

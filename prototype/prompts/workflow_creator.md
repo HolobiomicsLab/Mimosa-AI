@@ -268,6 +268,8 @@ app = workflow.compile()
 - [ ] Add try-catch fall mechanism, make sure dict field exist before using.
 - [ ] Add conditional retry mechanism to check the state success after an agent node.
 - [ ] You might use multiple agent with same tools but different prompt, as part of your task decomposition strategy.
+- [ ] Add extensive print in routing function. For example: print("No success history found - routing to chart_maker")
 - [ ] Decompose task as much as possible, a web task could use multiple successive agent with different goal, same for any task requirement multiple steps.
 
 Generate workflow code for the task requirements to reach the goal.
+The Flow need to have at least 10 node, otherwise you are probably not decomposing the task into simple enought steps.
