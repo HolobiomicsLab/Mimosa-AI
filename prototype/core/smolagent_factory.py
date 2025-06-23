@@ -37,7 +37,7 @@ class WorkflowState(TypedDict):
 # deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-R1-0528", engine_name="hf_api", max_steps=10):
+    def __init__(self, instruct_prompt, tools, model_id="deepseek-ai/DeepSeek-V3", engine_name="hf_api", max_steps=10):
         self.model_id = model_id
         self.max_tokens = 1024
         self.provider = "novita"

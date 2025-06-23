@@ -18,12 +18,12 @@ def llm_make_workflow(goal_prompt: str, existing_tool_prompt: str) -> str:
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
 The following set of tools are availables for agents, it replaces EXISTING_TOOLS with more tailored package of tools.
-A set of tools is a LIST of tools that could be used by an agent. Be careful not to put them within a list (list within list cause error). 
+Each set of tools is a LIST of tools that could be used by an agent. Be careful not to put them within a list (list within list cause error). 
 
 {existing_tool_prompt}
 
 You could however combine tool set like so:
-MY_TOOLS = COFFEE_MACHINE_TOOL + CLEANING_TOOL + DUMMY_TOOL
+AGENT_TOOLS = COFFEE_MACHINE_TOOL + CLEANING_TOOL + DUMMY_TOOL
 
 Your task is to create a LangGraph workflow that achieves the following goal:
 
@@ -55,24 +55,33 @@ def get_codefile(path = "") -> str:
     except Exception as e:
         raise ValueError(f"Error reading file at {path}: {str(e)}")
 
-def load_tools_client() -> str:
-    """Load the tools client code from all Python files in the tools_client directory"""
-    tools_code = ""
-    existing_tool_prompt = ""
-    tools_client_dir = "core/tools_client"
-    
+def get_tools_code(tools_client_dir) -> None:
+    """Validate that the tools client directory exists and contains Python files"""
     if not os.path.exists(tools_client_dir):
-        return tools_code
+        raise ValueError(f"Tools client directory '{tools_client_dir}' does not exist.")
+    if not any(filename.endswith('.py') for filename in os.listdir(tools_client_dir)):
+        raise ValueError(f"No Python files found in tools client directory '{tools_client_dir}'.")
     
+    tools_code = []
     for filename in os.listdir(tools_client_dir):
         if not filename.endswith('.py'):
             continue
         filepath = os.path.join(tools_client_dir, filename)
         base_name = os.path.splitext(filename)[0]
-        # Add the file content
-        tools_code += get_codefile(filepath)
-        # Add a tool variable for this file
-        tool_var_name = f"{base_name.upper()}_TOOL"
+        tools_code.append((base_name, get_codefile(filepath)))
+    return tools_code
+
+def load_tools_client() -> str:
+    """Load the tools client code from all Python files in the tools_client directory"""
+    tools_code = ""
+    existing_tool_prompt = ""
+    tools_client_dir = "core/tools_client"
+
+    tools_code = get_tools_code(tools_client_dir)
+    for base_name, code in tools_code:
+        tools_code += code + '\n'
+        # Add a special tool variable that copy the tools variable of the current file
+        tool_var_name = f"{base_name.upper()}_TOOLS"
         tools_code += f"\n{tool_var_name} = tools\n"
         existing_tool_prompt += f"{tool_var_name}\n"
     
