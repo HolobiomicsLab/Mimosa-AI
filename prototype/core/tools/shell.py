@@ -21,10 +21,11 @@ observation: {observation_formatted}
 reward: {reward}
 """
 
-async def _async_tool_call(tool_name: str, params: dict) -> dict:
+async def _async_shell_tool_call(tool_name: str, params: dict) -> dict:
     async with Client(f"{API_SHELL_TOOLS_URL}/mcp") as client:
         tools = await client.list_tools()
-        assert tool_name in tools, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_SHELL_TOOLS_URL
+        tool_names = [tool.name for tool in tools]
+        assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_SHELL_TOOLS_URL
         buffer = await client.call_tool(tool_name, params)
         return json.loads(buffer[0].text)
 
@@ -40,7 +41,7 @@ class ExecuteBashCommand(Tool):
         reward = 0.0
         
         try:
-            result = _async_tool_call("execute_command", {"command": command})
+            result = asyncio.run(_async_shell_tool_call("execute_command", {"command": command}))
             
             if result and result.get('status') == 'success' and 'stdout' in result:
                 obs = result.get('stdout', 'No output') 

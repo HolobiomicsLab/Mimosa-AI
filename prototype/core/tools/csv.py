@@ -21,6 +21,14 @@ observation: {observation_formatted}
 reward: {reward}
 """
 
+async def _async_csv_tool_call(tool_name: str, params: dict) -> dict:
+    async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
+        tools = await client.list_tools()
+        tool_names = [tool.name for tool in tools]
+        assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_CSV_TOOLS_URL
+        buffer = await client.call_tool(tool_name, params)
+        return json.loads(buffer[0].text)
+
 class CreateCSVTool(Tool):
     name = "create_csv_tool"
     description = "Create a new CSV dataset with optional columns and initial data."
@@ -37,19 +45,7 @@ class CreateCSVTool(Tool):
         reward = 0.0
         
         try:
-            async def _create_csv():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    payload = {"name": name}
-                    if columns:
-                        payload["columns"] = columns
-                    if rows:
-                        payload["rows"] = rows
-                    buffer = await client.call_tool("create_csv", payload)
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-            
-            result = asyncio.run(_create_csv())
+            result = asyncio.run(_async_csv_tool_call("create_csv", {"name": name, "columns": columns, "rows": rows}))
             
             if result and result.get('status') == 'success':
                 obs = f"Created dataset '{name}' with shape {result.get('shape')}"
@@ -76,17 +72,7 @@ class LoadCSVTool(Tool):
         reward = 0.0
         
         try:
-            async def _load_csv():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    payload = {"source_path": file_path}
-                    if name:
-                        payload["name"] = name
-                    buffer = await client.call_tool("load_csv_from_path", payload)
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_load_csv())
+            result = asyncio.run(_async_csv_tool_call("load_csv_from_path", {"source_path": file_path, "name": name})) if not result else result
             
             if result and result.get('status') == 'success':
                 obs = f"Loaded dataset '{result.get('name')}' with shape {result.get('shape')}"
@@ -118,17 +104,7 @@ class GetCSVDataTool(Tool):
         reward = 0.0
         
         try:
-            async def _get_csv_data():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    payload = {"name": name}
-                    if limit:
-                        payload["limit"] = limit
-                    buffer = await client.call_tool("get_csv_data", payload)
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_get_csv_data())
+            result = asyncio.run(_async_csv_tool_call("get_csv_data", {"name": name, "limit": limit, "columns": columns})) if not result else result
             
             if result and result.get('status') == 'success':
                 rows = result.get('data', [])
@@ -158,14 +134,7 @@ class AddCSVRowTool(Tool):
         reward = 0.0
         
         try:
-            async def _add_csv_row():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    buffer = await client.call_tool("add_csv_row", {"name": name, "row": row})
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_add_csv_row())
+            result = asyncio.run(_async_csv_tool_call("add_csv_row", {"name": name, "row": row})) if not result else result
             
             if result and result.get('status') == 'success':
                 obs = f"Added row to '{name}', new shape: {result.get('shape')}"
@@ -194,14 +163,7 @@ class UpdateCSVRowTool(Tool):
         reward = 0.0
         
         try:
-            async def _update_csv_row():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    buffer = await client.call_tool("update_csv_row", {"name": name, "index": index, "row": row})
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_update_csv_row())
+            result = asyncio.run(_async_csv_tool_call("update_csv_row", {"name": name, "index": index, "row": row})) if not result else result
             
             if result and result.get('status') == 'success':
                 obs = f"Updated row {index} in '{name}'"
@@ -211,41 +173,6 @@ class UpdateCSVRowTool(Tool):
 
         except Exception as e:
             obs = f"Error updating row: {str(e)}"
-            
-        return build_formatted_output(action, obs, reward)
-
-class DeleteCSVRowTool(Tool):
-    name = "delete_csv_row_tool"
-    description = "Delete a specific row from a dataset by index."
-    inputs = {
-        "name": {"type": "string", "description": "Name of the dataset."},
-        "index": {"type": "integer", "description": "Row index to delete."}
-    }
-    output_type = "string"
-
-    def forward(self, name: str, index: int) -> str:
-        action = f"delete_csv_row_tool({name})"
-        obs = ''
-        reward = 0.0
-        
-        try:
-            async def _delete_csv_row():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    buffer = await client.call_tool("delete_csv_row", {"name": name, "index": index})
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_delete_csv_row())
-            
-            if result and result.get('status') == 'success':
-                obs = f"Deleted row {index} from '{name}', new shape: {result.get('shape')}"
-                reward = 1.0
-            else:
-                obs = f"Failed to delete row: {result.get('status', 'Unknown error') if result else 'No response'}"
-                
-        except Exception as e:
-            obs = f"Error deleting row: {str(e)}"
             
         return build_formatted_output(action, obs, reward)
 
@@ -265,17 +192,7 @@ class AddCSVColumnTool(Tool):
         reward = 0.0
         
         try:
-            async def _add_csv_column():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    payload = {"name": name, "column_name": column_name}
-                    if default_value is not None:
-                        payload["default_value"] = default_value
-                    buffer = await client.call_tool("add_csv_column", payload)
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_add_csv_column())
+            result = asyncio.run(_async_csv_tool_call("add_csv_column", {"name": name, "column_name": column_name, "default_value": default_value})) if not result else result
             
             if result and result.get('status') == 'success':
                 obs = f"Added column '{column_name}' to '{name}', new shape: {result.get('shape')}"
@@ -305,15 +222,7 @@ class QueryCSVTool(Tool):
         reward = 0.0
         
         try:
-            async def _query_csv():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    payload = {"name": name, "operation": operation}
-                    buffer = await client.call_tool("query_csv", payload)
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_query_csv())
+            result = asyncio.run(_async_csv_tool_call("query_csv", {"name": name, "operation": operation, "column": column, "conditions": conditions}))
             
             if result and result.get('status') == 'success':
                 query_result = result.get('result')
@@ -339,14 +248,7 @@ class ListCSVDatasetsTool(Tool):
         reward = 0.0
         
         try:
-            async def _list_csv_datasets():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    buffer = await client.call_tool("list_csv_datasets", {})
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_list_csv_datasets())
+            result = asyncio.run(_async_csv_tool_call("list_csv_datasets", {})) if not result else result
             
             if result and result.get('status') == 'success':
                 datasets = result.get('columns', [])
@@ -359,49 +261,15 @@ class ListCSVDatasetsTool(Tool):
             
         return build_formatted_output(action, obs, reward)
 
-class DeleteCSVDatasetTool(Tool):
-    name = "delete_csv_dataset_tool"
-    description = "Delete a dataset from memory."
-    inputs = {"name": {"type": "string", "description": "Name of the dataset to delete."}}
-    output_type = "string"
-
-    def forward(self, name: str) -> str:
-        action = f"delete_csv_dataset_tool({name})"
-        obs = ''
-        reward = 0.0
-        
-        try:
-            async def _delete_csv_dataset():
-                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-                    tools = await client.list_tools()
-                    print(f"Available tools: {tools}")
-                    buffer = await client.call_tool("delete_csv_dataset", {"name": name})
-                    return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
-            result = asyncio.run(_delete_csv_dataset())
-            
-            if result and result.get('status') == 'success':
-                obs = f"Deleted dataset '{name}'"
-                reward = 1.0
-            else:
-                obs = f"Failed to delete dataset '{name}'"
-                
-        except Exception as e:
-            obs = f"Error deleting dataset: {str(e)}"
-            
-        return build_formatted_output(action, obs, reward)
-
 # Tool instances
 create_csv_tool = CreateCSVTool()
 load_csv_tool = LoadCSVTool()
 get_csv_data_tool = GetCSVDataTool()
 add_csv_row_tool = AddCSVRowTool()
 update_csv_row_tool = UpdateCSVRowTool()
-delete_csv_row_tool = DeleteCSVRowTool()
 add_csv_column_tool = AddCSVColumnTool()
 query_csv_tool = QueryCSVTool()
 list_csv_datasets_tool = ListCSVDatasetsTool()
-delete_csv_dataset_tool = DeleteCSVDatasetTool()
 
 tools = [
     create_csv_tool,
@@ -409,11 +277,9 @@ tools = [
     get_csv_data_tool,
     add_csv_row_tool,
     update_csv_row_tool,
-    delete_csv_row_tool,
     add_csv_column_tool,
     query_csv_tool,
     list_csv_datasets_tool,
-    delete_csv_dataset_tool
 ]
 
 tools_name = [tool.name for tool in tools]

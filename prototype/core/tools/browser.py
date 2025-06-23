@@ -24,10 +24,11 @@ def build_formatted_output(action: str, observation: str, reward: float) -> str:
     }
     return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
-async def _async_tool_call(tool_name: str, params: dict) -> dict:
+async def _async_browser_tool_call(tool_name: str, params: dict) -> dict:
     async with Client(f"{API_BROWSER_TOOLS_URL}/mcp") as client:
         tools = await client.list_tools()
-        assert tool_name in tools, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_BROWSER_TOOLS_URL
+        tool_names = [tool.name for tool in tools]
+        assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_BROWSER_TOOLS_URL
         buffer = await client.call_tool(tool_name, params)
         return json.loads(buffer[0].text)
 
@@ -41,7 +42,7 @@ class SearchTool(Tool):
         obs = ''
         action = f"search_tool(query='{query}')"
         try:
-            result = asyncio.run(_async_tool_call("search", {"query": query}))
+            result = asyncio.run(_async_browser_tool_call("search", {"query": query}))
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
         except Exception as e:
@@ -61,7 +62,7 @@ class GoToUrlTool(Tool):
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(_async_tool_call("navigate", {"url": url}))
+            result = asyncio.run(_async_browser_tool_call("navigate", {"url": url}))
         except Exception as e:
             print(str(e))
             obs = f'failed to navigate to {url} due to error: {str(e)}'
@@ -90,7 +91,7 @@ class GetNavigableLinksTool(Tool):
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(_async_tool_call("get_links", {}))
+            result = asyncio.run(_async_browser_tool_call("get_links", {}))
         except Exception as e:
             print(str(e))
             obs = 'Error getting navigable links due to error ' + str(e)
@@ -115,7 +116,7 @@ class ScreenshotTool(Tool):
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(_async_tool_call("screenshot", {}))
+            result = asyncio.run(_async_browser_tool_call("screenshot", {}))
         except Exception as e:
             print(str(e))
             obs = 'Error taking screenshot due to error ' + str(e)
@@ -143,9 +144,3 @@ tools = [
 ]
 
 tools_name = [tool.name for tool in tools]
-
-if __name__ == "__main__":
-    print("Available tools:")
-    for tool in tools:
-        print(f"- {tool.name}: {tool.description}")
-    print
