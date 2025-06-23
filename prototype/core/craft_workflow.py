@@ -55,30 +55,31 @@ def get_codefile(path = "") -> str:
     except Exception as e:
         raise ValueError(f"Error reading file at {path}: {str(e)}")
 
-def get_tools_code(tools_client_dir) -> None:
+def load_tools_code(tools_dir) -> None:
     """Validate that the tools client directory exists and contains Python files"""
-    if not os.path.exists(tools_client_dir):
-        raise ValueError(f"Tools client directory '{tools_client_dir}' does not exist.")
-    if not any(filename.endswith('.py') for filename in os.listdir(tools_client_dir)):
-        raise ValueError(f"No Python files found in tools client directory '{tools_client_dir}'.")
+    if not os.path.exists(tools_dir):
+        raise ValueError(f"Tools client directory '{tools_dir}' does not exist.")
+    if not any(filename.endswith('.py') for filename in os.listdir(tools_dir)):
+        raise ValueError(f"No Python files found in tools client directory '{tools_dir}'.")
     
     tools_code = []
-    for filename in os.listdir(tools_client_dir):
+    for filename in os.listdir(tools_dir):
         if not filename.endswith('.py'):
             continue
-        filepath = os.path.join(tools_client_dir, filename)
+        filepath = os.path.join(tools_dir, filename)
         base_name = os.path.splitext(filename)[0]
         tools_code.append((base_name, get_codefile(filepath)))
     return tools_code
 
-def load_tools_client() -> str:
-    """Load the tools client code from all Python files in the tools_client directory"""
+def load_tools() -> str:
+    """Load the tools client code from all Python files in the tools directory"""
     tools_code = ""
     existing_tool_prompt = ""
-    tools_client_dir = "core/tools_client"
+    tools_dir = "core/tools"
 
-    tools_code = get_tools_code(tools_client_dir)
-    for base_name, code in tools_code:
+    loaded_tool = load_tools_code(tools_dir)
+    print(f"✅ Loaded {len(loaded_tool)} tools from {tools_dir}")
+    for base_name, code in loaded_tool:
         tools_code += code + '\n'
         # Add a special tool variable that copy the tools variable of the current file
         tool_var_name = f"{base_name.upper()}_TOOLS"
@@ -119,7 +120,7 @@ def create_folder_structure(uuid_str: str) -> None:
 def craft_workflow(goal_prompt: str, template_workflow=None) -> tuple[str, str]:
     uuid_str = str(uuid.uuid4()).replace("-", "")
     path = create_folder_structure(uuid_str)
-    tools_code, existing_tool_prompt = load_tools_client()
+    tools_code, existing_tool_prompt = load_tools()
     factory_code = load_factory_code()
     if template_workflow is None:
         workflow_code = create_workflow_code(goal_prompt, existing_tool_prompt)
@@ -168,5 +169,5 @@ except Exception as e:
     print(f"Could not save workflow data: {{e}}")
 '''
     code_path = os.path.join(path, f"workflow_code.py")
-    save_code_to_file(complete_code, code_path)
+    save_code_to_file(workflow_code, code_path)
     return complete_code

@@ -29,6 +29,7 @@ The multi-agent workflow is a graph of agents where nodes are either functions o
 
 ```python
 # State Schema - ALREADY DEFINED 
+
 class Action(TypedDict):
     tool: str
     inputs: dict
@@ -38,12 +39,12 @@ class Observation(TypedDict):
 
 # WorkflowState is passed between langraph node
 class WorkflowState(TypedDict):
-    step_name: List[str]
-    actions: List[Action]
-    observations: List[Observation]
-    rewards: List[float]
-    answers: List[str]
-    success: List[bool]
+    step_name: List[str] # Current step name
+    actions: List[Action] # List of action (tool used)
+    observations: List[Observation] # List of observation (tool feedback)
+    rewards: List[float] # List of reward based on success between 0 and 1
+    answers: List[str] # List of raw agent answer
+    success: List[bool] # List of success
 ```
 
 
@@ -175,15 +176,20 @@ workflow = StateGraph(WorkflowState)
 # MANDATORY: Agent instructions
 instruct_web = """You are a web research agent that searches and analyzes online content.
 
-## YOUR TASK
+## TASK
 - Search the web for information on given topics
 - Extract relevant data from web pages and articles
 - Provide clear, well-sourced findings
+
+## UPON COMPLETION
+
+If you consider research complete, say RESEARCH_SUCCESS
+If you consider you failed to find informations, say RESEARCH_FAILURE
 """
 
 instruct_chart = """You are a data visualization agent that creates charts and graphs.
 
-## YOUR TASK
+## TASK
 - Create visualizations based on provided data
 - Generate appropriate chart types for the data
 - Ensure charts are clear and informative
@@ -201,18 +207,17 @@ smolagent_chart = SmolAgentFactory(instruct_chart, EXISTING_TOOLS_CHART)
 ```python
 def advanced_router(state: WorkflowState) -> str:
     print("======== ROUTING DECISION ========")
-    print(f"📊 Current state keys: {list(state.keys())}")
-    
     try:
         success_list = state.get("success", [])
         step_name_list = state.get("step_name", [])
+        raw_answers = state.get("answers", [])
         
         if not success_list:
-            print("⚠️  No success history found - routing to chart_maker")
-            state["step_name"].append("chart_maker")
-            return "chart_maker"
+            print("⚠️  No success history found - routing back to web_task")
+            state["step_name"].append("web_task")
+            return "web_task"
             
-        last_success = success_list[-1]
+        last_success = "RESEARCH_SUCCESS" in raw_answers[-1]
         current_step = step_name_list[-1] if step_name_list else "unknown"
         
         if last_success:
@@ -221,23 +226,15 @@ def advanced_router(state: WorkflowState) -> str:
         else:
             retry_count = step_name_list.count(current_step)
             if retry_count < 3:
-                print(f"🔄 Retrying '{current_step}' (attempt {retry_count + 1}/3)")
+                print(f"🔄 Retrying {current_step}")
                 state["step_name"].append(f"{current_step}_retry")
                 return "retry_path"
             else:
-                print(f"❌ Max retries reached for '{current_step}' - using fallback")
-                state["step_name"].append("fallback_agent")
-                return "fallback_path"
-                
-    except (KeyError, IndexError) as e:
-        print(f"🚨 Error accessing state: {e}")
-        state["step_name"].append("emergency_fallback")
-        return "emergency_fallback"
+                print(f"❌ Max retries reached, giving up...")
+                return END 
     except Exception as e:
         print(f"💥 Unexpected error: {e}")
         return END
-    finally:
-        print("📍 ======== END ROUTING ========\n")
 ```
 
 # MANDATORY: Add nodes to workflow

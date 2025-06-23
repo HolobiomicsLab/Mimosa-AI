@@ -51,7 +51,7 @@ def select_workflow_template() -> str:
 def main():
     """Main execution function"""
     goal_prompt = """
-Generate a CSV file analyzing the major AI actors (companies, research institutions, and startups) in France and compare their budgets or funding with those of major AI actors in the USA. For each actor, include the organization name, type (e.g., company, startup, research institute), headquarters location, primary AI focus (e.g., generative AI, chip design, AI infrastructure), estimated annual AI-related budget or funding (in USD), and key funding sources (e.g., venture capital, government, corporate investment). Collect data for at least 10 actors in France and 10 in the USA. Add a column calculating the budget as a percentage of the total AI budget across all listed actors. Sort the CSV by budget in descending order and include a brief summary of findings in a separate text file, highlighting key differences in scale and funding sources between France and the USA.
+Search how to install the gpaw sotware on a Macos system with M1 chip. Then proceed to install it.
     """
     if not os.getenv('HF_TOKEN'):
         raise ValueError("HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")

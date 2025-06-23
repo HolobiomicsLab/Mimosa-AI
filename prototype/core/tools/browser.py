@@ -14,8 +14,7 @@ from smolagents import (
 )
 import json
 
-API_BASE_URL = 'http://localhost:5002'
-
+API_BROWSER_TOOLS_URL = 'http://localhost:5002'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     output = {
@@ -25,23 +24,24 @@ def build_formatted_output(action: str, observation: str, reward: float) -> str:
     }
     return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
+async def _async_tool_call(tool_name: str, params: dict) -> dict:
+    async with Client(f"{API_BROWSER_TOOLS_URL}/mcp") as client:
+        tools = await client.list_tools()
+        assert tool_name in tools, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_BROWSER_TOOLS_URL
+        buffer = await client.call_tool(tool_name, params)
+        return json.loads(buffer[0].text)
+
 class SearchTool(Tool):
     name = "search_tool"
     description = "Perform a search using DuckDuckGo and return the results."
     inputs = {"query": {"type": "string", "description": "The search query."}}
     output_type = "string"
 
-    async def _async_search(self, query: str) -> dict:
-        async with Client(f"{API_BASE_URL}/mcp") as client:
-            buffer = await client.call_tool("search", {"query": query})
-            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
     def forward(self, query: str) -> str:
         obs = ''
         action = f"search_tool(query='{query}')"
         try:
-            result = DuckDuckGoSearchTool
-            result = asyncio.run(self._async_search(query))
+            result = asyncio.run(_async_tool_call("search", {"query": query}))
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
         except Exception as e:
@@ -56,17 +56,12 @@ class GoToUrlTool(Tool):
     inputs = {"url": {"type": "string", "description": "The URL to navigate to."}}
     output_type = "string"
 
-    async def _async_navigate(self, url: str) -> dict:
-        async with Client(f"{API_BASE_URL}/mcp") as client:
-            buffer = await client.call_tool("navigate", {"url": url})
-            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
     def forward(self, url: str) -> str:
         action = f"go_to_url_tool(url='{url}')"
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(self._async_navigate(url))
+            result = asyncio.run(_async_tool_call("navigate", {"url": url}))
         except Exception as e:
             print(str(e))
             obs = f'failed to navigate to {url} due to error: {str(e)}'
@@ -90,17 +85,12 @@ class GetNavigableLinksTool(Tool):
     inputs = {}
     output_type = "string"
 
-    async def _async_get_links(self) -> dict:
-        async with Client(f"{API_BASE_URL}/mcp") as client:
-            buffer = await client.call_tool("get_links")
-            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
     def forward(self) -> str:
         action = 'get_navigable_links_tool()'
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(self._async_get_links())
+            result = asyncio.run(_async_tool_call("get_links", {}))
         except Exception as e:
             print(str(e))
             obs = 'Error getting navigable links due to error ' + str(e)
@@ -120,17 +110,12 @@ class ScreenshotTool(Tool):
     inputs = {}
     output_type = "string"
 
-    async def _async_screenshot(self) -> dict:
-        async with Client(f"{API_BASE_URL}/mcp") as client:
-            buffer = await client.call_tool("screenshot")
-            return json.loads(buffer[0].text) if buffer else {"status": "error", "message": "No response from server"}
-
     def forward(self) -> str:
         action = 'screenshot()'
         obs = ''
         reward = 0.0
         try:
-            result = asyncio.run(self._async_screenshot())
+            result = asyncio.run(_async_tool_call("screenshot", {}))
         except Exception as e:
             print(str(e))
             obs = 'Error taking screenshot due to error ' + str(e)

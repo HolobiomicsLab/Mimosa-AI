@@ -10,7 +10,7 @@ from fastmcp import Client
 
 from smolagents import Tool
 
-API_BASE_URL = 'http://localhost:5001'
+API_CSV_TOOLS_URL = 'http://localhost:5001'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     action_formatted = action[:256].strip().replace('\n', ' - ')
@@ -38,7 +38,7 @@ class CreateCSVTool(Tool):
         
         try:
             async def _create_csv():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     payload = {"name": name}
@@ -77,7 +77,7 @@ class LoadCSVTool(Tool):
         
         try:
             async def _load_csv():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     payload = {"source_path": file_path}
@@ -119,7 +119,7 @@ class GetCSVDataTool(Tool):
         
         try:
             async def _get_csv_data():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     payload = {"name": name}
@@ -159,7 +159,7 @@ class AddCSVRowTool(Tool):
         
         try:
             async def _add_csv_row():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     buffer = await client.call_tool("add_csv_row", {"name": name, "row": row})
@@ -195,7 +195,7 @@ class UpdateCSVRowTool(Tool):
         
         try:
             async def _update_csv_row():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     buffer = await client.call_tool("update_csv_row", {"name": name, "index": index, "row": row})
@@ -230,7 +230,7 @@ class DeleteCSVRowTool(Tool):
         
         try:
             async def _delete_csv_row():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     buffer = await client.call_tool("delete_csv_row", {"name": name, "index": index})
@@ -266,7 +266,7 @@ class AddCSVColumnTool(Tool):
         
         try:
             async def _add_csv_column():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     payload = {"name": name, "column_name": column_name}
@@ -306,7 +306,7 @@ class QueryCSVTool(Tool):
         
         try:
             async def _query_csv():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     payload = {"name": name, "operation": operation}
@@ -340,7 +340,7 @@ class ListCSVDatasetsTool(Tool):
         
         try:
             async def _list_csv_datasets():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     buffer = await client.call_tool("list_csv_datasets", {})
@@ -372,7 +372,7 @@ class DeleteCSVDatasetTool(Tool):
         
         try:
             async def _delete_csv_dataset():
-                async with Client(f"{API_BASE_URL}/mcp") as client:
+                async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
                     tools = await client.list_tools()
                     print(f"Available tools: {tools}")
                     buffer = await client.call_tool("delete_csv_dataset", {"name": name})
