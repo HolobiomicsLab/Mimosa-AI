@@ -1,6 +1,7 @@
 fastmcp==2.8.1
-python_a2a
+requests>=2.31.0
 smolagents[all]
 langgraph>=0.4.7
 matplotlib>=3.9.0
 numpy>=2.0.0
+python_a2a
