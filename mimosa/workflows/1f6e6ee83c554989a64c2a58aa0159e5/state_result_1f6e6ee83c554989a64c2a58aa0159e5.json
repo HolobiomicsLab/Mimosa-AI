@@ -1,0 +1,24 @@
+{
+  "step_name": [
+    "Initial Step"
+  ],
+  "actions": [
+    {
+      "tool": "No action"
+    }
+  ],
+  "observations": [
+    {
+      "data": "No observation"
+    }
+  ],
+  "rewards": [
+    0.0
+  ],
+  "answers": [
+    "GIVE_UP"
+  ],
+  "success": [
+    true
+  ]
+}
