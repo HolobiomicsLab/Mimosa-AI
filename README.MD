@@ -9,31 +9,29 @@
 - Python 3.10 or higher
 - pip3 package manager
 
-### Install & Run
+### 🚀 Install & Run
 
-0. **Setup your env file**
-
-```sh
+#### Step 1: Environment Setup
+```bash
 mv .env.example .env
 ```
+Configure your `.env` file with the following API keys:
+- `HF_TOKEN`: Your Hugging Face token
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `LANGFUSE_PUBLIC_KEY` & `LANGFUSE_PRIVATE_KEY`: Optional, for [telemetry monitoring](https://huggingface.co/docs/smolagents/tutorials/inspect_runs)
 
-Fill with your API key for `HF_TOKEN` and `OPENAI_API_KEY`.
+#### Step 2: Install Dependencies
+```bash
+pip3 install -r requirements.txt
+```
 
-`LANGFUSE_PUBLIC/PRIVATE_KEY` are only needed if you wish to setup agent [telemetry](https://huggingface.co/docs/smolagents/tutorials/inspect_runs).
+#### Step 3: Start MCP Server
+Launch the toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)
 
-1. **Install dependencies**
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-
-2. **Run the toolomics MCP server**
-
-See instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)
-
-2. **Run the main script with a goal**:
-    ```bash
-    python3 main.py --goal "Your research objective here"
-    ```
+#### Step 4: Run Mimosa-AI
+```bash
+python3 main.py --goal "Your research objective here"
+```
 
 ### Usage Options
 
