@@ -80,11 +80,3 @@ class LLMProvider:
             return thought
         except Exception as e:
             raise RuntimeError(f"❌ OpenAI API error: {str(e)}") from e
-
-
-# Legacy functions for backward compatibility
-def deepseek_fn(history: List[Dict[str, str]], verbose: bool = False) -> str:
-    return LLMProvider().deepseek_completion(history, verbose)
-
-def openai_fn(history: List[Dict[str, str]], verbose: bool = False) -> str:
-    return LLMProvider().openai_completion(history, verbose)

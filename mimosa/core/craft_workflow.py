@@ -1,7 +1,7 @@
 import uuid
 import os
 from typing import Optional, Tuple
-from core.provider import openai_fn, deepseek_fn
+from core.provider import LLMProvider
 
 
 class WorkflowCrafting:
@@ -27,9 +27,6 @@ class WorkflowCrafting:
         
         Returns:
             str: The system prompt content
-            
-        Raises:
-            ValueError: If prompt file cannot be read
         """
         try:
             with open("prompts/workflow_creator.md", 'r') as f:
@@ -49,17 +46,17 @@ class WorkflowCrafting:
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
-The following set of tools are available for agents:
+The following tools packages are available for agents:
 {existing_tool_prompt}
 
-Your task is to create a LangGraph workflow that achieves:
+Your task is to create a LangGraph-SmolAgent workflow that achieves:
 {goal_prompt}
         """
         history = [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': prompt}
         ]
-        return openai_fn(history)
+        return LLMProvider().openai_completion(history, verbose=False)
 
     @staticmethod
     def extract_python_code(code: str) -> str:

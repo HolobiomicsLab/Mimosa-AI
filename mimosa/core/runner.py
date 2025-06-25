@@ -8,27 +8,24 @@ class WorkflowRunner:
         process (subprocess.Popen): The subprocess running the workflow
     """
     
-    def __init__(self) -> None:
+    def __init__(self, python_version: str = "3.10") -> None:
         """Initialize the workflow runner."""
         self.process: Optional[subprocess.Popen] = None
+        self.python_version = python_version
 
     def run(self, code: str) -> int:
         """Execute the given workflow code in a sandboxed subprocess.
         
         Args:
             code: The Python code to execute
-            
         Returns:
             int: The return code of the execution (0 for success)
-            
-        Raises:
-            RuntimeError: If execution fails with non-zero exit code
         """
         print("\n🔧 Executing generated workflow in sandbox...")
         
         try:
             self.process = subprocess.Popen(
-                ["python", "-c", code],
+                ["python3.10", "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -53,8 +50,3 @@ class WorkflowRunner:
         except Exception as e:
             print(f"❌ Error during execution: {e}")
             raise RuntimeError(f"Failed to execute workflow: {str(e)}")
-
-
-def runner(code: str) -> str:
-    """Legacy runner function (maintained for backward compatibility)."""
-    return WorkflowRunner().run(code)

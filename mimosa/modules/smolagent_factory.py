@@ -1,5 +1,8 @@
 
 import os
+import base64
+import json
+import re
 from typing import Callable
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
@@ -10,12 +13,35 @@ from smolagents import (
     ActionStep,
     TaskStep
 )
+
+from opentelemetry.sdk.trace import TracerProvider
+
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
-import json
-import re
+
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {}
+
+
+LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_AUTH=base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
+
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel" # EU data region
+os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {LANGFUSE_AUTH}"
+
+trace_provider = TracerProvider()
+trace_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
+
+SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
+
 
 # good models:
 #Qwen/Qwen2.5-72B-Instruct
@@ -101,11 +127,11 @@ class SmolAgentFactory:
             if not action or action == {}:
                 continue
             trajectory_str += f"""
-        ### Step {idx + 1}:
-        Action: {action['tool']}
-        Observation: {observation['data'][:256]}... (truncated for brevity)
-        Success: {success}
-        ---
+            ### Step {idx + 1}:
+            Action: {action['tool']}
+            Observation: {observation['data'][:256]}... (truncated for brevity)
+            Success: {success}
+            ---
             """
         state_answers = state.get("answers", [])
         prev_infos = state_answers[-1] if state_answers else "No information yet"
@@ -121,13 +147,12 @@ class SmolAgentFactory:
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
+
     def parse_tool_output(self, output: str):
-        
         actions = []
         observations = []
         rewards = []
         success = []
-        
         # Look for ```json blocks in the output
         json_blocks = re.findall(r"```json\n(.*?)\n```", output, re.DOTALL)
         if not json_blocks:
