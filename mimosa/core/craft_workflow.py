@@ -173,7 +173,9 @@ import os
 
 # Initialize and execute workflow
 initial_state = {{
-    "step_name": ["{goal_prompt}"],
+    "workflow_uuid": "{uuid_str}",
+    "step_name": [],
+    "step_uuid": [],
     "actions": [],
     "observations": [],
     "rewards": [],

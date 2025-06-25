@@ -3,6 +3,8 @@ import os
 import base64
 import json
 import re
+import time
+import uuid
 from typing import Callable
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 from smolagents import (
@@ -29,7 +31,6 @@ BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {}
 
-
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
 LANGFUSE_AUTH=base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
@@ -42,14 +43,15 @@ trace_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
 
 SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
-
 # good models:
 #Qwen/Qwen2.5-72B-Instruct
 #Qwen/Qwen2.5-Coder-32B-Instruct
 # deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
-    def __init__(self, instruct_prompt, tools,
+    def __init__(self,
+                 instruct_prompt,
+                 tools,
                  model_id="deepseek-ai/DeepSeek-V3",
                  engine_name="hf_api",
                  max_steps=10
@@ -63,6 +65,9 @@ class SmolAgentFactory:
         self.local = False
         self.engine_name = engine_name
         self.engine = None
+        self.run_uuid = str(uuid.uuid4())
+        self.memory_folder = 'memory' 
+        os.makedirs(self.memory_folder, exist_ok=True)
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
@@ -77,7 +82,7 @@ class SmolAgentFactory:
         )
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-    
+        
     def get_engine(self):
         if self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
@@ -178,7 +183,8 @@ class SmolAgentFactory:
             (sum(rewards) / len(rewards)) if len(rewards) > 0 else 0,
             any(success) or len(success) == 0
         )
-
+    
+    
     def parse_memory_output(self):
         text_memory_length = 0 
         actions, observations, rewards, success = [], [], [], []
@@ -200,14 +206,70 @@ class SmolAgentFactory:
         print(f"Total text memory length: {text_memory_length} characters.")
         return actions, observations, rewards, success
 
+    def save_memories(self, workflow_uuid: str):
+        memories = []
+        memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
+        date_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        for memory_json in self.agent.memory.get_full_steps():
+            memories.append(memory_json)
+        try:
+            os.makedirs(memory_folder_path, exist_ok=True)
+            with open(os.path.join(memory_folder_path, f"memory_{self.run_uuid}.json"), "w") as f:
+                json.dump(memories, f, indent=2)
+        except Exception as e:
+            raise ValueError(f"Failed to save memory: {str(e)}")
+
+    def get_memory_file_paths(self, workflow_uuid: Optional[str] = None) -> str:
+        files = []
+        if not workflow_uuid:
+            return []
+        memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
+        for file in os.listdir(memory_folder_path):
+            if file.startswith("memory_") and file.endswith(".json"):
+                files.append(file)
+        return files
+    
+    def load_memories(self, file_path):
+        memories = []
+        try:
+            with open(file_path, "r") as f:
+                memories = json.load(f)
+        except FileNotFoundError:
+            print(f"No cached memory found for run {self.run_uuid}. Starting fresh.")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to load memory: {str(e)}")
+        print(f"Loaded {len(memories)} steps from memory for run {self.run_uuid}.")
+        return memories
+    
+    def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        memories = []
+        workflow_uuid = state.get("workflow_uuid", None)
+        memories_files = self.get_memory_file_paths(workflow_uuid=workflow_uuid)
+        for memory_file in memories_files:
+            memory = self.load_memories(memory_file)
+            memories.extend(memory)
+        if not memories or len(memories) == 0:
+            output = self.agent.run(instructions)
+            self.save_memories(workflow_uuid=workflow_uuid)
+            return output
+        for memory in memories:
+            print("loading memory:\n", memory)
+            # TODO how to make a ActionStep from a memory?
+            #if memory.get("task") == state.get("task_prompt"):
+            #    self.agent.memory.steps.append(memory)
+            exit()
+        return self.agent.run(instructions)
+
+
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_workflow_step_prompt(state)
         try:
-            result = self.agent.run(instructions)
+            result = self.run_cached(state, instructions)
         except Exception as e:
             print(f"Error running agent: {e}")
             return {
                 **state,
+                "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
                 "actions": state.get("actions", []) + [{"tool": "LLM request"}],
                 "observations": state.get("observations", []) + [{"data": str(e)}],
                 "rewards": state.get("rewards", []) + [0.0],
@@ -226,6 +288,7 @@ class SmolAgentFactory:
         success_bool = success[-1] if len(success) > 0 else True
         return {
             **state,
+            "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "rewards": state.get("rewards", []) + [reward],

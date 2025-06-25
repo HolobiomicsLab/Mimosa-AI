@@ -9,9 +9,12 @@ import sys
 import argparse
 import requests
 from typing import Optional
+import dotenv
 
 from core.craft_workflow import WorkflowCrafting
 from core.runner import WorkflowRunner
+
+dotenv.load_dotenv()
 
 class MimosaApp:
     """Main application class for the Mimosa AI Agent Framework.
@@ -28,11 +31,11 @@ class MimosaApp:
         """
         self.workflow_dir = workflow_dir
 
-    def select_workflow_template(self, workflow_uuid: Optional[str] = None) -> str:
+    def select_workflow_template(self, template_uuid: Optional[str] = None) -> str:
         """Select and load a workflow template by UUID.
         
         Args:
-            workflow_uuid: Optional UUID of workflow template to load
+            template_uuid: Optional UUID of workflow template to load
         Returns:
             str: The workflow template content if found, None otherwise
         """
@@ -41,35 +44,36 @@ class MimosaApp:
         workflows = [f for f in os.listdir(self.workflow_dir)]
         if not workflows:
             return None
-        if workflow_uuid is None:
+        if template_uuid is None:
             # TODO implement a auto-selection mechanism for available workflows
             return None
         try:
-            with open(f"{self.workflow_dir}/{workflow_uuid}/workflow_code_{workflow_uuid}.py", 'r') as f:
+            with open(f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py", 'r') as f:
                 return f.read()
         except FileNotFoundError:
-            raise ValueError(f"❌ Workflow template for UUID {workflow_uuid} not found in {self.workflow_dir}.")
+            raise ValueError(f"❌ Workflow template for UUID {template_uuid} not found in {self.workflow_dir}.")
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow template: {str(e)}")
 
     def orchestrate_workflow(self, goal_prompt: str,
-                                   workflow_uuid: Optional[str] = None,
+                                   template_uuid: Optional[str] = None,
                                    python_version: str = "3.10") -> str:
         """Execute a workflow with the given goal prompt.
         
         Args:
             goal_prompt: The goal description for the workflow
-            workflow_uuid: Optional UUID of a workflow template to load
+            template_uuid: Optional UUID of a workflow template to load
         Returns:
             str: Execution status message
         """
+        workflow_crafter = WorkflowCrafting(tools_dir="modules/tools",
+                                            workflow_dir=self.workflow_dir)
         workflow_runner = WorkflowRunner(python_version=python_version)
-        workflow_crafter = WorkflowCrafting(tools_dir="modules/tools", workflow_dir=self.workflow_dir)
         try:
             workflow_code = workflow_crafter.craft_workflow(
                 goal_prompt,
-                template_workflow=self.select_workflow_template(workflow_uuid=workflow_uuid),
-                save_workflow=(workflow_uuid is not None),
+                template_workflow=self.select_workflow_template(template_uuid=template_uuid),
+                save_workflow=(template_uuid is None),
             )
             workflow_runner.run(workflow_code)
             return "Workflow executed successfully"
@@ -127,7 +131,7 @@ def main():
     app = MimosaApp()
     app.validate_environment()
     app.install_dependencies()
-    app.orchestrate_workflow(goal_prompt=args.goal, workflow_uuid=args.load_template)
+    app.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
 
 
 if __name__ == "__main__":

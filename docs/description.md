@@ -17,7 +17,7 @@ Information between node is transfered throught a state dict:
 
 ```python
 class WorkflowState(TypedDict):
-    step_name: List[str] # Current step name
+    step_uuid: List[str] # Current step name
     answers: List[str] # List of raw agent answer
     success: List[bool] # List of success
 ```
