@@ -5,17 +5,6 @@
 *.safetensors
 *.egg-info
 cookies.json
-test_agent.py
-config.ini
-.voices/
-.logs/
-.screenshots/
-.screenshots/*.png
-.screenshots/*.jpg
-conversations/
-experimentation
-mimosa-experimental-env/
-mimosa-env/*
 .env
 */.env
 
@@ -27,6 +16,7 @@ logs
 **/*.back.*
 node_modules
 bower_components
+mimosa/.debug
 *.sublime*
 psd
 thumb
