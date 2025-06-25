@@ -11,7 +11,7 @@
 
 ### Install & Run
 
-0. Setup your env file
+0. **Setup your env file**
 
 ```sh
 mv .env.example .env
