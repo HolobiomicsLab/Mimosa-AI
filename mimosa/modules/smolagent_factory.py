@@ -7,14 +7,18 @@ import time
 import uuid
 from typing import Callable
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
+import smolagents
 from smolagents import (
     CodeAgent,
-    HfApiModel,
     MLXModel,
-    InferenceClientModel,
     ActionStep,
     TaskStep
 )
+
+try:
+    from smolagents import HfApiModel
+except ImportError:
+    from smolagents import InferenceClientModel as HfApiModel # HfApiModel was renamed to InferenceClientModel in v1.14 https://github.com/huggingface/smolagents/releases
 
 from opentelemetry.sdk.trace import TracerProvider
 
@@ -66,7 +70,7 @@ class SmolAgentFactory:
         self.engine_name = engine_name
         self.engine = None
         self.run_uuid = str(uuid.uuid4())
-        self.memory_folder = 'memory' 
+        self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
 
         if not self.token:
@@ -208,8 +212,10 @@ class SmolAgentFactory:
 
     def save_memories(self, workflow_uuid: str):
         memories = []
+        if not workflow_uuid or not workflow_uuid.strip():
+            return
         memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-        date_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        #self.agent.save(f"./{memory_folder_path}/save_{workflow_uuid}_{self.run_uuid}.json")
         for memory_json in self.agent.memory.get_full_steps():
             memories.append(memory_json)
         try:
@@ -221,9 +227,12 @@ class SmolAgentFactory:
 
     def get_memory_file_paths(self, workflow_uuid: Optional[str] = None) -> str:
         files = []
-        if not workflow_uuid:
+        if workflow_uuid is None or not workflow_uuid.strip():
             return []
         memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
+        if not os.path.exists(memory_folder_path):
+            print(f"Memory folder {memory_folder_path} does not exist. No cached memories available.")
+            return []
         for file in os.listdir(memory_folder_path):
             if file.startswith("memory_") and file.endswith(".json"):
                 files.append(file)
@@ -236,6 +245,7 @@ class SmolAgentFactory:
                 memories = json.load(f)
         except FileNotFoundError:
             print(f"No cached memory found for run {self.run_uuid}. Starting fresh.")
+            return []
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
         print(f"Loaded {len(memories)} steps from memory for run {self.run_uuid}.")
@@ -267,6 +277,7 @@ class SmolAgentFactory:
             result = self.run_cached(state, instructions)
         except Exception as e:
             print(f"Error running agent: {e}")
+            raise e
             return {
                 **state,
                 "step_uuid": state.get("step_uuid", []) + [self.run_uuid],

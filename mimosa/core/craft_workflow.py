@@ -144,7 +144,7 @@ Your task is to create a LangGraph-SmolAgent workflow that achieves:
         print(f"✅ Created workflow directory: {workflow_path}")
         return workflow_path
 
-    def assemblate_workflow(self, goal_prompt: str,
+    def assemble_workflow(self, goal_prompt: str,
                             tools_code: str,
                             state_code: str,
                             smolagent_factory_code: str,
@@ -153,11 +153,9 @@ Your task is to create a LangGraph-SmolAgent workflow that achieves:
                             uuid_str: str
                            ) -> str:
         return f'''
-from smolagents import CodeAgent, tool, HfApiModel
-from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
-import json
 import os
+import json
+from langgraph.graph import StateGraph, START, END
 
 # Load tools
 {tools_code}
@@ -184,11 +182,17 @@ initial_state = {{
 }}
 
 try:
-    png = app.get_graph().draw_mermaid_png()
-    with open(os.path.join("{path}", "workflow_{uuid_str}.png"), "wb") as f:
-        f.write(png)
+    if "{path}":
+        print("Saving workflow graph PNG at :", "{path}")
+        try:
+            png = app.get_graph().draw_mermaid_png()
+            with open(os.path.join("{path}", "workflow_{uuid_str}.png"), "wb") as f:
+                f.write(png)
+        except Exception as e:
+            raise(f"Could not save workflow graph:" + str(e))
 except Exception as e:
-    print(f"Could not save workflow graph:" + str(e))
+    print(f"❌ Error saving PNG workflow:" + str(e))
+    pass
 
 try:
     result_state = app.invoke(initial_state)
@@ -196,11 +200,13 @@ except KeyboardInterrupt:
     print("Workflow execution interrupted by user")
     pass
 
-try:
-    with open(os.path.join("{path}", "state_result_{uuid_str}.json"), "w") as f:
-        json.dump(result_state, f, indent=2)
-except Exception as e:
-    print(f"Could not save workflow data:" + str(e))
+if "{path}":
+    print("Saving workflow state JSON at :", "{path}")
+    try:
+        with open(os.path.join("{path}", "state_result_{uuid_str}.json"), "w") as f:
+            json.dump(result_state, f, indent=2)
+    except Exception as e:
+        raise(f"Could not save workflow data:" + str(e))
 '''
 
     def craft_workflow(
@@ -231,7 +237,7 @@ except Exception as e:
         
         path = self.create_folder_structure(uuid_str) if save_workflow else ""
         
-        complete_code = self.assemblate_workflow(
+        complete_code = self.assemble_workflow(
             goal_prompt,
             tools_code,
             state_code,
@@ -248,13 +254,12 @@ except Exception as e:
                 print(f"✅ Saved workflow code to: {path}/workflow_code_{uuid_str}.py")
             except Exception as e:
                 print(f"❌ Failed to save workflow code: {str(e)}")
-        
-        try:
-            with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), 'w') as f:
-                f.write(self.get_system_prompt())
-            print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
-        except Exception as e:
-            print(f"❌ Failed to save system prompt: {str(e)}")
+            try:
+                with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), 'w') as f:
+                    f.write(self.get_system_prompt())
+                print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
+            except Exception as e:
+                print(f"❌ Failed to save system prompt: {str(e)}")
         return complete_code
 
 def craft_workflow(goal_prompt: str, template_workflow=None, save_workflow=True) -> str:
