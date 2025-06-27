@@ -81,12 +81,13 @@ class WorkflowNodeFactory:
 ```
 
 **Example declaration of SmolAgent node**:
+
 ```python
 workflow.add_node("web_surfer", WorkflowNodeFactory.create_agent_node(smolagent_web))
 workflow.add_node("chart_maker", WorkflowNodeFactory.create_agent_node(smolagent_chart))
 ```
 
-Do not redefine function or class, Do not write dummy functions. Everything is ready for use.
+Do not redefine these methods. Do not try to import. Everything you need is ready for use and be inserted in the environment.
 
 ### Conditional Routing Function with Error Handling
 

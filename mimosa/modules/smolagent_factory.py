@@ -221,7 +221,7 @@ class SmolAgentFactory:
         try:
             os.makedirs(memory_folder_path, exist_ok=True)
             with open(os.path.join(memory_folder_path, f"memory_{self.run_uuid}.json"), "w") as f:
-                json.dump(memories, f, indent=2)
+                json.dump(str(memories), f, indent=2)
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}")
 

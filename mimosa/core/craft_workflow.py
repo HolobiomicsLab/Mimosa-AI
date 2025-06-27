@@ -154,8 +154,11 @@ Your task is to create a LangGraph-SmolAgent workflow that achieves:
                            ) -> str:
         return f'''
 import os
+import sys
+import re
 import json
 from langgraph.graph import StateGraph, START, END
+from typing import TypedDict, List
 
 # Load tools
 {tools_code}
