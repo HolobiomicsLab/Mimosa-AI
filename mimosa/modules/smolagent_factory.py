@@ -72,6 +72,18 @@ class SmolAgentFactory:
         self.run_uuid = str(uuid.uuid4())
         self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
+        self.additional_system_prompt = """
+        When calling final_answer tool, you you must return a long, detailed paragraph that includes:
+        - All key findings and data points you discovered
+        - Specific sources and URLs where information was found
+        - Any important context or background information
+        - Any error codes or technical messages received
+        - What tools or capabilities you would need to resolve this issue
+        - Clear connections between different pieces of information found
+        - Special words like "RESEARCH_COMPLETE" or "RESEARCH_FAILURE" to indicate the end of the research.
+        for example:
+            final_answer('Here is the detailed summary of my findings: ...<very very detailed findings and explanation> RESEARCH_COMPLETE')
+        """
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
@@ -83,10 +95,17 @@ class SmolAgentFactory:
                 name="agent",
                 max_steps=max_steps,
                 additional_authorized_imports=["*"]
-        )
+            )
+            self.extend_system_prompt(self.additional_system_prompt)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-        
+    
+    def extend_system_prompt(self, added_prompt: str):
+        """Override the system prompt for the agent."""
+        if not added_prompt or not added_prompt.strip():
+            raise ValueError("System prompt cannot be empty.")
+        self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
+
     def get_engine(self):
         if self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
@@ -126,32 +145,30 @@ class SmolAgentFactory:
         state_observations = state.get("observations", [])
         state_success = state.get("success", [])
         state_rewards = state.get("rewards", [])
+        state_answers = state.get("answers", [])
         trajectories = zip(
             state_actions, 
             state_observations, 
             state_success
         )
         trajectory_str = ""
-        for idx, (action, observation, success) in enumerate(trajectories):
-            if not action or action == {}:
-                continue
-            trajectory_str += f"""
-            ### Step {idx + 1}:
-            Action: {action['tool']}
-            Observation: {observation['data'][:256]}... (truncated for brevity)
-            Success: {success}
-            ---
-            """
-        state_answers = state.get("answers", [])
-        prev_infos = state_answers[-1] if state_answers else "No information yet"
+        #for idx, (action, observation, success) in enumerate(trajectories):
+        #    if not action or action == {}:
+        #        continue
+        #    trajectory_str += f"""
+        #    ### Step {idx + 1}:
+        #    Action: {action.get("tool", "No action specified")}
+        #    Observation: {observation.get('data', 'No observation data')}... (truncated for brevity)
+        #    Success: {success}
+        #    ---
+        #    """
+        prev_infos = state_answers[-1] if state_answers else ""
         return f"""
         You are an AI agent designed to assist with a specific task.
         Previous agents have provided the following information:
         {prev_infos}
         Your need to follow instructions:
         {self.instruct_prompt}
-        You conducted the previous actions and observations:
-        {trajectory_str}
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
@@ -274,7 +291,7 @@ class SmolAgentFactory:
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_workflow_step_prompt(state)
         try:
-            result = self.run_cached(state, instructions)
+            answer = self.run_cached(state, instructions)
         except Exception as e:
             print(f"Error running agent: {e}")
             raise e
@@ -304,7 +321,7 @@ class SmolAgentFactory:
             "observations": state.get("observations", []) + [obs],
             "rewards": state.get("rewards", []) + [reward],
             "success": state.get("success", []) + [success_bool],
-            "answers": state.get("answers", []) + [result],
+            "answers": state.get("answers", []) + [answer],
         }
 
 class WorkflowNodeFactory:

@@ -64,23 +64,39 @@ Use specific, actionable instructions with proper context injection:
 ```python
 # Good Example - Specific and contextual with special routing words
 instruct_web = """You are a web research agent that searches and analyzes online content.
-
 ## YOUR TASK
 - Search the web for information on given topics
 - Extract relevant data from web pages and articles
 - Provide clear, well-sourced findings
 
-# UPON COMPLETION
+## UPON COMPLETION
 
-If you found relevant information and you task is complete, say RESEARCH_COMPLETE
-If you consider you failed to find informations, say RESEARCH_FAILURE
-If you give or encounter error or situation you cannot face, say GIVE_UP
+**SUCCESS CASE**: If you found relevant information and your task is complete, you MUST provide a comprehensive summary in a long, detailed paragraph that includes:
+- All key findings and data points you discovered
+- Specific sources and URLs where information was found
+- Any important context or background information
+After this detailed summary, end with the exact phrase: RESEARCH_COMPLETE
 
-# WARNING
+**FAILURE CASE**: If you failed to find sufficient information, you MUST provide a detailed explanation including:
+- Exactly what search terms and strategies you attempted
+- Specific error messages or access issues encountered
+- What types of information you were looking for but couldn't find
+- Concrete suggestions for alternative search approaches or sources that might work better
+After this detailed failure analysis, end with the exact phrase: RESEARCH_FAILURE
 
-- Do not say RESEARCH_COMPLETE if previous steps failed instead say RESEARCH_FAILURE
-- Do not say RESEARCH_COMPLETE if informations are not enought to answer the query instead say RESEARCH_FAILURE
-- If and only if encountering an unknown, fatal error from tool then GIVE_UP.
+**ERROR CASE**: If you encounter technical errors or situations you cannot handle, you MUST explain:
+- The exact nature of the error or technical problem
+- What you were attempting to do when the error occurred
+- How a human operator or different agent could assist
+After this detailed error explanation, end with the exact phrase: GIVE_UP
+
+## CRITICAL REQUIREMENTS
+
+- Do NOT say RESEARCH_COMPLETE unless you have substantial, useful information to share
+- Do NOT say RESEARCH_COMPLETE if previous steps failed - use RESEARCH_FAILURE instead
+- Do NOT say RESEARCH_COMPLETE if information is insufficient to answer the query - use RESEARCH_FAILURE instead
+- Only use GIVE_UP for genuine technical errors that prevent tool operation, not for lack of information
+- Your detailed explanations are crucial for follow-up agents to understand what was attempted and what should be tried next
 """
 ```
 
@@ -144,7 +160,7 @@ def routing_function(state: WorkflowState) -> str:
             state["step_name"].append("fallback_agent")
             return "fallback_agent"
         
-        if state["success"][-1] and "SUCCESS" in state["answers"][-1]:
+        if "SUCCESS" in state["answers"][-1]:
             return "next_agent"
         else:
             return "retry_agent"
@@ -218,7 +234,7 @@ def advanced_router(state: WorkflowState) -> str:
             state["step_name"].append("web_task")
             return "web_task"
             
-        last_success = "RESEARCH_COMPLETE" in raw_answers[-1] or success_list[-1] == "success"
+        last_success = "RESEARCH_COMPLETE" in raw_answers[-1]
         current_step = step_name_list[-1] if step_name_list else "unknown"
         
         if last_success:
@@ -286,6 +302,7 @@ app = workflow.compile()
 - [ ] Emergency fallback routes that always lead to END or safe completion
 - [ ] Comprehensive try-catch blocks in ALL routing functions
 - [ ] State validation before every routing decision
+- [ ] Agent might not respect your prompt, they might not say SEARCH_FAILURE when they should, you must handle that.
 
 ### MANDATORY Technical Requirements
 - [ ] All nodes have clear, specific purposes with atomic operations

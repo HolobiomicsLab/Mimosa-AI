@@ -70,7 +70,7 @@ class LLMProvider:
         try:
             response = self.openai_client.chat.completions.create(
                 model="o3-2025-04-16",
-                messages=history,
+                messages=history
             )
             if response is None:
                 raise RuntimeError("❌ OpenAI response is empty")
