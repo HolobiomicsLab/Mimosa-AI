@@ -1,7 +1,7 @@
 
 import sys, os
-from core.craft_workflow import WorkflowCrafting
-from core.runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
+from core.workflow_factory import WorkflowFactory
+from core.code_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 from typing import Optional
 
 class WorkflowOrchestrator:
@@ -11,19 +11,19 @@ class WorkflowOrchestrator:
         workflow_dir (str): Directory containing workflow templates
     """
     
-    def __init__(self, workflow_dir: str = "workflows") -> None:
+    def __init__(self, config) -> None:
         """Initialize the Mimosa application.
         
         Args:
-            workflow_dir: Path to directory containing workflow templates
+            config: Configuration object containing paths and settings
         """
-        self.workflow_dir = workflow_dir
-        self.workflow_crafter = WorkflowCrafting(tools_dir="modules/tools",
-                                                 workflow_dir=self.workflow_dir)
+        self.workflow_dir = config.workflow_dir
+        self.workflow_factory = WorkflowFactory(config)
+
         self.runner_config = RuntimeConfig(
-            python_version="3.10",
-            timeout=3600,
-            max_memory_mb=1024
+            python_version=config.runner_default_python_version,
+            timeout=config.runner_default_timeout,
+            max_memory_mb=config.runner_default_max_memory_mb,
         )
         self.workflow_runner = WorkflowRunner(self.runner_config)
 
@@ -97,7 +97,7 @@ class WorkflowOrchestrator:
             str: Execution status message
         """
 
-        workflow_code = self.workflow_crafter.craft_workflow(
+        workflow_code = self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=self.select_workflow_template(template_uuid=template_uuid),
             save_workflow=(template_uuid is None),

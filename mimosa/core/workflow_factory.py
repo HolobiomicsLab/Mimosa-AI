@@ -1,10 +1,9 @@
 import uuid
 import os
 from typing import Optional, Tuple
-from core.provider import LLMProvider
+from core.llm_provider import LLMProvider
 
-
-class WorkflowCrafting:
+class WorkflowFactory:
     """Handles the creation and management of AI workflow generation.
     
     Attributes:
@@ -12,15 +11,17 @@ class WorkflowCrafting:
         workflow_dir (str): Base directory for workflow storage
     """
     
-    def __init__(self, tools_dir: str = "modules/tools", workflow_dir: str = "workflows") -> None:
+    def __init__(self, config) -> None:
         """Initialize the workflow crafting system.
         
         Args:
-            tools_dir: Path to directory containing tool modules
-            workflow_dir: Base directory for workflow storage
+            config: Configuration object containing paths and settings
         """
-        self.tools_dir = tools_dir
-        self.workflow_dir = workflow_dir
+        self.tools_dir = config.tools_dir
+        self.workflow_dir = config.workflow_dir
+        self.schema_code_path = config.schema_code_path
+        self.smolagent_factory_code_path = config.smolagent_factory_code_path
+        self.prompt_workflow_creator = config.prompt_workflow_creator
 
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
@@ -29,7 +30,7 @@ class WorkflowCrafting:
             str: The system prompt content
         """
         try:
-            with open("prompts/workflow_creator.md", 'r') as f:
+            with open(self.prompt_workflow_creator, 'r') as f:
                 return f.read()
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}")
@@ -230,8 +231,8 @@ if "{path}":
         uuid_str = str(uuid.uuid4()).replace("-", "")
         tools_code, existing_tool_prompt = self.load_tools_code()
         
-        state_code = open("modules/state_schema.py").read()
-        smolagent_factory_code = open("modules/smolagent_factory.py").read()
+        state_code = open(self.schema_code_path).read()
+        smolagent_factory_code = open(self.smolagent_factory_code_path).read()
         workflow_code = (
             template_workflow 
             if template_workflow 
@@ -264,6 +265,3 @@ if "{path}":
             except Exception as e:
                 print(f"❌ Failed to save system prompt: {str(e)}")
         return complete_code
-
-def craft_workflow(goal_prompt: str, template_workflow=None, save_workflow=True) -> str:
-    return WorkflowCrafting().craft_workflow(goal_prompt, template_workflow, save_workflow)

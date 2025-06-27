@@ -74,13 +74,13 @@ instruct_web = """You are a web research agent that searches and analyzes online
 
 If you found relevant information and you task is complete, say RESEARCH_COMPLETE
 If you consider you failed to find informations, say RESEARCH_FAILURE
-If you give or encounter error or situtation you cannot face, say GIVE_UP
+If you give or encounter error or situation you cannot face, say GIVE_UP
 
 # WARNING
 
 - Do not say RESEARCH_COMPLETE if previous steps failed instead say RESEARCH_FAILURE
 - Do not say RESEARCH_COMPLETE if informations are not enought to answer the query instead say RESEARCH_FAILURE
-- If encountering an unknown error from tool then GIVE UP, you are not alone, other agents will take care of it.
+- If and only if encountering an unknown, fatal error from tool then GIVE_UP.
 """
 ```
 
@@ -281,7 +281,7 @@ app = workflow.compile()
 - [ ] Task broken down to smallest logical units (divide and conquer principle)
 
 ### MANDATORY Error Handling & Fallback Requirements
-- [ ] **Every agent has 2+ fallback paths** (retry, graceful degradation, give up)
+- [ ] **Every agent has 2+ fallback paths**
 - [ ] Retry mechanisms with attempt counters (max 3 retries per agent)
 - [ ] Emergency fallback routes that always lead to END or safe completion
 - [ ] Comprehensive try-catch blocks in ALL routing functions
