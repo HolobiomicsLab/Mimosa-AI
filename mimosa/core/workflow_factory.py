@@ -35,23 +35,15 @@ class WorkflowFactory:
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}")
 
-    def llm_make_workflow(self, system_prompt: str, goal_prompt: str, existing_tool_prompt: str) -> str:
-        """Generate workflow code using LLM.
-        
-        Args:
-            goal_prompt: The goal description for the workflow
-            existing_tool_prompt: Description of available tools
-        Returns:
-            str: Generated workflow code from LLM
-        """
+    def llm_make_workflow(self, system_prompt: str, craft_instructions: str, existing_tool_prompt: str) -> str:
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-Your task is to create a LangGraph-SmolAgent workflow that achieves:
-{goal_prompt}
+Your task is to create a LangGraph-SmolAgent workflow for the following plan:
+{craft_instructions}
         """
         history = [
             {'role': 'system', 'content': system_prompt},
@@ -114,18 +106,18 @@ Your task is to create a LangGraph-SmolAgent workflow that achieves:
         print(f"✅ Loaded {len(os.listdir(self.tools_dir))} tools from {self.tools_dir}")
         return tools_code, existing_tool_prompt
 
-    def create_workflow_code(self, goal_prompt: str, existing_tool_prompt: str) -> str:
+    def create_workflow_code(self, craft_instructions: str, existing_tool_prompt: str) -> str:
         """Generate and validate workflow code.
         
         Args:
-            goal_prompt: The goal description
+            craft_instructions: The goal description
             existing_tool_prompt: Description of available tools
         Returns:
             str: Validated workflow code
         """
         print("🧠 Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
-        llm_output = self.llm_make_workflow(system_prompt, goal_prompt, existing_tool_prompt)
+        llm_output = self.llm_make_workflow(system_prompt, craft_instructions, existing_tool_prompt)
         workflow_code = self.extract_python_code(llm_output)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
@@ -145,14 +137,13 @@ Your task is to create a LangGraph-SmolAgent workflow that achieves:
         print(f"✅ Created workflow directory: {workflow_path}")
         return workflow_path
 
-    def assemble_workflow(self, goal_prompt: str,
-                            tools_code: str,
-                            state_code: str,
-                            smolagent_factory_code: str,
-                            workflow_code: str,
-                            path: str,
-                            uuid_str: str
-                           ) -> str:
+    def assemble_workflow(self, tools_code: str,
+                                state_code: str,
+                                smolagent_factory_code: str,
+                                workflow_code: str,
+                                path: str,
+                                uuid_str: str
+                         ) -> str:
         return f'''
 import os
 import sys
@@ -213,16 +204,57 @@ if "{path}":
         raise(f"Could not save workflow data:" + str(e))
 '''
 
+    def workflow_planning(self, goal_prompt: str, existing_tool_prompt: str) -> str:
+        sys_prompt = "You are an expert in analyzing complex tasks and giving detailed plans for achieving them using multi-agent system."
+        prompt = f"""
+        Given the following goal for a multi-agent system:
+
+        {goal_prompt}
+
+        And the available tools packages:
+
+        {existing_tool_prompt}
+
+        Please generate a overall plan for achieving the goal using the available tools.
+        You should not generate any code, just a plan.
+        You should think about whenever the task is possible at all if it isn't say TASK_IMPOSSIBLE.
+        You must answer in this format:
+        <step>) <agent name(<tool_name>)> -> <task description>
+        For example, if the goal is to "Search and install the mzmind software", you might generate a plan like:
+        1) feasibility_checker_agent(WEB_TOOLS) ->,Verify that the requested task is actually possible
+        2) web_searcher_agent(WEB_TOOLS) -> Perform a deep web-search on how to use *mzmind* in batch / CLI mode
+        3) extractor_agent(DOC_TOOL) -> Extract the CLI information into a structured CSV
+        4) builder_agent(SHELL_TOOL) -> Build and install for macOS Apple-Silicon (arm64)
+        """
+        history = [
+            {'role': 'system', 'content': sys_prompt},
+            {'role': 'user', 'content': prompt}
+        ]
+        print("🧠 Planning workflow with LLM...")
+        plan = LLMProvider().openai_completion(history, verbose=False)
+        print("✅ LLM generated workflow plan successfully")
+        print("=== Workflow Plan Generated ===\n", plan)
+        if "TASK_IMPOSSIBLE" in plan:
+            raise ValueError("❌ The task is impossible to achieve with the available tools.\n" + plan)
+        instruct = f"""
+        Goal:
+        {goal_prompt}
+        Target plan:
+        {plan.strip()} 
+        """ 
+        return instruct
+
+
     def craft_workflow(
         self,
         goal_prompt: str,
         template_workflow: Optional[str] = None,
         save_workflow: bool = True
-    ) -> str:
+    ) -> Tuple[str, str]:
         """Main method to craft a complete workflow.
         
         Args:
-            goal_prompt: The goal description
+            craft_instructions: The goal description
             template_workflow: Optional pre-existing workflow template
             save_workflow: Whether to save the workflow
         Returns:
@@ -233,6 +265,7 @@ if "{path}":
         
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()
+        #craft_instructions = self.workflow_planning(goal_prompt, existing_tool_prompt)
         workflow_code = (
             template_workflow 
             if template_workflow 
@@ -242,7 +275,6 @@ if "{path}":
         path = self.create_folder_structure(uuid_str) if save_workflow else ""
         
         complete_code = self.assemble_workflow(
-            goal_prompt,
             tools_code,
             state_code,
             smolagent_factory_code,
@@ -264,4 +296,4 @@ if "{path}":
                 print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
             except Exception as e:
                 print(f"❌ Failed to save system prompt: {str(e)}")
-        return complete_code
+        return complete_code, uuid_str

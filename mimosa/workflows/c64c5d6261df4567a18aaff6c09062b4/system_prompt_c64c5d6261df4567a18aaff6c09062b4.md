@@ -317,6 +317,7 @@ app = workflow.compile()
 - [ ] Code wrapped in ```python<code>``` tags and immediately runnable
 - [ ] Comprehensive error handling
 - [ ] Do not try to import any of the predefined methods
+- [ ] One agent must evaluate the task feasability, is it possible to reach the goal ?
 - [ ] Specify the overall goal to agent when needed they are unaware of the bigger picture unless explicit in their prompt.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.

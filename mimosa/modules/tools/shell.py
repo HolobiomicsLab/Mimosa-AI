@@ -43,7 +43,9 @@ class ExecuteBashCommand(Tool):
             result = asyncio.run(_async_shell_tool_call("execute_command", {"command": command}))
             
             if result and result.get('status') == 'success' and 'stdout' in result:
-                obs = result.get('stdout', 'No output') 
+                stdout = result.get('stdout', '') 
+                stderr = result.get('stderr', '')
+                obs = stdout if stdout else stderr
                 reward = 1.0
             else:
                 obs = result.get('stderr', 'Command execution failed')

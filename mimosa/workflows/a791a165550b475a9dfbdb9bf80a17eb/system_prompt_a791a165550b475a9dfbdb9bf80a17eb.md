@@ -191,25 +191,29 @@ from langgraph.graph import StateGraph, START, END
 workflow = StateGraph(WorkflowState)
 
 # MANDATORY: Agent instructions
-instruct_web = """You are a web research agent specialized in finding software installation information.
+instruct_web = """You are a web research agent that searches and analyzes online content.
 
-## YOUR TASK
-Search for comprehensive MetaboT software installation instructions including:
-- Download sources and requirements
-- Step-by-step installation procedures
-- System compatibility and dependencies
+## TASK
+- Search the web for information on given topics
+- Extract relevant data from web pages and articles
+- Provide clear, well-sourced findings
 
-## COMPLETION PROTOCOL
+## UPON COMPLETION
 
-**SUCCESS**: If you found complete installation information:
-final_answer("RESEARCH_COMPLETE: [Provide detailed installation steps, download links, system requirements, and any prerequisites for MetaboT installation]")
-
-**FAILURE**: If installation information is insufficient or unavailable:
-final_answer("RESEARCH_FAILURE: [Explain what you searched, what was missing, and suggest alternative approaches]")
+If you found relevant information and you task is complete, say RESEARCH_COMPLETE
+If you consider you failed to find informations, say RESEARCH_FAILURE
 """
 
-instruct_chart = """
-...
+instruct_chart = """You are a data visualization agent that creates charts and graphs.
+
+## TASK
+- Create visualizations based on provided data
+- Generate appropriate chart types for the data
+- Ensure charts are clear and informative
+
+## CONSIDERATIONS
+- Use the data from previous observations
+- Choose the most suitable visualization format
 """
 
 # MANDATORY: Agent creation
@@ -317,6 +321,6 @@ app = workflow.compile()
 - [ ] Code wrapped in ```python<code>``` tags and immediately runnable
 - [ ] Comprehensive error handling
 - [ ] Do not try to import any of the predefined methods
-- [ ] Specify the overall goal to agent when needed they are unaware of the bigger picture unless explicit in their prompt.
+- [ ] One agent must evaluate the task feasability, is it possible to reach the goal ?
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.

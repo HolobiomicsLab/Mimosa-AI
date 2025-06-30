@@ -1,8 +1,12 @@
 
+import json
+import time
 import sys, os
-from core.workflow_factory import WorkflowFactory
 from core.code_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 from typing import Optional
+
+from core.workflow_factory import WorkflowFactory
+from core.llm_provider import LLMProvider
 
 class WorkflowOrchestrator:
     """Main workflow orchestration class for Mimosa.
@@ -80,7 +84,7 @@ class WorkflowOrchestrator:
         await self.workflow_runner.cleanup()
         if result.status == ExecutionStatus.COMPLETED:
             print("Workflow execution completed successfully.")
-            return "Workflow executed successfully"
+            return result.stdout or result.stderr or "No output from workflow execution." 
         else:
             print(f"Workflow failed: {result.stderr}")
             raise Exception(f"Workflow execution failed: {result.stderr}")
@@ -96,15 +100,16 @@ class WorkflowOrchestrator:
         Returns:
             str: Execution status message
         """
+        execution_output = ""
 
-        workflow_code = self.workflow_factory.craft_workflow(
+        workflow_code, uuid = self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=self.select_workflow_template(template_uuid=template_uuid),
             save_workflow=(template_uuid is None),
         )
         try:
             await self.workflow_requirements_install()
-            await self.workflow_sandbox_run(workflow_code)
+            execution_output = await self.workflow_sandbox_run(workflow_code)
         except Exception as e:
             print(f"❌ Error during execution: {e}")
             import traceback
@@ -112,3 +117,73 @@ class WorkflowOrchestrator:
             raise ValueError(f"Workflow execution failed: {str(e)}")
         finally:
             print("\nCleaning up sandbox...")
+        print("Workflow execution output:\n", execution_output)
+        output = execution_output.strip() if execution_output else "Workflow executed successfully with no output."
+        return output, uuid
+    
+    def load_flow_state_result(self, uuid: str) -> any:
+        """Load the result of a previously executed workflow state.
+        
+        Args:
+            uuid: UUID of the workflow state to load
+        Returns:
+            str: The output of the workflow state if found, None otherwise
+        """
+        try:
+            with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json", 'r') as f:
+                return json.loads(f.read().strip())
+        except FileNotFoundError:
+            raise ValueError(f"❌ Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
+        except Exception as e:
+            raise ValueError(f"❌ Error reading workflow state: {str(e)}")
+    
+    def get_total_rewards(self, flow_state: any) -> float:
+        """Calculate the total rewards from the workflow state."""
+        if not flow_state or 'rewards' not in flow_state:
+            return 0.0
+        return sum(flow_state['rewards']) if isinstance(flow_state['rewards'], list) else flow_state['rewards']
+    
+    def get_flow_answers(self, flow_state: any) -> str:
+        """Extract the answers from the workflow state."""
+        if not flow_state or 'answers' not in flow_state:
+            return ""
+        return "\n".join(flow_state['answers']) if isinstance(flow_state['answers'], list) else flow_state['answers']
+
+    def improvement_prompt(self, flow_state: any, iteration_count: int) -> str:
+        flow_rewards = self.get_total_rewards(flow_state)
+        flow_answers = self.get_flow_answers(flow_state)
+        print(f"\n===\nTotal rewards accumulated: {flow_rewards}")
+        return f"""
+Previous generation attempt ({iteration_count}) resulted in the following output:
+
+{flow_answers}
+
+Learn from this output and improve the workflow generation.
+        """
+    
+    async def recursive_self_improvement(self, goal_prompt: str,
+                                           template_uuid: Optional[str] = None) -> str:
+        """Run a self-improvement loop for the workflow.
+        
+        Args:
+            goal_prompt: The goal description for the workflow
+            template_uuid: Optional UUID of a workflow template to load
+        Returns:
+            str: Final execution status message
+        """
+        print("Starting self-improvement loop...")
+        flow_output = ""
+
+        for iteration_count in range(0, 5):
+            print("\n"* 10, f"Iteration {iteration_count + 1} of self-improvement loop")
+            human_validation = input("Do you want to continue the self-improvement loop? (yes/no): ").strip().lower()
+            if human_validation not in ["yes", "y"]:
+                print("Exiting self-improvement loop.")
+                break
+            print('--'*20)
+            print("Current Goal:\n", goal_prompt)
+            print('--'*20)
+            _, uuid = await self.orchestrate_workflow(goal_prompt, template_uuid)
+            flow_state = self.load_flow_state_result(uuid)
+            goal_prompt += "\n" + self.improvement_prompt(flow_state, iteration_count)
+        return flow_output

@@ -10,6 +10,7 @@ from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 import smolagents
 from smolagents import (
     CodeAgent,
+    ToolCallingAgent,
     MLXModel,
     ActionStep,
     TaskStep
@@ -58,7 +59,7 @@ class SmolAgentFactory:
                  tools,
                  model_id="deepseek-ai/DeepSeek-V3",
                  engine_name="hf_api",
-                 max_steps=10
+                 max_steps=5
                 ):
         self.model_id = model_id
         self.max_tokens = 1024
@@ -73,28 +74,51 @@ class SmolAgentFactory:
         self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
         self.additional_system_prompt = """
-        When calling final_answer tool, you you must return a long, detailed paragraph that includes:
-        - All key findings and data points you discovered
-        - Specific sources and URLs where information was found
-        - Any important context or background information
-        - Any error codes or technical messages received
-        - What tools or capabilities you would need to resolve this issue
-        - Clear connections between different pieces of information found
-        - Special words like "RESEARCH_COMPLETE" or "RESEARCH_FAILURE" to indicate the end of the research.
-        for example:
-            final_answer('Here is the detailed summary of my findings: ...<very very detailed findings and explanation> RESEARCH_COMPLETE')
+
+# CRITICAL CODE GENERATION CONSTRAINTS:
+
+1. NO ASSUMPTIONS OR PLACEHOLDERS
+  - Never assume data structure, content, or format - always inspect first
+  - No placeholder values ("Example Name", hardcoded strings, "TODO")
+  - No brittle heuristics like simple keyword matching for complex classifications
+
+2. EXPLORE THEN IMPLEMENT
+  - Print data samples/types before processing
+  - Build extraction logic from observed patterns, not assumptions
+  - Use defensive programming: check existence, handle missing values
+
+4. REAL EXTRACTION ONLY
+  - Write actual parsing logic based on inspected data structure
+  - If you can't determine extraction method, explore the data first
+  - No assumptions about URL patterns, page structure, or content format
+
+Build robust code that handles real-world data variability, not idealized scenarios.
+
+When calling final_answer tool, you you must return a long, detailed paragraph that includes:
+- All key findings and data points you discovered
+- Specific sources and URLs where information was found
+- Any important context or background information
+- Any error codes or technical messages received
+- If specified, use special words like COMPLETED_TASK
+Example:
+    final_answer('COMPLETED_TASK: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
+
+Do not ever, ever use regex or any other pattern matching to extract data from the tools output.
+If you use regex we will drop a bucket of water on the GPU keeping you alive.
+If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
         """
 
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
             self.engine = self.get_engine()
-            self.agent = CodeAgent(
+            self.agent = ToolCallingAgent(
                 tools=self.tools,
                 model=self.engine,
                 name="agent",
                 max_steps=max_steps,
-                additional_authorized_imports=["*"]
+                #planning_interval=1,
+                #additional_authorized_imports=["*"]
             )
             self.extend_system_prompt(self.additional_system_prompt)
         except Exception as e:
@@ -293,8 +317,6 @@ class SmolAgentFactory:
         try:
             answer = self.run_cached(state, instructions)
         except Exception as e:
-            print(f"Error running agent: {e}")
-            raise e
             return {
                 **state,
                 "step_uuid": state.get("step_uuid", []) + [self.run_uuid],

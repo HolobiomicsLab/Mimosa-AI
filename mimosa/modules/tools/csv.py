@@ -71,7 +71,7 @@ class LoadCSVTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("load_csv_from_path", {"source_path": file_path, "name": name})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("load_csv_from_path", {"source_path": file_path, "name": name}))
             
             if result and result.get('status') == 'success':
                 obs = f"Loaded dataset '{result.get('name')}' with shape {result.get('shape')}"
@@ -103,7 +103,7 @@ class GetCSVDataTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("get_csv_data", {"name": name, "limit": limit, "columns": columns})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("get_csv_data", {"name": name, "limit": limit, "columns": columns}))
             
             if result and result.get('status') == 'success':
                 rows = result.get('data', [])
@@ -133,7 +133,7 @@ class AddCSVRowTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("add_csv_row", {"name": name, "row": row})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("add_csv_row", {"name": name, "row": row}))
             
             if result and result.get('status') == 'success':
                 obs = f"Added row to '{name}', new shape: {result.get('shape')}"
@@ -162,7 +162,7 @@ class UpdateCSVRowTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("update_csv_row", {"name": name, "index": index, "row": row})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("update_csv_row", {"name": name, "index": index, "row": row}))
             
             if result and result.get('status') == 'success':
                 obs = f"Updated row {index} in '{name}'"
@@ -191,7 +191,7 @@ class AddCSVColumnTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("add_csv_column", {"name": name, "column_name": column_name, "default_value": default_value})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("add_csv_column", {"name": name, "column_name": column_name, "default_value": default_value}))
             
             if result and result.get('status') == 'success':
                 obs = f"Added column '{column_name}' to '{name}', new shape: {result.get('shape')}"
@@ -247,7 +247,7 @@ class ListCSVDatasetsTool(Tool):
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("list_csv_datasets", {})) if not result else result
+            result = asyncio.run(_async_csv_tool_call("list_csv_datasets", {}))
             
             if result and result.get('status') == 'success':
                 datasets = result.get('columns', [])

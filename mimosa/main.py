@@ -53,7 +53,8 @@ async def main():
     config.validate_paths()
     
     orchestrator = WorkflowOrchestrator(config)
-    await orchestrator.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
+    #await orchestrator.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
+    await orchestrator.recursive_self_improvement(goal_prompt=args.goal, template_uuid=args.load_template)
 
 if __name__ == "__main__":
     asyncio.run(main())

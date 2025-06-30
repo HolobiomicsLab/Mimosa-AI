@@ -68,7 +68,8 @@ class SearchTool(Tool):
             obs = result.get('result', 'No results found')
             reward = 1.0 if obs else 0.0
         except Exception as e:
-            print(str(e))
+            if "connection attempts failed" in str(e):
+                raise ConnectionError("Failed to connect to the browser tools MCP. Please ensure the service is running.")
             obs = "Search failed for query: " + query + " due to error: " + str(e)
             reward = 0.0
         return build_formatted_output(action, obs, reward)
