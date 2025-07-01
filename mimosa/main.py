@@ -10,10 +10,11 @@ import argparse
 import requests
 import dotenv
 
-from orchestrator import WorkflowOrchestrator
 from config import Config
 from fastmcp import Client
 import asyncio
+
+from core.dgm import GodelMachine
 
 dotenv.load_dotenv()
 
@@ -57,10 +58,9 @@ async def main():
     validate_environment()
     config.validate_paths()
     
-    orchestrator = WorkflowOrchestrator(config)
+    dgm = GodelMachine(config)
     await discover_mcp_servers()
-    await orchestrator.recursive_self_improvement(goal_prompt=args.goal, template_uuid=args.load_template)
-    #await orchestrator.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
+    await dgm.recursive_self_improvement(goal_prompt=args.goal, template_uuid=args.load_template)
 
 if __name__ == "__main__":
     asyncio.run(main())
