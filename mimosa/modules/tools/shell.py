@@ -10,7 +10,7 @@ from fastmcp import Client
 
 from smolagents import Tool
 
-API_SHELL_TOOLS_URL = 'http://localhost:5004'
+API_SHELL_TOOLS_URL = 'http://localhost:5002'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     output = {

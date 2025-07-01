@@ -12,6 +12,7 @@ class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""
     def __init__(self, config) -> None:
         self.config = config
+        self.workflow_dir = config.workflow_dir
         self.orchestrator = WorkflowOrchestrator(config)
 
     def load_flow_state_result(self, uuid: str) -> any:

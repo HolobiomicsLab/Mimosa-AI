@@ -14,7 +14,7 @@ from smolagents import (
 )
 import json
 
-API_BROWSER_TOOLS_URL = 'http://localhost:5002'
+API_BROWSER_TOOLS_URL = 'http://localhost:5000'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     output = {
