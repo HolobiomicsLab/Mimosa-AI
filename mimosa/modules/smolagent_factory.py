@@ -59,7 +59,7 @@ class SmolAgentFactory:
                  tools,
                  model_id="deepseek-ai/DeepSeek-V3",
                  engine_name="hf_api",
-                 max_steps=5
+                 max_steps=9
                 ):
         self.model_id = model_id
         self.max_tokens = 1024
@@ -74,7 +74,6 @@ class SmolAgentFactory:
         self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
         self.additional_system_prompt = """
-
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
 1. NO ASSUMPTIONS OR PLACEHOLDERS
@@ -92,6 +91,14 @@ class SmolAgentFactory:
   - If you can't determine extraction method, explore the data first
   - No assumptions about URL patterns, page structure, or content format
 
+5. NO REGEX OR PATTERN MATCHING
+  - Do not use regex or pattern matching to extract data from tools output
+
+6. AVOID CONTEXT SATURATION
+- Do not try to see multiple webpage, document, or file at once. This would saturate you.
+- Focus on one task at a time, extracting data from one source before moving to the next
+- To save time you could preview the data of multiple sources, but do not try to process it all at once.
+
 Build robust code that handles real-world data variability, not idealized scenarios.
 
 When calling final_answer tool, you you must return a long, detailed paragraph that includes:
@@ -103,8 +110,6 @@ When calling final_answer tool, you you must return a long, detailed paragraph t
 Example:
     final_answer('COMPLETED_TASK: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 
-Do not ever, ever use regex or any other pattern matching to extract data from the tools output.
-If you use regex we will drop a bucket of water on the GPU keeping you alive.
 If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
         """
 
@@ -112,13 +117,13 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
         try:
             self.engine = self.get_engine()
-            self.agent = ToolCallingAgent(
+            self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
                 name="agent",
                 max_steps=max_steps,
-                #planning_interval=1,
-                #additional_authorized_imports=["*"]
+                planning_interval=3,
+                additional_authorized_imports=["*"]
             )
             self.extend_system_prompt(self.additional_system_prompt)
         except Exception as e:

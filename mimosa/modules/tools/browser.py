@@ -32,28 +32,6 @@ async def _async_browser_tool_call(tool_name: str, params: dict) -> dict:
         buffer = await client.call_tool(tool_name, params)
         return json.loads(buffer[0].text)
 
-class RestartBrowserTool(Tool):
-    name = "restart_browser_tool"
-    description = "Restart the browser instance. Use in case of browser errors or crashes."
-    inputs = {}
-    output_type = "string"
-
-    def forward(self) -> str:
-        action = 'restart_browser_tool()'
-        obs = ''
-        reward = 0.0
-        try:
-            result = asyncio.run(_async_browser_tool_call("restart", {}))
-            if result.get('status') == 'success':
-                obs = 'Browser restarted successfully.'
-                reward = 1.0
-            else:
-                obs = 'Failed to restart browser: ' + result.get('message', 'Unknown error')
-        except Exception as e:
-            print(str(e))
-            obs = 'Error restarting browser: ' + str(e)
-        return build_formatted_output(action, obs, reward)
-
 class SearchTool(Tool):
     name = "search_tool"
     description = "Perform a search using DuckDuckGo and return the results."
@@ -158,14 +136,12 @@ search_tool = SearchTool()
 go_to_url_tool = GoToUrlTool()
 get_navigable_links_tool = GetNavigableLinksTool()
 screenshot_tool = ScreenshotTool()
-restart_tool = RestartBrowserTool()
 
 tools = [
     search_tool,
     go_to_url_tool,
     get_navigable_links_tool,
-    screenshot_tool,
-    restart_tool
+    screenshot_tool
 ]
 
 tools_name = [tool.name for tool in tools]

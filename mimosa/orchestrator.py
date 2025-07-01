@@ -2,14 +2,13 @@
 import json
 import time
 import sys, os
-from core.code_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 from typing import Optional
 
 from core.workflow_factory import WorkflowFactory
-from core.llm_provider import LLMProvider
+from core.code_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 
 class WorkflowOrchestrator:
-    """Main workflow orchestration class for Mimosa.
+    """Main Meta-Agent workflow orchestration class.
 
     Attributes:
         workflow_dir (str): Directory containing workflow templates
@@ -105,6 +104,7 @@ class WorkflowOrchestrator:
         workflow_code, uuid = self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=self.select_workflow_template(template_uuid=template_uuid),
+            template_uuid=template_uuid,
             save_workflow=(template_uuid is None),
         )
         try:
@@ -114,10 +114,9 @@ class WorkflowOrchestrator:
             print(f"❌ Error during execution: {e}")
             import traceback
             traceback.print_exc()
-            raise ValueError(f"Workflow execution failed: {str(e)}")
+            return str(e), uuid
         finally:
             print("\nCleaning up sandbox...")
-        print("Workflow execution output:\n", execution_output)
         output = execution_output.strip() if execution_output else "Workflow executed successfully with no output."
         return output, uuid
     
@@ -160,7 +159,6 @@ Previous generation attempt ({iteration_count}) resulted in the following output
 
 Learn from this output and improve the workflow generation.
         """
-    
     async def recursive_self_improvement(self, goal_prompt: str,
                                            template_uuid: Optional[str] = None) -> str:
         """Run a self-improvement loop for the workflow.
@@ -175,15 +173,22 @@ Learn from this output and improve the workflow generation.
         flow_output = ""
 
         for iteration_count in range(0, 5):
-            print("\n"* 10, f"Iteration {iteration_count + 1} of self-improvement loop")
-            human_validation = input("Do you want to continue the self-improvement loop? (yes/no): ").strip().lower()
+            print(f"\n{'='*60}")
+            print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
+            print(f"{'='*60}")
+            
+            human_validation = input("Continue with next iteration? (yes/no): ").strip().lower()
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.")
                 break
-            print('--'*20)
-            print("Current Goal:\n", goal_prompt)
-            print('--'*20)
+                
+            print(f"\n{'📋 CURRENT GOAL':^60}")
+            print(f"{'─'*60}")
+            print(f"  {goal_prompt}")
+            print(f"{'─'*60}\n")
+            
             _, uuid = await self.orchestrate_workflow(goal_prompt, template_uuid)
             flow_state = self.load_flow_state_result(uuid)
             goal_prompt += "\n" + self.improvement_prompt(flow_state, iteration_count)
+            
         return flow_output

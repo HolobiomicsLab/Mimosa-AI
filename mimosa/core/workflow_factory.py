@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from core.llm_provider import LLMProvider
 
 class WorkflowFactory:
-    """Handles the creation and management of AI workflow generation.
+    """Handles the creation and management of Langraph-SmolAgent workflow generation.
     
     Attributes:
         tools_dir (str): Directory containing tool modules
@@ -164,6 +164,9 @@ from typing import TypedDict, List
 # Generated workflow
 {workflow_code}
 
+print("worflow run: compiling workflow...")
+app = workflow.compile()
+
 # Initialize and execute workflow
 initial_state = {{
     "workflow_uuid": "{uuid_str}",
@@ -178,7 +181,7 @@ initial_state = {{
 
 try:
     if "{path}":
-        print("Saving workflow graph PNG at :", "{path}")
+        print("workflow run: saving workflow graph as PNG at ", "{path}")
         try:
             png = app.get_graph().draw_mermaid_png()
             with open(os.path.join("{path}", "workflow_{uuid_str}.png"), "wb") as f:
@@ -189,14 +192,17 @@ except Exception as e:
     print(f"❌ Error saving PNG workflow:" + str(e))
     pass
 
+print("workflow run: invoking workflow...")
 try:
     result_state = app.invoke(initial_state)
 except KeyboardInterrupt:
     print("Workflow execution interrupted by user")
     pass
+print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
+print("workflow run: result state:", result_state)
 
 if "{path}":
-    print("Saving workflow state JSON at :", "{path}")
+    print("workflow run: saving workflow state JSON at :", "{path}")
     try:
         with open(os.path.join("{path}", "state_result_{uuid_str}.json"), "w") as f:
             json.dump(result_state, f, indent=2)
@@ -204,75 +210,34 @@ if "{path}":
         raise(f"Could not save workflow data:" + str(e))
 '''
 
-    def workflow_planning(self, goal_prompt: str, existing_tool_prompt: str) -> str:
-        sys_prompt = "You are an expert in analyzing complex tasks and giving detailed plans for achieving them using multi-agent system."
-        prompt = f"""
-        Given the following goal for a multi-agent system:
-
-        {goal_prompt}
-
-        And the available tools packages:
-
-        {existing_tool_prompt}
-
-        Please generate a overall plan for achieving the goal using the available tools.
-        You should not generate any code, just a plan.
-        You should think about whenever the task is possible at all if it isn't say TASK_IMPOSSIBLE.
-        You must answer in this format:
-        <step>) <agent name(<tool_name>)> -> <task description>
-        For example, if the goal is to "Search and install the mzmind software", you might generate a plan like:
-        1) feasibility_checker_agent(WEB_TOOLS) ->,Verify that the requested task is actually possible
-        2) web_searcher_agent(WEB_TOOLS) -> Perform a deep web-search on how to use *mzmind* in batch / CLI mode
-        3) extractor_agent(DOC_TOOL) -> Extract the CLI information into a structured CSV
-        4) builder_agent(SHELL_TOOL) -> Build and install for macOS Apple-Silicon (arm64)
-        """
-        history = [
-            {'role': 'system', 'content': sys_prompt},
-            {'role': 'user', 'content': prompt}
-        ]
-        print("🧠 Planning workflow with LLM...")
-        plan = LLMProvider().openai_completion(history, verbose=False)
-        print("✅ LLM generated workflow plan successfully")
-        print("=== Workflow Plan Generated ===\n", plan)
-        if "TASK_IMPOSSIBLE" in plan:
-            raise ValueError("❌ The task is impossible to achieve with the available tools.\n" + plan)
-        instruct = f"""
-        Goal:
-        {goal_prompt}
-        Target plan:
-        {plan.strip()} 
-        """ 
-        return instruct
-
-
     def craft_workflow(
         self,
         goal_prompt: str,
         template_workflow: Optional[str] = None,
+        template_uuid: Optional[str] = None,
         save_workflow: bool = True
     ) -> Tuple[str, str]:
         """Main method to craft a complete workflow.
         
         Args:
             craft_instructions: The goal description
-            template_workflow: Optional pre-existing workflow template
+            template_workflow: pre-existing workflow template UUID
             save_workflow: Whether to save the workflow
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "")
+        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
         tools_code, existing_tool_prompt = self.load_tools_code()
         
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()
-        #craft_instructions = self.workflow_planning(goal_prompt, existing_tool_prompt)
         workflow_code = (
             template_workflow 
             if template_workflow 
             else self.create_workflow_code(goal_prompt, existing_tool_prompt)
         )
         
-        path = self.create_folder_structure(uuid_str) if save_workflow else ""
+        path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
         
         complete_code = self.assemble_workflow(
             tools_code,

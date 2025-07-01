@@ -40,7 +40,7 @@ class RuntimeConfig:
             self.temp_dir = "./tmp"
 
 class WorkflowRunner:
-    """Async workflow execution engine with proper resource management."""
+    """Async workflow execution engine for python code."""
     
     def __init__(self, config: RuntimeConfig = None):
         self.config = config or RuntimeConfig()

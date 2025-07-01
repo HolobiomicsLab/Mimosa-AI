@@ -12,22 +12,28 @@ import dotenv
 
 from orchestrator import WorkflowOrchestrator
 from config import Config
+from fastmcp import Client
+import asyncio
 
 dotenv.load_dotenv()
-    
-def ping_mcp_server(endpoint: str) -> None:
-    """Ping the MCP server to ensure it is running.
-    """
-    try:
-        response = requests.get(endpoint, timeout=5)
-        if response.status_code != 200:
-            raise RuntimeError("\n❌ MCP server is not reachable. Please start the server.")
-    except (requests.ConnectionError, requests.Timeout, requests.RequestException) as e:
-        raise RuntimeError(f"❌ Failed to connect to Tools MCP server. Please ensure it is running.")
-    except ConnectionRefusedError as e:
-        raise RuntimeError(f"❌ Connection refused when trying to reach MCP server: {str(e)}")
-    except Exception as e:
-        raise RuntimeError(f"❌ An unexpected error occurred while pinging MCP server: {str(e)}")
+
+async def discover_mcp_servers():
+    """Discover MCP servers on ports 5000-5050 and list their tools."""
+    print("🔍 Discovering MCP servers on ports 5000-5050...")
+    found_servers = False
+    for port in range(5000, 5051):
+        try:
+            async with Client(f"http://localhost:{port}/mcp") as client:
+                tools = await client.list_tools()
+                if tools:
+                    print(f"✅ Found MCP server on port {port}")
+                    print(f"📋 Available tools: {[tool.name for tool in tools]}")
+                    found_servers = True
+        except Exception as e:
+            continue
+    if not found_servers:
+        print("❌ No MCP servers found on ports 5000-5050. Please ensure at least one server is running.")
+        raise RuntimeError("No MCP servers found. Please start Toolomics MCP server.")
     print(" ✅ Connected to Tools MCP server successfully.")
 
 def validate_environment() -> None:
@@ -49,12 +55,12 @@ async def main():
     args = parser.parse_args()
 
     validate_environment()
-    ping_mcp_server(endpoint=config.mcp_health_endpoint)
     config.validate_paths()
     
     orchestrator = WorkflowOrchestrator(config)
-    #await orchestrator.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
+    await discover_mcp_servers()
     await orchestrator.recursive_self_improvement(goal_prompt=args.goal, template_uuid=args.load_template)
+    #await orchestrator.orchestrate_workflow(goal_prompt=args.goal, template_uuid=args.load_template)
 
 if __name__ == "__main__":
     asyncio.run(main())
