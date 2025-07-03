@@ -80,7 +80,6 @@ class WorkflowOrchestrator:
 
         print("Running workflow in python sandbox...")
         result = await self.workflow_runner.execute(workflow_code, progress_callback=progress_handler)
-        await self.workflow_runner.cleanup()
         if result.status == ExecutionStatus.COMPLETED:
             print("Workflow execution completed successfully.")
             return result.stdout or result.stderr or "No output from workflow execution." 
@@ -119,4 +118,13 @@ class WorkflowOrchestrator:
             print("\nCleaning up sandbox...")
         output = execution_output.strip() if execution_output else "Workflow executed successfully with no output."
         return output, uuid
+    
+    def __del__(self):
+        """Cleanup resources on deletion."""
+        try:
+            self.workflow_runner.cleanup()
+        except Exception as e:
+            print(f"❌ Error during cleanup: {e}")
+            import traceback
+            traceback.print_exc()
     

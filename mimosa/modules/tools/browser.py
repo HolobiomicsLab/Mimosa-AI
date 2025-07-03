@@ -29,7 +29,7 @@ async def _async_browser_tool_call(tool_name: str, params: dict) -> dict:
         tools = await client.list_tools()
         tool_names = [tool.name for tool in tools]
         assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_BROWSER_TOOLS_URL
-        buffer = await client.call_tool(tool_name, params)
+        buffer = await client.call_tool(tool_name, params, timeout=120)
         return json.loads(buffer[0].text)
 
 class SearchTool(Tool):

@@ -102,8 +102,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the following plan:
             tool_var_name = f"{base_name.upper()}_TOOLS"
             tools_code += f"\n{tool_var_name} = tools\n"
             existing_tool_prompt += f"{tool_var_name}\n"
-            
-        print(f"✅ Loaded {len(os.listdir(self.tools_dir))} tools from {self.tools_dir}")
+
+        print(f"✅ Loaded {len(os.listdir(self.tools_dir))} Tools packages from {self.tools_dir}")
         return tools_code, existing_tool_prompt
 
     def create_workflow_code(self, craft_instructions: str, existing_tool_prompt: str) -> str:

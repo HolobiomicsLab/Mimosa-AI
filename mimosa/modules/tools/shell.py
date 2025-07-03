@@ -10,7 +10,7 @@ from fastmcp import Client
 
 from smolagents import Tool
 
-API_SHELL_TOOLS_URL = 'http://localhost:5002'
+API_SHELL_TOOLS_URL = 'http://localhost:5102'
 
 def build_formatted_output(action: str, observation: str, reward: float) -> str:
     output = {
@@ -25,7 +25,7 @@ async def _async_shell_tool_call(tool_name: str, params: dict) -> dict:
         tools = await client.list_tools()
         tool_names = [tool.name for tool in tools]
         assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_SHELL_TOOLS_URL
-        buffer = await client.call_tool(tool_name, params)
+        buffer = await client.call_tool(tool_name, params, timeout=1800)
         return json.loads(buffer[0].text)
 
 class ExecuteBashCommand(Tool):

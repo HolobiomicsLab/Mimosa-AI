@@ -27,9 +27,11 @@ class GodelMachine:
             with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json", 'r') as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
-            raise ValueError(f"❌ Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
+            print(f"❌ Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
+            return None
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}")
+        return None
     
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
@@ -43,9 +45,14 @@ class GodelMachine:
             return ""
         return "\n".join(flow_state['answers']) if isinstance(flow_state['answers'], list) else flow_state['answers']
 
-    def improvement_prompt(self, flow_state: any, iteration_count: int) -> str:
-        flow_rewards = self.get_total_rewards(flow_state)
-        flow_answers = self.get_flow_answers(flow_state)
+    def improvement_prompt(self, flow_state: any, run_stdout: str, iteration_count: int) -> str:
+        flow_rewards = 0.0
+        flow_answers = ""
+        if flow_state is not None:
+            flow_rewards = self.get_total_rewards(flow_state)
+            flow_answers = self.get_flow_answers(flow_state)
+        else:
+            flow_answers = run_stdout.strip()
         print(f"\n===\nTotal rewards accumulated: {flow_rewards}")
         return f"""
 Previous generation attempt ({iteration_count}) resulted in the following output:
@@ -82,8 +89,9 @@ Learn from this output and improve the workflow generation.
             print(f"  {goal_prompt}")
             print(f"{'─'*60}\n")
             
-            _, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid)
+            run_stdout, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid)
             flow_state = self.load_flow_state_result(uuid)
-            goal_prompt += "\n" + self.improvement_prompt(flow_state, iteration_count)
+            goal_prompt += "\n" + self.improvement_prompt(flow_state, run_stdout, iteration_count)
+            template_uuid = None
 
         return flow_output

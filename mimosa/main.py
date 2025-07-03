@@ -21,10 +21,10 @@ dotenv.load_dotenv()
 
 async def discover_mcp_servers() -> List[int]:
     """Discover MCP servers on ports 5000-5050 and list their tools."""
-    print("🔍 Discovering MCP servers on ports 5000-5050...")
+    print("🔍 Discovering MCP servers on ports 5000-5250...")
     found_servers = False
     ports = []
-    for port in range(5000, 5100):
+    for port in range(5000, 5251):
         try:
             async with Client(f"http://localhost:{port}/mcp") as client:
                 tools = await client.list_tools()
