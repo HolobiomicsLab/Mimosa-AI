@@ -19,26 +19,33 @@ from core.dgm import GodelMachine
 
 dotenv.load_dotenv()
 
-async def discover_mcp_servers() -> List[int]:
-    """Discover MCP servers on ports 5000-5050 and list their tools."""
-    print("🔍 Discovering MCP servers on ports 5000-5250...")
+async def discover_mcp_servers(port_min: int = 5000, port_max: int = 5250, timeout: float = 2.0) -> List[int]:
+    """Discover MCP servers on ports range with timeout handling."""
+    print(f"🔍 Discovering MCP servers on ports {port_min}-{port_max}...")
     found_servers = False
     ports = []
-    for port in range(5000, 5251):
+    
+    for port in range(port_min, port_max + 1):
         try:
-            async with Client(f"http://localhost:{port}/mcp") as client:
+            async with Client(f"http://localhost:{port}/mcp", timeout=3.0) as client:
                 tools = await client.list_tools()
                 if tools:
                     print(f"✅ Found MCP server on port {port}")
                     print(f"📋 Available tools: {[tool.name for tool in tools]}")
                     found_servers = True
                     ports.append(port)
-        except Exception as _:
+        except asyncio.TimeoutError:
+            print(f"❌ MCP server on port {port} timed out after {timeout}s")
             continue
+        except Exception as e:
+            error_msg = str(e).lower()
+            continue
+    
     if not found_servers:
-        print("❌ No MCP servers found on ports 5000-5100. Please ensure at least one server is running.")
+        print(f"❌ No MCP servers found on ports {port_min}-{port_max}. Please ensure at least one server is running.")
         raise RuntimeError("No MCP servers found. Please start Toolomics MCP server.")
-    print(" ✅ Connected to Tools MCP server successfully.")
+    
+    print(f"✅ Connected to {len(ports)} MCP server(s) successfully.")
     return ports
 
 def verify_tools_module_ports(tools_dir: str, ports: List[int]) -> None:
