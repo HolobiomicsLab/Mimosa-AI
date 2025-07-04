@@ -257,33 +257,17 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         return actions, observations, rewards, success
 
     def save_memories(self, workflow_uuid: str):
-        memories = []
         if not workflow_uuid or not workflow_uuid.strip():
             return
-        memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-        #self.agent.save(f"./{memory_folder_path}/save_{workflow_uuid}_{self.run_uuid}.json")
-        for memory_json in self.agent.memory.get_full_steps():
-            memories.append(memory_json)
         try:
+            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
             os.makedirs(memory_folder_path, exist_ok=True)
-            with open(os.path.join(memory_folder_path, f"memory_{self.run_uuid}.json"), "w") as f:
-                json.dump(str(memories), f, indent=2)
+            agent_dict = self.agent.to_dict()
+            with open(os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json"), "w") as f:
+                json.dump(agent_dict, f, indent=2)
         except Exception as e:
-            raise ValueError(f"Failed to save memory: {str(e)}")
+            raise ValueError(f"Failed to save agent: {str(e)}")
 
-    def get_memory_file_paths(self, workflow_uuid: Optional[str] = None) -> str:
-        files = []
-        if workflow_uuid is None or not workflow_uuid.strip():
-            return []
-        memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-        if not os.path.exists(memory_folder_path):
-            print(f"Memory folder {memory_folder_path} does not exist. No cached memories available.")
-            return []
-        for file in os.listdir(memory_folder_path):
-            if file.startswith("memory_") and file.endswith(".json"):
-                files.append(file)
-        return files
-    
     def load_memories(self, file_path):
         memories = []
         try:
@@ -296,24 +280,32 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             raise ValueError(f"Failed to load memory: {str(e)}")
         print(f"Loaded {len(memories)} steps from memory for run {self.run_uuid}.")
         return memories
+
+    def load_agent(self, workflow_uuid: str):
+        try:
+            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
+            agent_file_path = os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json")
+            
+            if not os.path.exists(agent_file_path):
+                print(f"No agent file found at {agent_file_path}. Cannot load agent.")
+                return None
+                
+            with open(agent_file_path, 'r') as f:
+                loaded_dict = json.load(f)
+                new_agent = CodeAgent.from_dict(loaded_dict)
+                self.agent = new_agent
+                print(f"Successfully loaded agent from {agent_file_path}")
+                return new_agent
+        except Exception as e:
+            print(f"Failed to load agent: {str(e)}")
+            return None
     
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
-        memories = []
         workflow_uuid = state.get("workflow_uuid", None)
-        memories_files = self.get_memory_file_paths(workflow_uuid=workflow_uuid)
-        for memory_file in memories_files:
-            memory = self.load_memories(memory_file)
-            memories.extend(memory)
-        if not memories or len(memories) == 0:
-            output = self.agent.run(instructions)
-            self.save_memories(workflow_uuid=workflow_uuid)
-            return output
-        for memory in memories:
-            print("loading memory:\n", memory)
-            # TODO how to make a ActionStep from a memory?
-            #if memory.get("task") == state.get("task_prompt"):
-            #    self.agent.memory.steps.append(memory)
-            exit()
+        if workflow_uuid is not None:
+            self.load_agent(workflow_uuid)
+        self.agent.run(instructions)
+        self.save_memories(workflow_uuid=workflow_uuid)
         return self.agent.run(instructions)
 
 

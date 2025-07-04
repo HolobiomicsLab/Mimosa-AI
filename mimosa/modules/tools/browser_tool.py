@@ -4,7 +4,6 @@ It is loaded in a sandbox python environment as part of the crafted workflow.
 '''
 
 from typing import List, Any
-import requests
 import asyncio
 
 from fastmcp import Client
@@ -25,6 +24,7 @@ def build_formatted_output(action: str, observation: str, reward: float) -> str:
     return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
 
 async def _async_browser_tool_call(tool_name: str, params: dict) -> dict:
+    print(f"DEBUG: Calling tool {tool_name} with params {params}")
     async with Client(f"{API_BROWSER_TOOLS_URL}/mcp") as client:
         tools = await client.list_tools()
         tool_names = [tool.name for tool in tools]
@@ -63,7 +63,9 @@ class GoToUrlTool(Tool):
         obs = ''
         reward = 0.0
         try:
+            print(f"DEBUG: Navigating to URL: {url}")
             result = asyncio.run(_async_browser_tool_call("navigate", {"url": url}))
+            print(f"DEBUG: Navigation result: {result}")
         except Exception as e:
             print(str(e))
             obs = f'failed to navigate to {url} due to error: {str(e)}'
@@ -145,3 +147,20 @@ tools = [
 ]
 
 tools_name = [tool.name for tool in tools]
+
+if __name__ == "__main__":
+    print("Available tools:")
+    for tool in tools:
+        print(f"- {tool.name}: {tool.description}")
+    print("testing search tool...")
+    try:    
+        result = asyncio.run(search_tool.forward("Mimosa AI"))
+        print(f"Search result: {result}")
+    except Exception as e:
+        print(f"Error occurred while testing search tool: {e}")
+    print("testing go_to_url_tool...")
+    try:        
+        result = asyncio.run(go_to_url_tool.forward("https://www.example.com"))
+        print(f"Go to URL result: {result}")
+    except Exception as e:
+        print(f"Error occurred while testing go_to_url_tool: {e}")

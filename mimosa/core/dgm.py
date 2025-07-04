@@ -107,7 +107,7 @@ Learn from this output and improve the workflow generation.
                               template_uuid: Optional[str] = None,
                         ):
         template = self.select_workflow_template(template_uuid=template_uuid)
-        self.recursive_self_improvement(goal_prompt, template_uuid=template_uuid, workflow_template=template)
+        await self.recursive_self_improvement(goal_prompt, template_uuid=template_uuid, workflow_template=template)
 
     async def recursive_self_improvement(self, goal_prompt: str,
                                                template_uuid: Optional[str] = None,
@@ -143,5 +143,5 @@ Learn from this output and improve the workflow generation.
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}). Ending self-improvement loop.")
             return flow_output
-        self.recursive_self_improvement(goal_prompt, template_uuid, iteration_count+1, max_depth=max_depth)
+        await self.recursive_self_improvement(goal_prompt, template_uuid, iteration_count+1, max_depth=max_depth)
         return flow_output
