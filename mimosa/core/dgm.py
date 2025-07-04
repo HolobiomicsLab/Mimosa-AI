@@ -33,6 +33,18 @@ class GodelMachine:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}")
         return None
     
+    def load_workflow_code(self, uuid: str) -> str:
+        """
+        Load the workflow code for a given UUID.
+        """
+        try:
+            with open(f"{self.workflow_dir}/{uuid}/workflow_code_{uuid}.py", 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            raise ValueError(f"❌ Workflow code for UUID {uuid} not found in {self.workflow_dir}.")
+        except Exception as e:
+            raise ValueError(f"❌ Error reading workflow code: {str(e)}")
+    
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
         if not flow_state or 'rewards' not in flow_state:
@@ -45,24 +57,63 @@ class GodelMachine:
             return ""
         return "\n".join(flow_state['answers']) if isinstance(flow_state['answers'], list) else flow_state['answers']
 
-    def improvement_prompt(self, flow_state: any, run_stdout: str, iteration_count: int) -> str:
+    def improvement_prompt(self, flow_state: any, flow_code: str, run_stdout: str, iteration_count: int) -> str:
         flow_rewards = 0.0
         flow_answers = ""
         if flow_state is not None:
             flow_rewards = self.get_total_rewards(flow_state)
             flow_answers = self.get_flow_answers(flow_state)
         else:
-            flow_answers = run_stdout.strip()
+            flow_answers = run_stdout.strip() # if run failed, use stdout/stderr as fallback
         print(f"\n===\nTotal rewards accumulated: {flow_rewards}")
         return f"""
+You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
+
+Previous workflow code you generated:
+{flow_code}
+
 Previous generation attempt ({iteration_count}) resulted in the following output:
 
 {flow_answers}
 
 Learn from this output and improve the workflow generation.
         """
+
+    def select_workflow_template(self, template_uuid: Optional[str] = None) -> str:
+        """Select and load a workflow template by UUID.
+        
+        Args:
+            template_uuid: Optional UUID of workflow template to load
+        Returns:
+            str: The workflow template content if found, None otherwise
+        """
+        if not os.path.exists(self.workflow_dir):
+            return None
+        workflows = [f for f in os.listdir(self.workflow_dir)]
+        if not workflows:
+            return None
+        if template_uuid is None:
+            # TODO implement a auto-selection mechanism for available workflows
+            return None
+        try:
+            with open(f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py", 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            raise ValueError(f"❌ Workflow template for UUID {template_uuid} not found in {self.workflow_dir}.")
+        except Exception as e:
+            raise ValueError(f"❌ Error reading workflow template: {str(e)}")
+    
+    async def start_dgm(self, goal_prompt: str,
+                              template_uuid: Optional[str] = None,
+                        ):
+        template = self.select_workflow_template(template_uuid=template_uuid)
+        self.recursive_self_improvement(goal_prompt, template_uuid=template_uuid, workflow_template=template)
+
     async def recursive_self_improvement(self, goal_prompt: str,
-                                           template_uuid: Optional[str] = None) -> str:
+                                               template_uuid: Optional[str] = None,
+                                               workflow_template: Optional[str] = None,
+                                               iteration_count: int = 0,
+                                               max_depth: int = 5) -> str:
         """Run a self-improvement loop for the workflow.
         
         Args:
@@ -71,27 +122,26 @@ Learn from this output and improve the workflow generation.
         Returns:
             str: Final execution status message
         """
-        print("Starting self-improvement loop...")
         flow_output = ""
-
-        for iteration_count in range(0, 5):
-            print(f"\n{'='*60}")
-            print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
-            print(f"{'='*60}")
+        print(f"\n{'='*60}")
+        print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
+        print(f"{'='*60}")
+        human_validation = input("Continue with next iteration? (yes/no): ").strip().lower()
+        if human_validation not in ["yes", "y"]:
+            print("Exiting self-improvement loop.")
+            return flow_output
+        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"{'─'*60}")
+        print(f"  {goal_prompt}")
+        print(f"{'─'*60}\n")
             
-            human_validation = input("Continue with next iteration? (yes/no): ").strip().lower()
-            if human_validation not in ["yes", "y"]:
-                print("Exiting self-improvement loop.")
-                break
-                
-            print(f"\n{'📋 CURRENT GOAL':^60}")
-            print(f"{'─'*60}")
-            print(f"  {goal_prompt}")
-            print(f"{'─'*60}\n")
-            
-            run_stdout, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid)
-            flow_state = self.load_flow_state_result(uuid)
-            goal_prompt += "\n" + self.improvement_prompt(flow_state, run_stdout, iteration_count)
-            template_uuid = None
-
+        run_stdout, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid, workflow_template)
+        flow_state = self.load_flow_state_result(uuid)
+        flow_code = self.load_workflow_code(uuid)
+        goal_prompt += "\n" + self.improvement_prompt(flow_state, flow_code, run_stdout, iteration_count)
+        template_uuid = None
+        if iteration_count >= max_depth:
+            print(f"Maximum iterations reached ({max_depth}). Ending self-improvement loop.")
+            return flow_output
+        self.recursive_self_improvement(goal_prompt, template_uuid, iteration_count+1, max_depth=max_depth)
         return flow_output

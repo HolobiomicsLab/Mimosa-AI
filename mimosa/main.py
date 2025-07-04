@@ -83,7 +83,7 @@ async def main():
     dgm = GodelMachine(config)
     ports = await discover_mcp_servers()
     verify_tools_module_ports(config.tools_dir, ports)
-    await dgm.recursive_self_improvement(goal_prompt=args.goal, template_uuid=args.load_template)
+    await dgm.start_dgm(goal_prompt=args.goal, template_uuid=args.load_template)
 
 if __name__ == "__main__":
     asyncio.run(main())

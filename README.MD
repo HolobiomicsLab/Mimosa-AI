@@ -36,7 +36,7 @@ python3 main.py --goal "Your research objective here"
 ### Usage Options
 
 - `--goal GOAL`: Required. Specify your research objective or scientific question
-- `--load_template LOAD_TEMPLATE`: Optional. Load a predefined workflow template
+- `--load_template TEMPLATE_UUID`: Optional. Load a predefined workflow template from workflows folder
 
 **Example:**
 ```bash

@@ -18,7 +18,19 @@ class Config:
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
-        self.runner_requirements_file: Optional[str] = "requirements.txt"
+        self.runner_requirements: List[str] = [
+            "python-dotenv",
+            "fastmcp==2.8.1",
+            "requests>=2.31.0",
+            "smolagents[all]",
+            "langgraph>=0.4.7",
+            "matplotlib>=3.9.0",
+            "numpy>=2.0.0",
+            "python_a2a",
+            "opentelemetry-sdk",
+            "opentelemetry-exporter-otlp",
+            "openinference-instrumentation-smolagents"
+        ]
     
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
@@ -43,7 +55,7 @@ class Config:
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
             "runner_default_max_cpu_percent": self.runner_default_max_cpu_percent,
             "runner_temp_dir": self.runner_temp_dir,
-            "runner_requirements_file": self.runner_requirements_file
+            "runner_requirements": self.runner_requirements
         }
     
     def from_json(self, data: Dict[str, Any]) -> None:
@@ -60,7 +72,7 @@ class Config:
         self.runner_default_max_memory_mb = data.get("runner_default_max_memory_mb", self.runner_default_max_memory_mb)
         self.runner_default_max_cpu_percent = data.get("runner_default_max_cpu_percent", self.runner_default_max_cpu_percent)
         self.runner_temp_dir = data.get("runner_temp_dir", self.runner_temp_dir)
-        self.runner_requirements_file = data.get("runner_requirements_file", self.runner_requirements_file)
+        self.runner_requirements = data.get("runner_requirements", self.runner_requirements)
     
     def __str__(self) -> str:
         """String representation of the configuration."""
@@ -69,5 +81,4 @@ class Config:
                f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, " \
                f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, " \
                f"runner_default_timeout={self.runner_default_timeout}, runner_default_max_memory_mb={self.runner_default_max_memory_mb}, " \
-               f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir}, " \
-               f"runner_requirements_file={self.runner_requirements_file})"
+               f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir})"

@@ -5,7 +5,7 @@ import sys, os
 from typing import Optional
 
 from core.workflow_factory import WorkflowFactory
-from core.code_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
+from core.workflow_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 
 class WorkflowOrchestrator:
     """Main Meta-Agent workflow orchestration class.
@@ -20,54 +20,20 @@ class WorkflowOrchestrator:
         Args:
             config: Configuration object containing paths and settings
         """
+        self.config = config
         self.workflow_dir = config.workflow_dir
         self.workflow_factory = WorkflowFactory(config)
 
         self.runner_config = RuntimeConfig(
-            python_version=config.runner_default_python_version,
-            timeout=config.runner_default_timeout,
-            max_memory_mb=config.runner_default_max_memory_mb,
+            python_version=self.config.runner_default_python_version,
+            timeout=self.config.runner_default_timeout,
+            max_memory_mb=self.config.runner_default_max_memory_mb,
         )
         self.workflow_runner = WorkflowRunner(self.runner_config)
 
-    def select_workflow_template(self, template_uuid: Optional[str] = None) -> str:
-        """Select and load a workflow template by UUID.
-        
-        Args:
-            template_uuid: Optional UUID of workflow template to load
-        Returns:
-            str: The workflow template content if found, None otherwise
-        """
-        if not os.path.exists(self.workflow_dir):
-            return None
-        workflows = [f for f in os.listdir(self.workflow_dir)]
-        if not workflows:
-            return None
-        if template_uuid is None:
-            # TODO implement a auto-selection mechanism for available workflows
-            return None
-        try:
-            with open(f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py", 'r') as f:
-                return f.read()
-        except FileNotFoundError:
-            raise ValueError(f"❌ Workflow template for UUID {template_uuid} not found in {self.workflow_dir}.")
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow template: {str(e)}")
     
     async def workflow_requirements_install(self):
-        deps = [
-            "python-dotenv",
-            "fastmcp==2.8.1",
-            "requests>=2.31.0",
-            "smolagents[all]",
-            "langgraph>=0.4.7",
-            "matplotlib>=3.9.0",
-            "numpy>=2.0.0",
-            "python_a2a",
-            "opentelemetry-sdk",
-            "opentelemetry-exporter-otlp",
-            "openinference-instrumentation-smolagents"
-        ]
+        deps = self.config.runner_requirements
         print("Installing dependencies...")
         dep_result = await self.workflow_runner.install_dependencies(deps)
         if dep_result.status != ExecutionStatus.COMPLETED:
@@ -89,6 +55,7 @@ class WorkflowOrchestrator:
     
     async def orchestrate_workflow(self, goal_prompt: str,
                                    template_uuid: Optional[str] = None,
+                                   workflow_template: Optional[str] = None
                                   ) -> str:
         """Execute a workflow with the given goal prompt.
         
@@ -102,7 +69,7 @@ class WorkflowOrchestrator:
 
         workflow_code, uuid = self.workflow_factory.craft_workflow(
             goal_prompt,
-            template_workflow=self.select_workflow_template(template_uuid=template_uuid),
+            template_workflow=workflow_template,
             template_uuid=template_uuid,
             save_workflow=(template_uuid is None),
         )
