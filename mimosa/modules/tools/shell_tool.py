@@ -32,7 +32,7 @@ class ShellTool(Tool):
             buffer = await client.call_tool(tool_name, params, timeout=1800)
             return json.loads(buffer[0].text)
 
-class ExecuteBashCommand(Tool):
+class ExecuteBashCommand(ShellTool):
     name = "execute_bash_command"
     description = "Execute a bash command."
     inputs = {"command": {"type": "string", "description": "The bash command to execute. Do not specify interpreter or shell, just the command itself."}}

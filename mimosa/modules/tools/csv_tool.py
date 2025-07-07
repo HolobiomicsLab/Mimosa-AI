@@ -33,7 +33,7 @@ class CsvTool(Tool):
             buffer = await client.call_tool(tool_name, params, timeout=30)
             return json.loads(buffer[0].text)
 
-class CreateCSVTool(Tool):
+class CreateCSVTool(CsvTool):
     name = "create_csv_tool"
     description = "Create a new CSV dataset with optional columns and initial data."
     inputs = {
@@ -62,7 +62,7 @@ class CreateCSVTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class LoadCSVTool(Tool):
+class LoadCSVTool(CsvTool):
     name = "load_csv_tool" 
     description = "Load CSV data from a file path into a named dataset."
     inputs = {
@@ -94,7 +94,7 @@ class LoadCSVTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class GetCSVDataTool(Tool):
+class GetCSVDataTool(CsvTool):
     name = "get_csv_data_tool"
     description = "Get data from a dataset with optional filtering and pagination."
     inputs = {
@@ -126,7 +126,7 @@ class GetCSVDataTool(Tool):
             obs = f"Error getting data from '{name}': {str(e)}"
         return self.build_formatted_output(action, obs, reward)
 
-class AddCSVRowTool(Tool):
+class AddCSVRowTool(CsvTool):
     name = "add_csv_row_tool"
     description = "Add a new row to a dataset."
     inputs = {
@@ -155,7 +155,7 @@ class AddCSVRowTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class UpdateCSVRowTool(Tool):
+class UpdateCSVRowTool(CsvTool):
     name = "update_csv_row_tool"
     description = "Update a specific row in a dataset by index."
     inputs = {
@@ -185,7 +185,7 @@ class UpdateCSVRowTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class AddCSVColumnTool(Tool):
+class AddCSVColumnTool(CsvTool):
     name = "add_csv_column_tool"
     description = "Add a new column to a dataset with optional default value."
     inputs = {
@@ -215,7 +215,7 @@ class AddCSVColumnTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class QueryCSVTool(Tool):
+class QueryCSVTool(CsvTool):
     name = "query_csv_tool"
     description = "Perform analytical operations on a dataset (describe, value_counts, groupby, filter)."
     inputs = {
@@ -247,7 +247,7 @@ class QueryCSVTool(Tool):
             
         return self.build_formatted_output(action, obs, reward)
 
-class ListCSVDatasetsTool(Tool):
+class ListCSVDatasetsTool(CsvTool):
     name = "list_csv_datasets_tool"
     description = "List all available datasets with their basic information."
     inputs = {}
