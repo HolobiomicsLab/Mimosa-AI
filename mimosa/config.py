@@ -29,7 +29,8 @@ class Config:
             "python_a2a",
             "opentelemetry-sdk",
             "opentelemetry-exporter-otlp",
-            "openinference-instrumentation-smolagents"
+            "openinference-instrumentation-smolagents",
+            "asyncio==3.4.3"
         ]
     
     def validate_paths(self) -> None:

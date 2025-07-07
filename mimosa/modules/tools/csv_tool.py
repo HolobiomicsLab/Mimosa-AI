@@ -12,21 +12,26 @@ from smolagents import Tool
 
 API_CSV_TOOLS_URL = 'http://localhost:5101'
 
-def build_formatted_output(action: str, observation: str, reward: float) -> str:
-    output = {
-        "action": action[:256].strip().replace('\n', ' - '),
-        "observation": observation[:4096],
-        "reward": reward
-    }
-    return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
+class CsvTool(Tool):
+    def __init__(self):
+        super().__init__()
+        import asyncio
 
-async def _async_csv_tool_call(tool_name: str, params: dict) -> dict:
-    async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
-        tools = await client.list_tools()
-        tool_names = [tool.name for tool in tools]
-        assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_CSV_TOOLS_URL
-        buffer = await client.call_tool(tool_name, params, timeout=30)
-        return json.loads(buffer[0].text)
+    def build_formatted_output(self, action: str, observation: str, reward: float) -> str:
+        output = {
+            "action": action[:256].strip().replace('\n', ' - '),
+            "observation": observation[:4096],
+            "reward": reward
+        }
+        return f"\n```json\n{json.dumps(output, indent=2)}\n```\n"
+
+    async def _async_csv_tool_call(self, tool_name: str, params: dict) -> dict:
+        async with Client(f"{API_CSV_TOOLS_URL}/mcp") as client:
+            tools = await client.list_tools()
+            tool_names = [tool.name for tool in tools]
+            assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_CSV_TOOLS_URL
+            buffer = await client.call_tool(tool_name, params, timeout=30)
+            return json.loads(buffer[0].text)
 
 class CreateCSVTool(Tool):
     name = "create_csv_tool"
@@ -39,12 +44,13 @@ class CreateCSVTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, columns: List[str] = None, rows: List[List] = None) -> str:
+        import asyncio
         action = f"create_csv_tool({name})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("create_csv", {"name": name, "columns": columns, "rows": rows}))
+            result = asyncio.run(self._async_csv_tool_call("create_csv", {"name": name, "columns": columns, "rows": rows}))
             
             if result and result.get('status') == 'success':
                 obs = f"Created dataset '{name}' with shape {result.get('shape')}"
@@ -54,7 +60,7 @@ class CreateCSVTool(Tool):
         except Exception as e:
             obs = f"Error creating dataset: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class LoadCSVTool(Tool):
     name = "load_csv_tool" 
@@ -66,12 +72,13 @@ class LoadCSVTool(Tool):
     output_type = "string"
 
     def forward(self, file_path: str, name: str = None) -> str:
+        import asyncio
         action = f"load_csv_tool({file_path})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("load_csv_from_path", {"source_path": file_path, "name": name}))
+            result = asyncio.run(self._async_csv_tool_call("load_csv_from_path", {"source_path": file_path, "name": name}))
             
             if result and result.get('status') == 'success':
                 obs = f"Loaded dataset '{result.get('name')}' with shape {result.get('shape')}"
@@ -85,7 +92,7 @@ class LoadCSVTool(Tool):
         except Exception as e:
             obs = f"Error loading CSV from '{file_path}': {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class GetCSVDataTool(Tool):
     name = "get_csv_data_tool"
@@ -98,12 +105,13 @@ class GetCSVDataTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, limit: int = None, columns: List[str] = None) -> str:
+        import asyncio
         action = f"get_csv_data_tool({name})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("get_csv_data", {"name": name, "limit": limit, "columns": columns}))
+            result = asyncio.run(self._async_csv_tool_call("get_csv_data", {"name": name, "limit": limit, "columns": columns}))
             
             if result and result.get('status') == 'success':
                 rows = result.get('data', [])
@@ -116,7 +124,7 @@ class GetCSVDataTool(Tool):
                 obs = f"Failed to get data from '{name}': {error_msg}"
         except Exception as e:
             obs = f"Error getting data from '{name}': {str(e)}"
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class AddCSVRowTool(Tool):
     name = "add_csv_row_tool"
@@ -128,12 +136,13 @@ class AddCSVRowTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, row: Dict[str, Any]) -> str:
+        import asyncio
         action = f"add_csv_row_tool({name})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("add_csv_row", {"name": name, "row": row}))
+            result = asyncio.run(self._async_csv_tool_call("add_csv_row", {"name": name, "row": row}))
             
             if result and result.get('status') == 'success':
                 obs = f"Added row to '{name}', new shape: {result.get('shape')}"
@@ -144,7 +153,7 @@ class AddCSVRowTool(Tool):
         except Exception as e:
             obs = f"Error adding row: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class UpdateCSVRowTool(Tool):
     name = "update_csv_row_tool"
@@ -157,12 +166,13 @@ class UpdateCSVRowTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, index: int, row: Dict[str, Any]) -> str:
+        import asyncio
         action = f"update_csv_row_tool({name})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("update_csv_row", {"name": name, "index": index, "row": row}))
+            result = asyncio.run(self._async_csv_tool_call("update_csv_row", {"name": name, "index": index, "row": row}))
             
             if result and result.get('status') == 'success':
                 obs = f"Updated row {index} in '{name}'"
@@ -173,7 +183,7 @@ class UpdateCSVRowTool(Tool):
         except Exception as e:
             obs = f"Error updating row: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class AddCSVColumnTool(Tool):
     name = "add_csv_column_tool"
@@ -186,12 +196,13 @@ class AddCSVColumnTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, column_name: str, default_value: Any = None) -> str:
+        import asyncio
         action = f"add_csv_column_tool({name}, {column_name})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("add_csv_column", {"name": name, "column_name": column_name, "default_value": default_value}))
+            result = asyncio.run(self._async_csv_tool_call("add_csv_column", {"name": name, "column_name": column_name, "default_value": default_value}))
             
             if result and result.get('status') == 'success':
                 obs = f"Added column '{column_name}' to '{name}', new shape: {result.get('shape')}"
@@ -202,7 +213,7 @@ class AddCSVColumnTool(Tool):
         except Exception as e:
             obs = f"Error adding column: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class QueryCSVTool(Tool):
     name = "query_csv_tool"
@@ -216,12 +227,13 @@ class QueryCSVTool(Tool):
     output_type = "string"
 
     def forward(self, name: str, operation: str, column: str = None, conditions: Dict[str, Any] = None) -> str:
+        import asyncio
         action = f"query_csv_tool({name}, {operation})"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("query_csv", {"name": name, "operation": operation, "column": column, "conditions": conditions}))
+            result = asyncio.run(self._async_csv_tool_call("query_csv", {"name": name, "operation": operation, "column": column, "conditions": conditions}))
             
             if result and result.get('status') == 'success':
                 query_result = result.get('result')
@@ -233,7 +245,7 @@ class QueryCSVTool(Tool):
         except Exception as e:
             obs = f"Error querying dataset: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 class ListCSVDatasetsTool(Tool):
     name = "list_csv_datasets_tool"
@@ -242,12 +254,13 @@ class ListCSVDatasetsTool(Tool):
     output_type = "string"
 
     def forward(self) -> str:
+        import asyncio
         action = "list_csv_datasets_tool()"
         obs = ''
         reward = 0.0
         
         try:
-            result = asyncio.run(_async_csv_tool_call("list_csv_datasets", {}))
+            result = asyncio.run(self._async_csv_tool_call("list_csv_datasets", {}))
             
             if result and result.get('status') == 'success':
                 datasets = result.get('columns', [])
@@ -258,7 +271,7 @@ class ListCSVDatasetsTool(Tool):
         except Exception as e:
             obs = f"Error listing datasets: {str(e)}"
             
-        return build_formatted_output(action, obs, reward)
+        return self.build_formatted_output(action, obs, reward)
 
 # Tool instances
 create_csv_tool = CreateCSVTool()
