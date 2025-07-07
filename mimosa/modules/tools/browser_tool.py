@@ -25,11 +25,24 @@ def build_formatted_output(action: str, observation: str, reward: float) -> str:
 
 async def _async_browser_tool_call(tool_name: str, params: dict) -> dict:
     print(f"DEBUG: Calling tool {tool_name} with params {params}")
+    
+    try:
+        return await asyncio.wait_for(
+            _do_tool_call(tool_name, params),
+            timeout=60
+        )
+    except asyncio.TimeoutError:
+        raise Exception(f"Tool {tool_name} timed out - server may be stuck")
+    except Exception as e:
+        raise Exception(f"Tool {tool_name} failed: {str(e)}")
+
+async def _do_tool_call(tool_name: str, params: dict) -> dict:
     async with Client(f"{API_BROWSER_TOOLS_URL}/mcp") as client:
         tools = await client.list_tools()
         tool_names = [tool.name for tool in tools]
-        assert tool_name in tool_names, "Fatal Error: " + tool_name + " not in tools list for mcp at " + API_BROWSER_TOOLS_URL
-        buffer = await client.call_tool(tool_name, params, timeout=120)
+        assert tool_name in tool_names, f"Tool {tool_name} not in tools list"
+        
+        buffer = await client.call_tool(tool_name, params, timeout=30)
         return json.loads(buffer[0].text)
 
 class SearchTool(Tool):
@@ -148,19 +161,22 @@ tools = [
 
 tools_name = [tool.name for tool in tools]
 
-if __name__ == "__main__":
+async def main():
     print("Available tools:")
     for tool in tools:
         print(f"- {tool.name}: {tool.description}")
     print("testing search tool...")
     try:    
-        result = asyncio.run(search_tool.forward("Mimosa AI"))
+        result = await _async_browser_tool_call("search", {"query": "Mimosa AI"})
         print(f"Search result: {result}")
     except Exception as e:
         print(f"Error occurred while testing search tool: {e}")
     print("testing go_to_url_tool...")
     try:        
-        result = asyncio.run(go_to_url_tool.forward("https://www.example.com"))
+        result = await _async_browser_tool_call("navigate", {"url": "https://sciencebusiness.net/network-updates/cnrs-france-has-increased-its-ai-dedicated-resources-fourfold"})
         print(f"Go to URL result: {result}")
     except Exception as e:
         print(f"Error occurred while testing go_to_url_tool: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

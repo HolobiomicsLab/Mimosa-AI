@@ -314,6 +314,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         try:
             answer = self.run_cached(state, instructions)
         except Exception as e:
+            raise e # easier to debug for now
             return {
                 **state,
                 "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
