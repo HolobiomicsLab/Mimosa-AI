@@ -248,7 +248,7 @@ if "{path}":
             uuid_str
         )
 
-        if save_workflow:
+        if save_workflow and isinstance(workflow_code, str):
             try:
                 with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), 'w') as f:
                     f.write(workflow_code)

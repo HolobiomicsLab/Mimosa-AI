@@ -137,7 +137,7 @@ Learn from this output and improve the workflow generation.
             
         run_stdout, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid, workflow_template)
         flow_state = self.load_flow_state_result(uuid)
-        flow_code = self.load_workflow_code(uuid)
+        flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
         goal_prompt += "\n" + self.improvement_prompt(flow_state, flow_code, run_stdout, iteration_count)
         template_uuid = None
         if iteration_count >= max_depth:
