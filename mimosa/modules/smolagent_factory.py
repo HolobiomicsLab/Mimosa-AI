@@ -59,7 +59,7 @@ class SmolAgentFactory:
     def __init__(self,
                  instruct_prompt,
                  tools,
-                 model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
+                 model_id="deepseek-ai/DeepSeek-V3",
                  engine_name="hf_api",
                  max_steps=9
                 ):
