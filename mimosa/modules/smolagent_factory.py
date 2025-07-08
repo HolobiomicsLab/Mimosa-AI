@@ -6,8 +6,10 @@ import re
 import time
 import uuid
 from typing import Callable
+from dataclasses import dataclass, asdict
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
 import smolagents
+from smolagents.models import get_dict_from_nested_dataclasses
 from smolagents import (
     CodeAgent,
     ToolCallingAgent,
@@ -57,13 +59,13 @@ class SmolAgentFactory:
     def __init__(self,
                  instruct_prompt,
                  tools,
-                 model_id="deepseek-ai/DeepSeek-V3",
+                 model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
                  engine_name="hf_api",
                  max_steps=9
                 ):
         self.model_id = model_id
         self.max_tokens = 1024
-        self.provider = "fireworks-ai"
+        self.provider = "nebius"
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
@@ -122,7 +124,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 model=self.engine,
                 name="agent",
                 max_steps=max_steps,
-                planning_interval=3,
+                #planning_interval=3, # think more before acting
                 additional_authorized_imports=["*"]
             )
             self.extend_system_prompt(self.additional_system_prompt)
@@ -234,7 +236,6 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             any(success) or len(success) == 0
         )
     
-    
     def parse_memory_output(self):
         text_memory_length = 0 
         actions, observations, rewards, success = [], [], [], []
@@ -257,57 +258,57 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         return actions, observations, rewards, success
 
     def save_memories(self, workflow_uuid: str):
+        print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
         if not workflow_uuid or not workflow_uuid.strip():
             return
         try:
+            memories = []
             memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
             os.makedirs(memory_folder_path, exist_ok=True)
-            agent_dict = self.agent.to_dict()
+            for idx, step in enumerate(self.agent.memory.steps):
+                if isinstance(step, ActionStep):
+                    action_step = step.dict()
+                    action_step["model_input_messages"] = (
+                        get_dict_from_nested_dataclasses(
+                            [asdict(msg) for msg in step.model_input_messages], ignore_key="raw"
+                        )
+                        if step.model_input_messages
+                        else None
+                    )
+                    memories.append(action_step)
             with open(os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json"), "w") as f:
-                json.dump(agent_dict, f, indent=2)
+                json.dump(memories, f, indent=2)
+            print(f"Agent memory saved successfully to {os.path.join(memory_folder_path, f'agent_{self.run_uuid}.json')}")
         except Exception as e:
-            raise ValueError(f"Failed to save agent: {str(e)}")
+            raise ValueError(f"Failed to save memory: {str(e)}")
 
-    def load_memories(self, file_path):
-        memories = []
-        try:
-            with open(file_path, "r") as f:
-                memories = json.load(f)
-        except FileNotFoundError:
-            print(f"No cached memory found for run {self.run_uuid}. Starting fresh.")
-            return []
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to load memory: {str(e)}")
-        print(f"Loaded {len(memories)} steps from memory for run {self.run_uuid}.")
-        return memories
-
-    def load_agent(self, workflow_uuid: str):
+    def load_agent_memory(self, workflow_uuid: str):
+        print(f"Loading agent memory for workflow UUID: {workflow_uuid}")
         try:
             memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
             agent_file_path = os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json")
             
             if not os.path.exists(agent_file_path):
-                print(f"No agent file found at {agent_file_path}. Cannot load agent.")
+                print(f"No agent file found at {agent_file_path}. Not using cached memory.")
                 return None
                 
             with open(agent_file_path, 'r') as f:
-                loaded_dict = json.load(f)
-                new_agent = CodeAgent.from_dict(loaded_dict)
-                self.agent = new_agent
+                memory_dict = json.load(f)
+                self.agent.memory.steps.extend([
+                    ActionStep(**step) if isinstance(step, dict) else step for step in memory_dict
+                ])
+                print("Loaded last : ", self.agent.memory.steps[-1] if self.agent.memory.steps else "No steps loaded")
                 print(f"Successfully loaded agent from {agent_file_path}")
-                return new_agent
         except Exception as e:
-            print(f"Failed to load agent: {str(e)}")
-            return None
+            raise ValueError(f"Failed to load memory: {str(e)}")
     
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:
-            self.load_agent(workflow_uuid)
-        self.agent.run(instructions)
+            self.load_agent_memory(workflow_uuid)
+        res = self.agent.run(instructions)
         self.save_memories(workflow_uuid=workflow_uuid)
-        return self.agent.run(instructions)
-
+        return res
 
     def run(self, state: WorkflowState) -> dict:
         instructions = self.build_workflow_step_prompt(state)
