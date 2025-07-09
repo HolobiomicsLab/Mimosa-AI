@@ -12,26 +12,57 @@
 ### 🚀 Install & Run
 
 #### Step 1: Environment Setup
+
+**Option A: Using pip**
 ```bash
+# Create and activate virtual environment
+python3 -m venv mimosa-env
+source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
+
+# Configure environment
 mv .env.example .env
 ```
+
+**Option B: Using uv (faster alternative)**
+```bash
+# Install uv if not already installed
+pip install uv
+
+# Create and activate virtual environment
+uv venv mimosa-env
+source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
+
+# Configure environment
+mv .env.example .env
+```
+
 Configure your `.env` file with the following API keys:
 - `HF_TOKEN`: Your Hugging Face token
 - `OPENAI_API_KEY`: Your OpenAI API key
 - `LANGFUSE_PUBLIC_KEY` & `LANGFUSE_PRIVATE_KEY`: Optional, for [telemetry monitoring](https://huggingface.co/docs/smolagents/tutorials/inspect_runs)
 
 #### Step 2: Install Dependencies
+
+**Using pip:**
 ```bash
 pip3 install -r requirements.txt
+```
+
+**Using uv (faster):**
+```bash
+uv pip install -r requirements.txt
 ```
 
 #### Step 3: Start MCP Server
 Launch the toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)
 
 #### Step 4: Run Mimosa-AI
+
 ```bash
-python3 main.py --goal "Your research objective here"
+python3 main.py --goal "Your objective here"
 ```
+
+> **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
 
 ### Usage Options
 
@@ -40,8 +71,10 @@ python3 main.py --goal "Your research objective here"
 
 **Example:**
 ```bash
-python3 main.py --goal "Search for the latest research on transformer architectures, identify a promising technique, and implement a novel variant to evaluate its performance" --load_template 64a644cf1ef449a684a8a369e47387e2
+python3 main.py --goal "search and install llama.cpp for this OS architecture" --load_template 64a644cf1ef449a684a8a369e47387e2
 ```
+
+**`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
 
 ## 📈 Telemetry Setup
 

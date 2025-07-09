@@ -194,8 +194,12 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 if type(step_obs) is not str:
                     step_obs = step_obs.dict()["message"]
                 step_action = step.code_action
-                assert isinstance(step_obs, str), f"Expected step observation to be a string, got {type(step_obs)}"
-                assert isinstance(step_action, str), f"Expected step action to be a string, got {type(step_action)}"
+                if not isinstance(step_obs, str):
+                    print("Skipping non-string observation:", step_obs)
+                    continue
+                if not isinstance(step_action, str):
+                    print("Skipping non-string action:", step_action)
+                    continue
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
