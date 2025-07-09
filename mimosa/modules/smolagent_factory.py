@@ -256,15 +256,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         try:
             answer = self.run_cached(state, instructions)
         except Exception as e:
-            raise e # easier to debug for now
-            return {
-                **state,
-                "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
-                "actions": state.get("actions", []) + [{"tool": "LLM request"}],
-                "observations": state.get("observations", []) + [{"data": str(e)}],
-                "success": state.get("success", []) + [False],
-                "answers": state.get("answers", []) + ["Error in step execution."],
-            }
+            raise e
         actions, observations, success = self.parse_memory_output()
         action: Action = {
             "tool": actions[-1] if actions else "No action",
