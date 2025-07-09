@@ -184,57 +184,19 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
 
-    def parse_tool_output(self, output: str):
-        actions = []
-        observations = []
-        rewards = []
-        success = []
-        # Look for ```json blocks in the output
-        json_blocks = re.findall(r"```json\n(.*?)\n```", output, re.DOTALL)
-        if not json_blocks:
-            return (output, "Completed", 0.0, True)  # No valid JSON blocks found
-        
-        for block in json_blocks:
-            try:
-                data = json.loads(block)
-                if "action" in data:
-                    actions.append(data["action"])
-                if "observation" in data:
-                    observations.append(data["observation"])
-                if "reward" in data:
-                    reward = float(data["reward"])
-                    rewards.append(reward)
-                    success.append(reward > 0)
-            except json.JSONDecodeError:
-                continue
-        
-        return (
-            "\n".join(actions),
-            "\n".join(observations),
-            (sum(rewards) / len(rewards)) if len(rewards) > 0 else 0,
-            any(success) or len(success) == 0
-        )
-    
     def parse_memory_output(self):
-        text_memory_length = 0 
-        actions, observations, rewards, success = [], [], [], []
+        actions, observations, success = [], [], []
         for idx, step in enumerate(self.agent.memory.steps):
             if isinstance(step, ActionStep):
                 error, feedback = step.error, step.observations
-                step_output = error if error else feedback
-                if not isinstance(step_output, str):
-                    continue
-                text_memory_length += len(step_output)
-                action_step, obs_step, reward_step, success_step = self.parse_tool_output(step_output)
-                if reward_step <= 0.0:
-                    continue
-                actions.append(action_step)
-                observations.append(obs_step)
-                rewards.append(reward_step)
-                success.append(success_step)
-        print(f"Parsed {len(actions)} actions, {len(observations)} observations, {len(rewards)} rewards, and {len(success)} success flags from memory.")
-        print(f"Total text memory length: {text_memory_length} characters.")
-        return actions, observations, rewards, success
+                step_obs = error if error else feedback
+                step_action = step.code_action
+                assert isinstance(step_obs, str), f"Expected step observation to be a string, got {type(step_obs)}"
+                assert isinstance(step_action, str), f"Expected step action to be a string, got {type(step_action)}"
+                actions.append(step_action)
+                observations.append(step_obs)
+                success.append(step.error is None)
+        return actions, observations, success
 
     def save_memories(self, workflow_uuid: str):
         print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
@@ -300,26 +262,22 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
                 "actions": state.get("actions", []) + [{"tool": "LLM request"}],
                 "observations": state.get("observations", []) + [{"data": str(e)}],
-                "rewards": state.get("rewards", []) + [0.0],
                 "success": state.get("success", []) + [False],
                 "answers": state.get("answers", []) + ["Error in step execution."],
             }
-        actions, observations, rewards, success = self.parse_memory_output()
-        action: Action = { # Only the last action matters for the state
+        actions, observations, success = self.parse_memory_output()
+        action: Action = {
             "tool": actions[-1] if actions else "No action",
         }
-        obs: Observation = { # Only the last observation matters for the state
+        obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        reward = sum(rewards) / len(rewards) if rewards else 0.0
-        # return True if final answer was called (no tool called, so array is empty).
         success_bool = success[-1] if len(success) > 0 else True
         return {
             **state,
             "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
-            "rewards": state.get("rewards", []) + [reward],
             "success": state.get("success", []) + [success_bool],
             "answers": state.get("answers", []) + [answer],
         }

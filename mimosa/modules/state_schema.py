@@ -13,6 +13,5 @@ class WorkflowState(TypedDict):
     task_prompt: List[str]
     actions: List[Action]
     observations: List[Observation]
-    rewards: List[float]
     answers: List[str]
     success: List[bool]

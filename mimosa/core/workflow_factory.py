@@ -174,7 +174,6 @@ initial_state = {{
     "step_uuid": [],
     "actions": [],
     "observations": [],
-    "rewards": [],
     "answers": [],
     "success": []
 }}

@@ -41,7 +41,6 @@ class WorkflowState(TypedDict):
     step_name: List[str] # Current step name
     actions: List[Action] # List of action (tool used)
     observations: List[Observation] # List of observation (tool feedback)
-    rewards: List[float] # List of reward based on success between 0 and 1
     answers: List[str] # List of raw agent answer
     success: List[bool] # List of success
 ```
