@@ -198,3 +198,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .aider*
+
+mimosa/workflows/*
+mimosa/memory/*
+mimosa/tmp/*
+mimosa/config.py

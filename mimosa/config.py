@@ -10,7 +10,7 @@ class Config:
         self.tools_dir: str = "modules/tools"
         self.schema_code_path: str = "modules/state_schema.py"
         self.smolagent_factory_code_path: str = "modules/smolagent_factory.py"
-        self.prompt_workflow_creator: str = "prompts/workflow_creator.md"
+        self.prompt_workflow_creator: str = "prompts/creator_metabo.md"
         self.workflow_llm_provider: str = "openai"
         self.mcp_health_endpoint: str = "http://localhost:5000/health"
         self.runner_default_python_version: str = "3.10"
