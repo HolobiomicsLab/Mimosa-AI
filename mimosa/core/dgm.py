@@ -57,7 +57,7 @@ class GodelMachine:
             return ""
         return "\n".join(flow_state['answers']) if isinstance(flow_state['answers'], list) else flow_state['answers']
 
-    def improvement_prompt(self, flow_state: any, flow_code: str, run_stdout: str, iteration_count: int) -> str:
+    def improvement_prompt(self, goal: str, flow_state: any, flow_code: str, run_stdout: str, iteration_count: int) -> str:
         flow_rewards = 0.0
         flow_answers = ""
         if flow_state is not None:
@@ -107,9 +107,12 @@ Learn from this output and improve the workflow generation.
                               template_uuid: Optional[str] = None,
                         ):
         template = self.select_workflow_template(template_uuid=template_uuid)
-        await self.recursive_self_improvement(goal_prompt, template_uuid=template_uuid, workflow_template=template)
+        await self.recursive_self_improvement(goal_prompt, goal_prompt, 
+                                                    template_uuid=template_uuid,
+                                                    workflow_template=template)
 
-    async def recursive_self_improvement(self, goal_prompt: str,
+    async def recursive_self_improvement(self, prompt: str,
+                                               goal: str,
                                                template_uuid: Optional[str] = None,
                                                workflow_template: Optional[str] = None,
                                                iteration_count: int = 0,
@@ -117,8 +120,12 @@ Learn from this output and improve the workflow generation.
         """Run a self-improvement loop for the workflow.
         
         Args:
-            goal_prompt: The goal description for the workflow
-            template_uuid: Optional UUID of a workflow template to load
+            prompt: The goal prompt for workflow generation, same as goal on first iteration
+            goal: The goal to achieve with the workflow
+            template_uuid: Optional UUID of workflow template to use
+            workflow_template: Optional workflow template code to use
+            iteration_count: Current iteration count (for recursion)
+            max_depth: Maximum depth of recursion
         Returns:
             str: Final execution status message
         """
@@ -132,16 +139,21 @@ Learn from this output and improve the workflow generation.
             return flow_output
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─'*60}")
-        print(f"  {goal_prompt}")
+        print(f"  {goal}")
         print(f"{'─'*60}\n")
             
-        run_stdout, uuid = await self.orchestrator.orchestrate_workflow(goal_prompt, template_uuid, workflow_template)
+        run_stdout, uuid = await self.orchestrator.orchestrate_workflow(prompt, template_uuid, workflow_template)
         flow_state = self.load_flow_state_result(uuid)
         flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
-        goal_prompt += "\n" + self.improvement_prompt(flow_state, flow_code, run_stdout, iteration_count)
+        prompt = self.improvement_prompt(goal, flow_state, flow_code, run_stdout, iteration_count)
         template_uuid = None
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}). Ending self-improvement loop.")
             return flow_output
-        await self.recursive_self_improvement(goal_prompt, template_uuid, iteration_count+1, max_depth=max_depth)
+        await self.recursive_self_improvement(prompt,
+                                              goal,
+                                              template_uuid,
+                                              workflow_template=flow_code,
+                                              iteration_count=iteration_count+1
+                                             )
         return flow_output

@@ -171,29 +171,8 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
-        state_steps = state.get("step_name", [])
-        state_actions = state.get("actions", [])
-        state_observations = state.get("observations", [])
-        state_success = state.get("success", [])
-        state_rewards = state.get("rewards", [])
         state_answers = state.get("answers", [])
-        trajectories = zip(
-            state_actions, 
-            state_observations, 
-            state_success
-        )
-        trajectory_str = ""
-        #for idx, (action, observation, success) in enumerate(trajectories):
-        #    if not action or action == {}:
-        #        continue
-        #    trajectory_str += f"""
-        #    ### Step {idx + 1}:
-        #    Action: {action.get("tool", "No action specified")}
-        #    Observation: {observation.get('data', 'No observation data')}... (truncated for brevity)
-        #    Success: {success}
-        #    ---
-        #    """
-        prev_infos = state_answers[-1] if state_answers else ""
+        prev_infos = state_answers[-1] if state_answers else "No previous answers, you are the first agent."
         return f"""
         You are an AI agent designed to assist with a specific task.
         Previous agents have provided the following information:

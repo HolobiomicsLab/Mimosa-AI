@@ -236,6 +236,9 @@ if "{path}":
             if template_workflow 
             else self.create_workflow_code(goal_prompt, existing_tool_prompt)
         )
+        if workflow_code is None or workflow_code.strip() == "":
+            print("Generated workflow:\n", workflow_code)
+            raise ValueError("❌ Generated workflow code is empty or invalid")
         
         path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
         
