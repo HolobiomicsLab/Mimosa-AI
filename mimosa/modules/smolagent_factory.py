@@ -217,9 +217,9 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                         else None
                     )
                     memories.append(action_step)
-            with open(os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json"), "w") as f:
+            with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
                 json.dump(memories, f, indent=2)
-            print(f"Agent memory saved successfully to {os.path.join(memory_folder_path, f'agent_{self.run_uuid}.json')}")
+            print(f"Agent memory saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}")
 
@@ -227,7 +227,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         print(f"Loading agent memory for workflow UUID: {workflow_uuid}")
         try:
             memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            agent_file_path = os.path.join(memory_folder_path, f"agent_{self.run_uuid}.json")
+            agent_file_path = os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json")
             
             if not os.path.exists(agent_file_path):
                 print(f"No agent file found at {agent_file_path}. Not using cached memory.")

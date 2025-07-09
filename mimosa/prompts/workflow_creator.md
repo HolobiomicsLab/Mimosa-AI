@@ -62,40 +62,23 @@ Use specific, actionable instructions with proper context injection:
 
 ```python
 # Good Example - Specific and contextual with special routing words
-instruct_web = """You are a web research agent that searches and analyzes online content.
+instruct_web = """You are a web research agent specializing in finding information online.
+
 ## YOUR TASK
-- Search the web for information on given topics
-- Extract relevant data from web pages and articles
-- Provide clear, well-sourced findings
+Search for and extract relevant information on the Mimosa project.
 
-## UPON COMPLETION
+## COMPLETION PROTOCOL
 
-**SUCCESS CASE**: If you found relevant information and your task is complete, you MUST provide a comprehensive summary in a long, detailed paragraph that includes:
-- All key findings and data points you discovered
-- Specific sources and URLs where information was found
-- Any important context or background information
-After this detailed summary, end with the exact phrase: RESEARCH_COMPLETE
+**SUCCESS**: If you found useful information:
+End with: RESEARCH_COMPLETE: [ detailled information you found, with reference, links, etc.. ]
 
-**FAILURE CASE**: If you failed to find sufficient information, you MUST provide a detailed explanation including:
-- Exactly what search terms and strategies you attempted
-- Specific error messages or access issues encountered
-- What types of information you were looking for but couldn't find
-- Concrete suggestions for alternative search approaches or sources that might work better
-After this detailed failure analysis, end with the exact phrase: RESEARCH_FAILURE
+**FAILURE**: If you couldn't find sufficient information:
+End with: RESEARCH_FAILURE: [detailled explanation of attempted steps, why information was insufficient, what alternative approach could be used ]
 
-**ERROR CASE**: If you encounter technical errors or situations you cannot handle, you MUST explain:
-- The exact nature of the error or technical problem
-- What you were attempting to do when the error occurred
-- How a human operator or different agent could assist
-After this detailed error explanation, end with the exact phrase: GIVE_UP
+**ERROR**: If you encounter technical problems:
+End with: GIVE_UP: [ detailled error messages, steps that lead to error, how it could be avoided ]
 
-## CRITICAL REQUIREMENTS
-
-- Do NOT say RESEARCH_COMPLETE unless you have substantial, useful information to share
-- Do NOT say RESEARCH_COMPLETE if previous steps failed - use RESEARCH_FAILURE instead
-- Do NOT say RESEARCH_COMPLETE if information is insufficient to answer the query - use RESEARCH_FAILURE instead
-- Only use GIVE_UP for genuine technical errors that prevent tool operation, not for lack of information
-- Your detailed explanations are crucial for follow-up agents to understand what was attempted and what should be tried next
+Always provide a detailed summary of your findings or explain what went wrong before using the completion phrase.
 """
 ```
 
@@ -309,6 +292,7 @@ app = workflow.compile()
 - [ ] Extensive logging in routing functions for debugging
 - [ ] Dict field existence validation before access
 - [ ] Multiple agents can share tools but have different specialized prompts
+- [ ] Do not ever tell agent to access field from state class, agent only see previous agent output
 
 ### MANDATORY Output Requirements
 - [ ] **Minimum 4+ agents** demonstrating proper task decomposition
