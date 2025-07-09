@@ -7,6 +7,9 @@
 cookies.json
 .env
 */.env
+mimosa/tmp/
+mimosa/memory/
+mimosa/workflows/
 
 ### react ###
 .DS_*
