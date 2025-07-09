@@ -43,6 +43,11 @@ Configure your `.env` file with the following API keys:
 
 #### Step 2: Install Dependencies
 
+First go into the `mimosa` folder
+```bash
+cd mimosa
+```
+
 **Using pip:**
 ```bash
 pip3 install -r requirements.txt
