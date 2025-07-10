@@ -15,13 +15,12 @@ from smolagents import (
     ToolCallingAgent,
     MLXModel,
     ActionStep,
-    TaskStep
+    TaskStep,
+    LiteLLMModel
 )
 
-try:
-    from smolagents import HfApiModel
-except ImportError:
-    from smolagents import InferenceClientModel as HfApiModel # HfApiModel was renamed to InferenceClientModel in v1.14 https://github.com/huggingface/smolagents/releases
+
+from smolagents import InferenceClientModel # HfApiModel was renamed to InferenceClientModel in v1.14 https://github.com/huggingface/smolagents/releases
 
 from opentelemetry.sdk.trace import TracerProvider
 
@@ -40,15 +39,17 @@ DANGEROUS_MODULES = {}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
-LANGFUSE_AUTH=base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
 
-os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel" # EU data region
-os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {LANGFUSE_AUTH}"
+if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
+    LANGFUSE_AUTH=base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
 
-trace_provider = TracerProvider()
-trace_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
+    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel" # EU data region
+    os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {LANGFUSE_AUTH}"
 
-SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
+    trace_provider = TracerProvider()
+    trace_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
+
+    SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 # good models:
 #Qwen/Qwen2.5-72B-Instruct
@@ -60,12 +61,12 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools,
                  model_id="deepseek-ai/DeepSeek-V3",
-                 engine_name="hf_api",
+                 engine_name="deepseek",  # Options: mlx, inference_client, deepseek, openai
                  max_steps=9
                 ):
         self.model_id = model_id
         self.max_tokens = 1024
-        self.provider = "nebius"
+        self.provider = "auto"
         self.token = os.getenv("HF_TOKEN")
         self.tools = tools or []
         self.instruct_prompt = instruct_prompt
@@ -145,20 +146,20 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "hf_api":
-            print("Using HfApiModel for Hugging Face API execution.")
-            return HfApiModel(
-                model_id=self.model_id,
-                provider=self.provider,
-                token=self.token,
-                max_tokens=self.max_tokens,
-            )
         elif self.engine_name == "inference_client":
             print("Using InferenceClientModel for inference client execution.")
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
                 token=self.token,
+                max_tokens=self.max_tokens,
+            )
+        elif self.engine_name == "deepseek":
+            print("Using LiteLLM for DeepSeek execution.")
+            return LiteLLMModel(
+                model_id="deepseek/deepseek-chat",
+                temperature=0.2,
+                api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
@@ -190,6 +191,8 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             if isinstance(step, ActionStep):
                 error, feedback = step.error, step.observations
                 step_obs = error if error else feedback
+                if type(step_obs) is not str:
+                    step_obs = step_obs.dict()["message"]
                 step_action = step.code_action
                 if not isinstance(step_obs, str):
                     print("Skipping non-string observation:", step_obs)
@@ -218,6 +221,13 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                             [asdict(msg) for msg in step.model_input_messages], ignore_key="raw"
                         )
                         if step.model_input_messages
+                        else None
+                    )
+                    action_step["model_output_message"] = (
+                        get_dict_from_nested_dataclasses(
+                            step.model_output_message, ignore_key="raw"
+                        )
+                        if step.model_output_message
                         else None
                     )
                     memories.append(action_step)
