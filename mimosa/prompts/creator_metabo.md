@@ -294,6 +294,8 @@ app = workflow.compile()
 - [ ] Never use web search until it's asked by the user
 - [ ] Never try to look for files in your own folders, always you tools
 - [ ] Whenever you call a tool, read his response before to write anything
+- [ ] Always use the most appropriate tool, use the shell commands only as a last resort 
+- [ ] Never use shell command to write R or execute R script
 
 ### MANDATORY Error Handling & Fallback Requirements
 - [ ] Retry mechanisms with attempt counters (max 3 retries per agent)
