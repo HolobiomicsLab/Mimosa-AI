@@ -198,7 +198,6 @@ except KeyboardInterrupt:
     print("Workflow execution interrupted by user")
     pass
 print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
-print("workflow run: result state:", result_state)
 
 if "{path}":
     print("workflow run: saving workflow state JSON at :", "{path}")
