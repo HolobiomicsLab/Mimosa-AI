@@ -1,6 +1,5 @@
 '''
 This module provides a set of tools for interacting with a web browser instance.
-It is loaded in a sandbox python environment as part of the crafted workflow.
 '''
 
 from smolagents import MCPClient
