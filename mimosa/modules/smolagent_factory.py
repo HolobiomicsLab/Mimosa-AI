@@ -189,16 +189,14 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         actions, observations, success = [], [], []
         for idx, step in enumerate(self.agent.memory.steps):
             if isinstance(step, ActionStep):
-                error, feedback = step.error, step.observations
-                step_obs = error if error else feedback
-                if type(step_obs) is not str:
-                    step_obs = step_obs.dict()["message"]
-                step_action = step.code_action
-                if not isinstance(step_obs, str):
-                    print("Skipping non-string observation:", step_obs)
-                    continue
-                if not isinstance(step_action, str):
-                    print("Skipping non-string action:", step_action)
+                error, obs = step.error, step.observations
+                step_obs = ""
+                step_action = ""
+                feedback = obs if obs else error
+                if type(feedback) is not str:
+                    step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
+                    step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
+                else:
                     continue
                 actions.append(step_action)
                 observations.append(step_obs)
@@ -218,7 +216,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     action_step = step.dict()
                     action_step["model_input_messages"] = (
                         get_dict_from_nested_dataclasses(
-                            [asdict(msg) for msg in step.model_input_messages], ignore_key="raw"
+                            step.model_input_messages, ignore_key="raw"
                         )
                         if step.model_input_messages
                         else None
@@ -233,34 +231,79 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     memories.append(action_step)
             with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
                 json.dump(memories, f, indent=2)
-            print(f"Agent memory saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
+            print(f"Agent memories saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}")
+    
+    def load_memory_json(self, memory_dict: List[dict]) -> List[ActionStep]:
+        memory_steps = []
 
-    def load_agent_memory(self, workflow_uuid: str):
-        print(f"Loading agent memory for workflow UUID: {workflow_uuid}")
+        for step_data in memory_dict:
+            action_step = ActionStep(
+                step_number=step_data.get("step", 1),
+                observations_images=step_data.get("observations_images", []),
+                timing=step_data.get("timing", {})
+            )
+            action_step.model_input_messages = step_data.get("model_input_messages")
+            action_step.model_output_message = step_data.get("model_output_message") 
+            action_step.tool_calls = step_data.get("tool_calls", [])
+            action_step.observations = step_data.get("observations", "")
+            action_step.model_output = step_data.get("model_output", "")
+            action_step.error = step_data.get("error")
+            action_step.token_usage = step_data.get("token_usage")
+            action_step.action_output = step_data.get("action_output")
+            memory_steps.append(action_step)
+        return memory_steps
+
+    def load_agent_memory(self, workflow_uuid: str, instructions: str):
         try:
             memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            agent_file_path = os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json")
             
-            if not os.path.exists(agent_file_path):
-                print(f"No agent file found at {agent_file_path}. Not using cached memory.")
+            if not os.path.exists(memory_folder_path):
                 return None
-                
-            with open(agent_file_path, 'r') as f:
-                memory_dict = json.load(f)
-                self.agent.memory.steps.extend([
-                    ActionStep(**step) if isinstance(step, dict) else step for step in memory_dict
-                ])
-                print("Loaded last : ", self.agent.memory.steps[-1] if self.agent.memory.steps else "No steps loaded")
-                print(f"Successfully loaded agent from {agent_file_path}")
+            
+            existing_memories = []
+            for filename in os.listdir(memory_folder_path):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(memory_folder_path, filename)
+                    try:
+                        with open(file_path, 'r') as f:
+                            memory_dict = json.load(f)
+                            if isinstance(memory_dict, list):
+                                existing_memories.append(
+                                    (filename, self.load_memory_json(memory_dict))
+                                )
+                    except Exception as e:
+                        print(f"Failed to load memory from {file_path}: {str(e)}")
+                        raise e
+            
+            matching_memory = None
+            filename_uuid = None
+            for (filename, memories) in existing_memories:
+                for memory_steps in memories:
+                    normalize = lambda text: re.sub(r'\s+', ' ', str(text).strip())
+                    normalized_instructions = normalize(instructions)
+                    for i, message in enumerate(memory_steps.model_input_messages):
+                        message_content = message["content"][0].get("text", "")
+                        normalized_message = normalize(message_content)
+                        if normalized_instructions in normalized_message:
+                            matching_memory = memory_steps
+                            filename_uuid = filename
+                            break
+                    if matching_memory:
+                        break
+            if matching_memory:
+                print("Loaded matching memories from file:", filename_uuid)
+                self.agent.memory.steps.append(matching_memory)
+            else:
+                print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
     
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:
-            self.load_agent_memory(workflow_uuid)
+            self.load_agent_memory(workflow_uuid, instructions)
         res = self.agent.run(instructions)
         self.save_memories(workflow_uuid=workflow_uuid)
         return res
