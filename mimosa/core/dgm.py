@@ -131,10 +131,11 @@ Learn from this output and improve the workflow generation.
         print(f"\n{'='*60}")
         print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
         print(f"{'='*60}")
-        human_validation = input("Continue with next iteration? (yes/no): ").strip().lower()
-        if human_validation not in ["yes", "y"]:
-            print("Exiting self-improvement loop.")
-            return flow_output
+        if iteration_count > 0:
+            human_validation = input("Continue with next iteration? (yes/no): ").strip().lower()
+            if human_validation not in ["yes", "y"]:
+                print("Exiting self-improvement loop.")
+                return flow_output
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─'*60}")
         print(f"  {goal}")
