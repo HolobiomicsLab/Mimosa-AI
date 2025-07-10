@@ -1,4 +1,9 @@
 
+"""
+This module provides a factory for creating SmolAgents, which are AI agents by Hugging Face's SmolAgents library.
+The code is not imported directly. It is loaded by the workflow factory and executed in a sandboxed Python environment as part of the crafted workflow.
+"""
+
 import os
 import base64
 import json
@@ -262,32 +267,34 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             action_step.action_output = step_data.get("action_output")
             memory_steps.append(action_step)
         return memory_steps
+    
+    def collect_existing_memories(self, memory_folder_path: str) -> List[Tuple[str, List[ActionStep]]]:
+        existing_memories = []
+        for filename in os.listdir(memory_folder_path):
+            if filename.endswith('.json'):
+                file_path = os.path.join(memory_folder_path, filename)
+                try:
+                    with open(file_path, 'r') as f:
+                        memory_dict = json.load(f)
+                        if isinstance(memory_dict, list):
+                            existing_memories.append(
+                                (filename, self.load_memory_json(memory_dict))
+                            )
+                except Exception as e:
+                    print(f"Failed to load memory from {file_path}: {str(e)}")
+                    raise e
+        return existing_memories
 
     def load_agent_memory(self, workflow_uuid: str, instructions: str):
+        matching_memory = None
+        filename_uuid = None
+    
         try:
             memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            
             if not os.path.exists(memory_folder_path):
                 return None
             
-            existing_memories = []
-            for filename in os.listdir(memory_folder_path):
-                if filename.endswith('.json'):
-                    file_path = os.path.join(memory_folder_path, filename)
-                    try:
-                        with open(file_path, 'r') as f:
-                            memory_dict = json.load(f)
-                            if isinstance(memory_dict, list):
-                                existing_memories.append(
-                                    (filename, self.load_memory_json(memory_dict))
-                                )
-                    except Exception as e:
-                        print(f"Failed to load memory from {file_path}: {str(e)}")
-                        raise e
-            
-            matching_memory = None
-            filename_uuid = None
-            for (filename, memories) in existing_memories:
+            for (filename, memories) in self.collect_existing_memories(memory_folder_path):
                 for memory_steps in memories:
                     normalize = lambda text: re.sub(r'\s+', ' ', str(text).strip())
                     normalized_instructions = normalize(instructions)

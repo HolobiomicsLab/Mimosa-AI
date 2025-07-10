@@ -152,7 +152,7 @@ Learn from this output and improve the workflow generation.
         await self.recursive_self_improvement(prompt,
                                               goal,
                                               template_uuid,
-                                              workflow_template=flow_code,
+                                              workflow_template=flow_code if flow_state else None,
                                               iteration_count=iteration_count+1
                                              )
         return flow_output

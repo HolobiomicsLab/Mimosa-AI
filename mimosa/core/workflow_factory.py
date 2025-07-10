@@ -83,7 +83,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the following plan:
             raise ValueError(f"❌ Tools directory '{self.tools_dir}' does not exist")
             
         tools_code = ""
-        existing_tool_prompt = ""
+        existing_tool_prompt = "The following tools packages are available for agents:\n\n"
         
         for filename in os.listdir(self.tools_dir):
             if not filename.endswith('.py'):
@@ -99,9 +99,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the following plan:
                 raise ValueError(f"❌ Error reading tool file {filename}: {str(e)}")
                 
             tools_code += code + '\n'
-            tool_var_name = f"{base_name.upper()}_TOOLS"
+            tool_var_name = base_name.upper()
             tools_code += f"\n{tool_var_name} = tools\n"
-            existing_tool_prompt += f"{tool_var_name}\n"
+        existing_tool_prompt += tools_code
 
         print(f"✅ Loaded {len(os.listdir(self.tools_dir))} Tools packages from {self.tools_dir}")
         return tools_code, existing_tool_prompt
