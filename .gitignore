@@ -7,6 +7,7 @@
 cookies.json
 .env
 */.env
+workflows/*
 mimosa/tmp/
 mimosa/memory/
 mimosa/workflows/

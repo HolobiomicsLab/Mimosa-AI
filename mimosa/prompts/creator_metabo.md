@@ -117,15 +117,15 @@ Tools are already in the context, not allowed to redeclare.
 
 Declare agent with tool:
 ```python
-smolagent_web = SmolAgentFactory(instruct_web, EXISTING_TOOLS_WEB)
+smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
 ```
 
 ### SmolAgent declaration
 
 ```python
 # Create and add agent node to workflow
-smolagent_web = SmolAgentFactory(instruct_web, EXISTING_TOOLS_WEB)
-smolagent_chart = SmolAgentFactory(instruct_chart, EXISTING_TOOLS_CHART)
+smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
+smolagent_chart = SmolAgentFactory("chart_maker", instruct_chart, EXISTING_TOOLS_CHART)
 ```
 
 The `SmolAgentFactory` is defined and already in the context. Not allowed to redeclare.
@@ -213,8 +213,8 @@ instruct_chart = """
 """
 
 # MANDATORY: Agent creation
-smolagent_web = SmolAgentFactory(instruct_web, EXISTING_TOOLS_WEB)
-smolagent_chart = SmolAgentFactory(instruct_chart, EXISTING_TOOLS_CHART)
+smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
+smolagent_chart = SmolAgentFactory("chart_maker", instruct_chart, EXISTING_TOOLS_CHART)
 
 # Advanced routing with multiple fallback paths
 ```python

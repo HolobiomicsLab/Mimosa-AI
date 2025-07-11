@@ -63,6 +63,7 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 class SmolAgentFactory:
 
     def __init__(self,
+                 name,
                  instruct_prompt,
                  tools,
                  model_id="deepseek-ai/DeepSeek-V3",
@@ -78,7 +79,7 @@ class SmolAgentFactory:
         self.local = False
         self.engine_name = engine_name
         self.engine = None
-        self.run_uuid = str(uuid.uuid4())
+        self.name = name
         self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
         self.additional_system_prompt = """
@@ -219,9 +220,16 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             for idx, step in enumerate(self.agent.memory.steps):
                 if isinstance(step, ActionStep):
                     action_step = step.dict()
-                    action_step["model_input_messages"] = (
+                    """action_step["model_input_messages"] = (
                         get_dict_from_nested_dataclasses(
                             [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
+                        )
+                        if step.model_input_messages
+                        else None
+                    )"""
+                    action_step["model_input_messages"] = (
+                        get_dict_from_nested_dataclasses(
+                            [asdict(msg) for msg in step.model_input_messages], ignore_key="raw"
                         )
                         if step.model_input_messages
                         else None
@@ -241,7 +249,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             except Exception as e:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
-            raise ValueError(f"Failed to save memory: {str(e)}")
+            raise ValueError(f"Failed to save memory: {str(e)}\n {memories}")
     
     def load_memory_json(self, memory_dict: List[dict]) -> List[ActionStep]:
         memory_steps = []
@@ -334,7 +342,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         success_bool = success[-1] if len(success) > 0 else True
         return {
             **state,
-            "step_uuid": state.get("step_uuid", []) + [self.run_uuid],
+            "step_uuid": state.get("step_uuid", []) + [self.name],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
