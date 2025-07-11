@@ -16,18 +16,19 @@ class MCP:
 class ToolManager:
     """Manager for MCP tools discovery and management."""
 
-    def __init__(self, mcps: Optional[List[MCP]] = None):
-        self.mcps = mcps
+    def __init__(self, config, mcps: Optional[List[MCP]] = None):
+        self.discovery_address = config.discovery_addresses
+        self.mcps = mcps if mcps is not None else []
 
-    async def discover_mcp_servers(self, port_min: int = 5000, port_max: int = 5250, timeout: float = 2.0) -> List[int]:
-        """Discover MCP servers on ports range with timeout handling."""
-        print(f"🔍 Discovering MCP servers on ports {port_min}-{port_max}...")
+    async def discover_mcp_at_address(self, address: str, port_min: int = 5000, port_max: int = 5250, timeout: float = 2.0) -> List[int]:
+        """Discover MCP servers on address and ports range with timeout handling."""
+        print(f"🔍 Discovering MCP servers at {address} on ports {port_min}-{port_max}...")
         found_servers = False
         mcps = []
 
         for port in range(port_min, port_max + 1):
             try:
-                async with Client(f"http://localhost:{port}/mcp", timeout=3.0) as client:
+                async with Client(f"http://{address}:{port}/mcp", timeout=3.0) as client:
                     found_servers = True
                     tools = await client.list_tools()
                     name = None
@@ -38,7 +39,7 @@ class ToolManager:
                     if tools:
                         print(f"✅ Found MCP server on port {port}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
-                        mcps.append(MCP(name=name, tools=[tool.name for tool in tools], address="localhost", port=port))
+                        mcps.append(MCP(name=name, tools=[tool.name for tool in tools], address=address, port=port))
             except asyncio.TimeoutError:
                 print(f"❌ MCP server on port {port} timed out after {timeout}s")
                 continue
@@ -50,8 +51,20 @@ class ToolManager:
             raise RuntimeError("No MCP servers found. Please start Toolomics MCP server.")
 
         print(f"✅ Connected to {len(mcps)} MCP server(s) successfully.")
-        self.mcps = mcps
+        self.mcps.extend(mcps)
         return mcps
+    
+    async def discover_mcp_servers(self, timeout: float = 2.0) -> List[MCP]:
+        for addr in self.discovery_address:
+            print(f"🔍 Discovering MCP servers at {addr.ip}...")
+            try:
+                mcps = await self.discover_mcp_at_address(addr.ip, addr.port_min, addr.port_max, timeout)
+                if mcps:
+                    print(f"✅ Found {len(mcps)} MCP server(s) at {addr.ip}.")
+                    return mcps
+            except Exception as e:
+                print(f"❌ Error discovering MCP servers at {addr.ip}: {e}")
+
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""

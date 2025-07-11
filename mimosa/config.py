@@ -1,6 +1,18 @@
 
 import os
 from typing import Optional, Dict, Any, List, Union, Tuple
+from dataclasses import dataclass
+
+@dataclass
+class AddressMCP:
+    """Represents an MCP server address with port range."""
+    ip: str
+    port_min: int
+    port_max: int
+
+    def __post_init__(self):
+        if self.port_min > self.port_max:
+            raise ValueError("port_min must be <= port_max")
 
 class Config:
     """Configuration class for Mimosa AI Agent Framework."""
@@ -18,6 +30,9 @@ class Config:
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
+        self.discovery_addresses: List[AddressMCP] = [
+            AddressMCP(ip="localhost", port_min=5000, port_max=5250),
+        ]
         self.runner_requirements: List[str] = [
             "python-dotenv",
             "fastmcp==2.8.1",
@@ -42,9 +57,13 @@ class Config:
         assert os.path.exists(self.smolagent_factory_code_path), f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
         assert os.path.exists(self.prompt_workflow_creator), f"System prompt file not found: {self.prompt_workflow_creator}"
     
-    def jsonify(self) -> Dict[str, Union[str, int, Optional[str]]]:
+    def jsonify(self) -> Dict[str, Union[str, int, Optional[str], List[Dict[str, Union[str, int]]]]]:
         """Convert configuration to a JSON-serializable dictionary."""
         return {
+            "discovery_addresses": [
+                {"ip": addr.ip, "port_min": addr.port_min, "port_max": addr.port_max}
+                for addr in self.discovery_addresses
+            ],
             "workflow_dir": self.workflow_dir,
             "tools_dir": self.tools_dir,
             "schema_code_path": self.schema_code_path,
@@ -63,6 +82,10 @@ class Config:
     def from_json(self, data: Dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
+        self.discovery_addresses = [
+            AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
+            for addr in data.get("discovery_addresses", [])
+        ]
         self.tools_dir = data.get("tools_dir", self.tools_dir)
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get("smolagent_factory_code_path", self.smolagent_factory_code_path)

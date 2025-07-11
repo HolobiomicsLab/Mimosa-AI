@@ -24,6 +24,7 @@ class WorkflowFactory:
         self.schema_code_path = config.schema_code_path
         self.smolagent_factory_code_path = config.smolagent_factory_code_path
         self.prompt_workflow_creator = config.prompt_workflow_creator
+        self.config = config
 
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
@@ -83,7 +84,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         tools_code = ""
         existing_tool_prompt = ""
-        tool_manager = ToolManager()
+        tool_manager = ToolManager(self.config)
         mcps = await tool_manager.discover_mcp_servers()
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)

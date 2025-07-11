@@ -17,6 +17,8 @@ class PushNotifier:
     
     def send_message(self, message, title=None, priority=0):
         """Send a push notification message."""
+        if not self.token or not self.user:
+            return None
         data = {
             "token": self.token,
             "user": self.user,

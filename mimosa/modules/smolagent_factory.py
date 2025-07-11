@@ -82,6 +82,7 @@ class SmolAgentFactory:
         self.name = name
         self.memory_folder = './memory' 
         os.makedirs(self.memory_folder, exist_ok=True)
+        self.run_uuid = str(uuid.uuid4())
         self.additional_system_prompt = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
