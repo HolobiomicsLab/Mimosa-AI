@@ -220,16 +220,9 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             for idx, step in enumerate(self.agent.memory.steps):
                 if isinstance(step, ActionStep):
                     action_step = step.dict()
-                    """action_step["model_input_messages"] = (
-                        get_dict_from_nested_dataclasses(
-                            [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
-                        )
-                        if step.model_input_messages
-                        else None
-                    )"""
                     action_step["model_input_messages"] = (
                         get_dict_from_nested_dataclasses(
-                            [asdict(msg) for msg in step.model_input_messages], ignore_key="raw"
+                            [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
                         )
                         if step.model_input_messages
                         else None

@@ -24,8 +24,6 @@ def validate_environment() -> None:
     """
     if not os.getenv('HF_TOKEN'):
         raise ValueError("⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
-    if not os.path.exists("modules/tools"):
-        raise ValueError("❌ Tools directory 'modules/' does not exist. Please ensure it is present.")
     if not os.getenv('OPENAI_API_KEY'):
         raise ValueError("⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key.")
 

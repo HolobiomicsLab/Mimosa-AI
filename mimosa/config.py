@@ -37,7 +37,6 @@ class Config:
     
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
-        assert os.path.exists(self.tools_dir), f"Tools directory not found: {self.tools_dir}"
         assert os.path.exists(self.workflow_dir), f"Workflow directory not found: {self.workflow_dir}"
         assert os.path.exists(self.schema_code_path), f"State schema file not found: {self.schema_code_path}"
         assert os.path.exists(self.smolagent_factory_code_path), f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
