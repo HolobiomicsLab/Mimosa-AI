@@ -221,7 +221,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     action_step = step.dict()
                     action_step["model_input_messages"] = (
                         get_dict_from_nested_dataclasses(
-                            step.model_input_messages, ignore_key="raw"
+                            [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
                         )
                         if step.model_input_messages
                         else None
@@ -234,9 +234,12 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                         else None
                     )
                     memories.append(action_step)
-            with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
-                json.dump(memories, f, indent=2)
-            print(f"Agent memories saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
+            try:
+                with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
+                    json.dump(memories, f, indent=2)
+                print(f"Agent memories saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
+            except Exception as e:
+                print(f"Failed to save memory: {str(e)}")
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}")
     

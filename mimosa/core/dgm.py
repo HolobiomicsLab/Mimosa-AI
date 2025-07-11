@@ -7,6 +7,7 @@ import os
 from typing import Optional
 
 from core.orchestrator import WorkflowOrchestrator
+from core.notify import PushNotifier
 
 class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""
@@ -14,6 +15,7 @@ class GodelMachine:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.orchestrator = WorkflowOrchestrator(config)
+        self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -143,6 +145,7 @@ Learn from this output and improve the workflow generation.
             
         run_stdout, uuid = await self.orchestrator.orchestrate_workflow(prompt, template_uuid, workflow_template)
         flow_state = self.load_flow_state_result(uuid)
+        self.notifier.send_message(str(flow_state) if flow_state else run_stdout, title=f"Workflow {uuid} completed.")
         flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
         prompt = self.improvement_prompt(goal, flow_state, flow_code, run_stdout, iteration_count)
         template_uuid = None

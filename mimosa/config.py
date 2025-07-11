@@ -32,6 +32,8 @@ class Config:
             "openinference-instrumentation-smolagents",
             "asyncio==3.4.3"
         ]
+        self.pushover_token: Optional[str] = os.getenv("PUSHOVER_TOKEN")
+        self.pushover_user: Optional[str] = os.getenv("PUSHOVER_USER")
     
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""

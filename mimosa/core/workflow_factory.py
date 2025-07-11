@@ -1,7 +1,9 @@
 import uuid
 import os
+import asyncio
 from typing import Optional, Tuple
 from core.llm_provider import LLMProvider
+from core.tools_manager import ToolManager
 
 class WorkflowFactory:
     """Handles the creation and management of Langraph-SmolAgent workflow generation.
@@ -42,7 +44,7 @@ You are an expert in generating LangGraph workflows using SmolAgent nodes.
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-Your task is to create a LangGraph-SmolAgent workflow for the following plan:
+Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
         history = [
@@ -73,37 +75,21 @@ Your task is to create a LangGraph-SmolAgent workflow for the following plan:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
 
-    def load_tools_code(self) -> Tuple[str, str]:
+    async def load_tools_code(self) -> Tuple[str, str]:
         """Load all tool code from the tools directory.
         
         Returns:
             Tuple[str, str]: Tuple containing (tools_code, existing_tool_prompt)
         """
-        if not os.path.exists(self.tools_dir):
-            raise ValueError(f"❌ Tools directory '{self.tools_dir}' does not exist")
-            
         tools_code = ""
-        existing_tool_prompt = "The following tools packages are available for agents:\n\n"
-        
-        for filename in os.listdir(self.tools_dir):
-            if not filename.endswith('.py'):
-                continue
-                
-            filepath = os.path.join(self.tools_dir, filename)
-            base_name = os.path.splitext(filename)[0]
-            
-            try:
-                with open(filepath, 'r') as f:
-                    code = f.read()
-            except Exception as e:
-                raise ValueError(f"❌ Error reading tool file {filename}: {str(e)}")
-                
-            tools_code += code + '\n'
-            tool_var_name = base_name.upper()
-            tools_code += f"\n{tool_var_name} = tools\n"
-        existing_tool_prompt += tools_code
-
-        print(f"✅ Loaded {len(os.listdir(self.tools_dir))} Tools packages from {self.tools_dir}")
+        existing_tool_prompt = ""
+        tool_manager = ToolManager()
+        mcps = await tool_manager.discover_mcp_servers()
+        for mcp in mcps:
+            client_code = tool_manager.get_client_code(mcp)
+            client_prompt = tool_manager.get_client_prompt(mcp)
+            tools_code += client_code + "\n"
+            existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
 
     def create_workflow_code(self, craft_instructions: str, existing_tool_prompt: str) -> str:
@@ -208,7 +194,7 @@ if "{path}":
         raise(f"Could not save workflow data:" + str(e))
 '''
 
-    def craft_workflow(
+    async def craft_workflow(
         self,
         goal_prompt: str,
         template_workflow: Optional[str] = None,
@@ -225,8 +211,8 @@ if "{path}":
             str: Complete executable workflow code
         """
         uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
-        tools_code, existing_tool_prompt = self.load_tools_code()
-        
+        tools_code, existing_tool_prompt = await self.load_tools_code()
+
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()
         workflow_code = (

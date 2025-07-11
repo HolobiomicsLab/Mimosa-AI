@@ -6,9 +6,8 @@ The multi-agent workflow is a graph of agents where nodes are either functions o
 
 ### 1. Task Decomposition Strategy (CRITICAL)
 - **Divide and Conquer**: Break complex tasks into the smallest possible specialized sub-agents
-- Each agent should handle ONE atomic operation with zero overlap
-- Create sequential chains of simple agents rather than complex multi-purpose ones
-- **Minimum 3+ agents** for any non-trivial task to ensure proper decomposition
+- Each agent should handle ONE atomic operation with zero overlap. One agent has one set of tools.
+- Decompose tasks based on natural functional boundaries - for non-trivial task use multiple agents.
 
 ### 2. State Flow Design with Robust Error Handling
 - Use conditional routing with custom functions for state-dependent decisions

@@ -67,7 +67,7 @@ class WorkflowOrchestrator:
         """
         execution_output = ""
 
-        workflow_code, uuid = self.workflow_factory.craft_workflow(
+        workflow_code, uuid = await self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=workflow_template,
             template_uuid=template_uuid,
@@ -77,7 +77,7 @@ class WorkflowOrchestrator:
             await self.workflow_requirements_install()
             execution_output = await self.workflow_sandbox_run(workflow_code)
         except Exception as e:
-            print(f"❌ Error during execution: {e}")
+            print(f"❌ Error during {uuid} workflow execution: {e}")
             import traceback
             traceback.print_exc()
             return str(e), uuid
