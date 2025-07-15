@@ -22,7 +22,6 @@ class ToolManager:
 
     async def discover_mcp_at_address(self, address: str, port_min: int = 5000, port_max: int = 5250, timeout: float = 2.0) -> List[int]:
         """Discover MCP servers on address and ports range with timeout handling."""
-        print(f"🔍 Discovering MCP servers at {address} on ports {port_min}-{port_max}...")
         found_servers = False
         mcps = []
 
@@ -49,8 +48,6 @@ class ToolManager:
         if not found_servers:
             print(f"❌ No MCP servers found on ports {port_min}-{port_max}. Please ensure at least one server is running.")
             raise RuntimeError("No MCP servers found. Please start Toolomics MCP server.")
-
-        print(f"✅ Connected to {len(mcps)} MCP server(s) successfully.")
         self.mcps.extend(mcps)
         return mcps
     
