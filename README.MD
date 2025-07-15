@@ -16,11 +16,8 @@
 **Option A: Using pip**
 ```bash
 # Create and activate virtual environment
-python3 -m venv mimosa-env
+python3 -m venv .venv
 source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
-
-# Configure environment
-mv .env.example .env
 ```
 
 **Option B: Using uv (faster alternative)**
@@ -29,12 +26,10 @@ mv .env.example .env
 pip install uv
 
 # Create and activate virtual environment
-uv venv mimosa-env
-source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
-
-# Configure environment
-mv .env.example .env
+uv venv .venv
+source .venv/bin/activate  # On Windows: mimosa-env\Scripts\activate
 ```
+
 
 Configure your `.env` file with the following API keys:
 - `HF_TOKEN`: Your Hugging Face token
