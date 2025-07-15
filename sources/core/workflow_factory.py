@@ -1,9 +1,8 @@
 import uuid
 import os
-import asyncio
 from typing import Optional, Tuple
-from core.llm_provider import LLMProvider
-from core.tools_manager import ToolManager
+from .llm_provider import LLMProvider
+from .tools_manager import ToolManager
 
 class WorkflowFactory:
     """Handles the creation and management of Langraph-SmolAgent workflow generation.
@@ -19,7 +18,6 @@ class WorkflowFactory:
         Args:
             config: Configuration object containing paths and settings
         """
-        self.tools_dir = config.tools_dir
         self.workflow_dir = config.workflow_dir
         self.schema_code_path = config.schema_code_path
         self.smolagent_factory_code_path = config.smolagent_factory_code_path
@@ -86,6 +84,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         existing_tool_prompt = ""
         tool_manager = ToolManager(self.config)
         mcps = await tool_manager.discover_mcp_servers()
+        if not mcps:
+            raise ValueError("\nNo MCP servers found. Please ensure at least one MCP is running on toolomics.")
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)
             client_prompt = tool_manager.get_client_prompt(mcp)

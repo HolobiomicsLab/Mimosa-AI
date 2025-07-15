@@ -4,8 +4,8 @@ import time
 import sys, os
 from typing import Optional
 
-from core.workflow_factory import WorkflowFactory
-from core.workflow_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
+from .workflow_factory import WorkflowFactory
+from .workflow_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
 
 class WorkflowOrchestrator:
     """Main Meta-Agent workflow orchestration class.

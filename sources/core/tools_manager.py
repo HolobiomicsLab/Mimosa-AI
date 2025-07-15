@@ -59,8 +59,8 @@ class ToolManager:
                 if mcps:
                     print(f"✅ Found {len(mcps)} MCP server(s) at {addr.ip}.")
                     return mcps
-            except Exception as e:
-                print(f"❌ Error discovering MCP servers at {addr.ip}: {e}")
+            except Exception as _:
+                raise ValueError(f"❌ Error discovering MCP servers at {addr.ip}, no MCP servers found.")
 
 
     def _get_client_variable_name(self, mcp: MCP) -> str:

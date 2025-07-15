@@ -6,8 +6,8 @@ import json
 import os
 from typing import Optional
 
-from core.orchestrator import WorkflowOrchestrator
-from core.notify import PushNotifier
+from .orchestrator import WorkflowOrchestrator
+from .notify import PushNotifier
 
 class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""

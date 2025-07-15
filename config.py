@@ -18,11 +18,10 @@ class Config:
     """Configuration class for Mimosa AI Agent Framework."""
     
     def __init__(self):
-        self.workflow_dir: str = "workflows"
-        self.tools_dir: str = "modules/tools"
-        self.schema_code_path: str = "modules/state_schema.py"
-        self.smolagent_factory_code_path: str = "modules/smolagent_factory.py"
-        self.prompt_workflow_creator: str = "prompts/workflow_creator.md"
+        self.workflow_dir: str = "sources/workflows"
+        self.schema_code_path: str = "sources/modules/state_schema.py"
+        self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_creator.md"
         self.workflow_llm_provider: str = "openai"
         self.mcp_health_endpoint: str = "http://localhost:5000/health"
         self.runner_default_python_version: str = "3.10"
@@ -65,7 +64,6 @@ class Config:
                 for addr in self.discovery_addresses
             ],
             "workflow_dir": self.workflow_dir,
-            "tools_dir": self.tools_dir,
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
@@ -86,7 +84,6 @@ class Config:
             AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
             for addr in data.get("discovery_addresses", [])
         ]
-        self.tools_dir = data.get("tools_dir", self.tools_dir)
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get("smolagent_factory_code_path", self.smolagent_factory_code_path)
         self.prompt_workflow_creator = data.get("prompt_workflow_creator", self.prompt_workflow_creator)
@@ -101,7 +98,7 @@ class Config:
     
     def __str__(self) -> str:
         """String representation of the configuration."""
-        return f"Config(workflow_dir={self.workflow_dir}, tools_dir={self.tools_dir}, " \
+        return f"Config(workflow_dir={self.workflow_dir}, " \
                f"schema_code_path={self.schema_code_path}, smolagent_factory_code_path={self.smolagent_factory_code_path}, " \
                f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, " \
                f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, " \
