@@ -27,7 +27,6 @@ pip install uv
 
 # Create and activate virtual environment
 uv venv .venv
-source .venv/bin/activate  # On Windows: mimosa-env\Scripts\activate
 ```
 
 
@@ -60,6 +59,8 @@ Launch the toolomics MCP server following the instructions at [HolobiomicsLab/to
 
 ```bash
 python3 main.py --goal "Your objective here"
+# or
+uv run main.py --goal "Your objective here"
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
