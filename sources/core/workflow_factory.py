@@ -1,3 +1,7 @@
+"""
+This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
+"""
+
 import uuid
 import os
 from typing import Optional, Tuple

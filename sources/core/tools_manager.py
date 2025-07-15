@@ -1,4 +1,7 @@
 
+"""
+This class manages the discovery and interaction with MCP tools.
+"""
 
 import asyncio
 
