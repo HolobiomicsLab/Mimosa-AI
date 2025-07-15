@@ -26,7 +26,7 @@ class Benchmarker:
                             step_text += f"\ERROR: {error}\n"
                         else:
                             step_text += f"\RESULT: {step.get('observations', '')}\n"
-                    
+
                     step_dict[start_time] = step_text
 
         text = ""
