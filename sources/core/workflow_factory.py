@@ -1,6 +1,6 @@
-import uuid
 import os
-from typing import Optional, Tuple
+import uuid
+
 from .llm_provider import LLMProvider
 from .tools_manager import ToolManager
 
@@ -32,7 +32,7 @@ class WorkflowFactory:
             str: The system prompt content
         """
         try:
-            with open(self.prompt_workflow_creator, "r") as f:
+            with open(self.prompt_workflow_creator) as f:
                 return f.read()
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}")
@@ -77,7 +77,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
 
-    async def load_tools_code(self) -> Tuple[str, str]:
+    async def load_tools_code(self) -> tuple[str, str]:
         """Load all tool code from the tools directory.
 
         Returns:
@@ -209,10 +209,10 @@ if "{path}":
     async def craft_workflow(
         self,
         goal_prompt: str,
-        template_workflow: Optional[str] = None,
-        template_uuid: Optional[str] = None,
+        template_workflow: str | None = None,
+        template_uuid: str | None = None,
         save_workflow: bool = True,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
 
         Args:

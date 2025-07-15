@@ -1,6 +1,6 @@
 import os
-from typing import Optional, Dict, Any, List, Union, Tuple
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -31,10 +31,10 @@ class Config:
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
-        self.discovery_addresses: List[AddressMCP] = [
+        self.discovery_addresses: list[AddressMCP] = [
             AddressMCP(ip="localhost", port_min=5000, port_max=5250),
         ]
-        self.runner_requirements: List[str] = [
+        self.runner_requirements: list[str] = [
             "python-dotenv",
             "fastmcp==2.8.1",
             "requests>=2.31.0",
@@ -48,8 +48,8 @@ class Config:
             "openinference-instrumentation-smolagents",
             "asyncio==3.4.3",
         ]
-        self.pushover_token: Optional[str] = os.getenv("PUSHOVER_TOKEN")
-        self.pushover_user: Optional[str] = os.getenv("PUSHOVER_USER")
+        self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
+        self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
@@ -68,7 +68,7 @@ class Config:
 
     def jsonify(
         self,
-    ) -> Dict[str, Union[str, int, Optional[str], List[Dict[str, Union[str, int]]]]]:
+    ) -> dict[str, str | int | str | None | list[dict[str, str | int]]]:
         """Convert configuration to a JSON-serializable dictionary."""
         return {
             "discovery_addresses": [
@@ -89,7 +89,7 @@ class Config:
             "runner_requirements": self.runner_requirements,
         }
 
-    def from_json(self, data: Dict[str, Any]) -> None:
+    def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.discovery_addresses = [

@@ -38,7 +38,7 @@ class Benchmarker:
             file.write(text)
 
     def get_text(self):
-        return open(self.path / "formated.txt", "r").read()
+        return open(self.path / "formated.txt").read()
 
     def __str__(self):
         return f"Benchmarker text:\n\n{self.get_text()}"

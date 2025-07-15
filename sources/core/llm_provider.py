@@ -1,7 +1,6 @@
 import os
-from typing import List, Dict, Optional
+
 from openai import OpenAI
-from anthropic import Anthropic
 
 
 class LLMProvider:
@@ -20,7 +19,7 @@ class LLMProvider:
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def deepseek_completion(
-        self, history: List[Dict[str, str]], verbose: bool = False
+        self, history: list[dict[str, str]], verbose: bool = False
     ) -> str:
         """Generate text using Deepseek API.
 
@@ -46,7 +45,7 @@ class LLMProvider:
             raise RuntimeError(f"❌ Deepseek API error: {str(e)}") from e
 
     def openai_completion(
-        self, history: List[Dict[str, str]], verbose: bool = False
+        self, history: list[dict[str, str]], verbose: bool = False
     ) -> str:
         """Generate text using OpenAI API.
 

@@ -4,17 +4,16 @@ Mimosa - A AI Agent Framework for advancing scientific research
 ============================================================================
 """
 
-import os
-import asyncio
 import argparse
-import requests
+import asyncio
+import os
+from typing import List, Optional
+
 import dotenv
+import requests
+from fastmcp import Client
 
 from config import Config
-from fastmcp import Client
-import asyncio
-from typing import Optional, List
-
 from sources.core.dgm import GodelMachine
 
 dotenv.load_dotenv()

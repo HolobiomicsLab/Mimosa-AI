@@ -4,10 +4,9 @@ Darwin Godel Machine
 
 import json
 import os
-from typing import Optional
 
-from .orchestrator import WorkflowOrchestrator
 from .notify import PushNotifier
+from .orchestrator import WorkflowOrchestrator
 
 
 class GodelMachine:
@@ -28,7 +27,7 @@ class GodelMachine:
             str: The output of the workflow state if found, None otherwise
         """
         try:
-            with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json", "r") as f:
+            with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
             print(
@@ -44,7 +43,7 @@ class GodelMachine:
         Load the workflow code for a given UUID.
         """
         try:
-            with open(f"{self.workflow_dir}/{uuid}/workflow_code_{uuid}.py", "r") as f:
+            with open(f"{self.workflow_dir}/{uuid}/workflow_code_{uuid}.py") as f:
                 return f.read()
         except FileNotFoundError:
             raise ValueError(
@@ -98,7 +97,7 @@ Previous generation attempt ({iteration_count}) resulted in the following output
 Learn from this output and improve the workflow generation.
         """
 
-    def select_workflow_template(self, template_uuid: Optional[str] = None) -> str:
+    def select_workflow_template(self, template_uuid: str | None = None) -> str:
         """Select and load a workflow template by UUID.
 
         Args:
@@ -117,7 +116,6 @@ Learn from this output and improve the workflow generation.
         try:
             with open(
                 f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py",
-                "r",
             ) as f:
                 return f.read()
         except FileNotFoundError:
@@ -130,7 +128,7 @@ Learn from this output and improve the workflow generation.
     async def start_dgm(
         self,
         goal_prompt: str,
-        template_uuid: Optional[str] = None,
+        template_uuid: str | None = None,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
         await self.recursive_self_improvement(
@@ -144,8 +142,8 @@ Learn from this output and improve the workflow generation.
         self,
         prompt: str,
         goal: str,
-        template_uuid: Optional[str] = None,
-        workflow_template: Optional[str] = None,
+        template_uuid: str | None = None,
+        workflow_template: str | None = None,
         iteration_count: int = 0,
         max_depth: int = 5,
     ) -> str:

@@ -1,10 +1,6 @@
-import json
-import time
-import sys, os
-from typing import Optional
 
 from .workflow_factory import WorkflowFactory
-from .workflow_runner import WorkflowRunner, RuntimeConfig, ExecutionStatus
+from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
 
 class WorkflowOrchestrator:
@@ -60,8 +56,8 @@ class WorkflowOrchestrator:
     async def orchestrate_workflow(
         self,
         goal_prompt: str,
-        template_uuid: Optional[str] = None,
-        workflow_template: Optional[str] = None,
+        template_uuid: str | None = None,
+        workflow_template: str | None = None,
     ) -> str:
         """Execute a workflow with the given goal prompt.
 

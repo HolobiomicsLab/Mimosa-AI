@@ -1,13 +1,11 @@
 import asyncio
+import logging
 import os
-import sys
-from pathlib import Path
-from typing import Optional, Dict, Any, Callable, List
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-import tempfile
-import signal
-import logging
+from pathlib import Path
+from typing import Any
 
 
 class ExecutionStatus(Enum):
@@ -26,7 +24,7 @@ class ExecutionResult:
     stdout: str
     stderr: str
     execution_time: float
-    resource_usage: Optional[Dict[str, Any]] = None
+    resource_usage: dict[str, Any] | None = None
 
 
 @dataclass
@@ -35,8 +33,8 @@ class RuntimeConfig:
     timeout: int = 3600
     max_memory_mb: int = 1024
     max_cpu_percent: int = 100
-    temp_dir: Optional[Path] = None
-    requirements_file: Optional[Path] = "requirements.txt"
+    temp_dir: Path | None = None
+    requirements_file: Path | None = "requirements.txt"
 
     def __post_init__(self):
         if self.temp_dir is None:
@@ -49,7 +47,7 @@ class WorkflowRunner:
     def __init__(self, config: RuntimeConfig = None):
         self.config = config or RuntimeConfig()
         self.logger = logging.getLogger(__name__)
-        self._active_processes: Dict[str, asyncio.subprocess.Process] = {}
+        self._active_processes: dict[str, asyncio.subprocess.Process] = {}
         self._setup_environment()
 
     def _setup_environment(self) -> None:
@@ -74,7 +72,7 @@ class WorkflowRunner:
             return False
 
     async def install_dependencies(
-        self, requirements: Optional[List[str]] = None
+        self, requirements: list[str] | None = None
     ) -> ExecutionResult:
         """Install dependencies asynchronously."""
         if not requirements and not self.config.requirements_file:
@@ -93,7 +91,7 @@ class WorkflowRunner:
         return await self._run_command(cmd)
 
     async def install_dependencies(
-        self, requirements: Optional[List[str]] = None
+        self, requirements: list[str] | None = None
     ) -> ExecutionResult:
         """Install dependencies asynchronously."""
         if not requirements and not self.config.requirements_file:
@@ -114,8 +112,8 @@ class WorkflowRunner:
     async def execute(
         self,
         code: str,
-        execution_id: Optional[str] = None,
-        progress_callback: Optional[Callable[[str], None]] = None,
+        execution_id: str | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         """Execute workflow code with full async support and monitoring."""
 
@@ -129,9 +127,9 @@ class WorkflowRunner:
 
     async def _run_command(
         self,
-        cmd: List[str],
-        execution_id: Optional[str] = None,
-        progress_callback: Optional[Callable[[str], None]] = None,
+        cmd: list[str],
+        execution_id: str | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         """Core async command execution with monitoring."""
 
@@ -188,7 +186,7 @@ class WorkflowRunner:
     async def _stream_output(
         self,
         process: asyncio.subprocess.Process,
-        progress_callback: Optional[Callable[[str], None]] = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> tuple[str, str]:
         """Stream process output with real-time callbacks."""
 
@@ -232,7 +230,7 @@ class WorkflowRunner:
 
         return True
 
-    async def get_active_executions(self) -> List[str]:
+    async def get_active_executions(self) -> list[str]:
         """Get list of currently running executions."""
         return list(self._active_processes.keys())
 

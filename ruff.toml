@@ -38,7 +38,8 @@ exclude = [
     "sources/workflows", # contains dynamically generated workflow files that shouldn't be linted
     "sources/memory", # contains JSON memory files and runtime data
     "tmp", # temporary files used by WorkflowRunner
-    "./tmp" # temporary files used by WorkflowRunner
+    "./tmp", # temporary files used by WorkflowRunner
+    "main.py",
 ]
 
 

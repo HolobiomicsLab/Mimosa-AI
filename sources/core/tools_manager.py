@@ -1,17 +1,15 @@
 import asyncio
 
 from fastmcp import Client
-import asyncio
-from typing import Optional, List
 
 
 class MCP:
     def __init__(
         self,
-        name: Optional[str] = None,
-        tools: List[str] = None,
-        address: Optional[str] = None,
-        port: Optional[int] = None,
+        name: str | None = None,
+        tools: list[str] = None,
+        address: str | None = None,
+        port: int | None = None,
     ):
         self.name = name
         self.tools = tools if tools is not None else []
@@ -22,7 +20,7 @@ class MCP:
 class ToolManager:
     """Manager for MCP tools discovery and management."""
 
-    def __init__(self, config, mcps: Optional[List[MCP]] = None):
+    def __init__(self, config, mcps: list[MCP] | None = None):
         self.discovery_address = config.discovery_addresses
         self.mcps = mcps if mcps is not None else []
 
@@ -32,7 +30,7 @@ class ToolManager:
         port_min: int = 5000,
         port_max: int = 5250,
         timeout: float = 2.0,
-    ) -> List[int]:
+    ) -> list[int]:
         """Discover MCP servers on address and ports range with timeout handling."""
         found_servers = False
         mcps = []
@@ -65,7 +63,7 @@ class ToolManager:
             except asyncio.TimeoutError:
                 print(f"❌ MCP server on port {port} timed out after {timeout}s")
                 continue
-            except Exception as e:
+            except Exception:
                 continue
 
         if not found_servers:
@@ -78,7 +76,7 @@ class ToolManager:
         self.mcps.extend(mcps)
         return mcps
 
-    async def discover_mcp_servers(self, timeout: float = 2.0) -> List[MCP]:
+    async def discover_mcp_servers(self, timeout: float = 2.0) -> list[MCP]:
         for addr in self.discovery_address:
             print(f"🔍 Discovering MCP servers at {addr.ip}...")
             try:
