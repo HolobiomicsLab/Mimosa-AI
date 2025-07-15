@@ -11,7 +11,7 @@ class Benchmarker:
 
     def generate_text(self):
         step_dict = {}
-        for root, dirs, files in os.walk(self.path):
+        for root, _dirs, files in os.walk(self.path):
             for file in files:
                 if file.endswith(".json"):
                     steps = json.load(open(os.path.join(root, file)))
