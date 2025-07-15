@@ -9,9 +9,9 @@ cookies.json
 .env.*
 */.env
 workflows/*
-mimosa/tmp/
-mimosa/memory/
-mimosa/workflows/
+sources/tmp/
+sources/memory/
+sources/workflows/
 mimosa-env/*
 
 ### react ###
@@ -22,7 +22,7 @@ logs
 **/*.back.*
 node_modules
 bower_components
-mimosa/.debug
+sources/.debug
 *.sublime*
 psd
 thumb
@@ -202,7 +202,12 @@ cython_debug/
 .pypirc
 .aider*
 
-mimosa/workflows/*
-mimosa/memory/*
-mimosa/tmp/*
-mimosa/config.py
+sources/workflows/*
+sources/memory/*
+tmp/*
+config.py
+
+tmp/
+sources/memory
+memory/
+sources/workflows/
