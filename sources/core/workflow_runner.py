@@ -1,0 +1,243 @@
+import asyncio
+import os
+import sys
+from pathlib import Path
+from typing import Optional, Dict, Any, Callable, List
+from dataclasses import dataclass
+from enum import Enum
+import tempfile
+import signal
+import logging
+
+class ExecutionStatus(Enum):
+    PENDING = "pending"
+    RUNNING = "running" 
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
+
+@dataclass
+class ExecutionResult:
+    status: ExecutionStatus
+    return_code: int
+    stdout: str
+    stderr: str
+    execution_time: float
+    resource_usage: Optional[Dict[str, Any]] = None
+
+@dataclass
+class RuntimeConfig:
+    python_version: str = "3.10"
+    timeout: int = 3600
+    max_memory_mb: int = 1024
+    max_cpu_percent: int = 100
+    temp_dir: Optional[Path] = None
+    requirements_file: Optional[Path] = "requirements.txt"
+    
+    def __post_init__(self):
+        if self.temp_dir is None:
+            self.temp_dir = "./tmp"
+
+class WorkflowRunner:
+    """Async workflow execution engine for python code."""
+    
+    def __init__(self, config: RuntimeConfig = None):
+        self.config = config or RuntimeConfig()
+        self.logger = logging.getLogger(__name__)
+        self._active_processes: Dict[str, asyncio.subprocess.Process] = {}
+        self._setup_environment()
+    
+    def _setup_environment(self) -> None:
+        """Initialize the execution environment."""
+        os.makedirs(self.config.temp_dir, exist_ok=True)
+        # Validate python version availability
+        if not self._check_python_version():
+            raise RuntimeError(f"Python {self.config.python_version} not available")
+    
+    def _check_python_version(self) -> bool:
+        """Check if the specified Python version is available."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                [f"python{self.config.python_version}", "--version"],
+                capture_output=True, 
+                timeout=10
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+    
+    async def install_dependencies(self, requirements: Optional[List[str]] = None) -> ExecutionResult:
+        """Install dependencies asynchronously."""
+        if not requirements and not self.config.requirements_file:
+            return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
+        
+        cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
+        
+        if requirements:
+            cmd.extend(requirements)
+        elif self.config.requirements_file:
+            if not self.config.requirements_file.exists():
+                raise FileNotFoundError(f"Requirements file not found: {self.config.requirements_file}")
+            cmd.extend(["-r", str(self.config.requirements_file)])
+        return await self._run_command(cmd)
+
+    async def install_dependencies(self, requirements: Optional[List[str]] = None) -> ExecutionResult:
+        """Install dependencies asynchronously."""
+        if not requirements and not self.config.requirements_file:
+            return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
+        
+        cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
+        
+        if requirements:
+            cmd.extend(requirements)
+        elif self.config.requirements_file:
+            if not os.path.exists(self.config.requirements_file):
+                raise FileNotFoundError(f"Requirements file not found: {self.config.requirements_file}")
+            cmd.extend(["-r", str(self.config.requirements_file)])
+        return await self._run_command(cmd)
+    
+    async def execute(self, 
+                     code: str, 
+                     execution_id: Optional[str] = None,
+                     progress_callback: Optional[Callable[[str], None]] = None) -> ExecutionResult:
+        """Execute workflow code with full async support and monitoring."""
+        
+        execution_id = execution_id or f"exec_{id(code)}"
+
+        script_path = os.path.join(self.config.temp_dir, f"{execution_id}.py")
+        with open(script_path, "w") as f:
+            f.write(code)
+        cmd = [f"python{self.config.python_version}", str(script_path)]
+        return await self._run_command(cmd, execution_id, progress_callback)
+    
+    async def _run_command(self, 
+                          cmd: List[str], 
+                          execution_id: Optional[str] = None,
+                          progress_callback: Optional[Callable[[str], None]] = None) -> ExecutionResult:
+        """Core async command execution with monitoring."""
+        
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=1024 * 1024  # 1MB buffer limit
+            )
+            
+            if execution_id:
+                self._active_processes[execution_id] = process
+            
+            stdout_data, stderr_data = await asyncio.wait_for(
+                self._stream_output(process, progress_callback),
+                timeout=self.config.timeout
+            )
+            
+            await process.wait()
+            execution_time = asyncio.get_event_loop().time() - start_time
+            
+            status = ExecutionStatus.COMPLETED if process.returncode == 0 else ExecutionStatus.FAILED
+            
+            return ExecutionResult(
+                status=status,
+                return_code=process.returncode,
+                stdout=stdout_data,
+                stderr=stderr_data,
+                execution_time=execution_time
+            )
+            
+        except asyncio.TimeoutError:
+            if execution_id and execution_id in self._active_processes:
+                await self._kill_process(execution_id)
+            return ExecutionResult(ExecutionStatus.TIMEOUT, -1, "", "Execution timed out", 0.0)
+            
+        except Exception as e:
+            self.logger.error(f"Execution failed: {e}")
+            return ExecutionResult(ExecutionStatus.FAILED, -1, "", str(e), 0.0)
+        
+        finally:
+            if execution_id and execution_id in self._active_processes:
+                del self._active_processes[execution_id]
+    
+    async def _stream_output(self, 
+                            process: asyncio.subprocess.Process, 
+                            progress_callback: Optional[Callable[[str], None]] = None) -> tuple[str, str]:
+        """Stream process output with real-time callbacks."""
+        
+        stdout_lines = []
+        stderr_lines = []
+        
+        async def read_stdout():
+            async for line in process.stdout:
+                line_str = line.decode('utf-8', errors='replace')
+                stdout_lines.append(line_str)
+                if progress_callback:
+                    progress_callback(line_str.rstrip())
+        
+        async def read_stderr():
+            async for line in process.stderr:
+                stderr_lines.append(line.decode('utf-8', errors='replace'))
+        
+        await asyncio.gather(read_stdout(), read_stderr())
+        
+        return ''.join(stdout_lines), ''.join(stderr_lines)
+    
+    async def cancel_execution(self, execution_id: str) -> bool:
+        """Cancel a running execution."""
+        if execution_id not in self._active_processes:
+            return False
+        
+        return await self._kill_process(execution_id)
+    
+    async def _kill_process(self, execution_id: str) -> bool:
+        """Forcefully terminate a process."""
+        process = self._active_processes.get(execution_id)
+        if not process:
+            return False
+        
+        try:
+            process.terminate()
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+        
+        return True
+    
+    async def get_active_executions(self) -> List[str]:
+        """Get list of currently running executions."""
+        return list(self._active_processes.keys())
+    
+    async def cleanup(self) -> None:
+        """Clean up all resources and running processes."""
+        for execution_id in list(self._active_processes.keys()):
+            await self._kill_process(execution_id)
+        import shutil
+        if os.path.exists(self.config.temp_dir):
+            shutil.rmtree(self.config.temp_dir, ignore_errors=True)
+
+async def main():
+    config = RuntimeConfig(
+        python_version="3.10",
+        timeout=60,
+        max_memory_mb=256
+    )
+    runner = WorkflowRunner(config)
+    await runner.install_dependencies(["requests", "numpy"])
+    code = """
+print("Hello from the workflow runner!")
+"""
+    def progress_handler(line: str):
+        print(f"[PROGRESS] {line}")
+    result = await runner.execute(code, progress_callback=progress_handler)
+    print(f"Status: {result.status}")
+    print(f"Output: {result.stdout}")
+    print(f"Error: {result.stderr}")
+    print(f"Execution time: {result.execution_time:.2f}s")
+    await runner.cleanup()
+
+if __name__ == "__main__":
+    asyncio.run(main())
