@@ -1,0 +1,64 @@
+
+# See https://docs.astral.sh/ruff/linter/#rule-selection
+
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "sources/modules",
+    "sources/workflows", # contains dynamically generated workflow files that shouldn't be linted
+    "sources/memory", # contains JSON memory files and runtime data
+    "tmp", # temporary files used by WorkflowRunner
+    "./tmp" # temporary files used by WorkflowRunner
+]
+
+
+[lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # # pydocstyle
+    # "D"
+]
+[lint.pydocstyle]
+convention = "google"
+
