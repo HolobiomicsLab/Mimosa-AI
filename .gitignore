@@ -208,8 +208,8 @@ cython_debug/
 
 
 
-mimosa/workflows/*
-mimosa/memory/*
-mimosa/tmp/*
-mimosa/config.py
+sources/workflows
+memory/
+tmp/
+./config.py
 CLAUDE.md
