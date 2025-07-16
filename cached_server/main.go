@@ -118,9 +118,6 @@ func (c *RequestCache) loadIndex() {
 		
 		c.index[req.Hash] = &req
 		loadedCount++
-		log.Printf("[CACHE] Loaded cached entry: %s (hash: %s, provider: %s, age: %v)", 
-			req.ID, req.Hash[:8]+"...", req.Provider, time.Since(req.Timestamp).Round(time.Second))
-		
 		return nil
 	})
 	
@@ -156,7 +153,7 @@ func (c *RequestCache) generateHash(req map[string]interface{}) string {
 	hash := sha256.Sum256(data)
 	hashStr := fmt.Sprintf("%x", hash)
 	
-	log.Printf("[CACHE] Generated hash %s... for request with model=%v, messages_count=%d", 
+	log.Printf("[CACHE] Generated hash %s...", 
 		hashStr[:8], normalized["model"], len(req["messages"].([]interface{})))
 	
 	return hashStr
@@ -208,8 +205,6 @@ func (c *RequestCache) Set(hash string, req map[string]interface{}, resp map[str
 	// Update index
 	c.index[hash] = cached
 	
-	log.Printf("[CACHE] ✓ CACHED: Stored new cache entry (id: %s, hash: %s..., provider: %s, file: %s)", 
-		cached.ID, hash[:8], provider, filename)
 	log.Printf("[CACHE] Cache now contains %d entries", len(c.index))
 }
 
@@ -295,8 +290,6 @@ func (rs *RouterServer) forwardRequest(provider Provider, reqBody []byte, origin
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
 	
-	log.Printf("[PROVIDER] Using API key: %s...%s", provider.APIKey[:4], provider.APIKey[len(provider.APIKey)-4:])
-	
 	// Copy safe headers from original request
 	copiedHeaders := 0
 	for key, value := range originalHeaders {
@@ -307,9 +300,6 @@ func (rs *RouterServer) forwardRequest(provider Provider, reqBody []byte, origin
 			copiedHeaders++
 		}
 	}
-	log.Printf("[PROVIDER] Copied %d headers from original request", copiedHeaders)
-	
-	log.Printf("[PROVIDER] Sending request to %s...", provider.Name)
 	resp, err := client.Do(req)
 	if err != nil {
 		duration := time.Since(startTime)
@@ -317,10 +307,6 @@ func (rs *RouterServer) forwardRequest(provider Provider, reqBody []byte, origin
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	
-	duration := time.Since(startTime)
-	log.Printf("[PROVIDER] Response received from %s (status: %d, duration: %v)", 
-		provider.Name, resp.StatusCode, duration)
 	
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -356,10 +342,6 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	requestStart := time.Now()
 	requestID := fmt.Sprintf("req_%d", time.Now().UnixNano())
 	
-	log.Printf("[REQUEST] %s Starting chat completion request from %s", requestID, r.RemoteAddr)
-	log.Printf("[REQUEST] %s Method: %s, Path: %s, User-Agent: %s", 
-		requestID, r.Method, r.URL.Path, r.Header.Get("User-Agent"))
-	
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -368,9 +350,6 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 	
-	log.Printf("[REQUEST] %s Request body size: %d bytes", requestID, len(body))
-	
-	// Parse request
 	var requestData map[string]interface{}
 	if err := json.Unmarshal(body, &requestData); err != nil {
 		log.Printf("[REQUEST] %s ERROR: Invalid JSON request: %v", requestID, err)
@@ -378,28 +357,12 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 	
-	// Log request details
-	if model, ok := requestData["model"]; ok {
-		log.Printf("[REQUEST] %s Model: %v", requestID, model)
-	}
-	if messages, ok := requestData["messages"].([]interface{}); ok {
-		log.Printf("[REQUEST] %s Messages count: %d", requestID, len(messages))
-	}
-	if temp, ok := requestData["temperature"]; ok {
-		log.Printf("[REQUEST] %s Temperature: %v", requestID, temp)
-	}
-	
 	// Generate hash for caching
 	hash := rs.cache.generateHash(requestData)
-	log.Printf("[REQUEST] %s Generated cache hash: %s...", requestID, hash[:8])
-	
-	// Check cache if enabled
 	if rs.config.Server.CacheEnabled {
-		log.Printf("[REQUEST] %s Cache is enabled, checking for cached response...", requestID)
-		
 		if cached := rs.cache.Get(hash); cached != nil {
 			cacheDuration := time.Since(requestStart)
-			log.Printf("[REQUEST] %s ✓ CACHE HIT! Returning cached response (served in %v)", 
+			log.Printf("[REQUEST] %s ✓ CACHE HIT! Returning cached response", 
 				requestID, cacheDuration)
 			
 			w.Header().Set("Content-Type", "application/json")
@@ -414,10 +377,6 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 			log.Printf("[REQUEST] %s Request completed via cache", requestID)
 			return
 		}
-		
-		log.Printf("[REQUEST] %s Cache miss, will forward to provider", requestID)
-	} else {
-		log.Printf("[REQUEST] %s Cache is disabled, forwarding to provider", requestID)
 	}
 	
 	// Select provider
@@ -454,7 +413,6 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	if rs.config.Server.CacheEnabled {
 		log.Printf("[REQUEST] %s Caching response...", requestID)
 		rs.cache.Set(hash, requestData, response, provider.Name)
-		log.Printf("[REQUEST] %s Response cached successfully", requestID)
 	} else {
 		log.Printf("[REQUEST] %s Skipping cache (disabled)", requestID)
 	}
@@ -470,7 +428,7 @@ func (rs *RouterServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	}
 	
 	totalDuration := time.Since(requestStart)
-	log.Printf("[REQUEST] %s ✓ Request completed successfully (total time: %v)", requestID, totalDuration)
+	log.Printf("[REQUEST] %s completed successfully (total time: %v)", requestID, totalDuration)
 }
 
 // healthCheck provides health check endpoint
