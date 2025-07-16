@@ -63,11 +63,23 @@ class LLMProvider:
                 model=model, messages=history, stream=False
             )
             thought = response.choices[0].message.content
+            # Extract token usage information
+            token_usage = {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
             if verbose:
                 print(thought)
             if path:
                 self.save_call(
-                    {"model": model, "messages": history, "thought": thought}, path
+                    {
+                        "model": model,
+                        "messages": history,
+                        "thought": thought,
+                        "token_usage": token_usage
+                    },
+                    path
                 )
             return thought
         except Exception as e:
@@ -100,11 +112,23 @@ class LLMProvider:
             if response is None:
                 raise RuntimeError("❌ OpenAI response is empty")
             thought = response.choices[0].message.content
+            # Extract token usage information
+            token_usage = {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
             if verbose:
                 print(thought)
             if path:
                 self.save_call(
-                    {"model": model, "history": history, "thought": thought}, path
+                    {
+                        "model": model,
+                        "history": history,
+                        "thought": thought,
+                        "token_usage": token_usage
+                    },
+                    path
                 )
             return thought
         except Exception as e:
