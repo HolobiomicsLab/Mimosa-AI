@@ -2,6 +2,7 @@
 This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
 """
 
+from typing import Tuple
 import uuid
 import os
 import uuid
@@ -234,7 +235,7 @@ if WORKFLOW_PATH:
         )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
-        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
+        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str) , os.path.join(self.memory_dir, uuid_str)
 
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()

@@ -98,7 +98,7 @@ class SmolAgentFactory:
 
 4. REAL EXTRACTION ONLY
   - Write actual parsing logic based on inspected data structure
-  - If you can't determine extraction method, explore the data first
+  - If you can'LOGt determine extraction method, explore the data first
   - No assumptions about URL patterns, page structure, or content format
 
 5. NO REGEX OR PATTERN MATCHING
@@ -235,9 +235,10 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     )
                     memories.append(action_step)
             try:
-                with open(os.path.join(self.memory_folder, f"node_task_{self.run_uuid}.json"), "w") as f:
+                agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
+                with open(agent_task_path, "w") as f:
                     json.dump(memories, f, indent=2)
-                print(f"Agent memories saved successfully to {os.path.join(self.memory_folder, f'node_task_{self.run_uuid}.json')}")
+                print(f"Agent memories saved successfully to {agent_task_path}")
             except Exception as e:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
@@ -266,7 +267,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
     def collect_existing_memories(self) -> List[Tuple[str, List[ActionStep]]]:
         existing_memories = []
         for filename in os.listdir(self.memory_folder):
-            if filename.startswith('node_task_') and filename.endswith('.json'):
+            if filename.startswith('task_') and filename.endswith('.json'):
                 file_path = os.path.join(self.memory_folder, filename)
                 try:
                     with open(file_path, 'r') as f:

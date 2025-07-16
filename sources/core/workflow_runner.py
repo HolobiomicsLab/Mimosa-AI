@@ -107,6 +107,7 @@ class WorkflowRunner:
         script_path = os.path.join(self.config.temp_dir, f"{execution_id}.py")
         with open(script_path, "w") as f:
             f.write(code)
+        print(f"Executing script: {script_path}")
         cmd = [f"python{self.config.python_version}", str(script_path)]
         return await self._run_command(cmd, execution_id, progress_callback)
 
