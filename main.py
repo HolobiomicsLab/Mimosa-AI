@@ -4,29 +4,40 @@ Mimosa - A AI Agent Framework for advancing scientific research
 ============================================================================
 """
 
-import os
-import asyncio
 import argparse
-import requests
+import asyncio
+import os
+from typing import List, Optional
+
 import dotenv
+import requests
+from fastmcp import Client
 
 from config import Config
+<<<<<<< HEAD
 from fastmcp import Client
 import asyncio
 from typing import Optional, List
 
 from sources.core.planner import Planner
+=======
+>>>>>>> main
 from sources.core.dgm import GodelMachine
 
 dotenv.load_dotenv()
 
+
 def validate_environment() -> None:
-    """Validate required environment configuration.
-    """
-    if not os.getenv('HF_TOKEN') or os.getenv('HF_TOKEN') == "":
-        raise ValueError("⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token.")
-    if not os.getenv('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY') == "":
-        raise ValueError("⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key.")
+    """Validate required environment configuration."""
+    if not os.getenv("HF_TOKEN"):
+        raise ValueError(
+            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token."
+        )
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key."
+        )
+
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
     """Add CLI arguments for config parameters that can be overridden."""
@@ -76,11 +87,15 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
 async def main():
     """Main execution function"""
     config = Config()
-    parser = argparse.ArgumentParser(description="Mimosa - A AI Agent Framework for advancing scientific research")
-    parser.add_argument("--single-task-goal", type=str, help="Start a single task with a goal prompt.")
-    parser.add_argument("--goal", type=str, help="Goal prompt for the Mimosa using task planning.")
-    parser.add_argument("--load_template", type=str, help="Optional workflow UUID to load")
-    add_config_arguments(parser, config)
+    parser = argparse.ArgumentParser(
+        description="Mimosa - A AI Agent Framework for advancing scientific research"
+    )
+    parser.add_argument(
+        "--goal", required=True, type=str, help="Goal prompt for the workflow"
+    )
+    parser.add_argument(
+        "--load_template", type=str, help="Optional workflow UUID to load"
+    )
     args = parser.parse_args()
     apply_config_overrides(args, config)
 
@@ -95,6 +110,7 @@ async def main():
         await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
     else:
         raise ValueError("No goal provided. Use --single-task-goal or --goal to start a task.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

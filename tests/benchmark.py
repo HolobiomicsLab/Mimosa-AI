@@ -1,6 +1,11 @@
-from sources.core.benchmarker import Benchmarker
+import os
+import sys
 
-def test_benchmark_format(uuid:str):
+sys.path.append(os.getcwd())
+from mimosa.core.benchmarker import Benchmarker
+
+
+def test_benchmark_format(uuid: str):
     benchmarker = Benchmarker(uuid)
     benchmarker.generate_text()
     print(benchmarker)

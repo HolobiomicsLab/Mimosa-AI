@@ -11,7 +11,7 @@ class Benchmarker:
 
     def generate_text(self):
         step_dict = {}
-        for root, dirs, files in os.walk(self.path):
+        for root, _dirs, files in os.walk(self.path):
             for file in files:
                 if file.endswith(".json"):
                     steps = json.load(open(os.path.join(root, file)))
@@ -26,7 +26,7 @@ class Benchmarker:
                             step_text += f"\ERROR: {error}\n"
                         else:
                             step_text += f"\RESULT: {step.get('observations', '')}\n"
-                    
+
                     step_dict[start_time] = step_text
 
         text = ""
@@ -38,7 +38,7 @@ class Benchmarker:
             file.write(text)
 
     def get_text(self):
-        return open(self.path / "formated.txt", "r").read()
+        return open(self.path / "formated.txt").read()
 
     def __str__(self):
         return f"Benchmarker text:\n\n{self.get_text()}"
