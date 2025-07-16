@@ -56,34 +56,7 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
-# good models:
-#Qwen/Qwen2.5-72B-Instruct
-#Qwen/Qwen2.5-Coder-32B-Instruct
-# deepseek-ai/DeepSeek-V3
-class SmolAgentFactory:
-
-    def __init__(self,
-                 name,
-                 instruct_prompt,
-                 tools,
-                 model_id="deepseek-ai/DeepSeek-V3",
-                 engine_name="cached",  # Options: mlx, inference_client, cached, deepseek, openai
-                 max_steps=9
-                ):
-        self.model_id = model_id
-        self.max_tokens = 1024
-        self.provider = "auto"
-        self.token = os.getenv("HF_TOKEN")
-        self.tools = tools or []
-        self.instruct_prompt = instruct_prompt
-        self.local = False
-        self.engine_name = engine_name
-        self.engine = None
-        self.name = name
-        self.memory_folder = MEMORY_PATH
-        #os.makedirs(self.memory_folder, exist_ok=True)
-        self.run_uuid = str(uuid.uuid4())
-        self.additional_system_prompt = """
+ADDED_SYSTEM_PROMPT = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
 1. NO ASSUMPTIONS OR PLACEHOLDERS
@@ -121,10 +94,38 @@ Example:
     final_answer('COMPLETED_TASK: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 
 If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
-        """
+"""
 
+# good models:
+#Qwen/Qwen2.5-72B-Instruct
+#Qwen/Qwen2.5-Coder-32B-Instruct
+# deepseek-ai/DeepSeek-V3
+class SmolAgentFactory:
+
+    def __init__(self,
+                 name,
+                 instruct_prompt,
+                 tools,
+                 model_id="deepseek-ai/DeepSeek-V3",
+                 max_steps=9
+                ):
+        self.name = name
+        self.instruct_prompt = instruct_prompt
+        self.tools = tools or []
+        self.model_id = model_id
+        self.engine = None
+        self.provider = "auto"
+        self.max_tokens = 1024
+        self.token = os.getenv("HF_TOKEN")
+        self.memory_folder = "./sources/memory"
+        self.engine_name = os.getenv("ENGINE_NAME", "inference_client").lower()
+        self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
+        self.run_uuid = str(uuid.uuid4())
+
+        os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
+
         try:
             self.engine = self.get_engine()
             self.agent = CodeAgent(
@@ -135,7 +136,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 #planning_interval=3, # think more before acting
                 additional_authorized_imports=["*"]
             )
-            self.extend_system_prompt(self.additional_system_prompt)
+            self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
     
@@ -148,7 +149,6 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
     def get_engine(self):
         if self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
-            self.local = True
             return MLXModel(
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
@@ -175,7 +175,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 provider="openai",
                 api_key=os.getenv("OPENAI_API_KEY")
             )
-        elif self.engine_name == "cached":
+        elif self.engine_name == "cached" or self.use_cached_engine:
             return LiteLLMModel(
                 model_id="deepseek/deepseek-chat",
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
