@@ -6,10 +6,12 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
+import json
 import os
 import signal
 import sys
-from typing import List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import dotenv
 import requests
@@ -79,10 +81,13 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
-def setup_signal_handlers():
+def setup_signal_handlers(config: Config):
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
         print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
+        
+        calculate_cost(config)
+        
         # Cancel all running tasks
         for task in asyncio.all_tasks():
             if not task.done():
@@ -94,9 +99,9 @@ def setup_signal_handlers():
 
 async def main():
     """Main execution function"""
-    setup_signal_handlers()
-    
     config = Config()
+    setup_signal_handlers(config)
+    
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
@@ -131,6 +136,15 @@ async def main():
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         raise
+    finally:
+        print("\n🧹 Cleaning up resources...")
+        await dgm.cleanup()
+        await planner.cleanup() if 'planner' in locals() else None
+        await config.workflow_runner.cleanup()
+        
+        # Calculate final cost before shutdown
+        print("\n📊 Final cost calculation:")
+        calculate_cost(config)
 
 
 if __name__ == "__main__":
