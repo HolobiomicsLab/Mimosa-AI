@@ -9,6 +9,8 @@ cookies.json
 .env.*
 */.env
 workflows/*
+cached_server/cache/*
+cached_server/config.yaml
 sources/tmp/
 sources/memory/
 sources/workflows/
