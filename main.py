@@ -15,6 +15,7 @@ from fastmcp import Client
 
 from config import Config
 from sources.core.dgm import GodelMachine
+from sources.core.planner import Planner
 
 dotenv.load_dotenv()
 
@@ -83,11 +84,15 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
-        "--goal", required=True, type=str, help="Goal prompt for the workflow"
+        "--goal", type=str, help="Goal prompt for the workflow"
+    )
+    parser.add_argument(
+        "--single_task",  type=str, help="Goal prompt for the workflow"
     )
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load"
     )
+    add_config_arguments(parser, config)
     args = parser.parse_args()
     apply_config_overrides(args, config)
 
@@ -95,7 +100,7 @@ async def main():
     config.validate_paths()
 
     dgm = GodelMachine(config)
-    if args.single_task_goal:
+    if args.single_task:
         await dgm.start_dgm(goal_prompt=args.single_task_goal)
     elif args.goal:
         planner = Planner(config)
