@@ -101,6 +101,8 @@ Declare agent with tool:
 smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
 ```
 
+You must use one list of tools per agent.
+
 ### SmolAgent declaration
 
 ```python
@@ -163,6 +165,7 @@ You should implement robust routing with multiple fallback paths. By prompting t
 # SmolAgent Factory already declared - Loaded in interpreter context
 # WorkflowNodeFactory already declared - Loaded in interpreter context
 # Tools already declared - Loaded in interpreter context
+# Worflow coùmpilation is already declared like this : app = workflow.compile()
 
 
 # MANDATORY: Import statements
@@ -259,9 +262,6 @@ workflow.add_conditional_edges(
         "emergency_fallback": END
     }
 )
-
-# MANDATORY: Compilation
-app = workflow.compile()
 ```
 
 ## QUALITY REQUIREMENTS & CHECKLIST

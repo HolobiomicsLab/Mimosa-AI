@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 class Benchmarker:
-    def __init__(self, uuid: str):
+    def __init__(self, config, uuid: str):
         self.uuid = uuid
         self.path = Path("mimosa") / "memory" / self.uuid
         self.results = []

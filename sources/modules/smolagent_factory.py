@@ -80,8 +80,8 @@ class SmolAgentFactory:
         self.engine_name = engine_name
         self.engine = None
         self.name = name
-        self.memory_folder = './memory' 
-        os.makedirs(self.memory_folder, exist_ok=True)
+        self.memory_folder = MEMORY_PATH
+        #os.makedirs(self.memory_folder, exist_ok=True)
         self.run_uuid = str(uuid.uuid4())
         self.additional_system_prompt = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
@@ -216,8 +216,6 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             return
         try:
             memories = []
-            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            os.makedirs(memory_folder_path, exist_ok=True)
             for idx, step in enumerate(self.agent.memory.steps):
                 if isinstance(step, ActionStep):
                     action_step = step.dict()
@@ -237,9 +235,9 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     )
                     memories.append(action_step)
             try:
-                with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
+                with open(os.path.join(self.memory_folder, f"node_task_{self.run_uuid}.json"), "w") as f:
                     json.dump(memories, f, indent=2)
-                print(f"Agent memories saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
+                print(f"Agent memories saved successfully to {os.path.join(self.memory_folder, f'node_task_{self.run_uuid}.json')}")
             except Exception as e:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
@@ -265,11 +263,11 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             memory_steps.append(action_step)
         return memory_steps
     
-    def collect_existing_memories(self, memory_folder_path: str) -> List[Tuple[str, List[ActionStep]]]:
+    def collect_existing_memories(self) -> List[Tuple[str, List[ActionStep]]]:
         existing_memories = []
-        for filename in os.listdir(memory_folder_path):
-            if filename.endswith('.json'):
-                file_path = os.path.join(memory_folder_path, filename)
+        for filename in os.listdir(self.memory_folder):
+            if filename.startswith('node_task_') and filename.endswith('.json'):
+                file_path = os.path.join(self.memory_folder, filename)
                 try:
                     with open(file_path, 'r') as f:
                         memory_dict = json.load(f)
@@ -287,11 +285,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         filename_uuid = None
     
         try:
-            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            if not os.path.exists(memory_folder_path):
-                return None
-            
-            for (filename, memories) in self.collect_existing_memories(memory_folder_path):
+            for (filename, memories) in self.collect_existing_memories():
                 for memory_steps in memories:
                     normalize = lambda text: re.sub(r'\s+', ' ', str(text).strip())
                     normalized_instructions = normalize(instructions)

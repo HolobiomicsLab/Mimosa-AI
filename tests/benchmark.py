@@ -1,7 +1,9 @@
 from sources.core.benchmarker import Benchmarker
+from config import Config
 
 def test_benchmark_format(uuid:str):
-    benchmarker = Benchmarker(uuid)
+    config = Config()
+    benchmarker = Benchmarker(config, uuid)
     benchmarker.generate_text()
     print(benchmarker)
 
