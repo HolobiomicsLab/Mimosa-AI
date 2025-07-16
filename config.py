@@ -64,6 +64,17 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
+        self.model_pricing = {
+            # OpenAI models
+            "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
+            "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
+            "o3-2025-04-16": {"input": 2, "output": 8},
+            # Deepseek models
+            "deepseek-reasoner": {"input": 0.55, "output": 2.19},
+            "deepseek-chat": {"input": 0.27, "output": 1.10},
+            # Default pricing for unknown models
+            "default" : {"input": 0.70, "output": 2.50}
+        } # Per 1M tokens
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
