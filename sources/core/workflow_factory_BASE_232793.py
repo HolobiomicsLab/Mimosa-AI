@@ -228,10 +228,14 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
+        uuid_str = (
+            str(uuid.uuid4()).replace("-", "")
+            if template_uuid is None
+            else template_uuid
+        )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
-        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else (os.path.join(self.workflow_dir, uuid_str) , os.path.join(self.memory_dir, uuid_str))
+        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str) , os.path.join(self.memory_dir, uuid_str)
 
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()
@@ -254,9 +258,6 @@ if WORKFLOW_PATH:
             memory_path,
             uuid_str
         )
-
-        print(f"workflow path {workflow_path}")
-        print(f"workflow path {memory_path}")
 
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal_prompt)

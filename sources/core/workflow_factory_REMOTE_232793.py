@@ -228,7 +228,11 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
+        uuid_str = (
+            str(uuid.uuid4()).replace("-", "")
+            if template_uuid is None
+            else template_uuid
+        )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
         workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else (os.path.join(self.workflow_dir, uuid_str) , os.path.join(self.memory_dir, uuid_str))
