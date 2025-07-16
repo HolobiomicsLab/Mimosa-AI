@@ -147,7 +147,13 @@ class SmolAgentFactory:
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "mlx":
+        if self.engine_name == "cached" or self.use_cached_engine:
+            return LiteLLMModel(
+                model_id="deepseek/deepseek-chat",
+                base_url="http://0.0.0.0:6767/v1/chat/completions",
+                max_tokens=self.max_tokens,
+            )
+        elif self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
             return MLXModel(
                 model_id=self.model_id,
@@ -174,12 +180,6 @@ class SmolAgentFactory:
                 model_id="deepseek",
                 provider="openai",
                 api_key=os.getenv("OPENAI_API_KEY")
-            )
-        elif self.engine_name == "cached" or self.use_cached_engine:
-            return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
-                base_url="http://0.0.0.0:6767/v1/chat/completions",
-                max_tokens=self.max_tokens,
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
