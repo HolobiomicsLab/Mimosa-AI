@@ -11,9 +11,22 @@ class AddressMCP:
     port_min: int
     port_max: int
 
+    def _validate_port(self, port_number: int) -> None:
+        assert port_number >= 0 and port_number <= 65535, "Port number must be between 0 and 65535"
+    
+    def _validate_ip(self, ip: str) -> None:
+        if not self.ip:
+            raise ValueError("IP address cannot be empty")
+        if not isinstance(self.ip, str):
+            raise TypeError(f"IP address must be a string, got {type(self.ip).__name__} instead.")
+
     def __post_init__(self):
+        """Validate the address and port range."""
+        self._validate_ip(self.ip)
+        self._validate_port(self.port_min)
+        self._validate_port(self.port_max)
         if self.port_min > self.port_max:
-            raise ValueError("port_min must be <= port_max")
+            raise ValueError(f"port_min must be <= port_max for ip {self.ip}.")
 
 
 class Config:
