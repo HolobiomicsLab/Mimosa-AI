@@ -7,6 +7,8 @@ Mimosa - A AI Agent Framework for advancing scientific research
 import argparse
 import asyncio
 import os
+import signal
+import sys
 from typing import List, Optional
 
 import dotenv
@@ -77,8 +79,23 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
+def setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown."""
+    def signal_handler(signum, frame):
+        print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
+        # Cancel all running tasks
+        for task in asyncio.all_tasks():
+            if not task.done():
+                task.cancel()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
 async def main():
     """Main execution function"""
+    setup_signal_handlers()
+    
     config = Config()
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
@@ -99,14 +116,21 @@ async def main():
     validate_environment()
     config.validate_paths()
 
-    dgm = GodelMachine(config)
-    if args.single_task:
-        await dgm.start_dgm(goal_prompt=args.single_task_goal)
-    elif args.goal:
-        planner = Planner(config)
-        await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
-    else:
-        raise ValueError("No goal provided. Use --single-task-goal or --goal to start a task.")
+    try:
+        dgm = GodelMachine(config)
+        if args.single_task:
+            await dgm.start_dgm(goal_prompt=args.single_task)
+        elif args.goal:
+            planner = Planner(config)
+            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+        else:
+            raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+    except KeyboardInterrupt:
+        print("\n⚠️ Interrupted by user. Cleaning up...")
+        raise
+    except Exception as e:
+        print(f"❌ Error during execution: {e}")
+        raise
 
 
 if __name__ == "__main__":

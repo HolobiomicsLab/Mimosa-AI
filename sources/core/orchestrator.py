@@ -101,12 +101,34 @@ class WorkflowOrchestrator:
         )
         return output, uuid
 
-    def __del__(self):
-        """Cleanup resources on deletion."""
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with proper cleanup."""
         try:
-            self.workflow_runner.cleanup()
+            await self.workflow_runner.cleanup()
         except Exception as e:
             print(f"❌ Error during cleanup: {e}")
             import traceback
+            traceback.print_exc()
 
+    def __del__(self):
+        """Cleanup resources on deletion - sync fallback."""
+        # Note: This is a fallback - proper cleanup should use async context manager
+        import asyncio
+        try:
+            # Only attempt sync cleanup if no event loop is running
+            try:
+                loop = asyncio.get_running_loop()
+                # If we have a running loop, schedule cleanup as a task
+                asyncio.create_task(self.workflow_runner.cleanup())
+            except RuntimeError:
+                # No running loop, we can't do async cleanup in __del__
+                # This is expected behavior - cleanup should be done via context manager
+                pass
+        except Exception as e:
+            print(f"❌ Error during cleanup: {e}")
+            import traceback
             traceback.print_exc()
