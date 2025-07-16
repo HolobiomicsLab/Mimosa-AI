@@ -94,25 +94,6 @@ class WorkflowRunner:
             cmd.extend(["-r", str(self.config.requirements_file)])
         return await self._run_command(cmd)
 
-    async def install_dependencies(
-        self, requirements: list[str] | None = None
-    ) -> ExecutionResult:
-        """Install dependencies asynchronously."""
-        if not requirements and not self.config.requirements_file:
-            return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
-
-        cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
-
-        if requirements:
-            cmd.extend(requirements)
-        elif self.config.requirements_file:
-            if not os.path.exists(self.config.requirements_file):
-                raise FileNotFoundError(
-                    f"Requirements file not found: {self.config.requirements_file}"
-                )
-            cmd.extend(["-r", str(self.config.requirements_file)])
-        return await self._run_command(cmd)
-
     async def execute(
         self,
         code: str,
