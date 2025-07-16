@@ -2,7 +2,6 @@ import os
 import json
 from typing import List, Dict, Optional
 from openai import OpenAI
-from anthropic import Anthropic
 
 
 class LLMProvider:

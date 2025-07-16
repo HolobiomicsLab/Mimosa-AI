@@ -289,6 +289,8 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 for memory_steps in memories:
                     normalize = lambda text: re.sub(r'\s+', ' ', str(text).strip())
                     normalized_instructions = normalize(instructions)
+                    if memory_steps.model_input_messages is None:
+                        continue
                     for i, message in enumerate(memory_steps.model_input_messages):
                         message_content = message["content"][0].get("text", "")
                         normalized_message = normalize(message_content)

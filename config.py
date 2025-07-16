@@ -1,11 +1,12 @@
-
 import os
-from typing import Optional, Dict, Any, List, Union, Tuple
 from dataclasses import dataclass
+from typing import Any
+
 
 @dataclass
 class AddressMCP:
     """Represents an MCP server address with port range."""
+
     ip: str
     port_min: int
     port_max: int
@@ -27,9 +28,10 @@ class AddressMCP:
         if self.port_min > self.port_max:
             raise ValueError(f"port_min must be <= port_max for ip {self.ip}.")
 
+
 class Config:
     """Configuration class for Mimosa AI Agent Framework."""
-    
+
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
@@ -43,10 +45,10 @@ class Config:
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
-        self.discovery_addresses: List[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5250),
+        self.discovery_addresses: list[AddressMCP] = [
+            AddressMCP(ip="localhost", port_min=5000, port_max=5250),
         ]
-        self.runner_requirements: List[str] = [
+        self.runner_requirements: list[str] = [
             "python-dotenv",
             "fastmcp==2.8.1",
             "requests>=2.31.0",
@@ -58,19 +60,29 @@ class Config:
             "opentelemetry-sdk",
             "opentelemetry-exporter-otlp",
             "openinference-instrumentation-smolagents",
-            "asyncio==3.4.3"
+            "asyncio==3.4.3",
         ]
-        self.pushover_token: Optional[str] = os.getenv("PUSHOVER_TOKEN")
-        self.pushover_user: Optional[str] = os.getenv("PUSHOVER_USER")
-    
+        self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
+        self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
+
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
-        assert os.path.exists(self.workflow_dir), f"Workflow directory not found: {self.workflow_dir}"
-        assert os.path.exists(self.schema_code_path), f"State schema file not found: {self.schema_code_path}"
-        assert os.path.exists(self.smolagent_factory_code_path), f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
-        assert os.path.exists(self.prompt_workflow_creator), f"System prompt file not found: {self.prompt_workflow_creator}"
-    
-    def jsonify(self) -> Dict[str, Union[str, int, Optional[str], List[Dict[str, Union[str, int]]]]]:
+        assert os.path.exists(self.workflow_dir), (
+            f"Workflow directory not found: {self.workflow_dir}"
+        )
+        assert os.path.exists(self.schema_code_path), (
+            f"State schema file not found: {self.schema_code_path}"
+        )
+        assert os.path.exists(self.smolagent_factory_code_path), (
+            f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
+        )
+        assert os.path.exists(self.prompt_workflow_creator), (
+            f"System prompt file not found: {self.prompt_workflow_creator}"
+        )
+
+    def jsonify(
+        self,
+    ) -> dict[str, str | int | str | None | list[dict[str, str | int]]]:
         """Convert configuration to a JSON-serializable dictionary."""
         return {
             "discovery_addresses": [
@@ -88,10 +100,10 @@ class Config:
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
             "runner_default_max_cpu_percent": self.runner_default_max_cpu_percent,
             "runner_temp_dir": self.runner_temp_dir,
-            "runner_requirements": self.runner_requirements
+            "runner_requirements": self.runner_requirements,
         }
-    
-    def from_json(self, data: Dict[str, Any]) -> None:
+
+    def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.discovery_addresses = [
@@ -99,22 +111,42 @@ class Config:
             for addr in data.get("discovery_addresses", [])
         ]
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
-        self.smolagent_factory_code_path = data.get("smolagent_factory_code_path", self.smolagent_factory_code_path)
-        self.prompt_workflow_creator = data.get("prompt_workflow_creator", self.prompt_workflow_creator)
-        self.workflow_llm_provider = data.get("workflow_llm_provider", self.workflow_llm_provider)
-        self.mcp_health_endpoint = data.get("mcp_health_endpoint", self.mcp_health_endpoint)
-        self.runner_default_python_version = data.get("runner_default_python_version", self.runner_default_python_version)
-        self.runner_default_timeout = data.get("runner_default_timeout", self.runner_default_timeout)
-        self.runner_default_max_memory_mb = data.get("runner_default_max_memory_mb", self.runner_default_max_memory_mb)
-        self.runner_default_max_cpu_percent = data.get("runner_default_max_cpu_percent", self.runner_default_max_cpu_percent)
+        self.smolagent_factory_code_path = data.get(
+            "smolagent_factory_code_path", self.smolagent_factory_code_path
+        )
+        self.prompt_workflow_creator = data.get(
+            "prompt_workflow_creator", self.prompt_workflow_creator
+        )
+        self.workflow_llm_provider = data.get(
+            "workflow_llm_provider", self.workflow_llm_provider
+        )
+        self.mcp_health_endpoint = data.get(
+            "mcp_health_endpoint", self.mcp_health_endpoint
+        )
+        self.runner_default_python_version = data.get(
+            "runner_default_python_version", self.runner_default_python_version
+        )
+        self.runner_default_timeout = data.get(
+            "runner_default_timeout", self.runner_default_timeout
+        )
+        self.runner_default_max_memory_mb = data.get(
+            "runner_default_max_memory_mb", self.runner_default_max_memory_mb
+        )
+        self.runner_default_max_cpu_percent = data.get(
+            "runner_default_max_cpu_percent", self.runner_default_max_cpu_percent
+        )
         self.runner_temp_dir = data.get("runner_temp_dir", self.runner_temp_dir)
-        self.runner_requirements = data.get("runner_requirements", self.runner_requirements)
-    
+        self.runner_requirements = data.get(
+            "runner_requirements", self.runner_requirements
+        )
+
     def __str__(self) -> str:
         """String representation of the configuration."""
-        return f"Config(workflow_dir={self.workflow_dir}, " \
-               f"schema_code_path={self.schema_code_path}, smolagent_factory_code_path={self.smolagent_factory_code_path}, " \
-               f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, " \
-               f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, " \
-               f"runner_default_timeout={self.runner_default_timeout}, runner_default_max_memory_mb={self.runner_default_max_memory_mb}, " \
-               f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir})"
+        return (
+            f"Config(workflow_dir={self.workflow_dir}, "
+            f"schema_code_path={self.schema_code_path}, smolagent_factory_code_path={self.smolagent_factory_code_path}, "
+            f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, "
+            f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, "
+            f"runner_default_timeout={self.runner_default_timeout}, runner_default_max_memory_mb={self.runner_default_max_memory_mb}, "
+            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir})"
+        )

@@ -4,21 +4,23 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 
 import uuid
 import os
-from typing import Optional, Tuple
+import uuid
+
 from .llm_provider import LLMProvider
 from .tools_manager import ToolManager
 
+
 class WorkflowFactory:
     """Handles the creation and management of Langraph-SmolAgent workflow generation.
-    
+
     Attributes:
         tools_dir (str): Directory containing tool modules
         workflow_dir (str): Base directory for workflow storage
     """
-    
+
     def __init__(self, config) -> None:
         """Initialize the workflow crafting system.
-        
+
         Args:
             config: Configuration object containing paths and settings
         """
@@ -31,12 +33,12 @@ class WorkflowFactory:
 
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
-        
+
         Returns:
             str: The system prompt content
         """
         try:
-            with open(self.prompt_workflow_creator, 'r') as f:
+            with open(self.prompt_workflow_creator) as f:
                 return f.read()
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}")
@@ -52,15 +54,15 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
         history = [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': prompt}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
         ]
         return LLMProvider().openai_completion(history, path,verbose=False)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
         """Extract Python code blocks from text.
-        
+
         Args:
             code: Text potentially containing Python code blocks
         Returns:
@@ -79,9 +81,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
 
-    async def load_tools_code(self) -> Tuple[str, str]:
+    async def load_tools_code(self) -> tuple[str, str]:
         """Load all tool code from the tools directory.
-        
+
         Returns:
             Tuple[str, str]: Tuple containing (tools_code, existing_tool_prompt)
         """
@@ -90,7 +92,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         tool_manager = ToolManager(self.config)
         mcps = await tool_manager.discover_mcp_servers()
         if not mcps:
-            raise ValueError("\nNo MCP servers found. Please ensure at least one MCP is running on toolomics.")
+            raise ValueError(
+                "\nNo MCP servers found. Please ensure at least one MCP is running on toolomics."
+            )
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)
             client_prompt = tool_manager.get_client_prompt(mcp)
@@ -100,7 +104,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
 
     def create_workflow_code(self, craft_instructions: str, existing_tool_prompt: str,path:str) -> str:
         """Generate and validate workflow code.
-        
+
         Args:
             craft_instructions: The goal description
             existing_tool_prompt: Description of available tools
@@ -118,7 +122,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
 
     def create_folder_structure(self, uuid_str: str) -> Tuple[str]:
         """Create directory structure for new workflow.
-        
+
         Args:
             uuid_str: Unique identifier for the workflow
         Returns:
@@ -210,12 +214,12 @@ if WORKFLOW_PATH:
     async def craft_workflow(
         self,
         goal_prompt: str,
-        template_workflow: Optional[str] = None,
-        template_uuid: Optional[str] = None,
-        save_workflow: bool = True
-    ) -> Tuple[str, str]:
+        template_workflow: str | None = None,
+        template_uuid: str | None = None,
+        save_workflow: bool = True,
+    ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
-        
+
         Args:
             craft_instructions: The goal description
             template_workflow: pre-existing workflow template UUID
@@ -223,7 +227,11 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
+        uuid_str = (
+            str(uuid.uuid4()).replace("-", "")
+            if template_uuid is None
+            else template_uuid
+        )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
         workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
