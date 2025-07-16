@@ -14,14 +14,6 @@ import requests
 from fastmcp import Client
 
 from config import Config
-<<<<<<< HEAD
-from fastmcp import Client
-import asyncio
-from typing import Optional, List
-
-from sources.core.planner import Planner
-=======
->>>>>>> main
 from sources.core.dgm import GodelMachine
 
 dotenv.load_dotenv()
