@@ -67,7 +67,7 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools,
                  model_id="deepseek-ai/DeepSeek-V3",
-                 engine_name="deepseek",  # Options: mlx, inference_client, deepseek, openai
+                 engine_name="cached",  # Options: mlx, inference_client, cached, deepseek, openai
                  max_steps=9
                 ):
         self.model_id = model_id
@@ -173,8 +173,13 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             return InferenceClientModel(
                 model_id="deepseek",
                 provider="openai",
-                base_url="0.0.0.0:6767",
                 api_key=os.getenv("OPENAI_API_KEY")
+            )
+        elif self.engine_name == "cached":
+            return InferenceClientModel(
+                model_id="deepseek",
+                provider="openai",
+                base_url="0.0.0.0:6767"
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
