@@ -49,13 +49,16 @@ class ToolManager:
                     tools = await client.list_tools()
                     name = None
                     try:
-                        name = await client.call_tool("get_mcp_name", {})
+                        resp = await client.call_tool("get_mcp_name", {})
+                        name = resp[0].text if resp else None
                     except Exception as e:
                         print(
                             f"⚠️ Failed to get name for MCP server on port {port}: {e}"
                         )
+                        name = f"mcp_{port}"
+                    assert name, "MCP name must be set"
                     if tools:
-                        print(f"✅ Found MCP server on port {port}")
+                        print(f"✅ Found MCP server on port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
                         mcps.append(
                             MCP(
@@ -98,7 +101,7 @@ class ToolManager:
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
-        name = mcp.name.content[0].text
+        name = mcp.name
         name = name.replace(" ", "_").upper()
         return name + "_TOOLS"
 
