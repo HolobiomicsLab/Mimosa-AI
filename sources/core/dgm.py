@@ -4,6 +4,7 @@ Darwin Godel Machine
 
 import json
 import os
+from pathlib import Path
 
 from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
@@ -15,8 +16,85 @@ class GodelMachine:
     def __init__(self, config) -> None:
         self.config = config
         self.workflow_dir = config.workflow_dir
+        self.model_pricing = config.model_pricing
         self.orchestrator = WorkflowOrchestrator(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
+
+    def calculate_cost(self, uuid: str )-> float:
+        """Calculate the cost of a workflow run based on token usage.
+        
+        Args:
+            config: The configuration object
+            uuid: Optional UUID of the workflow run to calculate cost for.
+                If not provided, will try to find the most recent run.
+        
+        Returns:
+            float: The total cost in USD
+        """
+
+        # Calculate cost before shutting down
+        print("\n📊 Calculating final cost before shutdown...")
+
+        memory_path = Path(self.config.memory_dir) / uuid
+
+        if not memory_path.exists():
+            print(f"❌ Memory directory not found: {memory_path}")
+            return 0.0
+        
+        llm_calls = []
+        with open(memory_path / "llms_call.json") as f:
+            json_calls = json.load(f) 
+            for call in json_calls:
+                total_tokens = call["token_usage"]["total_tokens"]
+                model =  call["model"]
+
+                llm_calls.append({
+                    "model": model,
+                    "tokens": total_tokens
+                })
+        
+        workflow_path= Path(self.config.workflow_dir) / uuid
+
+        if not workflow_path.exists():
+            print(f"❌ Workflow directory not found: {workflow_path}")
+            return 0.0
+        
+        with open(workflow_path / f"state_result_{uuid}.json") as f:
+            state_results = json.load(f)
+            for token in state_results["tokens"]:
+                llm_calls.append({
+                    "model": "deepseek/deepseek-chat",
+                    "tokens": token
+                })
+        
+        total_cost = 0.0
+        
+        for call in llm_calls:
+            model = call["model"]
+            tokens = call["token"]
+            
+            # Get pricing for this model, or use default if not found
+            pricing = self.model_pricing.get(model, self.model_pricing["default"])
+
+            cost = tokens * pricing
+
+            call["cost"] = cost / 1_000_000  # Convert to USD (assuming pricing is per million tokens)
+
+            total_cost += cost
+
+            
+        # Print detailed cost breakdown
+        print("\n💰 Cost Breakdown:")
+        print("=" * 60)
+        for model, cost_info in llm_calls.items():
+            print(f"Model: {model}")
+            print(f"  Tokens: {cost_info['tokens']:,}")
+            print(f"  Cost: ${cost_info['cost']:.4f}")
+            print("-" * 40)
+        
+        print(f"Total Cost: ${total_cost:.4f}")
+        return total_cost
+
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -169,6 +247,7 @@ Learn from this output and improve the workflow generation.
             )
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.")
+                print()
                 return flow_output
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─' * 60}")
