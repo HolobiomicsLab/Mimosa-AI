@@ -1,0 +1,1 @@
+create a mock csv with a list of random names, that's it no complex workflow, just a single agent, just a simple test
