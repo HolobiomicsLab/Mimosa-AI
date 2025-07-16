@@ -117,7 +117,9 @@ class SmolAgentFactory:
         self.provider = "auto"
         self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = "./sources/memory"
+        self.memory_folder = "./sources/memory/"
+        print("debug path", os.getcwd())
+        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
         self.engine_name = os.getenv("ENGINE_NAME", "inference_client").lower()
         self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
         self.run_uuid = str(uuid.uuid4())

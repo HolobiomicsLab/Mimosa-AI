@@ -61,7 +61,7 @@ class GodelMachine:
         if not flow_state or "answers" not in flow_state:
             return ""
         return (
-            "\n".join(flow_state["answers"])
+            "\n".join(str(x) for x in flow_state["answers"])
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
