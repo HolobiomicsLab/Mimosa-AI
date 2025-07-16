@@ -98,13 +98,13 @@ class ToolManager:
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
-        name = mcp.name if mcp.name else "Unknown"
-        name = mcp.name[0].text if mcp.name else "Unknown"
+        name = mcp.name.content[0].text
         name = name.replace(" ", "_").upper()
         return name + "_TOOLS"
 
     def get_client_prompt(self, mcp: MCP) -> str:
         """Generate a prompt for the MCP client."""
+        assert isinstance(mcp, MCP), "Expected MCP instance"
         if not mcp.address or not mcp.port:
             raise ValueError("MCP address and port must be set.")
         if not mcp.tools:

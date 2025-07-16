@@ -75,12 +75,26 @@ class WorkflowRunner:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
+    async def ensure_pip(self) -> None:
+        """Ensure pip is installed and up-to-date."""
+        import subprocess
+        try:
+            subprocess.run(
+                [f"python{self.config.python_version}", "-m", "ensurepip"],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Failed to ensure pip: {e}")
+
     async def install_dependencies(
         self, requirements: list[str] | None = None
     ) -> ExecutionResult:
         """Install dependencies asynchronously."""
+
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
+        
+        await self.ensure_pip()
 
         cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
 
