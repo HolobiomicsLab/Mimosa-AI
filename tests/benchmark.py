@@ -9,7 +9,7 @@ def test_benchmark_format(uuid:str):
 
 
 if __name__ == "__main__":
-    uuid = "794d54e2d7ae49f9a426e66431d63232"
+    uuid = "fac733880369477d93194dd560e16f99"
     test_benchmark_format(uuid)
     print("Benchmark format test completed.")
     # You can add more tests or assertions here to validate the output

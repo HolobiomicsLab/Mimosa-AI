@@ -121,7 +121,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         print("✅ LLM generated workflow code successfully")
         return workflow_code
 
-    def create_folder_structure(self, uuid_str: str) -> Tuple[str]:
+    def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
 
         Args:

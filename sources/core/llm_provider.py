@@ -1,6 +1,6 @@
-import os
 import json
-from typing import List, Dict, Optional
+import os
+
 from openai import OpenAI
 
 
@@ -19,7 +19,7 @@ class LLMProvider:
         )
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def save_call(self, call: Dict[str, str], path: str) -> None:
+    def save_call(self, call: dict[str, str], path: str) -> None:
         """
         Save the API call details to a JSON file as a list of calls.
         If the file exists, append to the list; otherwise, create a new list.
@@ -30,7 +30,7 @@ class LLMProvider:
         """
         path = f"{path}/llm_calls.json"
         try:
-            with open(path, "r") as f:
+            with open(path) as f:
                 calls: list = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             calls = []
@@ -40,8 +40,8 @@ class LLMProvider:
 
     def deepseek_completion(
         self,
-        history: List[Dict[str, str]],
-        path: str,
+        history: list[dict[str, str]],
+        path: str | None = None,
         verbose: bool = False,
         model="deepseek-reasoner",
     ) -> str:
@@ -65,17 +65,18 @@ class LLMProvider:
             thought = response.choices[0].message.content
             if verbose:
                 print(thought)
-            self.save_call(
-                {"model": model, "messages": history, "thought": thought}, path
-            )
+            if path:
+                self.save_call(
+                    {"model": model, "messages": history, "thought": thought}, path
+                )
             return thought
         except Exception as e:
             raise RuntimeError(f"❌ Deepseek API error: {str(e)}") from e
 
     def openai_completion(
         self,
-        history: List[Dict[str, str]],
-        path: str,
+        history: list[dict[str, str]],
+        path: str | None = None,
         verbose: bool = False,
         model="o3-2025-04-16",
     ) -> str:
@@ -101,9 +102,10 @@ class LLMProvider:
             thought = response.choices[0].message.content
             if verbose:
                 print(thought)
-            self.save_call(
-                {"model": model, "history": history, "thought": thought}, path
-            )
+            if path:
+                self.save_call(
+                    {"model": model, "history": history, "thought": thought}, path
+                )
             return thought
         except Exception as e:
             raise RuntimeError(f"❌ OpenAI API error: {str(e)}") from e
