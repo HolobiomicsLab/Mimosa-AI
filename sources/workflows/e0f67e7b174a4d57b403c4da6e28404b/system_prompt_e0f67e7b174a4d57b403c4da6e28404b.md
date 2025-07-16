@@ -281,6 +281,7 @@ app = workflow.compile()
 - [ ] Robust prompt compliance validation in routing functions (agents may not follow termination keywords like SEARCH_FAILURE, SUCCESS, etc.)
 - [ ] Fallback routing when agents don't provide expected termination signals or ignore prompt instructions
 - [ ] Agent whose task depend on a previous agent must have the option to say INSUFFICIENT_INFORMATION triggering the routing function to go back to the previous agent.
+- [ ] Adapt the routing to go back as far as necessary. Task require going 3 step back ? Then routing on INSUFFICIENT_INFORMATION goes back to 3 task before
 
 ### MANDATORY Technical Requirements
 - [ ] All nodes have clear, specific purposes with atomic operations

@@ -1,3 +1,8 @@
+"""
+This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
+"""
+
+import uuid
 import os
 import uuid
 
@@ -256,16 +261,28 @@ if "{path}":
         )
 
         if save_workflow and isinstance(workflow_code, str):
-            try:
-                with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
-                    f.write(workflow_code)
-                print(f"✅ Saved workflow code to: {path}/workflow_code_{uuid_str}.py")
-            except Exception as e:
-                print(f"❌ Failed to save workflow code: {str(e)}")
-            try:
-                with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), "w") as f:
-                    f.write(self.get_system_prompt())
-                print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
-            except Exception as e:
-                print(f"❌ Failed to save system prompt: {str(e)}")
+            self.save_workflow_files(path, uuid_str, workflow_code, goal_prompt)
         return complete_code, uuid_str
+
+    def save_workflow_files(self, path: str, uuid_str: str, workflow_code: str, goal_prompt: str) -> None:
+        """Save workflow code and metadata to files."""
+        try:
+            with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), 'w') as f:
+                f.write(workflow_code)
+            print(f"✅ Saved workflow code to: {path}/workflow_code_{uuid_str}.py")
+        except Exception as e:
+            print(f"❌ Failed to save workflow code: {str(e)}")
+
+        try:
+            with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), 'w') as f:
+                f.write(self.get_system_prompt())
+            print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
+        except Exception as e:
+            print(f"❌ Failed to save system prompt: {str(e)}")
+
+        try:
+            with open(os.path.join(path, f"goal_{uuid_str}.txt"), 'w') as f:
+                f.write(goal_prompt)
+            print(f"✅ Saved workflow goal to: {path}/goal_{uuid_str}.txt")
+        except Exception as e:
+            print(f"❌ Failed to save workflow code: {str(e)}")

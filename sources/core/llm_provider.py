@@ -1,3 +1,7 @@
+"""
+This is the LLMProvider class that handles interactions with various LLM APIs.
+"""
+
 import os
 
 from openai import OpenAI

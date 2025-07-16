@@ -12,7 +12,7 @@ The multi-agent workflow is a graph of agents where nodes are either functions o
 ### 2. State Flow Design with Robust Error Handling
 - Use conditional routing with custom functions for state-dependent decisions
 - **MANDATORY**: Implement multiple fallback paths for every possible failure
-- Create alternative execution paths when primary agents fail
+- **Multi-Level Retry Mechanisms**: Implement cascading retry paths that can backtrack to earlier agents when downstream failures are caused by upstream issues (e.g., web agent provides misleading information → CSV collection agent processes it successfully but with flawed data → execution agent fails → retry path should route back to the original web agent to gather better information)
 
 ### 3. Agent Limitations
 - Agents cannot access WorkflowState history or structure directly
@@ -218,14 +218,7 @@ def advanced_router(state: WorkflowState) -> str:
             print(f"🎉 Step '{current_step}' completed successfully")
             return "next_step"
         else:
-            retry_count = step_name_list.count(current_step)
-            if retry_count < 3:
-                print(f"🔄 Retrying {current_step}")
-                state["step_name"].append(f"{current_step}_retry")
-                return "retry_path"
-            else:
-                print(f"❌ Max retries reached, giving up...")
-                return END 
+            return "first_step"
     except Exception as e:
         print(f"💥 Unexpected error: {e}")
         return END
@@ -244,8 +237,7 @@ workflow.add_conditional_edges(
     {
         "chart_maker": "chart_maker",
         "retry_path": "web_surfer",
-        "fallback_path": "chart_maker",
-        "emergency_fallback": END
+        "fallback_path": "chart_maker"
     }
 )
 
@@ -255,8 +247,7 @@ workflow.add_conditional_edges(
     {
         END: END,
         "retry_path": "chart_maker",
-        "fallback_path": END,
-        "emergency_fallback": END
+        "fallback_path": END
     }
 )
 
@@ -267,38 +258,23 @@ app = workflow.compile()
 ## QUALITY REQUIREMENTS & CHECKLIST
 
 ### MANDATORY Task Decomposition Requirements
-- [ ] **High number of specialized agents** for complex tasks (search → extract → validate → format)
 - [ ] Each agent has ONE atomic responsibility with zero functional overlap
-- [ ] Sequential chains of simple agents instead of complex multi-purpose ones
 - [ ] Clear data handoff between consecutive specialized agents
 - [ ] Task broken down to smallest logical units (divide and conquer principle)
 
 ### MANDATORY Error Handling & Fallback Requirements
-- [ ] Retry mechanisms with attempt counters (max 3 retries per agent)
 - [ ] Emergency fallback routes that lead to END when task is impossible due to fatal error
-- [ ] Comprehensive try-catch blocks in ALL routing functions
-- [ ] State validation before every routing decision
-- [ ] Robust prompt compliance validation in routing functions (agents may not follow termination keywords like SEARCH_FAILURE, SUCCESS, etc.)
 - [ ] Fallback routing when agents don't provide expected termination signals or ignore prompt instructions
 - [ ] Agent whose task depend on a previous agent must have the option to say INSUFFICIENT_INFORMATION triggering the routing function to go back to the previous agent.
 
 ### MANDATORY Technical Requirements
-- [ ] All nodes have clear, specific purposes with atomic operations
-- [ ] Conditional routing handles ALL possible execution paths
 - [ ] Tool selection matches individual agent capabilities  
-- [ ] Instruction templates provide sufficient context for single-purpose tasks
 - [ ] Workflow has clear start and guaranteed end conditions
 - [ ] Extensive logging in routing functions for debugging
-- [ ] Dict field existence validation before access
-- [ ] Multiple agents can share tools but have different specialized prompts
-- [ ] Do not ever tell agent to access field from state class, agent only see previous agent output
 
 ### MANDATORY Output Requirements
-- [ ] **Minimum 4+ agents** demonstrating proper task decomposition
-- [ ] **At least 2 fallback mechanisms** implemented across the workflow
 - [ ] Code wrapped in ```python<code>``` tags and immediately runnable
 - [ ] Comprehensive error handling
 - [ ] Do not try to import any of the predefined methods
-- [ ] Specify the overall goal to agent when needed they are unaware of the bigger picture unless explicit in their prompt.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
