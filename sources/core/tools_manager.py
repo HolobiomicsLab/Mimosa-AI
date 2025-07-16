@@ -68,9 +68,7 @@ class ToolManager:
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
-        name = mcp.name if mcp.name else "Unknown"
-        if hasattr(name, 'content') and name.content:
-            name = name.content[0].text
+        name = mcp.name[0].text if mcp.name else "Unknown"
         name = name.replace(" ", "_").upper()
         return name + "_TOOLS"
 
