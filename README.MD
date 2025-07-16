@@ -79,7 +79,9 @@ python3 main.py --goal "search and install llama.cpp for this OS architecture" -
 
 ## Use Caching system
 
-### First to use the caching system, first setup and run the cache server.
+You'll need to open 2 terminal.
+
+### First terminal 
 
 1. **Create a config.yaml file in cached_server**
 
@@ -102,7 +104,7 @@ providers:
 go run main.go
 ```
 
-### Then in another terminal start mimosa 
+### Second terminal 
 
 First export this:
 
