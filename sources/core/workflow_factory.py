@@ -231,7 +231,8 @@ if WORKFLOW_PATH:
         uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
-        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
+        workflow_path = self.create_folder_structure(uuid_str) if save_workflow else os.path.join(self.workflow_dir, uuid_str)
+        memory_path = os.path.join(self.memory_dir, uuid_str) if save_workflow else None
 
         state_code = open(self.schema_code_path).read()
         smolagent_factory_code = open(self.smolagent_factory_code_path).read()

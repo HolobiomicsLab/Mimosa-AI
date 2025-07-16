@@ -165,14 +165,15 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             print("Using LiteLLM for DeepSeek execution.")
             return LiteLLMModel(
                 model_id="deepseek/deepseek-chat",
-                temperature=0.2,
+                temperature=0.7,
                 api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
-                model_id="gpt-4o",
+                model_id="deepseek",
                 provider="openai",
+                base_url="0.0.0.0:6767",
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
