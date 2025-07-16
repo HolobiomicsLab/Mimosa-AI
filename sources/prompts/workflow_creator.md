@@ -276,5 +276,6 @@ workflow.add_conditional_edges(
 - [ ] Code wrapped in ```python<code>``` tags and immediately runnable
 - [ ] Comprehensive error handling
 - [ ] Do not try to import any of the predefined methods
+- [ ] Agent should always have a single tool package, you can't combine tool package, divide and conqueer with more agent instead.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
