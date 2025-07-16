@@ -1,12 +1,9 @@
-import os
-import sys
+from sources.core.benchmarker import Benchmarker
+from config import Config
 
-sys.path.append(os.getcwd())
-from mimosa.core.benchmarker import Benchmarker
-
-
-def test_benchmark_format(uuid: str):
-    benchmarker = Benchmarker(uuid)
+def test_benchmark_format(uuid:str):
+    config = Config()
+    benchmarker = Benchmarker(config, uuid)
     benchmarker.generate_text()
     print(benchmarker)
 

@@ -34,6 +34,7 @@ class Config:
 
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
+        self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_creator.md"

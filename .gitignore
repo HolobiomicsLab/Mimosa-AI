@@ -202,6 +202,9 @@ cython_debug/
 .pypirc
 .aider*
 
+sources/workflows/*
+sources/memory/*
+tmp/*
 # Ruff stuff:
 .ruff_cache/
 
