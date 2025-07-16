@@ -176,10 +176,10 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         elif self.engine_name == "cached":
-            return InferenceClientModel(
-                model_id="deepseek",
-                provider="openai",
-                base_url="0.0.0.0:6767"
+            return LiteLLMModel(
+                model_id="deepseek/deepseek-chat",
+                base_url="http://0.0.0.0:6767/v1/chat/completions",
+                max_tokens=self.max_tokens,
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
