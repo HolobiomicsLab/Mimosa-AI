@@ -171,7 +171,7 @@ class SmolAgentFactory:
             print("Using LiteLLM for DeepSeek execution.")
             return LiteLLMModel(
                 model_id="deepseek/deepseek-chat",
-                temperature=0.7,
+                temperature=0.2,
                 api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
