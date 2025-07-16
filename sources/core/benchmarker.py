@@ -72,6 +72,11 @@ class Benchmarker:
             else:
                 text += f"Output: {step['result']}\n"
             text += "\n"
+
+        text += "--- WORKFLOW CODE ---\n"
+        with open(self.workflow_path / f"workflow_code_{self.uuid}.py") as f:
+            workflow_code = f.read()
+        text += f"{workflow_code}\n"
         
         # Write the formatted text to file
         with open(self.memory_path / "formated.txt", "w") as file:
@@ -79,7 +84,22 @@ class Benchmarker:
 
     def evaluate(self):
         """Evaluate the benchmark results."""
-        system_prompt = """You are an expert in evaluating AI agent workflows."""
+        system_prompt = """You are a rigorous and objective evaluator of a multi-agent system designed to solve a complex goal through a coordinated workflow. You will be given:
+
+1. A description of the system’s **goal**.
+2. A list of **agents**, each with their assigned roles.
+3. The **workflow trace**, including the input and output of each step for every agent.
+4. The **workflow code** that orchestrates the agents.
+
+Your task is to:
+- Check if each agent behaves consistently with its role.
+- Determine whether each step logically follows from the previous step.
+- Identify whether outputs are appropriate, helpful, or erroneous.
+- Pinpoint any bottlenecks, misunderstandings, or failures.
+- Evaluate how well the agents are collaborating to reach the goal.
+- Suggest what changes could improve the system's reliability, performance, or alignment with the goal.
+
+Be precise, constructive, and technical in your judgment."""
         prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
 
 {self.get_text()}
