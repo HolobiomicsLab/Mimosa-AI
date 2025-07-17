@@ -35,7 +35,7 @@ class GodelMachine:
             )
             return None
         except Exception as e:
-            raise ValueError(f"❌ Error reading workflow state: {str(e)}")
+            raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
         return None
 
     def load_workflow_code(self, uuid: str) -> str:
@@ -45,12 +45,12 @@ class GodelMachine:
         try:
             with open(f"{self.workflow_dir}/{uuid}/workflow_code_{uuid}.py") as f:
                 return f.read()
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             raise ValueError(
                 f"❌ Workflow code for UUID {uuid} not found in {self.workflow_dir}."
-            )
+            ) from e
         except Exception as e:
-            raise ValueError(f"❌ Error reading workflow code: {str(e)}")
+            raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
@@ -118,12 +118,12 @@ Learn from this output and improve the workflow generation.
                 f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py",
             ) as f:
                 return f.read()
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             raise ValueError(
-                f"❌ Workflow template for UUID {template_uuid} not found in {self.workflow_dir}."
-            )
+                f"❌ Workflow for UUID {template_uuid} not in {self.workflow_dir}."
+            ) from e
         except Exception as e:
-            raise ValueError(f"❌ Error reading workflow template: {str(e)}")
+            raise ValueError(f"❌ Error reading workflow template: {str(e)}") from e
 
     async def start_dgm(
         self,
@@ -150,7 +150,7 @@ Learn from this output and improve the workflow generation.
         """Run a self-improvement loop for the workflow.
 
         Args:
-            prompt: The goal prompt for workflow generation, same as goal on first iteration
+            prompt: The goal prompt for workflow generation
             goal: The goal to achieve with the workflow
             template_uuid: Optional UUID of workflow template to use
             workflow_template: Optional workflow template code to use
@@ -190,7 +190,7 @@ Learn from this output and improve the workflow generation.
         template_uuid = None
         if iteration_count >= max_depth:
             print(
-                f"Maximum iterations reached ({max_depth}). Ending self-improvement loop."
+                f"Maximum iterations reached ({max_depth})."
             )
             return flow_output
         await self.recursive_self_improvement(

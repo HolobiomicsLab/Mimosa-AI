@@ -76,7 +76,8 @@ class ToolManager:
 
         if not found_servers:
             print(
-                f"❌ No MCP servers found on ports {port_min}-{port_max}. Please ensure at least one server is running."
+                f"❌ No MCP servers found on ports {port_min}-{port_max}. \
+                Please ensure toolomics MCPs server is running."
             )
             raise RuntimeError(
                 "No MCP servers found. Please start Toolomics MCP server."
@@ -94,10 +95,10 @@ class ToolManager:
                 if mcps:
                     print(f"✅ Found {len(mcps)} MCP server(s) at {addr.ip}.")
                     return mcps
-            except Exception as _:
+            except Exception as e:
                 raise ValueError(
-                    f"❌ Error discovering MCP servers at {addr.ip}, no MCP servers found."
-                )
+                    f"❌ Error discovering MCP servers at {addr.ip}, no MCPs found."
+                ) from e
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""

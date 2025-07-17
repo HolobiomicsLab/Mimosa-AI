@@ -118,10 +118,10 @@ async def main():
 
     try:
         dgm = GodelMachine(config)
+        planner = Planner(config)
         if args.single_task:
             await dgm.start_dgm(goal_prompt=args.single_task)
         elif args.goal:
-            planner = Planner(config)
             await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
         else:
             raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
