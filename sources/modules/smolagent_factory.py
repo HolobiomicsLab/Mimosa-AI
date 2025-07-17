@@ -66,11 +66,10 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools,
-                 model_id="deepseek-ai/DeepSeek-V3",
-                 engine_name="deepseek",  # Options: mlx, inference_client, deepseek, openai
+                 engine_name="LiteLLMModel",  # Options: mlx, inference_client, LiteLLMModel, openai
                  max_steps=9
                 ):
-        self.model_id = model_id
+        self.model_id = MODEL_ID
         self.max_tokens = 1024
         self.provider = "auto"
         self.token = os.getenv("HF_TOKEN")
@@ -81,7 +80,6 @@ class SmolAgentFactory:
         self.engine = None
         self.name = name
         self.memory_folder = MEMORY_PATH
-        #os.makedirs(self.memory_folder, exist_ok=True)
         self.run_uuid = str(uuid.uuid4())
         self.additional_system_prompt = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
@@ -130,7 +128,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
-                name="agent",
+                name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=3, # think more before acting
                 additional_authorized_imports=["*"]
@@ -161,18 +159,17 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 token=self.token,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "deepseek":
-            print("Using LiteLLM for DeepSeek execution.")
+        elif self.engine_name == "LiteLLMModel":
+            print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 temperature=0.2,
-                api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
-                model_id="gpt-4o",
-                provider="openai",
+                model_id=self.model_id,
+                provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
@@ -335,6 +332,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],
+            "task_prompt": state.get("task_prompt", []) + [instructions],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
