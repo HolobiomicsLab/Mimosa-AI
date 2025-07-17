@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 
 from config import Config
-from sources.core.benchmarker import Benchmarker
+from sources.core.judge import Benchmarker
 
 load_dotenv()
 
