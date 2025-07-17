@@ -141,6 +141,7 @@ class WorkflowRunner:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=1024 * 1024,  # 1MB buffer limit
+                env=dict(os.environ)  # Pass host environment variables
             )
 
             if execution_id:

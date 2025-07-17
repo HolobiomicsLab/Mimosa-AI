@@ -14,14 +14,14 @@
 #### Step 1: Environment Setup
 
 **Option A: Using pip**
-```bash
+```sh
 # Create and activate virtual environment
 python3 -m venv .venv
 source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
 ```
 
 **Option B: Using uv (faster alternative)**
-```bash
+```sh
 # Install uv if not already installed
 pip install uv
 
@@ -38,17 +38,17 @@ Configure your `.env` file with the following API keys:
 #### Step 2: Install Dependencies
 
 First go into the `mimosa` folder
-```bash
+```sh
 cd mimosa
 ```
 
 **Using pip:**
-```bash
+```sh
 pip3 install -r requirements.txt
 ```
 
 **Using uv (faster):**
-```bash
+```sh
 uv pip install -r requirements.txt
 ```
 
@@ -57,10 +57,10 @@ Launch the toolomics MCP server following the instructions at [HolobiomicsLab/to
 
 #### Step 4: Run Mimosa-AI
 
-```bash
-python3 main.py --goal "Your objective here"
+```sh
+python3 main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
 # or
-uv run main.py --goal "Your objective here"
+uv run main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
@@ -71,11 +71,54 @@ uv run main.py --goal "Your objective here"
 - `--load_template TEMPLATE_UUID`: Optional. Load a predefined workflow template from workflows folder
 
 **Example:**
-```bash
+```sh
 python3 main.py --goal "search and install llama.cpp for this OS architecture" --load_template 64a644cf1ef449a684a8a369e47387e2
 ```
 
 **`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
+
+## Use Caching system
+
+You'll need to open 2 terminal.
+
+### First terminal 
+
+1. **Create a config.yaml file in cached_server**
+
+```sh
+server:
+  port: 6767
+  storage_path: "./cache"
+  cache_enabled: true
+
+providers:
+  - name: "deepseek"
+    base_url: "https://api.deepseek.com"
+    api_key: "xxxxxxxx"
+    weight: 1
+```
+
+2. **Start the cached server**
+
+```sh
+go run main.go
+```
+
+### Second terminal 
+
+First export this:
+
+```sh
+export USE_CACHED_ENGINE="true"
+```
+
+Then run *Mimosa* as usual.
+
+```sh
+python3 main.py --goal "<goal>" --load_template <optional existing workflow uuid>
+```
+
+
 
 ## 📈 Telemetry Setup
 
@@ -84,7 +127,7 @@ Monitor and debug your AI agents with real-time observability dashboards.
 ### Quick Start
 
 1. **Deploy Langfuse locally**:
-    ```bash
+    ```sh
     git clone https://github.com/langfuse/langfuse.git
     cd langfuse
     docker compose up -d
