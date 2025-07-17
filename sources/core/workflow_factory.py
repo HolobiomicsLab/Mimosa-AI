@@ -158,11 +158,15 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         uuid_str: str,
     ) -> str:
         initial_state = {
-            key: uuid_str if key == "workflow_uuid" else []
+            key: (
+                uuid_str
+                if key == "workflow_uuid"
+                else self.config.smolagent_model_id if key == "model_id" else []
+            )
             for key in state_schema.WorkflowState.__annotations__
         }
 
-        return f'''
+        return f"""
 import os
 import sys
 import re
@@ -172,6 +176,7 @@ from typing import TypedDict, List
 
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
+MODEL_ID = {self.config.smolagent_model_id}
 
 # Load tools
 {tools_code}
@@ -219,7 +224,7 @@ if WORKFLOW_PATH:
             json.dump(result_state, f, indent=2)
     except Exception as e:
         raise(f"Could not save workflow data:" + str(e))
-'''
+"""
 
     async def craft_workflow(
         self,

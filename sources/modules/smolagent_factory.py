@@ -112,12 +112,12 @@ class SmolAgentFactory:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools or []
-        self.model_id = model_id
+        self.model_id = MODEL_ID
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = "./sources/memory/"
+        self.memory_folder = MEMORY_PATH
         print("debug path", os.getcwd())
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
         self.engine_name = os.getenv("ENGINE_NAME", "inference_client").lower()
@@ -133,7 +133,7 @@ class SmolAgentFactory:
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
-                name="agent",
+                name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=3, # think more before acting
                 additional_authorized_imports=["*"]
@@ -151,7 +151,7 @@ class SmolAgentFactory:
     def get_engine(self):
         if self.engine_name == "cached" or self.use_cached_engine:
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
                 max_tokens=self.max_tokens,
             )
@@ -169,18 +169,17 @@ class SmolAgentFactory:
                 token=self.token,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "deepseek":
-            print("Using LiteLLM for DeepSeek execution.")
+        elif self.engine_name == "LiteLLMModel":
+            print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 temperature=0.2,
-                api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
-                model_id="deepseek",
-                provider="openai",
+                model_id=self.model_id,
+                provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
@@ -343,6 +342,7 @@ class SmolAgentFactory:
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],
+            "task_prompt": state.get("task_prompt", []) + [instructions],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
