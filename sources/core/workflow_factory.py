@@ -178,7 +178,7 @@ from typing import TypedDict, List
 
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
-MODEL_ID = {self.config.smolagent_model_id}
+MODEL_ID = {self.config.smolagent_model_id!r}
 
 # Load tools
 {tools_code}
@@ -205,6 +205,9 @@ try:
             png = app.get_graph().draw_mermaid_png()
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
                 f.write(png)
+            mermaid_code = app.get_graph().draw_mermaid()
+            with open(os.path.join(WORKFLOW_PATH, "mermaid.txt"), "w") as f:
+                f.write(mermaid_code)
         except Exception as e:
             raise(f"Could not save workflow graph:" + str(e))
 except Exception as e:
