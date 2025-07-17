@@ -91,7 +91,7 @@ class WorkflowOrchestrator:
             import traceback
 
             traceback.print_exc()
-            return str(e), uuid
+            return str(e), uuid, False
         finally:
             print("\nCleaning up sandbox...")
         output = (
@@ -99,7 +99,7 @@ class WorkflowOrchestrator:
             if execution_output
             else "Workflow executed successfully with no output."
         )
-        return output, uuid
+        return output, uuid, True
 
     async def __aenter__(self):
         """Async context manager entry."""

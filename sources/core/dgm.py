@@ -182,15 +182,14 @@ Learn from this output and improve the workflow generation.
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
-        run_stdout, uuid = await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid , executed= await self.orchestrator.orchestrate_workflow(
             prompt, template_uuid, workflow_template
         )
-        total_cost = self.judge.calculate_cost(uuid)
-        print(f"Total workflow cost: {total_cost:.3f} USD")
-        if judge:
-            self.judge.evaluate(
-                run_stdout, goal, uuid
-            )
+        if executed:
+            if judge:
+                self.judge.evaluate(uuid)
+            total_cost = self.judge.calculate_cost(uuid)
+            print(f"Total workflow cost: {total_cost:.3f} USD")
         flow_state = self.load_flow_state_result(uuid)
         self.notifier.send_message(
             str(flow_state) if flow_state else run_stdout,
