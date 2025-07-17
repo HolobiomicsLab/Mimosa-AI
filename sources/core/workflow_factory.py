@@ -156,12 +156,13 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         workflow_path: str,
         memory_path: str,
         uuid_str: str,
+        goal_prompt: str,
     ) -> str:
         initial_state = {
             key: (
-                uuid_str
-                if key == "workflow_uuid"
-                else self.config.smolagent_model_id if key == "model_id" else []
+                uuid_str if key == "workflow_uuid"
+                else self.config.smolagent_model_id if key == "model_id" 
+                else goal_prompt if key == "goal" else []
             )
             for key in state_schema.WorkflowState.__annotations__
         }
@@ -223,7 +224,7 @@ print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
 if WORKFLOW_PATH:
     print("workflow run: saving workflow state JSON at :", WORKFLOW_PATH)
     try:
-        with open(os.path.join(WORKFLOW_PATH, "state_result_{uuid_str}.json"), "w") as f:
+        with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
             json.dump(result_state, f, indent=2)
     except Exception as e:
         raise(f"Could not save workflow data:" + str(e))
@@ -284,6 +285,7 @@ if WORKFLOW_PATH:
             workflow_path,
             memory_path,
             uuid_str,
+            goal_prompt
         )
 
         print(f"workflow path {workflow_path}")
@@ -312,10 +314,3 @@ if WORKFLOW_PATH:
             print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
         except Exception as e:
             print(f"❌ Failed to save system prompt: {str(e)}")
-
-        try:
-            with open(os.path.join(path, f"goal_{uuid_str}.txt"), "w") as f:
-                f.write(goal_prompt)
-            print(f"✅ Saved workflow goal to: {path}/goal_{uuid_str}.txt")
-        except Exception as e:
-            print(f"❌ Failed to save workflow code: {str(e)}")
