@@ -81,13 +81,10 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
-def setup_signal_handlers(config: Config):
+def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
         print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
-        
-        calculate_cost(config)
-        
         # Cancel all running tasks
         for task in asyncio.all_tasks():
             if not task.done():
@@ -97,10 +94,11 @@ def setup_signal_handlers(config: Config):
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+
 async def main():
     """Main execution function"""
     config = Config()
-    setup_signal_handlers(config)
+    setup_signal_handlers()
     
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
@@ -123,10 +121,10 @@ async def main():
 
     try:
         dgm = GodelMachine(config)
+        planner = Planner(config)
         if args.single_task:
             await dgm.start_dgm(goal_prompt=args.single_task)
         elif args.goal:
-            planner = Planner(config)
             await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
         else:
             raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
@@ -136,16 +134,6 @@ async def main():
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         raise
-    finally:
-        print("\n🧹 Cleaning up resources...")
-        await dgm.cleanup()
-        await planner.cleanup() if 'planner' in locals() else None
-        await config.workflow_runner.cleanup()
-        
-        # Calculate final cost before shutdown
-        print("\n📊 Final cost calculation:")
-        calculate_cost(config)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

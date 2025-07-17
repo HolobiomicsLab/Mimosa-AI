@@ -65,7 +65,7 @@ class SmolAgentFactory:
     def __init__(self,
                  name,
                  instruct_prompt,
-                 tools,
+                 tools = None,
                  engine_name="LiteLLMModel",  # Options: mlx, inference_client, LiteLLMModel, openai
                  max_steps=9
                 ):
@@ -80,7 +80,6 @@ class SmolAgentFactory:
         self.engine = None
         self.name = name
         self.memory_folder = MEMORY_PATH
-        self.run_uuid = str(uuid.uuid4())
         self.additional_system_prompt = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
