@@ -94,7 +94,7 @@ server:
 providers:
   - name: "deepseek"
     base_url: "https://api.deepseek.com"
-    api_key: "sk-696d587206dc4c51b2b5df529256c2c8"
+    api_key: "xxxxxxxx"
     weight: 1
 ```
 
