@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sources.core.llm_provider import LLMProvider
+from sources.modules import state_schema
 
 
 @dataclass
@@ -159,8 +160,8 @@ class WorkflowJudge:
         workflow_steps.sort(key=lambda x: (x["start_time"], x["step_number"]))
         
         # Read the goal
-        with open(workflow_path / f"goal_{uuid}.txt") as f:
-            goal = f.read()
+        with open(workflow_path / "state_result.json") as f:
+            goal = json.load(f).get("goal", "")
         
         # Format the text according to the new structure
         text = "--- GOAL ---\n"
@@ -182,10 +183,10 @@ class WorkflowJudge:
                 text += f"Output: {step['result']}\n"
             text += "\n"
 
-        text += "--- WORKFLOW CODE ---\n"
-        with open(workflow_path / f"workflow_code_{uuid}.py") as f:
-            workflow_code = f.read()
-        text += f"{workflow_code}\n"
+        text += "--- MERMAID WORKFLOW ---\n"
+        with open(workflow_path / "mermaid.txt") as f:
+            workflow_mermaid = f.read()
+        text += f"{workflow_mermaid}\n"
         
         # Write the formatted text to file
         with open(memory_path / "formated.txt", "w") as file:
@@ -229,7 +230,7 @@ Please analyze the system with the following structure:
 1. A description of the system's **goal**.
 2. A list of **agents**, each with their assigned roles.
 3. The **workflow trace**, including the input and output of each step for every agent.
-4. The **workflow code** that orchestrates the agents.
+4. The **mermaid workflow** that explain agent worflow.
 
 Your task is to:
 - Check if each agent behaves consistently with its role.
