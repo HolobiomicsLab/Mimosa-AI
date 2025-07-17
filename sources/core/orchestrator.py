@@ -118,16 +118,12 @@ class WorkflowOrchestrator:
         """Cleanup resources on deletion - sync fallback."""
         # Note: This is a fallback - proper cleanup should use async context manager
         import asyncio
+        from contextlib import suppress
         try:
             # Only attempt sync cleanup if no event loop is running
-            try:
-                loop = asyncio.get_running_loop()
+            with suppress(RuntimeError):
                 # If we have a running loop, schedule cleanup as a task
                 asyncio.create_task(self.workflow_runner.cleanup())
-            except RuntimeError:
-                # No running loop, we can't do async cleanup in __del__
-                # This is expected behavior - cleanup should be done via context manager
-                pass
         except Exception as e:
             print(f"❌ Error during cleanup: {e}")
             import traceback

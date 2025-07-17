@@ -42,9 +42,11 @@ class WorkflowFactory:
             with open(self.prompt_workflow_creator) as f:
                 return f.read()
         except Exception as e:
-            raise ValueError(f"Failed to load system prompt: {str(e)}")
+            raise ValueError(f"Failed to load system prompt: {str(e)}") from e
 
-    def llm_make_workflow(self, system_prompt: str, craft_instructions: str, existing_tool_prompt: str,path:str) -> str:
+    def llm_make_workflow(self, system_prompt: str, craft_instructions: str, 
+                          existing_tool_prompt: str, path:str
+                        ) -> str:
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
@@ -94,7 +96,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         mcps = await tool_manager.discover_mcp_servers()
         if not mcps:
             raise ValueError(
-                "\nNo MCP servers found. Please ensure at least one MCP is running on toolomics."
+                "\nNo MCP servers found." \
+                "Please ensure at least one MCP is running on toolomics."
             )
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)
@@ -103,7 +106,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
 
-    def create_workflow_code(self, craft_instructions: str, existing_tool_prompt: str,path:str) -> str:
+    def create_workflow_code(self, craft_instructions: str, 
+                             existing_tool_prompt: str,path:str
+                            ) -> str:
         """Generate and validate workflow code.
 
         Args:
@@ -114,7 +119,10 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         print("🧠 Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
-        llm_output = self.llm_make_workflow(system_prompt, craft_instructions, existing_tool_prompt,path)
+        llm_output = self.llm_make_workflow(system_prompt,
+                                            craft_instructions,
+                                            existing_tool_prompt,path
+                                           )
         workflow_code = self.extract_python_code(llm_output)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
@@ -228,17 +236,27 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None else template_uuid
+        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None \
+                                                      else template_uuid
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
-        workflow_path, memory_path = self.create_folder_structure(uuid_str) if save_workflow else (os.path.join(self.workflow_dir, uuid_str) , os.path.join(self.memory_dir, uuid_str))
+        if save_workflow:
+            workflow_path, memory_path = self.create_folder_structure(uuid_str)
+        else:
+            workflow_path = os.path.join(self.workflow_dir, uuid_str)
+            memory_path = os.path.join(self.memory_dir, uuid_str)
 
-        state_code = open(self.schema_code_path).read()
-        smolagent_factory_code = open(self.smolagent_factory_code_path).read()
+        with open(self.schema_code_path) as f:
+            state_code = f.read()
+        with open(self.smolagent_factory_code_path) as f:
+            smolagent_factory_code = f.read()
         workflow_code = (
             template_workflow 
             if template_workflow 
-            else self.create_workflow_code(goal_prompt, existing_tool_prompt,memory_path)
+            else self.create_workflow_code(goal_prompt,
+                                           existing_tool_prompt,
+                                           memory_path
+                                          )
         )
         if workflow_code is None or workflow_code.strip() == "":
             print("Generated workflow:\n", workflow_code)
@@ -259,10 +277,14 @@ if WORKFLOW_PATH:
         print(f"workflow path {memory_path}")
 
         if save_workflow and isinstance(workflow_code, str):
-            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal_prompt)
+            self.save_workflow_files(workflow_path, uuid_str,
+                                     workflow_code, goal_prompt
+                                    )
         return complete_code, uuid_str
 
-    def save_workflow_files(self, path: str, uuid_str: str, workflow_code: str, goal_prompt: str) -> None:
+    def save_workflow_files(self, path: str, uuid_str: str,
+                            workflow_code: str, goal_prompt: str
+                           ) -> None:
         """Save workflow code and metadata to files."""
         try:
             with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), 'w') as f:

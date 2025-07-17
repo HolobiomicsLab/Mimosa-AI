@@ -12,13 +12,13 @@ class AddressMCP:
     port_max: int
 
     def _validate_port(self, port_number: int) -> None:
-        assert port_number >= 0 and port_number <= 65535, "Port number must be between 0 and 65535"
+        assert port_number >= 0 and port_number <= 65535, "Port not between 0 and 65535"
     
     def _validate_ip(self, ip: str) -> None:
         if not self.ip:
             raise ValueError("IP address cannot be empty")
         if not isinstance(self.ip, str):
-            raise TypeError(f"IP address must be a string, got {type(self.ip).__name__} instead.")
+            raise TypeError(f"IP address must be string, got {type(self.ip).__name__}")
 
     def __post_init__(self):
         """Validate the address and port range."""
@@ -143,10 +143,15 @@ class Config:
     def __str__(self) -> str:
         """String representation of the configuration."""
         return (
-            f"Config(workflow_dir={self.workflow_dir}, "
-            f"schema_code_path={self.schema_code_path}, smolagent_factory_code_path={self.smolagent_factory_code_path}, "
-            f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, "
-            f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, "
-            f"runner_default_timeout={self.runner_default_timeout}, runner_default_max_memory_mb={self.runner_default_max_memory_mb}, "
-            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir})"
+            f"Config(workflow_dir={self.workflow_dir},\n"
+            f"schema_code_path={self.schema_code_path},\n"
+            f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
+            f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
+            f"workflow_llm_provider={self.workflow_llm_provider},\n"
+            f"mcp_health_endpoint={self.mcp_health_endpoint},\n"
+            f"runner_default_python_version={self.runner_default_python_version},\n"
+            f"runner_default_timeout={self.runner_default_timeout},\n"
+            f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
+            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
+            f"runner_temp_dir={self.runner_temp_dir})\n"
         )
