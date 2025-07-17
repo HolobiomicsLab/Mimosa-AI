@@ -37,6 +37,8 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_provider: str = "deepseek"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_creator.md"
         self.workflow_llm_provider: str = "openai"
         self.mcp_health_endpoint: str = "http://localhost:5000/health"
