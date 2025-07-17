@@ -10,7 +10,9 @@ from sources.core.llm_provider import LLMProvider
 class TokenUsage:
     agent: str
     model: str
-    tokens: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
 
 class WorkflowJudge:
     def __init__(self, config):
@@ -39,16 +41,20 @@ class WorkflowJudge:
             return 0.0
         
         llm_calls: list[TokenUsage] = []
-        with open(memory_path / "llms_call.json") as f:
-            json_calls = json.load(f) 
-            for call in json_calls:
-                total_tokens = call["token_usage"]["total_tokens"]
-                model =  call["model"]
 
+        # Orchestrator and Judge LLM calls
+
+        for call in ["orchestrator", "judge"]:
+            memory_file = memory_path / f"{call}.json"
+            if not memory_file.exists():
+                continue
+            
+            with open(memory_file) as f:
+                json_call = json.load(f)
                 llm_calls.append(TokenUsage(
-                    "orchestrator",
-                    model,
-                    total_tokens
+                    call,
+                    json_call["model"],
+                    *json_call["token_usage"].values()
                 ))
         
         workflow_path= Path(self.workflow_dir) / uuid
@@ -69,15 +75,21 @@ class WorkflowJudge:
         try:
             for file in os.listdir(memory_path):
                 if file.startswith("task_") and file.endswith(".json"):
-                    with open(workflow_path / file) as f:
+                    with open(memory_path / file) as f:
                         steps = json.load(f)
-                        total_tokens = 0
+                        token_usage = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0, 
+                        }
                         for step in steps:
-                            total_tokens += step.get("token_usage", {}).get("total_tokens", 0)
+                            step_usage = step.get("token_usage", None)
+                            if token_usage:
+                                token_usage = {key: token_usage[key] + step_usage[key] for key in step_usage}
                         llm_calls.append(TokenUsage(
                             file.replace("task_", "").replace(".json", ""),
                             model_id,
-                            total_tokens
+                            *token_usage.values()
                         ))
         except Exception as e:
             print(f"❌ Error reading workflow steps: {str(e)}")
@@ -87,11 +99,12 @@ class WorkflowJudge:
         print("\n💰 Cost Breakdown:")
         print("=" * 60)
         for call in llm_calls:
+            print(call)
             pricing = self.model_pricing.get(call.model, self.model_pricing["default"])
-            cost = call.tokens * pricing / 1_000_000 
+            cost = (call.input_tokens * pricing["input"] + call.output_tokens * pricing["output"]) / 1_000_000
             print("Agent:", call.agent)
             print(f"  Model: {call.model}")
-            print(f"  Tokens: {call.tokens:,}")
+            print(f"  Tokens: {call.total_tokens:,}")
             print(f"  Cost: {cost:.3f} USD")
             print("-" * 40)
             total_cost += cost
@@ -99,7 +112,7 @@ class WorkflowJudge:
         return total_cost
 
 
-    def generate_text(self, uuid: str):
+    def generate_text(self, uuid: str) -> str:
         """Generate formatted text for evaluation.
         
         Args:
@@ -117,7 +130,7 @@ class WorkflowJudge:
             if file.endswith(".json") and file.startswith("task_"):
                 agent_name = file.removeprefix('task_').removesuffix('.json').replace('_', ' ')
                 
-                with open(os.path.join(memory_path, file), "r") as f:
+                with open(os.path.join(memory_path, file)) as f:
                     steps = json.load(f)
                     start_time = int(steps[0]["timing"].get("start_time", ""))
                     user_task = steps[0]['model_input_messages'][1]['content'][0].get('text', '')
@@ -178,7 +191,34 @@ class WorkflowJudge:
         with open(memory_path / "formated.txt", "w") as file:
             file.write(text.strip())
 
-    def evaluate(self, uuid: str):
+        return text.strip()
+    
+    def long_prompt(self):
+        return """
+Please analyze the system with the following structure:
+
+1. **Step-by-step Critique**
+   - For each step in the workflow, indicate whether the output is relevant, valid, and logically derived from the input.
+   - Highlight any inconsistencies, errors, redundant actions, or missed opportunities.
+
+2. **Per-Agent Notes**
+   - For each agent, evaluate:
+     - Whether the agent's behavior aligns with its intended role
+     - How well it contributes to the overall goal
+     - Any limitations, misinterpretations, or inefficiencies observed
+     - Suggestions for prompt improvements or role clarification
+
+3. **Workflow Logic Assessment**
+   - Assess the global coordination between agents:
+     - Does the overall workflow make sense?
+     - Are steps logically ordered?
+     - Is there information loss or miscommunication between agents?
+     - Is the final output aligned with the initial goal?
+   - Suggest architectural or coordination-level improvements (e.g., adding intermediate validation, changing agent order, improving memory/context sharing)
+
+4. **Summary Judgment**
+ """
+    def evaluate(self, uuid: str, short: bool = True):
         """Evaluate the benchmark results.
         
         Args:
@@ -202,38 +242,17 @@ Your task is to:
 Be precise, constructive, and technical in your judgment."""
         prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
 
-{self.get_text(uuid)}
+{self.get_text(uuid)!r}
 
 --- EVALUATION REQUEST ---
-Please analyze the system with the following structure:
-
-1. **Step-by-step Critique**
-   - For each step in the workflow, indicate whether the output is relevant, valid, and logically derived from the input.
-   - Highlight any inconsistencies, errors, redundant actions, or missed opportunities.
-
-2. **Per-Agent Notes**
-   - For each agent, evaluate:
-     - Whether the agent's behavior aligns with its intended role
-     - How well it contributes to the overall goal
-     - Any limitations, misinterpretations, or inefficiencies observed
-     - Suggestions for prompt improvements or role clarification
-
-3. **Workflow Logic Assessment**
-   - Assess the global coordination between agents:
-     - Does the overall workflow make sense?
-     - Are steps logically ordered?
-     - Is there information loss or miscommunication between agents?
-     - Is the final output aligned with the initial goal?
-   - Suggest architectural or coordination-level improvements (e.g., adding intermediate validation, changing agent order, improving memory/context sharing)
-
-4. **Summary Judgment**
+{self.long_prompt() if not short else ""}
    - Provide an overall score (1–10) for each category in the following JSON format:
      ```json
-     {
+     {{
         "goal_alignment": X,
         "agent_collaboration": Y,
         "output_quality": Z,
-     }
+     }}
      ```
    - After the JSON, briefly justify your scores.
 
@@ -245,11 +264,13 @@ Please be objective, technical, and specific in your feedback.
         ]
         output = LLMProvider().openai_completion(
             history=history,
+            called_by="judge",
+            memory_path=self.memory_dir / uuid,
             model = "o4-mini-2025-04-16"
         )
 
         # Save the evaluation to a file
-        evaluation_path = Path(self.workflow_dir) / uuid / "evaluation.txt"
+        evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
         with open(evaluation_path, "w") as file:
             file.write(output)
         print("Evaluation completed. Results saved to:", evaluation_path)
@@ -327,8 +348,7 @@ Please be objective, technical, and specific in your feedback.
         Returns:
             str: The formatted benchmark text
         """
-        memory_path = Path(self.memory_dir) / uuid
-        formated_path = memory_path / "formated.txt"
+        formated_path = Path(self.memory_dir) / uuid / "formated.txt"
         if not formated_path.exists():
             self.generate_text(uuid)
         return open(formated_path).read()

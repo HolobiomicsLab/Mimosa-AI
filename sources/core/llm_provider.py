@@ -19,29 +19,23 @@ class LLMProvider:
         )
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def save_call(self, call: dict[str, str], path: str) -> None:
+    def save_call(self, call: dict[str, str], called_by: str, memory_path:str) -> None:
         """
-        Save the API call details to a JSON file as a list of calls.
-        If the file exists, append to the list; otherwise, create a new list.
+        Save the API call details to a JSON file.
 
         Args:
             call: Dictionary containing API call details
             uuid_str: Unique identifier for the request
         """
-        path = f"{path}/llm_calls.json"
-        try:
-            with open(path) as f:
-                calls: list = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            calls = []
-        calls.append(call)
+        path = os.path.join(memory_path, f"{called_by}.json")
         with open(path, "w") as f:
-            json.dump(calls, f, indent=2)
+            json.dump(call, f, indent=2)
 
     def deepseek_completion(
         self,
         history: list[dict[str, str]],
-        path: str | None = None,
+        called_by: str,
+        memory_path: str,
         verbose: bool = False,
         model="deepseek-reasoner",
     ) -> str:
@@ -71,16 +65,16 @@ class LLMProvider:
             }
             if verbose:
                 print(thought)
-            if path:
-                self.save_call(
-                    {
-                        "model": model,
-                        "messages": history,
-                        "thought": thought,
-                        "token_usage": token_usage
-                    },
-                    path
-                )
+            self.save_call(
+                {
+                    "model": model,
+                    "messages": history,
+                    "thought": thought,
+                    "token_usage": token_usage
+                },
+                called_by,
+                memory_path
+            )
             return thought
         except Exception as e:
             raise RuntimeError(f"❌ Deepseek API error: {str(e)}") from e
@@ -88,7 +82,8 @@ class LLMProvider:
     def openai_completion(
         self,
         history: list[dict[str, str]],
-        path: str | None = None,
+        called_by: str | None = None,
+        memory_path: str | None = None,
         verbose: bool = False,
         model="o3-2025-04-16",
     ) -> str:
@@ -120,16 +115,16 @@ class LLMProvider:
             }
             if verbose:
                 print(thought)
-            if path:
-                self.save_call(
-                    {
-                        "model": model,
-                        "history": history,
-                        "thought": thought,
-                        "token_usage": token_usage
-                    },
-                    path
-                )
+            self.save_call(
+                {
+                    "model": model,
+                    "messages": history,
+                    "thought": thought,
+                    "token_usage": token_usage
+                },
+                called_by,
+                memory_path
+            )
             return thought
         except Exception as e:
             raise RuntimeError(f"❌ OpenAI API error: {str(e)}") from e
