@@ -199,9 +199,9 @@ class SmolAgentFactory:
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
 
-    def parse_memory_output(self):# -> tuple[list, list, list, list]:
-        actions, observations, success, tokens = [], [], [], []
-        for idx, step in enumerate(self.agent.memory.steps):
+    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
+        actions, observations, success = [], [], []
+        for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):
                 error, obs = step.error, step.observations
                 step_obs = ""
@@ -215,8 +215,7 @@ class SmolAgentFactory:
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
-                tokens.append(step.token_usage.total_tokens)
-        return actions, observations, success, tokens
+        return actions, observations, success
 
     def save_memories(self, workflow_uuid: str):
         print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
@@ -331,7 +330,7 @@ class SmolAgentFactory:
             answer = self.run_cached(state, instructions)
         except Exception as e:
             raise e
-        actions, observations, success, tokens = self.parse_memory_output()
+        actions, observations, success = self.parse_memory_output()
         action: Action = {
             "tool": actions[-1] if actions else "No action",
         }
@@ -347,7 +346,6 @@ class SmolAgentFactory:
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
             "answers": state.get("answers", []) + [answer],
-            "tokens": state.get("tokens", []) + [tokens],
         }
 
 class WorkflowNodeFactory:
