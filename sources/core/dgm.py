@@ -32,7 +32,7 @@ class GodelMachine:
             str: The output of the workflow state if found, None otherwise
         """
         try:
-            with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json") as f:
+            with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
             print(
@@ -134,6 +134,7 @@ Learn from this output and improve the workflow generation.
         self,
         goal_prompt: str,
         template_uuid: str | None = None,
+        judge: bool = True,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
         await self.recursive_self_improvement(
@@ -141,6 +142,7 @@ Learn from this output and improve the workflow generation.
             goal_prompt,
             template_uuid=template_uuid,
             workflow_template=template,
+            judge=judge,
         )
 
     async def recursive_self_improvement(
