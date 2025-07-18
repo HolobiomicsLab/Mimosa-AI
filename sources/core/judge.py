@@ -258,6 +258,7 @@ Be precise, constructive, and technical in your judgment."""
 
 Please be objective, technical, and specific in your feedback.
 """
+        print("Calling LLMProvider to evaluate the workflow...")
         history = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -272,8 +273,7 @@ Please be objective, technical, and specific in your feedback.
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
         with open(evaluation_path, "w") as file:
-            pass
-            #file.write(output)
+            file.write(output)
         print("Evaluation completed. Results saved to:", evaluation_path)
             
         # Extract scores from the evaluation output

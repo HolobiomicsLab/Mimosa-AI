@@ -120,7 +120,7 @@ class SmolAgentFactory:
         self.memory_folder = MEMORY_PATH
         print("debug path", os.getcwd())
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
-        self.engine_name = os.getenv("ENGINE_NAME", "inference_client").lower()
+        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
         self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
         self.run_uuid = str(uuid.uuid4())
 
@@ -169,7 +169,7 @@ class SmolAgentFactory:
                 token=self.token,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "LiteLLMModel":
+        elif self.engine_name == "litellm":
             print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
@@ -183,7 +183,7 @@ class SmolAgentFactory:
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
-            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
+            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
