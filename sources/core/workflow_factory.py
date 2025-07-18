@@ -190,18 +190,11 @@ initial_state = {{
     "success": []
 }}
 
-try:
-    if WORKFLOW_PATH:
-        print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
-        try:
-            png = app.get_graph().draw_mermaid_png()
-            with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
-                f.write(png)
-        except Exception as e:
-            raise(f"Could not save workflow graph:" + str(e))
-except Exception as e:
-    print(f"❌ Error saving PNG workflow:" + str(e))
-    pass
+if WORKFLOW_PATH:
+    print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
+    png = app.get_graph().draw_mermaid_png()
+    with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
+        f.write(png)
 
 print("workflow run: invoking workflow...")
 try:
