@@ -65,7 +65,7 @@ class WorkflowJudge:
             return 0.0
         
         try:
-            with open(workflow_path / f"state_result_{uuid}.json") as f:
+            with open(workflow_path / "state_result.json") as f:
                 state_results = json.load(f)
                 model_id = state_results.get("model_id", None)
         except FileNotFoundError:
@@ -100,7 +100,6 @@ class WorkflowJudge:
         print("\n💰 Cost Breakdown:")
         print("=" * 60)
         for call in llm_calls:
-            print(call)
             pricing = self.model_pricing.get(call.model, self.model_pricing["default"])
             cost = (call.input_tokens * pricing["input"] + call.output_tokens * pricing["output"]) / 1_000_000
             print("Agent:", call.agent)
@@ -273,7 +272,8 @@ Please be objective, technical, and specific in your feedback.
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
         with open(evaluation_path, "w") as file:
-            file.write(output)
+            pass
+            #file.write(output)
         print("Evaluation completed. Results saved to:", evaluation_path)
             
         # Extract scores from the evaluation output
@@ -295,7 +295,7 @@ Please be objective, technical, and specific in your feedback.
         try:
             # Look for JSON block in the evaluation text
             import re
-            json_pattern = r'```json\s*({[^`]*})\s*```'
+            json_pattern = r'(?:```json\s*)?({[^`]*})(?:\s*```)?'
             match = re.search(json_pattern, evaluation_text)
             
             if match:
@@ -320,7 +320,7 @@ Please be objective, technical, and specific in your feedback.
         """
         try:
             workflow_path = Path(self.workflow_dir) / uuid
-            state_result_path = workflow_path / f"state_result_{uuid}.json"
+            state_result_path = workflow_path / "state_result.json"
             
             # Load existing state result if it exists
             try:
