@@ -46,9 +46,13 @@ class WorkflowFactory:
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}") from e
 
-    def llm_make_workflow(self, system_prompt: str, craft_instructions: str, 
-                          existing_tool_prompt: str, path:str
-                        ) -> str:
+    def llm_make_workflow(
+        self,
+        system_prompt: str,
+        craft_instructions: str,
+        existing_tool_prompt: str,
+        path: str,
+    ) -> str:
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
@@ -108,9 +112,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
 
-    def create_workflow_code(self, craft_instructions: str, 
-                             existing_tool_prompt: str,path:str
-                            ) -> str:
+    def create_workflow_code(
+        self, craft_instructions: str, existing_tool_prompt: str, path: str
+    ) -> str:
         """Generate and validate workflow code.
 
         Args:
@@ -121,10 +125,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         print("🧠 Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
-        llm_output = self.llm_make_workflow(system_prompt,
-                                            craft_instructions,
-                                            existing_tool_prompt,path
-                                           )
+        llm_output = self.llm_make_workflow(
+            system_prompt, craft_instructions, existing_tool_prompt, path
+        )
         workflow_code = self.extract_python_code(llm_output)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
