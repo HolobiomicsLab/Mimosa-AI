@@ -112,6 +112,10 @@ async def main():
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load"
     )
+    parser.add_argument(
+        "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+    )
+
     add_config_arguments(parser, config)
     args = parser.parse_args()
     apply_config_overrides(args, config)
@@ -123,7 +127,7 @@ async def main():
         dgm = GodelMachine(config)
         planner = Planner(config)
         if args.single_task:
-            await dgm.start_dgm(goal_prompt=args.single_task)
+            await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
         elif args.goal:
             await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
         else:

@@ -17,6 +17,6 @@ def test_judge(uuid:str):
 
 
 if __name__ == "__main__":
-    uuid = "630f8e9a2a26430aad4296363e790464"
+    uuid = "42d6b52eda73409aae263b23219169d6"
     test_judge(uuid)
     print("Benchmark format test completed.")
