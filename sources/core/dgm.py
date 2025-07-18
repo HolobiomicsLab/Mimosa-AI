@@ -59,7 +59,7 @@ class GodelMachine:
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
-        return 0.0  # TODO
+        return flow_state["evaluation_scores"]["overall_score"]
 
     def get_flow_answers(self, flow_state: any) -> str:
         """Extract the answers from the workflow state."""
@@ -88,7 +88,7 @@ class GodelMachine:
             flow_answers = (
                 run_stdout.strip()
             )  # if run failed, use stdout/stderr as fallback
-        print(f"\n===\nTotal rewards accumulated: {flow_rewards}")
+        print(f"\n===\nTotal rewards accumulated: {flow_rewards:.1f}")
         return f"""
 You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
 
@@ -134,7 +134,7 @@ Learn from this output and improve the workflow generation.
         self,
         goal_prompt: str,
         template_uuid: str | None = None,
-        judge: bool = True,
+        judge: bool = False,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
         await self.recursive_self_improvement(
@@ -153,7 +153,7 @@ Learn from this output and improve the workflow generation.
         workflow_template: str | None = None,
         iteration_count: int = 0,
         max_depth: int = 5,
-        judge: bool = True,
+        judge: bool = False,
     ) -> str:
         """Run a self-improvement loop for the workflow.
 
