@@ -101,7 +101,7 @@ Declare agent with tool:
 smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
 ```
 
-You must use one list of tools per agent.
+You must use at most one list of tools per agent.
 
 ### SmolAgent declaration
 
@@ -109,6 +109,7 @@ You must use one list of tools per agent.
 # Create and add agent node to workflow
 smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
 smolagent_chart = SmolAgentFactory("chart_maker", instruct_chart, EXISTING_TOOLS_CHART)
+smolagent_calculus = SmolAgentFactory("calculus", instruct_calculus)
 ```
 
 The `SmolAgentFactory` is defined and already in the context. Not allowed to redeclare.

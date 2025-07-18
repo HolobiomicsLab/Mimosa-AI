@@ -37,6 +37,8 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_provider: str = "deepseek"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_creator.md"
         self.workflow_llm_provider: str = "openai"
         self.mcp_health_endpoint: str = "http://localhost:5000/health"
@@ -64,6 +66,17 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
+        self.model_pricing = {
+            # OpenAI models
+            "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
+            "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
+            "o3-2025-04-16": {"input": 2, "output": 8},
+            # Deepseek models
+            "deepseek-reasoner": {"input": 0.55, "output": 2.19},
+            "deepseek-chat": {"input": 0.27, "output": 1.10},
+            # Default pricing for unknown models
+            "default" : {"input": 0.70, "output": 2.50}
+        } # Per 1M tokens
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""

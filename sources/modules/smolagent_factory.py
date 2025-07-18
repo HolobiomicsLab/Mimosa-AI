@@ -112,15 +112,15 @@ class SmolAgentFactory:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools or []
-        self.model_id = model_id
+        self.model_id = MODEL_ID
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = "./sources/memory/"
+        self.memory_folder = MEMORY_PATH
         print("debug path", os.getcwd())
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
-        self.engine_name = os.getenv("ENGINE_NAME", "inference_client").lower()
+        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
         self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
         self.run_uuid = str(uuid.uuid4())
 
@@ -133,7 +133,7 @@ class SmolAgentFactory:
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
-                name="agent",
+                name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=3, # think more before acting
                 additional_authorized_imports=["*"]
@@ -151,7 +151,7 @@ class SmolAgentFactory:
     def get_engine(self):
         if self.engine_name == "cached" or self.use_cached_engine:
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
                 max_tokens=self.max_tokens,
             )
@@ -169,22 +169,21 @@ class SmolAgentFactory:
                 token=self.token,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "deepseek":
-            print("Using LiteLLM for DeepSeek execution.")
+        elif self.engine_name == "litellm":
+            print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 temperature=0.2,
-                api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
-                model_id="deepseek",
-                provider="openai",
+                model_id=self.model_id,
+                provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
-            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
+            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
@@ -200,9 +199,9 @@ class SmolAgentFactory:
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
 
-    def parse_memory_output(self):
+    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
         actions, observations, success = [], [], []
-        for idx, step in enumerate(self.agent.memory.steps):
+        for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):
                 error, obs = step.error, step.observations
                 step_obs = ""
@@ -341,7 +340,8 @@ class SmolAgentFactory:
         success_bool = success[-1] if len(success) > 0 else True
         return {
             **state,
-            "step_uuid": state.get("step_uuid", []) + [self.name],
+            "step_name": state.get("step_name", []) + [self.name],
+            "task_prompt": state.get("task_prompt", []) + [instructions],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
