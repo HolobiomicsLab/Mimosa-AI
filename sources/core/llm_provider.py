@@ -19,7 +19,7 @@ class LLMProvider:
         )
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def save_call(self, call: dict[str, str], called_by: str, memory_path:str) -> None:
+    def save_call(self, call: dict[str, str], called_by: str, memory_path: str) -> None:
         """
         Save the API call details to a JSON file.
 
@@ -61,7 +61,7 @@ class LLMProvider:
             token_usage = {
                 "input_tokens": response.usage.prompt_tokens,
                 "output_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
+                "total_tokens": response.usage.total_tokens,
             }
             if verbose:
                 print(thought)
@@ -70,10 +70,10 @@ class LLMProvider:
                     "model": model,
                     "messages": history,
                     "thought": thought,
-                    "token_usage": token_usage
+                    "token_usage": token_usage,
                 },
                 called_by,
-                memory_path
+                memory_path,
             )
             return thought
         except Exception as e:
@@ -111,7 +111,7 @@ class LLMProvider:
             token_usage = {
                 "input_tokens": response.usage.prompt_tokens,
                 "output_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
+                "total_tokens": response.usage.total_tokens,
             }
             if verbose:
                 print(thought)
@@ -120,10 +120,10 @@ class LLMProvider:
                     "model": model,
                     "messages": history,
                     "thought": thought,
-                    "token_usage": token_usage
+                    "token_usage": token_usage,
                 },
                 called_by,
-                memory_path
+                memory_path,
             )
             return thought
         except Exception as e:

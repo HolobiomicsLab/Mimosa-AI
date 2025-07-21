@@ -1,11 +1,9 @@
-
-
 from .dgm import GodelMachine
 
 
 class Planner:
     """Planner class for long shot task planning"""
-    
+
     def __init__(self, config) -> None:
         self.config = config
         self.dgm = GodelMachine(config)

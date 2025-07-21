@@ -68,32 +68,40 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
-        self.model_pricing = {
-            # OpenAI models
-            "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
-            "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
-            "o3-2025-04-16": {"input": 2, "output": 8},
-            # Deepseek models
-            "deepseek/deepseek-reasoner": {"input": 0.55, "output": 2.19},
-            "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},
-            # Default pricing for unknown models
-            "default": {"input": 0.70, "output": 2.50},
-        }  # Per 1M tokens
+        self._pricing_client = OpenRouterPricingClient()
+        self._model_pricing_cache = None
+
+    @property
+    def model_pricing(self) -> dict[str, dict[str, float]]:
+        """Get model pricing with fallback to cached or default values."""
+        if self._model_pricing_cache is None:
+            # Try to fetch real-time pricing
+            pricing_data = self._pricing_client.get_model_pricing_dict()
+            if pricing_data:
+                self._model_pricing_cache = pricing_data
+            else:
+                # Fallback to static pricing if API fails
+                self._model_pricing_cache = self._pricing_client.get_fallback_pricing()
+        return self._model_pricing_cache
+
+    def refresh_pricing(self) -> None:
+        """Force refresh of model pricing from OpenRouter API."""
+        self._model_pricing_cache = None
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
-        assert os.path.exists(
-            self.workflow_dir
-        ), f"Workflow directory not found: {self.workflow_dir}"
-        assert os.path.exists(
-            self.schema_code_path
-        ), f"State schema file not found: {self.schema_code_path}"
-        assert os.path.exists(
-            self.smolagent_factory_code_path
-        ), f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
-        assert os.path.exists(
-            self.prompt_workflow_creator
-        ), f"System prompt file not found: {self.prompt_workflow_creator}"
+        assert os.path.exists(self.workflow_dir), (
+            f"Workflow directory not found: {self.workflow_dir}"
+        )
+        assert os.path.exists(self.schema_code_path), (
+            f"State schema file not found: {self.schema_code_path}"
+        )
+        assert os.path.exists(self.smolagent_factory_code_path), (
+            f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
+        )
+        assert os.path.exists(self.prompt_workflow_creator), (
+            f"System prompt file not found: {self.prompt_workflow_creator}"
+        )
 
     def jsonify(
         self,
