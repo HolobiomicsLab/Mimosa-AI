@@ -181,6 +181,7 @@ from typing import TypedDict, List
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
 MODEL_ID = {self.config.smolagent_model_id!r}
+GOAL = "{goal_prompt}"
 
 # Load tools
 {tools_code}
