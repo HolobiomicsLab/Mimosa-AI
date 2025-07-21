@@ -203,6 +203,7 @@ workflow.add_conditional_edges(
 - [ ] Tool selection must match the unique capabilities of each agent.
 - [ ] The workflow must have a clear START and guaranteed END.
 - [ ] Include extensive logging in routing functions for debugging.
+- [ ] Avoid using R Tools, R tools should only be used for specific scientific manipulation that couldn't be done otherwise.
 
 ### Output Requirements (MANDATORY)
 - [ ] Wrap the code in ```python ...``` tags for immediate execution.
