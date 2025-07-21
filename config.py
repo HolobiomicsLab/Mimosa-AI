@@ -72,8 +72,8 @@ class Config:
             "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
             "o3-2025-04-16": {"input": 2, "output": 8},
             # Deepseek models
-            "deepseek-reasoner": {"input": 0.55, "output": 2.19},
-            "deepseek-chat": {"input": 0.27, "output": 1.10},
+            "deepseek/deepseek-reasoner": {"input": 0.55, "output": 2.19},
+            "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},
             # Default pricing for unknown models
             "default" : {"input": 0.70, "output": 2.50}
         } # Per 1M tokens
