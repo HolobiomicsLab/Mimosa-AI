@@ -2,7 +2,6 @@
 This class orchestrates the execution of workflows in a sandboxed environment.
 """
 
-
 from .workflow_factory import WorkflowFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
@@ -108,6 +107,7 @@ class WorkflowOrchestrator:
         except Exception as e:
             print(f"❌ Error during cleanup: {e}")
             import traceback
+
             traceback.print_exc()
 
     def __del__(self):
@@ -115,6 +115,7 @@ class WorkflowOrchestrator:
         # Note: This is a fallback - proper cleanup should use async context manager
         import asyncio
         from contextlib import suppress
+
         try:
             # Only attempt sync cleanup if no event loop is running
             with suppress(RuntimeError):
@@ -123,4 +124,5 @@ class WorkflowOrchestrator:
         except Exception as e:
             print(f"❌ Error during cleanup: {e}")
             import traceback
+
             traceback.print_exc()

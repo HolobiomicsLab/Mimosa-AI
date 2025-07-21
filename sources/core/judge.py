@@ -14,20 +14,21 @@ class TokenUsage:
     output_tokens: int
     total_tokens: int
 
+
 class WorkflowJudge:
     def __init__(self, config):
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
 
-    def calculate_cost(self, uuid: str )-> float:
+    def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
-        
+
         Args:
             config: The configuration object
             uuid: Optional UUID of the workflow run to calculate cost for.
                 If not provided, will try to find the most recent run.
-        
+
         Returns:
             float: The total cost in USD
         """
@@ -39,7 +40,7 @@ class WorkflowJudge:
         if not memory_path.exists():
             print(f"❌ Memory directory not found: {memory_path}")
             return 0.0
-        
+
         llm_calls: list[TokenUsage] = []
 
         # Orchestrator and Judge LLM calls
@@ -48,21 +49,21 @@ class WorkflowJudge:
             memory_file = memory_path / f"{call}.json"
             if not memory_file.exists():
                 continue
-            
+
             with open(memory_file) as f:
                 json_call = json.load(f)
-                llm_calls.append(TokenUsage(
-                    call,
-                    json_call["model"],
-                    *json_call["token_usage"].values()
-                ))
-        
-        workflow_path= Path(self.workflow_dir) / uuid
+                llm_calls.append(
+                    TokenUsage(
+                        call, json_call["model"], *json_call["token_usage"].values()
+                    )
+                )
+
+        workflow_path = Path(self.workflow_dir) / uuid
 
         if not workflow_path.exists():
             print(f"❌ Workflow directory not found: {workflow_path}")
             return 0.0
-        
+
         try:
             with open(workflow_path / "state_result.json") as f:
                 state_results = json.load(f)
@@ -71,7 +72,6 @@ class WorkflowJudge:
             print(f"❌ State result file not found for UUID {uuid} in {workflow_path}.")
             return 0.0
 
-            
         try:
             for file in os.listdir(memory_path):
                 if file.startswith("task_") and file.endswith(".json"):
@@ -80,102 +80,115 @@ class WorkflowJudge:
                         token_usage = {
                             "input_tokens": 0,
                             "output_tokens": 0,
-                            "total_tokens": 0, 
+                            "total_tokens": 0,
                         }
                         for step in steps:
                             step_usage = step.get("token_usage", None)
                             if token_usage:
-                                token_usage = {key: token_usage[key] + step_usage[key] for key in step_usage}
-                        llm_calls.append(TokenUsage(
-                            file.replace("task_", "").replace(".json", ""),
-                            model_id,
-                            *token_usage.values()
-                        ))
+                                token_usage = {
+                                    key: token_usage[key] + step_usage[key]
+                                    for key in step_usage
+                                }
+                        llm_calls.append(
+                            TokenUsage(
+                                file.replace("task_", "").replace(".json", ""),
+                                model_id,
+                                *token_usage.values(),
+                            )
+                        )
         except Exception as e:
             print(f"❌ Error reading workflow steps: {str(e)}")
             return 0.0
-        
+
         total_cost = 0.0
         print("\n💰 Cost Breakdown:")
         print("=" * 60)
         for call in llm_calls:
             pricing = self.model_pricing.get(call.model, self.model_pricing["default"])
-            cost = (call.input_tokens * pricing["input"] + call.output_tokens * pricing["output"]) / 1_000_000
+            cost = (
+                call.input_tokens * pricing["input"]
+                + call.output_tokens * pricing["output"]
+            ) / 1_000_000
             print("Agent:", call.agent)
             print(f"  Model: {call.model}")
             print(f"  Tokens: {call.total_tokens:,}")
             print(f"  Cost: {cost:.3f} USD")
             print("-" * 40)
             total_cost += cost
-        
-        return total_cost
 
+        return total_cost
 
     def generate_text(self, uuid: str) -> str:
         """Generate formatted text for evaluation.
-        
+
         Args:
             uuid: UUID of the workflow run
         """
         # Set paths with the provided UUID
         memory_path = Path(self.memory_dir) / uuid
         workflow_path = Path(self.workflow_dir) / uuid
-        
+
         # Collect agent information
         agents = []
         workflow_steps = []
-        
+
         for file in os.listdir(memory_path):
             if file.endswith(".json") and file.startswith("task_"):
-                agent_name = file.removeprefix('task_').removesuffix('.json').replace('_', ' ')
-                
+                agent_name = (
+                    file.removeprefix("task_").removesuffix(".json").replace("_", " ")
+                )
+
                 with open(os.path.join(memory_path, file)) as f:
                     steps = json.load(f)
                     start_time = int(steps[0]["timing"].get("start_time", ""))
-                    user_task = steps[0]['model_input_messages'][1]['content'][0].get('text', '')
-                    
+                    user_task = steps[0]["model_input_messages"][1]["content"][0].get(
+                        "text", ""
+                    )
+
                     # Add agent to the list
-                    agents.append({
-                        "name": agent_name,
-                        "task": user_task,
-                        "start_time": start_time
-                    })
-                    
+                    agents.append(
+                        {
+                            "name": agent_name,
+                            "task": user_task,
+                            "start_time": start_time,
+                        }
+                    )
+
                     # Process steps for workflow
                     for step in steps:
                         step_info = {
                             "agent": agent_name,
-                            "step_number": step.get('step_number', ''),
-                            "action": step.get('code_action', ''),
+                            "step_number": step.get("step_number", ""),
+                            "action": step.get("code_action", ""),
                             "start_time": start_time,
                             "error": step.get("error", ""),
-                            "result": step.get('observations', '')
+                            "result": step.get("observations", ""),
                         }
                         workflow_steps.append(step_info)
-        
+
         # Sort agents and workflow steps by start time
         agents.sort(key=lambda x: x["start_time"])
         workflow_steps.sort(key=lambda x: (x["start_time"], x["step_number"]))
-        
+
         # Read the goal
         with open(workflow_path / "state_result.json") as f:
             goal = json.load(f).get("goal", "")
-        
+
         # Format the text according to the new structure
         text = "--- GOAL ---\n"
         text += f"{goal}\n\n"
-        
+
         text += "--- AGENTS ---\n"
         for agent in agents:
             text += f"{agent['name']}: {agent['task']}\n"
         text += "\n"
-        
+
         text += "--- WORKFLOW ---\n"
         for step in workflow_steps:
             text += f"Agent: {step['agent']}\n"
             text += f"Step: {step['step_number']}\n"
             text += f"Input: {step['action']}\n"
-            if step['error']:
+            if step["error"]:
                 text += f"Output: ERROR - {step['error']}\n"
             else:
                 text += f"Output: {step['result']}\n"
@@ -185,13 +198,13 @@ class WorkflowJudge:
         with open(workflow_path / "mermaid.txt") as f:
             workflow_mermaid = f.read()
         text += f"{workflow_mermaid}\n"
-        
+
         # Write the formatted text to file
         with open(memory_path / "formated.txt", "w") as file:
             file.write(text.strip())
 
         return text.strip()
-    
+
     def long_prompt(self):
         return """
 Please analyze the system with the following structure:
@@ -217,9 +230,10 @@ Please analyze the system with the following structure:
 
 4. **Summary Judgment**
  """
+
     def evaluate(self, uuid: str, short: bool = True):
         """Evaluate the benchmark results.
-        
+
         Args:
             uuid: UUID of the workflow run to evaluate
         """
@@ -266,7 +280,7 @@ Please be objective, technical, and specific in your feedback.
             history=history,
             called_by="judge",
             memory_path=self.memory_dir / uuid,
-            model = "o4-mini-2025-04-16"
+            model="o4-mini-2025-04-16",
         )
 
         # Save the evaluation to a file
@@ -274,33 +288,38 @@ Please be objective, technical, and specific in your feedback.
         with open(evaluation_path, "w") as file:
             file.write(output)
         print("Evaluation completed. Results saved to:", evaluation_path)
-            
+
         # Extract scores from the evaluation output
         scores = self._extract_scores(output)
-        
+
         # Update the state result file with the scores
         self._update_state_result(scores, uuid)
         print("Scores extracted and saved to state result.")
 
     def _extract_scores(self, evaluation_text):
         """Extract scores from the evaluation text.
-        
+
         Args:
             evaluation_text: The evaluation text containing the JSON scores
-            
+
         Returns:
             dict: The extracted scores or empty dict if not found
         """
         try:
             # Look for JSON block in the evaluation text
             import re
-            json_pattern = r'(?:```json\s*)?({[^`]*})(?:\s*```)?'
+
+            json_pattern = r"(?:```json\s*)?({[^`]*})(?:\s*```)?"
             match = re.search(json_pattern, evaluation_text)
-            
+
             if match:
                 json_str = match.group(1)
                 scores = json.loads(json_str)
-                scores["overall_score"] = scores["goal_alignment"] + scores["agent_collaboration"] + scores["output_quality"]
+                scores["overall_score"] = (
+                    scores["goal_alignment"]
+                    + scores["agent_collaboration"]
+                    + scores["output_quality"]
+                )
                 scores["overall_score"] /= 3
                 return scores
             else:
@@ -309,10 +328,10 @@ Please be objective, technical, and specific in your feedback.
         except Exception as e:
             print(f"❌ Error extracting scores: {str(e)}")
             return {}
-    
+
     def _update_state_result(self, scores, uuid: str):
         """Update the state result file with the evaluation scores.
-        
+
         Args:
             scores: The scores to add to the state result
             uuid: UUID of the workflow run
@@ -320,7 +339,7 @@ Please be objective, technical, and specific in your feedback.
         try:
             workflow_path = Path(self.workflow_dir) / uuid
             state_result_path = workflow_path / "state_result.json"
-            
+
             # Load existing state result if it exists
             try:
                 with open(state_result_path) as f:
@@ -328,23 +347,23 @@ Please be objective, technical, and specific in your feedback.
             except FileNotFoundError:
                 print(f"⚠️ State result file not found for UUID {uuid}")
                 return
-            
+
             # Add scores to state result
             state_result["evaluation_scores"] = scores
-            
+
             # Write updated state result back to file
             with open(state_result_path, "w") as f:
                 json.dump(state_result, f, indent=2)
-                
+
         except Exception as e:
             print(f"❌ Error updating state result: {str(e)}")
-    
+
     def get_text(self, uuid: str):
         """Get the formatted benchmark text.
-        
+
         Args:
             uuid: UUID of the workflow run
-        
+
         Returns:
             str: The formatted benchmark text
         """

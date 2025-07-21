@@ -5,7 +5,8 @@ from sources.core.judge import WorkflowJudge
 
 load_dotenv()
 
-def test_judge(uuid:str):
+
+def test_judge(uuid: str):
     config = Config()
     judge = WorkflowJudge(config)
 
