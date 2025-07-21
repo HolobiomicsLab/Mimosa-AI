@@ -104,7 +104,7 @@ class WorkflowJudge:
         print("\n💰 Cost Breakdown:")
         print("=" * 60)
         for call in llm_calls:
-            pricing = self.model_pricing.get(call.model, self.model_pricing["default"])
+            pricing = self.model_pricing.get(call.model, self.model_pricing.get("default", {"input": 0.70, "output": 2.50}))
             cost = (
                 call.input_tokens * pricing["input"]
                 + call.output_tokens * pricing["output"]

@@ -85,7 +85,7 @@ class LLMProvider:
         called_by: str | None = None,
         memory_path: str | None = None,
         verbose: bool = False,
-        model="o3-2025-04-16",
+        model="o3",
     ) -> str:
         """Generate text using OpenAI API.
 
