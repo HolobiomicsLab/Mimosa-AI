@@ -59,7 +59,9 @@ class GodelMachine:
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
-        return flow_state["evaluation_scores"]["overall_score"]
+        if "evaluation_scores" not in flow_state:
+            return 0.0
+        return flow_state["evaluation_scores"]["overall_score"] 
 
     def get_flow_answers(self, flow_state: any) -> str:
         """Extract the answers from the workflow state."""

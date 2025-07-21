@@ -35,18 +35,15 @@ class Observation(TypedDict):
     data: str
 
 class WorkflowState(TypedDict):
-    workflow_uuid: str
-    model_id: str
-    goal: str
     step_name: List[str]
-    task_prompt: List[str]
     actions: List[Action]
     observations: List[Observation]
     answers: List[str]
     success: List[bool]
 ```
 
-State is declared in context, not allowed to redeclare.
+State structure is declared in context, not allowed to redeclare.
+You don't have access to the content, only here for the information state structure
 
 ### SmolAgent creation
 
