@@ -15,7 +15,7 @@ class AddressMCP:
 
     def _validate_port(self, port_number: int) -> None:
         assert port_number >= 0 and port_number <= 65535, "Port not between 0 and 65535"
-    
+
     def _validate_ip(self, ip: str) -> None:
         if not ip:
             raise ValueError("IP address cannot be empty")
@@ -68,6 +68,7 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
+        self.model_pricing = {
             # OpenAI models
             "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
             "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
@@ -76,23 +77,23 @@ class Config:
             "deepseek/deepseek-reasoner": {"input": 0.55, "output": 2.19},
             "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},
             # Default pricing for unknown models
-            "default" : {"input": 0.70, "output": 2.50}
-        } # Per 1M tokens
+            "default": {"input": 0.70, "output": 2.50},
+        }  # Per 1M tokens
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
-        assert os.path.exists(self.workflow_dir), (
-            f"Workflow directory not found: {self.workflow_dir}"
-        )
-        assert os.path.exists(self.schema_code_path), (
-            f"State schema file not found: {self.schema_code_path}"
-        )
-        assert os.path.exists(self.smolagent_factory_code_path), (
-            f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
-        )
-        assert os.path.exists(self.prompt_workflow_creator), (
-            f"System prompt file not found: {self.prompt_workflow_creator}"
-        )
+        assert os.path.exists(
+            self.workflow_dir
+        ), f"Workflow directory not found: {self.workflow_dir}"
+        assert os.path.exists(
+            self.schema_code_path
+        ), f"State schema file not found: {self.schema_code_path}"
+        assert os.path.exists(
+            self.smolagent_factory_code_path
+        ), f"SmolAgent factory file not found: {self.smolagent_factory_code_path}"
+        assert os.path.exists(
+            self.prompt_workflow_creator
+        ), f"System prompt file not found: {self.prompt_workflow_creator}"
 
     def jsonify(
         self,
