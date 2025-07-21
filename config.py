@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from sources.utils.pricing import OpenRouterPricingClient
+
 
 @dataclass
 class AddressMCP:
@@ -15,10 +17,10 @@ class AddressMCP:
         assert port_number >= 0 and port_number <= 65535, "Port not between 0 and 65535"
     
     def _validate_ip(self, ip: str) -> None:
-        if not self.ip:
+        if not ip:
             raise ValueError("IP address cannot be empty")
-        if not isinstance(self.ip, str):
-            raise TypeError(f"IP address must be string, got {type(self.ip).__name__}")
+        if not isinstance(ip, str):
+            raise TypeError(f"IP address must be string, got {type(ip).__name__}")
 
     def __post_init__(self):
         """Validate the address and port range."""
@@ -66,7 +68,6 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
-        self.model_pricing = {
             # OpenAI models
             "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
             "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},

@@ -219,3 +219,5 @@ tmp/
 ./config.py
 CLAUDE.md
 docs/project.xml
+
+sources/cache

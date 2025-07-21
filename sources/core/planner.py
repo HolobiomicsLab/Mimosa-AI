@@ -1,6 +1,7 @@
 
+
 from .dgm import GodelMachine
-from typing import Optional
+
 
 class Planner:
     """Planner class for long shot task planning"""
