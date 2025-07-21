@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sources.core.llm_provider import LLMProvider
-from sources.modules import state_schema
 
 
 @dataclass

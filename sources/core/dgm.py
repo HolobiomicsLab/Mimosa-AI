@@ -4,7 +4,6 @@ Darwin Godel Machine
 
 import json
 import os
-from pathlib import Path
 
 from sources.core.judge import WorkflowJudge
 
