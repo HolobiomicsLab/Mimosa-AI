@@ -228,7 +228,6 @@ def advanced_router(state: WorkflowState) -> str:
     except Exception as e:
         print(f"💥 Unexpected error: {e}")
         return END
-```
 
 # MANDATORY: Add nodes to workflow
 workflow.add_node("web_surfer", WorkflowNodeFactory.create_agent_node(smolagent_web))
