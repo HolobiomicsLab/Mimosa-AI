@@ -2,8 +2,6 @@
 This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
 """
 
-from typing import Tuple
-import uuid
 import os
 import uuid
 
@@ -66,7 +64,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ]
-        return LLMProvider().openai_completion(history, "orchestrator",path, verbose=False)
+        return LLMProvider().openai_completion(
+            history, "orchestrator", path, verbose=False
+        )
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -102,7 +102,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         mcps = await tool_manager.discover_mcp_servers()
         if not mcps:
             raise ValueError(
-                "\nNo MCP servers found." \
+                "\nNo MCP servers found."
                 "Please ensure at least one MCP is running on toolomics."
             )
         for mcp in mcps:
@@ -163,9 +163,13 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
     ) -> str:
         initial_state = {
             key: (
-                uuid_str if key == "workflow_uuid"
-                else self.config.smolagent_model_id if key == "model_id" 
-                else goal_prompt if key == "goal" else []
+                uuid_str
+                if key == "workflow_uuid"
+                else self.config.smolagent_model_id
+                if key == "model_id"
+                else goal_prompt
+                if key == "goal"
+                else []
             )
             for key in state_schema.WorkflowState.__annotations__
         }
@@ -181,6 +185,7 @@ from typing import TypedDict, List
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
 MODEL_ID = {self.config.smolagent_model_id!r}
+GOAL = "{goal_prompt}"
 
 # Load tools
 {tools_code}
@@ -288,7 +293,7 @@ if WORKFLOW_PATH:
             workflow_path,
             memory_path,
             uuid_str,
-            goal_prompt
+            goal_prompt,
         )
 
         print(f"workflow path {workflow_path}")
