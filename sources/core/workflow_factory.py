@@ -2,10 +2,10 @@
 This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
 """
 
-from typing import Tuple
-import uuid
 import os
 import uuid
+
+from sources.modules import state_schema
 
 from .llm_provider import LLMProvider
 from .tools_manager import ToolManager
@@ -44,9 +44,13 @@ class WorkflowFactory:
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}") from e
 
-    def llm_make_workflow(self, system_prompt: str, craft_instructions: str, 
-                          existing_tool_prompt: str, path:str
-                        ) -> str:
+    def llm_make_workflow(
+        self,
+        system_prompt: str,
+        craft_instructions: str,
+        existing_tool_prompt: str,
+        path: str,
+    ) -> str:
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
@@ -60,7 +64,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ]
-        return LLMProvider().openai_completion(history, path,verbose=False)
+        return LLMProvider().openai_completion(
+            history, "orchestrator", path, verbose=False
+        )
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -96,7 +102,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         mcps = await tool_manager.discover_mcp_servers()
         if not mcps:
             raise ValueError(
-                "\nNo MCP servers found." \
+                "\nNo MCP servers found."
                 "Please ensure at least one MCP is running on toolomics."
             )
         for mcp in mcps:
@@ -106,9 +112,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
 
-    def create_workflow_code(self, craft_instructions: str, 
-                             existing_tool_prompt: str,path:str
-                            ) -> str:
+    def create_workflow_code(
+        self, craft_instructions: str, existing_tool_prompt: str, path: str
+    ) -> str:
         """Generate and validate workflow code.
 
         Args:
@@ -119,10 +125,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         print("🧠 Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
-        llm_output = self.llm_make_workflow(system_prompt,
-                                            craft_instructions,
-                                            existing_tool_prompt,path
-                                           )
+        llm_output = self.llm_make_workflow(
+            system_prompt, craft_instructions, existing_tool_prompt, path
+        )
         workflow_code = self.extract_python_code(llm_output)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
@@ -145,15 +150,31 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         print(f"✅ Created memory directory: {memory_path}")
         return workflow_path, memory_path
 
-    def assemble_workflow(self, tools_code: str,
-                                state_code: str,
-                                smolagent_factory_code: str,
-                                workflow_code: str,
-                                workflow_path: str,
-                                memory_path: str,
-                                uuid_str: str
-                         ) -> str:
-        return f'''
+    def assemble_workflow(
+        self,
+        tools_code: str,
+        state_code: str,
+        smolagent_factory_code: str,
+        workflow_code: str,
+        workflow_path: str,
+        memory_path: str,
+        uuid_str: str,
+        goal_prompt: str,
+    ) -> str:
+        initial_state = {
+            key: (
+                uuid_str
+                if key == "workflow_uuid"
+                else self.config.smolagent_model_id
+                if key == "model_id"
+                else goal_prompt
+                if key == "goal"
+                else []
+            )
+            for key in state_schema.WorkflowState.__annotations__
+        }
+
+        return f"""
 import os
 import sys
 import re
@@ -163,6 +184,8 @@ from typing import TypedDict, List
 
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
+MODEL_ID = {self.config.smolagent_model_id!r}
+GOAL = "{goal_prompt}"
 
 # Load tools
 {tools_code}
@@ -180,21 +203,23 @@ print("worflow run: compiling workflow...")
 app = workflow.compile()
 
 # Initialize and execute workflow
-initial_state = {{
-    "workflow_uuid": "{uuid_str}",
-    "step_name": [],
-    "step_uuid": [],
-    "actions": [],
-    "observations": [],
-    "answers": [],
-    "success": []
-}}
+initial_state = {initial_state}
 
-if WORKFLOW_PATH:
-    print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
-    png = app.get_graph().draw_mermaid_png()
-    with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
-        f.write(png)
+try:
+    if WORKFLOW_PATH:
+        print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
+        try:
+            png = app.get_graph().draw_mermaid_png()
+            with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
+                f.write(png)
+            mermaid_code = app.get_graph().draw_mermaid()
+            with open(os.path.join(WORKFLOW_PATH, "mermaid.txt"), "w") as f:
+                f.write(mermaid_code)
+        except Exception as e:
+            raise(f"Could not save workflow graph:" + str(e))
+except Exception as e:
+    print(f"❌ Error saving PNG workflow:" + str(e))
+    pass
 
 print("workflow run: invoking workflow...")
 try:
@@ -207,11 +232,11 @@ print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
 if WORKFLOW_PATH:
     print("workflow run: saving workflow state JSON at :", WORKFLOW_PATH)
     try:
-        with open(os.path.join(WORKFLOW_PATH, "state_result_{uuid_str}.json"), "w") as f:
+        with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
             json.dump(result_state, f, indent=2)
     except Exception as e:
         raise(f"Could not save workflow data:" + str(e))
-'''
+"""
 
     async def craft_workflow(
         self,
@@ -229,33 +254,37 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = str(uuid.uuid4()).replace("-", "") if template_uuid is None \
-                                                      else template_uuid
+        uuid_str = (
+            str(uuid.uuid4()).replace("-", "")
+            if template_uuid is None
+            else template_uuid
+        )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
-        if save_workflow:
-            workflow_path, memory_path = self.create_folder_structure(uuid_str)
-        else:
-            workflow_path = os.path.join(self.workflow_dir, uuid_str)
-            memory_path = os.path.join(self.memory_dir, uuid_str)
+        workflow_path, memory_path = (
+            self.create_folder_structure(uuid_str)
+            if save_workflow
+            else (
+                os.path.join(self.workflow_dir, uuid_str),
+                os.path.join(self.memory_dir, uuid_str),
+            )
+        )
 
         with open(self.schema_code_path) as f:
             state_code = f.read()
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
         workflow_code = (
-            template_workflow 
-            if template_workflow 
-            else self.create_workflow_code(goal_prompt,
-                                           existing_tool_prompt,
-                                           memory_path
-                                          )
+            template_workflow
+            if template_workflow
+            else self.create_workflow_code(
+                goal_prompt, existing_tool_prompt, memory_path
+            )
         )
         if workflow_code is None or workflow_code.strip() == "":
             print("Generated workflow:\n", workflow_code)
             raise ValueError("❌ Generated workflow code is empty or invalid")
-        
-        
+
         complete_code = self.assemble_workflow(
             tools_code,
             state_code,
@@ -263,39 +292,33 @@ if WORKFLOW_PATH:
             workflow_code,
             workflow_path,
             memory_path,
-            uuid_str
+            uuid_str,
+            goal_prompt,
         )
 
         print(f"workflow path {workflow_path}")
         print(f"workflow path {memory_path}")
 
         if save_workflow and isinstance(workflow_code, str):
-            self.save_workflow_files(workflow_path, uuid_str,
-                                     workflow_code, goal_prompt
-                                    )
+            self.save_workflow_files(
+                workflow_path, uuid_str, workflow_code, goal_prompt
+            )
         return complete_code, uuid_str
 
-    def save_workflow_files(self, path: str, uuid_str: str,
-                            workflow_code: str, goal_prompt: str
-                           ) -> None:
+    def save_workflow_files(
+        self, path: str, uuid_str: str, workflow_code: str, goal_prompt: str
+    ) -> None:
         """Save workflow code and metadata to files."""
         try:
-            with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), 'w') as f:
+            with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
                 f.write(workflow_code)
             print(f"✅ Saved workflow code to: {path}/workflow_code_{uuid_str}.py")
         except Exception as e:
             print(f"❌ Failed to save workflow code: {str(e)}")
 
         try:
-            with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), 'w') as f:
+            with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), "w") as f:
                 f.write(self.get_system_prompt())
             print(f"✅ Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
         except Exception as e:
             print(f"❌ Failed to save system prompt: {str(e)}")
-
-        try:
-            with open(os.path.join(path, f"goal_{uuid_str}.txt"), 'w') as f:
-                f.write(goal_prompt)
-            print(f"✅ Saved workflow goal to: {path}/goal_{uuid_str}.txt")
-        except Exception as e:
-            print(f"❌ Failed to save workflow code: {str(e)}")

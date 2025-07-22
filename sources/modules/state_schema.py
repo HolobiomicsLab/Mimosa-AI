@@ -13,8 +13,9 @@ class Observation(TypedDict):
 
 class WorkflowState(TypedDict):
     workflow_uuid: str
+    model_id: str
+    goal: str
     step_name: List[str]
-    step_uuid: List[str]
     task_prompt: List[str]
     actions: List[Action]
     observations: List[Observation]
