@@ -40,6 +40,7 @@ exclude = [
     "tmp", # temporary files used by WorkflowRunner
     "./tmp", # temporary files used by WorkflowRunner
     "main.py",
+    "sources/prompts"
 ]
 
 

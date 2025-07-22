@@ -6,10 +6,12 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
+import json
 import os
 import signal
 import sys
-from typing import List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import dotenv
 import requests
@@ -92,11 +94,12 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+
 async def main():
     """Main execution function"""
+    config = Config()
     setup_signal_handlers()
     
-    config = Config()
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
@@ -109,6 +112,10 @@ async def main():
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load"
     )
+    parser.add_argument(
+        "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+    )
+
     add_config_arguments(parser, config)
     args = parser.parse_args()
     apply_config_overrides(args, config)
@@ -120,7 +127,7 @@ async def main():
         dgm = GodelMachine(config)
         planner = Planner(config)
         if args.single_task:
-            await dgm.start_dgm(goal_prompt=args.single_task)
+            await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
         elif args.goal:
             await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
         else:
@@ -131,7 +138,6 @@ async def main():
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         raise
-
 
 if __name__ == "__main__":
     asyncio.run(main())

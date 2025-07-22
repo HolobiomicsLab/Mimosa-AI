@@ -5,6 +5,8 @@ Darwin Godel Machine
 import json
 import os
 
+from sources.core.judge import WorkflowJudge
+
 from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
 
@@ -15,7 +17,9 @@ class GodelMachine:
     def __init__(self, config) -> None:
         self.config = config
         self.workflow_dir = config.workflow_dir
+        self.model_pricing = config.model_pricing
         self.orchestrator = WorkflowOrchestrator(config)
+        self.judge = WorkflowJudge(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
 
     def load_flow_state_result(self, uuid: str) -> any:
@@ -27,7 +31,7 @@ class GodelMachine:
             str: The output of the workflow state if found, None otherwise
         """
         try:
-            with open(f"{self.workflow_dir}/{uuid}/state_result_{uuid}.json") as f:
+            with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
             print(
@@ -54,7 +58,9 @@ class GodelMachine:
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
-        return 0.0  # TODO
+        if "evaluation_scores" not in flow_state:
+            return 0.0
+        return flow_state["evaluation_scores"]["overall_score"]
 
     def get_flow_answers(self, flow_state: any) -> str:
         """Extract the answers from the workflow state."""
@@ -83,7 +89,7 @@ class GodelMachine:
             flow_answers = (
                 run_stdout.strip()
             )  # if run failed, use stdout/stderr as fallback
-        print(f"\n===\nTotal rewards accumulated: {flow_rewards}")
+        print(f"\n===\nTotal rewards accumulated: {flow_rewards:.1f}")
         return f"""
 You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
 
@@ -129,6 +135,7 @@ Learn from this output and improve the workflow generation.
         self,
         goal_prompt: str,
         template_uuid: str | None = None,
+        judge: bool = False,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
         await self.recursive_self_improvement(
@@ -136,6 +143,7 @@ Learn from this output and improve the workflow generation.
             goal_prompt,
             template_uuid=template_uuid,
             workflow_template=template,
+            judge=judge,
         )
 
     async def recursive_self_improvement(
@@ -146,6 +154,7 @@ Learn from this output and improve the workflow generation.
         workflow_template: str | None = None,
         iteration_count: int = 0,
         max_depth: int = 5,
+        judge: bool = False,
     ) -> str:
         """Run a self-improvement loop for the workflow.
 
@@ -169,15 +178,21 @@ Learn from this output and improve the workflow generation.
             )
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.")
+                print()
                 return flow_output
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─' * 60}")
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
-        run_stdout, uuid = await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             prompt, template_uuid, workflow_template
         )
+        if executed:
+            if judge:
+                self.judge.evaluate(uuid)
+            total_cost = self.judge.calculate_cost(uuid)
+            print(f"Total workflow cost: {total_cost:.3f} USD")
         flow_state = self.load_flow_state_result(uuid)
         self.notifier.send_message(
             str(flow_state) if flow_state else run_stdout,
@@ -189,9 +204,7 @@ Learn from this output and improve the workflow generation.
         )
         template_uuid = None
         if iteration_count >= max_depth:
-            print(
-                f"Maximum iterations reached ({max_depth})."
-            )
+            print(f"Maximum iterations reached ({max_depth}).")
             return flow_output
         await self.recursive_self_improvement(
             prompt,

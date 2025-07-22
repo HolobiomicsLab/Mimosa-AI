@@ -155,10 +155,12 @@ instruct_chart = """..."""
 # Create agents with specific tool packages (MANDATORY)
 smolagent_web = SmolAgentFactory("web_surfer", instruct_web, EXISTING_TOOLS_WEB)
 smolagent_chart = SmolAgentFactory("chart_maker", instruct_chart, EXISTING_TOOLS_CHART)
+smolagent_solver = SmolAgentFactory("solver", instruct_solver)
 
 # Add agent nodes to the workflow
 workflow.add_node("web_surfer", WorkflowNodeFactory.create_agent_node(smolagent_web))
 workflow.add_node("chart_maker", WorkflowNodeFactory.create_agent_node(smolagent_chart))
+workflow.add_node("solver", WorkflowNodeFactory.create_agent_node(smolagent_solver))
 
 # Define workflow edges and conditional routing for fallback & retries
 workflow.add_edge(START, "web_surfer")
