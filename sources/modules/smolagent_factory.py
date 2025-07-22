@@ -71,7 +71,7 @@ ADDED_SYSTEM_PROMPT = """
 
 4. REAL EXTRACTION ONLY
   - Write actual parsing logic based on inspected data structure
-  - If you can'LOGt determine extraction method, explore the data first
+  - If you can't determine extraction method, explore the data first
   - No assumptions about URL patterns, page structure, or content format
 
 5. NO REGEX OR PATTERN MATCHING
