@@ -78,6 +78,7 @@ class WorkflowRunner:
     async def ensure_pip(self) -> None:
         """Ensure pip is installed and up-to-date."""
         import subprocess
+
         try:
             subprocess.run(
                 [f"python{self.config.python_version}", "-m", "ensurepip"],
@@ -93,7 +94,7 @@ class WorkflowRunner:
 
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
-        
+
         await self.ensure_pip()
 
         cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
@@ -141,7 +142,7 @@ class WorkflowRunner:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=1024 * 1024,  # 1MB buffer limit
-                env=dict(os.environ)  # Pass host environment variables
+                env=dict(os.environ),  # Pass host environment variables
             )
 
             if execution_id:
