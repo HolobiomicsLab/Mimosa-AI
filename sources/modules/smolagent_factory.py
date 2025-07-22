@@ -105,13 +105,13 @@ class SmolAgentFactory:
     def __init__(self,
                  name,
                  instruct_prompt,
-                 tools,
+                 tools=[],
                  model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=9
+                 max_steps=3
                 ):
         self.name = name
         self.instruct_prompt = instruct_prompt
-        self.tools = tools or []
+        self.tools = tools
         self.model_id = MODEL_ID
         self.engine = None
         self.provider = "auto"

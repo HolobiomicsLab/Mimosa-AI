@@ -4,7 +4,6 @@ Darwin Godel Machine
 
 import json
 import os
-from pathlib import Path
 
 from sources.core.judge import WorkflowJudge
 
@@ -59,6 +58,8 @@ class GodelMachine:
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
+        if "evaluation_scores" not in flow_state:
+            return 0.0
         return flow_state["evaluation_scores"]["overall_score"]
 
     def get_flow_answers(self, flow_state: any) -> str:
@@ -184,7 +185,7 @@ Learn from this output and improve the workflow generation.
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
-        run_stdout, uuid , executed= await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             prompt, template_uuid, workflow_template
         )
         if executed:
@@ -203,9 +204,7 @@ Learn from this output and improve the workflow generation.
         )
         template_uuid = None
         if iteration_count >= max_depth:
-            print(
-                f"Maximum iterations reached ({max_depth})."
-            )
+            print(f"Maximum iterations reached ({max_depth}).")
             return flow_output
         await self.recursive_self_improvement(
             prompt,
