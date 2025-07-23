@@ -165,7 +165,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             key: (
                 uuid_str if key == "workflow_uuid"
                 else self.config.smolagent_model_id if key == "model_id" 
-                else goal_prompt if key == "goal" else []
+                else goal_prompt if key == "goal"
+                else 0 if key == "retries" else []
             )
             for key in state_schema.WorkflowState.__annotations__
         }

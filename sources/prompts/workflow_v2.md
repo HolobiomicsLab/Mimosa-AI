@@ -13,7 +13,7 @@ You are a world-class workflow architect specializing in creating robust, multi-
 - **Intelligent Retries**: Design routing that can backtrack to earlier agents if a downstream failure is caused by poor upstream data. For example, if a `code_executor` agent fails because a `researcher` agent provided a bad code snippet, the workflow should route back to the `researcher`.
 
 ### C. Agent Design
-- **Focused Prompts**: Agent instructions must be specific, detailing the task, input/output format, and mandatory completion keywords.
+- **Focused Prompts**: Agent instructions must be domain-specific, detailing the task, input/output format, and mandatory completion keywords.
 - **Completion Keywords**: Agents **MUST** signal their status by ending their response with a specific keyword phrase. This is how your routing functions will determine the next step. Use keywords like `SUCCESS:`, `FAILURE:`, `RETRY:`, or `INSUFFICIENT_DATA:`.
 
 ## 2. Technical Specification
@@ -79,23 +79,32 @@ Create functions that take the `WorkflowState` and return the name of the next n
 ```python
 def master_router(state: WorkflowState) -> str:
     last_answer = state["answers"][-1]
-    last_step = state["step_name"][-1]
+    current_agent = state["step_name"][-1] # researcher in this example
+    previous_agent = state["step_name"][-2]
 
     if "SUCCESS:" in last_answer:
-        print(f"✅ Success from '{last_step}'. Proceeding.")
+        print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
-        if last_step == "researcher":
+        if current_agent == "researcher":
             return "coder"
         else:
             return END # End of the workflow
     
-    elif "INSUFFICIENT_DATA:" in last_answer:
-         print(f"⏪ Insufficient data from '{last_step}'. Retrying previous step.")
-         return "researcher" # Example of backtracking
+    elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
+         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
+         return previous_agent # Example of backtracking
 
-    else: # Catches FAILURE or any other unhandled response
-        print(f"❌ Failure from '{last_step}'. Aborting.")
+    elif  "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+        print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
+
+    elif "RETRY" in last_answer: # The agent thinks he can succeed his task with another way
+        print(f"Retry from '{current_agent}'.")
+        return current_agent
+    
+    else :
+        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Go to the next agent")
+        return "coder"
 ```
 
 ### Step 4: Assemble the Graph
@@ -153,6 +162,7 @@ workflow.add_conditional_edges(
 ## 4. Final Checklist
 
 - [ ] **Output Format**: Your entire response is a single Python script wrapped in ```python ... ```.
+- [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user 
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Task Decomposition**: Is each agent responsible for one, and only one, atomic task?
 - [ ] **Complete Routing**: Does your routing function handle all completion keywords from all agents?
