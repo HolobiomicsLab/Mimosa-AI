@@ -107,7 +107,8 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools=[],
                  model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=3
+                 max_steps=2,
+                 max_retries = 3
                 ):
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -123,6 +124,7 @@ class SmolAgentFactory:
         self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
         self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
         self.run_uuid = str(uuid.uuid4())
+        self.max_retries = max_retries
 
         os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
@@ -135,7 +137,7 @@ class SmolAgentFactory:
                 model=self.engine,
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
-                #planning_interval=3, # think more before acting
+                #planning_interval=1, # think more before acting
                 additional_authorized_imports=["*"]
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
@@ -187,16 +189,21 @@ class SmolAgentFactory:
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        prev_infos = state_answers[-1] if state_answers else GOAL
+        if state_answers:
+            prev_infos = f"""Previens {state["step_name"][-1]} provided the following information:
+            {state_answers[-1]}"""
+        else:
+            prev_infos = f"""You are the first agent. The user provided the following information:
+            {GOAL}"""
         return f"""
         You are an AI agent designed to assist with a specific task.
-        Previous agents have provided the following information:
         {prev_infos}
         Your need to follow instructions:
         {self.instruct_prompt}
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
+        Your final answer must contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA.
         """
 
     def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
@@ -346,6 +353,7 @@ class SmolAgentFactory:
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
             "answers": state.get("answers", []) + [answer],
+            "retries" : state.get("retries",0)
         }
 
 class WorkflowNodeFactory:

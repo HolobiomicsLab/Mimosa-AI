@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sources.core.llm_provider import LLMProvider
-from sources.modules import state_schema
 
 
 @dataclass
@@ -55,7 +54,9 @@ class WorkflowJudge:
                 llm_calls.append(TokenUsage(
                     call,
                     json_call["model"],
-                    *json_call["token_usage"].values()
+                    json_call["usage"]["prompt_tokens"],
+                    json_call["usage"]["completion_tokens"],
+                    json_call["usage"]["total_tokens"]
                 ))
         
         workflow_path= Path(self.workflow_dir) / uuid
