@@ -45,7 +45,7 @@ class WorkflowJudge:
 
         # Orchestrator and Judge LLM calls
 
-        for call in ["orchestrator", "judge"]:
+        for call in ["workflow_creator", "judge"]:
             memory_file = memory_path / f"{call}.json"
             if not memory_file.exists():
                 continue
