@@ -106,8 +106,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=3
+                 max_steps=12
                 ):
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -135,7 +134,7 @@ class SmolAgentFactory:
                 model=self.engine,
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
-                #planning_interval=3, # think more before acting
+                planning_interval=4, # think more before acting
                 additional_authorized_imports=["*"]
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
