@@ -187,7 +187,7 @@ class SmolAgentFactory:
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        prev_infos = state_answers[-1] if state_answers else "No previous answers, you are the first agent."
+        prev_infos = state_answers[-1] if state_answers else GOAL
         return f"""
         You are an AI agent designed to assist with a specific task.
         Previous agents have provided the following information:
