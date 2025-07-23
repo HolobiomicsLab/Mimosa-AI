@@ -173,7 +173,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             )
             for key in state_schema.WorkflowState.__annotations__
         }
-
         return f"""
 import os
 import sys
