@@ -173,7 +173,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             )
             for key in state_schema.WorkflowState.__annotations__
         }
-
         return f"""
 import os
 import sys
@@ -185,7 +184,6 @@ from typing import TypedDict, List
 MEMORY_PATH = "{memory_path}"
 WORKFLOW_PATH = "{workflow_path}"
 MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = "{goal_prompt}"
 
 # Load tools
 {tools_code}
