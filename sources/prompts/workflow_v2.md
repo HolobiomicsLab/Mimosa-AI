@@ -79,51 +79,23 @@ Create functions that take the `WorkflowState` and return the name of the next n
 ```python
 def master_router(state: WorkflowState) -> str:
     last_answer = state["answers"][-1]
-<<<<<<< HEAD
-    current_agent = state["step_name"][-1] # researcher in this example
-    previous_agent = state["step_name"][-2]
+    last_step = state["step_name"][-1]
 
     if "SUCCESS:" in last_answer:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
-        if current_agent == "researcher":
-=======
-    last_step = state["step_name"][-1]
-
-    if "SUCCESS:" in last_answer:
-        print(f"✅ Success from '{last_step}'. Proceeding.")
-        # Logic to determine the next step after success
         if last_step == "researcher":
->>>>>>> ff71a1d (feat(config, llm_provider, planner, workflow_factory): update workflow creator prompt and enhance LLM configuration; refactor planner and LLM provider for improved functionality)
             return "coder"
         else:
             return END # End of the workflow
     
-<<<<<<< HEAD
-    elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
-         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return previous_agent # Example of backtracking
-
-    elif  "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
-        print(f"❌ Failure from '{current_agent}'. Aborting.")
-        return END
-
-    elif "RETRY" in last_answer: # The agent thinks he can succeed his task with another way
-        print(f"Retry from '{current_agent}'.")
-        return current_agent
-    
-    else :
-        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Go to the next agent")
-        return "coder"
-=======
     elif "INSUFFICIENT_DATA:" in last_answer:
          print(f"⏪ Insufficient data from '{last_step}'. Retrying previous step.")
          return "researcher" # Example of backtracking
 
-    else: # Catches FAILURE or any other unhandled response
-        print(f"❌ Failure from '{last_step}'. Aborting.")
+    elif  "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+        print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
->>>>>>> ff71a1d (feat(config, llm_provider, planner, workflow_factory): update workflow creator prompt and enhance LLM configuration; refactor planner and LLM provider for improved functionality)
 ```
 
 ### Step 4: Assemble the Graph
@@ -181,10 +153,6 @@ workflow.add_conditional_edges(
 ## 4. Final Checklist
 
 - [ ] **Output Format**: Your entire response is a single Python script wrapped in ```python ... ```.
-<<<<<<< HEAD
-- [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user 
-=======
->>>>>>> ff71a1d (feat(config, llm_provider, planner, workflow_factory): update workflow creator prompt and enhance LLM configuration; refactor planner and LLM provider for improved functionality)
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Task Decomposition**: Is each agent responsible for one, and only one, atomic task?
 - [ ] **Complete Routing**: Does your routing function handle all completion keywords from all agents?
