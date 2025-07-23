@@ -1,25 +1,61 @@
 import json
 import os
+from dataclasses import dataclass, field
 
-from openai import OpenAI
+import litellm
 
+
+@dataclass
+class LLMConfig:
+    """Configuration for Large Language Model interactions."""
+    model: str = "o3-2025-04-16"
+    provider: str = "openai"
+    temperature: float = 1.0
+    key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.key:
+            raise ValueError(
+                "API key not provided and OPENAI_API_KEY environment variable not set"
+            )
+        self.temperature = float(self.temperature)  # Ensure numeric type
+
+    @classmethod
+    def from_dict(cls, config: dict = None) -> "LLMConfig":
+        """Alternative constructor from dictionary (maintains backward compatibility)."""
+        config = config or {}
+        return cls(
+            model=config.get("model", "gpt-4o-mini"),
+            provider=config.get("provider", "openai"),
+            temperature=config.get("temperature", 1.0),
+            key=config.get("key", os.getenv("OPENAI_API_KEY", ""))
+        )
 
 class LLMProvider:
     """Handles interactions with various LLM APIs.
-
     Attributes:
         deepseek_client (OpenAI): Client for Deepseek API
         openai_client (OpenAI): Client for OpenAI API
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        agent_name: str,
+        memory_path,
+        system_msg: str = None,
+        config: LLMConfig = None,
+    ) -> None:
         """Initialize the LLM provider with API clients."""
-        self.deepseek_client = OpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"), base_url="https://api.deepseek.com"
-        )
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        if not config:
+            config = LLMConfig()
 
-    def save_call(self, call: dict[str, str], called_by: str, memory_path: str) -> None:
+        self.config = config
+        self.sys_msg = system_msg
+        self.agent_name = agent_name
+        self.memory_path = memory_path
+
+    def save_call(self, call: dict[str, str]) -> None:
         """
         Save the API call details to a JSON file.
 
@@ -27,104 +63,34 @@ class LLMProvider:
             call: Dictionary containing API call details
             uuid_str: Unique identifier for the request
         """
-        path = os.path.join(memory_path, f"{called_by}.json")
+        path = os.path.join(self.memory_path, f"{self.agent_name}.json")
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
-    def deepseek_completion(
-        self,
-        history: list[dict[str, str]],
-        called_by: str,
-        memory_path: str,
-        verbose: bool = False,
-        model="deepseek-reasoner",
-    ) -> str:
-        """Generate text using Deepseek API.
+    def __call__(self, prompt: str):
+        message = []
+        if self.sys_msg is not None:
+            message.append({"content": self.sys_msg, "role": "system"})
 
-        Args:
-            history: Conversation history in OpenAI format
-            uuid_str: Unique identifier for the request
-            verbose: Whether to print the response
+        message.append({"role": "user", "content": prompt})
 
-        Returns:
-            str: Generated text from Deepseek
-
-        Raises:
-            RuntimeError: If API request fails
-        """
         try:
-            response = self.deepseek_client.chat.completions.create(
-                model=model, messages=history, stream=False
+            response = litellm.completion(
+                model=f"{self.config.provider}/{self.config.model}",
+                messages=message,
+                temperature=self.config.temperature,
             )
-            thought = response.choices[0].message.content
-            # Extract token usage information
-            token_usage = {
-                "input_tokens": response.usage.prompt_tokens,
-                "output_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
-            if verbose:
-                print(thought)
-            self.save_call(
-                {
-                    "model": model,
-                    "messages": history,
-                    "thought": thought,
-                    "token_usage": token_usage,
-                },
-                called_by,
-                memory_path,
-            )
-            return thought
         except Exception as e:
-            raise RuntimeError(f"❌ Deepseek API error: {str(e)}") from e
+            raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
-    def openai_completion(
-        self,
-        history: list[dict[str, str]],
-        called_by: str | None = None,
-        memory_path: str | None = None,
-        verbose: bool = False,
-        model="o3",
-    ) -> str:
-        """Generate text using OpenAI API.
+        res = response.choices[0].message.content
 
-        Args:
-            history: Conversation history in OpenAI format
-            uuid_str: Unique identifier for the request
-            verbose: Whether to print the response
+        save_call = {
+            "model": self.config.model,
+            "message": message,
+            "thought": res,
+            "token_usage": response.usage.dict(),
+        }
+        self.save_call(save_call)
 
-        Returns:
-            str: Generated text from OpenAI
-
-        Raises:
-            RuntimeError: If API request fails
-        """
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=model, messages=history
-            )
-            if response is None:
-                raise RuntimeError("❌ OpenAI response is empty")
-            thought = response.choices[0].message.content
-            # Extract token usage information
-            token_usage = {
-                "input_tokens": response.usage.prompt_tokens,
-                "output_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
-            if verbose:
-                print(thought)
-            self.save_call(
-                {
-                    "model": model,
-                    "messages": history,
-                    "thought": thought,
-                    "token_usage": token_usage,
-                },
-                called_by,
-                memory_path,
-            )
-            return thought
-        except Exception as e:
-            raise RuntimeError(f"❌ OpenAI API error: {str(e)}") from e
+        return res
