@@ -9,6 +9,7 @@ from sources.core.judge import WorkflowJudge
 
 from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
+from .mcts import MCTS
 
 
 class GodelMachine:
@@ -18,6 +19,7 @@ class GodelMachine:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
+        self.mcts = MCTS(config)
         self.orchestrator = WorkflowOrchestrator(config)
         self.judge = WorkflowJudge(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
@@ -66,6 +68,7 @@ class GodelMachine:
         """Extract the answers from the workflow state."""
         if not flow_state or "answers" not in flow_state:
             return ""
+
         return (
             "\n".join(str(x) for x in flow_state["answers"])
             if isinstance(flow_state["answers"], list)
@@ -82,14 +85,17 @@ class GodelMachine:
     ) -> str:
         flow_rewards = 0.0
         flow_answers = ""
+
         if flow_state is not None:
             flow_rewards = self.get_total_rewards(flow_state)
             flow_answers = self.get_flow_answers(flow_state)
         else:
             flow_answers = (
                 run_stdout.strip()
-            )  # if run failed, use stdout/stderr as fallback
+            )
+
         print(f"\n===\nTotal rewards accumulated: {flow_rewards:.1f}")
+
         return f"""
 You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
 
@@ -103,7 +109,7 @@ Previous generation attempt ({iteration_count}) resulted in the following output
 Learn from this output and improve the workflow generation.
         """
 
-    def select_workflow_template(self, template_uuid: str | None = None) -> str:
+    def select_workflow_template(self, goal_prompt, template_uuid: str | None = None) -> str:
         """Select and load a workflow template by UUID.
 
         Args:
@@ -117,8 +123,10 @@ Learn from this output and improve the workflow generation.
         if not workflows:
             return None
         if template_uuid is None:
-            # TODO implement a auto-selection mechanism for available workflows
-            return None
+            candidates = self.mcts.select_best_workflows(
+                goal_prompt=goal_prompt,
+            )
+            return candidates[0].code if candidates else None
         try:
             with open(
                 f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py",
@@ -137,7 +145,8 @@ Learn from this output and improve the workflow generation.
         template_uuid: str | None = None,
         judge: bool = False,
     ):
-        template = self.select_workflow_template(template_uuid=template_uuid)
+        template = self.select_workflow_template(goal=goal_prompt,
+                                                 template_uuid=template_uuid)
         await self.recursive_self_improvement(
             goal_prompt,
             goal_prompt,
