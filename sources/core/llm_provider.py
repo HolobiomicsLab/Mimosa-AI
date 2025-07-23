@@ -58,8 +58,9 @@ class LLMConfig:
             model=config.get("model", "gpt-4o-mini"),
             provider=config.get("provider", "openai"),
             temperature=config.get("temperature", 1.0),
-            key=config.get("key", os.getenv("OPENAI_API_KEY", ""))
+            key=config.get("key", os.getenv("OPENAI_API_KEY", "")),
         )
+
 
 class LLMProvider:
     """Handles interactions with various LLM APIs.
@@ -84,7 +85,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
 
-    def save_call(self, call: dict[str, str]) -> None:
+    def save_call(self, call: dict) -> None:
         """
         Save the API call details to a JSON file.
 
