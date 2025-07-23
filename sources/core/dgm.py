@@ -9,7 +9,7 @@ from sources.core.judge import WorkflowJudge
 
 from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
-from .mcts import MCTS
+from .workflow_selection import WorkflowSelector
 
 
 class GodelMachine:
@@ -19,7 +19,7 @@ class GodelMachine:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
-        self.mcts = MCTS(config)
+        self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
         self.judge = WorkflowJudge(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
@@ -123,7 +123,7 @@ Learn from this output and improve the workflow generation.
         if not workflows:
             return None
         if template_uuid is None:
-            candidates = self.mcts.select_best_workflows(
+            candidates = self.workflow_selector.select_best_workflows(
                 goal_prompt=goal_prompt,
             )
             return candidates[0].code if candidates else None
