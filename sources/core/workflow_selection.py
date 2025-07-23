@@ -3,7 +3,6 @@
 from pathlib import Path
 import json
 import sys
-import os
 
 import torch
 import torch.nn.functional as F
@@ -13,14 +12,14 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import Config
 
 class WorkflowInfo:
-    def __init__(self, uuid, state_result, goal,, code, overall_score=0.0):
+    def __init__(self, uuid, state_result, goal, code, overall_score=0.0):
         self.uuid = uuid
         self.goal = goal
         self.state_result = state_result
         self.code = code
         self.overall_score = overall_score
 
-class MCTS:
+class WorkflowSelector:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
@@ -104,7 +103,7 @@ class MCTS:
 if __name__ == "__main__":
     config = Config()
     config.workflow_dir = "../workflows"
-    mcts = MCTS(config)
+    mcts = WorkflowSelector(config)
     goal = "install prima.cpp and run a simple script"
     matching_workflow = mcts.select_best_workflows(goal, threshold=0.2)
     print("Best matching workflow:")
