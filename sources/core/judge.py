@@ -52,13 +52,15 @@ class WorkflowJudge:
 
             with open(memory_file) as f:
                 json_call = json.load(f)
-                llm_calls.append(
-                    TokenUsage(
-                        call, json_call["model"], *json_call["token_usage"].values()
-                    )
-                )
-
-        workflow_path = Path(self.workflow_dir) / uuid
+                llm_calls.append(TokenUsage(
+                    call,
+                    json_call["model"],
+                    json_call["usage"]["prompt_tokens"],
+                    json_call["usage"]["completion_tokens"],
+                    json_call["usage"]["total_tokens"]
+                ))
+        
+        workflow_path= Path(self.workflow_dir) / uuid
 
         if not workflow_path.exists():
             print(f"❌ Workflow directory not found: {workflow_path}")
