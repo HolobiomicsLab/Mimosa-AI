@@ -4,6 +4,8 @@ smolagents[all]
 langgraph>=0.4.7
 matplotlib>=3.9.0
 numpy>=2.0.0
+sentence-transformers==5.0.0
+torch==1.0.2
 dotenv
 openai
 python_a2a

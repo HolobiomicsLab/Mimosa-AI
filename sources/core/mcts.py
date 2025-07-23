@@ -1,0 +1,112 @@
+
+
+from pathlib import Path
+import json
+import sys
+import os
+
+import torch
+import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from config import Config
+
+class WorkflowInfo:
+    def __init__(self, uuid, state_result, goal,, code, overall_score=0.0):
+        self.uuid = uuid
+        self.goal = goal
+        self.state_result = state_result
+        self.code = code
+        self.overall_score = overall_score
+
+class MCTS:
+    def __init__(self, config: Config) -> None:
+        self.config = config
+        self.workflows_folder = Path(config.workflow_dir)
+        self.workflows_info = self.discover_workflows()
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    def discover_workflows(self) -> dict[str, WorkflowInfo]:
+        workflows = {}
+
+        if not self.workflows_folder.exists():
+            print(f"Workflows directory {self.workflows_folder} does not exist.")
+            return workflows
+        for workflow_folder in self.workflows_folder.iterdir():
+            goal = ""
+            code = None
+            state_result = None
+            uuid = workflow_folder.name
+            overall_score = 0.0
+            if not workflow_folder.is_dir():
+                continue
+            state_file = workflow_folder / "state_result.json"
+            code_file = workflow_folder / f"workflow_code_{uuid}.py"
+            if not state_file.exists():
+                continue
+            if not code_file.exists():
+                raise ValueError(
+                    f"Workflow code file {code_file} does not exist for UUID {uuid}."
+                )
+            with open(state_file, 'r+') as f:
+                state_result = json.load(f)
+            with open(code_file, 'r') as f:
+                code = f.read()
+            uuid = workflow_folder.name
+            if state_result:
+                goal = state_result.get("goal", "")
+                scores = state_result.get("evaluation_scores", {})
+                overall_score = scores.get("overall_score", 0.0)
+            workflows[uuid] = WorkflowInfo(uuid, state_result, goal, code, overall_score)
+        return workflows
+    
+    def cosine_similarity(self, a: str, b: str) -> float:
+        """Calculate cosine similarity between two strings."""
+        embeddings_a = self.model.encode(a, convert_to_tensor=True)
+        embeddings_b = self.model.encode(b, convert_to_tensor=True)
+        return F.cosine_similarity(embeddings_a, embeddings_b, dim=0).item()
+    
+    def sort_similar_workflows(self, goal: str, threshold=0.8, debug=False) -> list[WorkflowInfo]:
+        """Find workflows with similar goals."""
+        assert threshold >= 0.0, "Threshold must be non-negative"
+        assert threshold <= 1.0, "Threshold must be at most 1.0"
+        if not self.workflows_info:
+            print("No workflows found.")
+            return []
+        similar_workflows = sorted(
+            self.workflows_info.values(),
+            key=lambda wf: self.cosine_similarity(wf.goal, goal),
+            reverse=True
+        )
+        if debug:
+            for wf in similar_workflows:
+                sim = self.cosine_similarity(wf.goal, goal)
+                print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Similarity: {sim:.4f}")
+        return [wf for wf in similar_workflows
+                if self.cosine_similarity(wf.goal, goal) >= threshold]
+    
+    def sort_workflows_by_score(self, workflows_info: list[WorkflowInfo]) -> list[WorkflowInfo]:
+        """Sort workflows by their overall score."""
+        sorted_workflows = sorted(
+            workflows_info,
+            key=lambda wf: wf.overall_score,
+            reverse=True
+        )
+        return [wf for wf in sorted_workflows]
+    
+    def select_best_workflows(self, goal: str, threshold=0.5) -> WorkflowInfo | None:
+        """Choose a workflow that matches the goal with a minimum threshold."""
+        similar_workflows = self.sort_similar_workflows(goal, threshold)
+        best_workflows = self.sort_workflows_by_score(similar_workflows)
+        return best_workflows
+
+if __name__ == "__main__":
+    config = Config()
+    config.workflow_dir = "../workflows"
+    mcts = MCTS(config)
+    goal = "install prima.cpp and run a simple script"
+    matching_workflow = mcts.select_best_workflows(goal, threshold=0.2)
+    print("Best matching workflow:")
+    for wf in matching_workflow:
+        print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
