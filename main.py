@@ -123,13 +123,15 @@ async def main():
     validate_environment()
     config.validate_paths()
 
+    print(f"goal {args.goal}")
+
     try:
         dgm = GodelMachine(config)
         planner = Planner(config)
         if args.single_task:
             await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
         elif args.goal:
-            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template, judge=args.judge)
         else:
             raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
     except KeyboardInterrupt:

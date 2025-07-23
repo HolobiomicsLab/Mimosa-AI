@@ -64,9 +64,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ]
-        return LLMProvider().openai_completion(
-            history, "orchestrator", path, verbose=False
-        )
+        return LLMProvider("workflow_creator",path,system_prompt)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
