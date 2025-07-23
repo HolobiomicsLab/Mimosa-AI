@@ -34,6 +34,33 @@ class LLMConfig:
         )
 
 
+@dataclass
+class LLMConfig:
+    """Configuration for Large Language Model interactions."""
+    model: str = "o3-2025-04-16"
+    provider: str = "openai"
+    temperature: float = 1.0
+    key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.key:
+            raise ValueError(
+                "API key not provided and OPENAI_API_KEY environment variable not set"
+            )
+        self.temperature = float(self.temperature)  # Ensure numeric type
+
+    @classmethod
+    def from_dict(cls, config: dict = None) -> "LLMConfig":
+        """Alternative constructor from dictionary (maintains backward compatibility)."""
+        config = config or {}
+        return cls(
+            model=config.get("model", "gpt-4o-mini"),
+            provider=config.get("provider", "openai"),
+            temperature=config.get("temperature", 1.0),
+            key=config.get("key", os.getenv("OPENAI_API_KEY", ""))
+        )
+
 class LLMProvider:
     """Handles interactions with various LLM APIs.
     Attributes:
@@ -57,7 +84,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
 
-    def save_call(self, call: dict) -> None:
+    def save_call(self, call: dict[str, str]) -> None:
         """
         Save the API call details to a JSON file.
 
