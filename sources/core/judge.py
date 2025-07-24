@@ -55,15 +55,17 @@ class WorkflowJudge:
 
             with open(memory_file) as f:
                 json_call = json.load(f)
-                llm_calls.append(TokenUsage(
-                    call,
-                    json_call["model"],
-                    json_call["usage"]["prompt_tokens"],
-                    json_call["usage"]["completion_tokens"],
-                    json_call["usage"]["total_tokens"]
-                ))
-        
-        workflow_path= Path(self.workflow_dir) / uuid
+                llm_calls.append(
+                    TokenUsage(
+                        call,
+                        json_call["model"],
+                        json_call["usage"]["prompt_tokens"],
+                        json_call["usage"]["completion_tokens"],
+                        json_call["usage"]["total_tokens"],
+                    )
+                )
+
+        workflow_path = Path(self.workflow_dir) / uuid
 
         if not workflow_path.exists():
             print(f"❌ Workflow directory not found: {workflow_path}")
@@ -213,8 +215,20 @@ class WorkflowJudge:
 
         return text.strip()
 
-    def long_prompt(self):
-        return """
+    def long_prompt(self, include_answer_assessment=False):
+        answer_assessment = (
+            """
+4. **Answer Correctness Assessment**
+   - Evaluate whether the final answer produced by the system matches the expected answer
+   - Analyze any discrepancies between the system's answer and the expected answer
+   - Identify potential reasons for incorrect or incomplete answers
+
+"""
+            if include_answer_assessment
+            else ""
+        )
+
+        return f"""
 Please analyze the system with the following structure:
 
 1. **Step-by-step Critique**
@@ -235,17 +249,22 @@ Please analyze the system with the following structure:
      - Is there information loss or miscommunication between agents?
      - Is the final output aligned with the initial goal?
    - Suggest architectural or coordination-level improvements (e.g., adding intermediate validation, changing agent order, improving memory/context sharing)
-
-4. **Summary Judgment**
+{answer_assessment}
+{4 + (1 if include_answer_assessment else 0)}. **Summary Judgment**
  """
 
-    def evaluate(self, uuid: str, short: bool = True,answer:str=None):
+    def evaluate(self, uuid: str, short: bool = True, answer: str = None):
         """Evaluate the benchmark results.
 
         Args:
             uuid: UUID of the workflow run to evaluate
         """
-        system_prompt = """You are a rigorous and objective evaluator of a multi-agent system designed to solve a complex goal through a coordinated workflow. You will be given:
+        # Adjust system prompt based on whether an expected answer is provided
+        answer_evaluation_task = ""
+        if answer:
+            answer_evaluation_task = "- Assess whether the final answer produced by the system matches the expected answer.\n"
+
+        system_prompt = f"""You are a rigorous and objective evaluator of a multi-agent system designed to solve a complex goal through a coordinated workflow. You will be given:
 
 1. A description of the system's **goal**.
 2. A list of **agents**, each with their assigned roles.
@@ -258,31 +277,48 @@ Your task is to:
 - Identify whether outputs are appropriate, helpful, or erroneous.
 - Pinpoint any bottlenecks, misunderstandings, or failures.
 - Evaluate how well the agents are collaborating to reach the goal.
-- Suggest what changes could improve the system's reliability, performance, or alignment with the goal.
+{answer_evaluation_task}- Suggest what changes could improve the system's reliability, performance, or alignment with the goal.
 
 Be precise, constructive, and technical in your judgment."""
-        prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
-
-{self.get_text(uuid)!r}
-
---- EVALUATION REQUEST ---
-{self.long_prompt() if not short else ""}
-   - Provide an overall score (1–10) for each category in the following JSON format:
+        # Prepare the expected answer information if available
+        expected_answer_info = ""
+        json_format = """
      ```json
      {{
         "goal_alignment": X,
         "agent_collaboration": Y,
         "output_quality": Z,
      }}
-     ```
+     ```"""
+
+        if answer:
+            expected_answer_info = f"\n\n--- EXPECTED ANSWER ---\n{answer}\n"
+            json_format = """
+     ```json
+     {{
+        "goal_alignment": X,
+        "agent_collaboration": Y,
+        "output_quality": Z,
+        "answer_correctness": W
+     }}
+     ```"""
+
+        prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
+
+{self.get_text(uuid)!r}{expected_answer_info}
+
+--- EVALUATION REQUEST ---
+{self.long_prompt(answer is not None) if not short else ""}
+   - Provide an overall score (1–10) for each category in the following JSON format:{json_format}
+   {"- The 'answer_correctness' score should evaluate how well the system's final answer matches the expected answer." if answer else ""}
    - After the JSON, briefly justify your scores.
 
 Please be objective, technical, and specific in your feedback.
 """
         print("Calling LLMProvider to evaluate the workflow...")
         memory_path = Path(self.memory_dir) / uuid
-        config_llm = LLMConfig().from_dict({"model":"o4-mini-2025-04-16"})
-        output = LLMProvider('judge',memory_path,system_prompt,config_llm)(prompt)
+        config_llm = LLMConfig().from_dict({"model": "o4-mini-2025-04-16"})
+        output = LLMProvider("judge", memory_path, system_prompt, config_llm)(prompt)
 
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
@@ -292,19 +328,8 @@ Please be objective, technical, and specific in your feedback.
 
         # Extract scores from the evaluation output
         scores = self._extract_scores(output)
-
-        # Update the state result file with the scores
-        
-        good_answer = None
-        if answer:
-            print("Judge compare output to real answer...")
-            workflow_path = Path(self.workflow_dir) / uuid
-            with open(workflow_path / "state_result.json") as f:
-                last_answer = json.load(f).get("answers", [])[-1]
-                good_answer = answer in last_answer
-                print("Good answer") if good_answer else print("Bad answer")
-        
-        self._update_state_result(scores, uuid,good_answer)
+            
+        self._update_state_result(scores, uuid)
         print("Scores extracted and saved to state result.")
 
     def _extract_scores(self, evaluation_text):
@@ -326,11 +351,12 @@ Please be objective, technical, and specific in your feedback.
             if match:
                 json_str = match.group(1)
                 scores = json.loads(json_str)
+                # Calculate overall score including answer_correctness if available
                 scores["overall_score"] = (
-                    scores["goal_alignment"]
-                    + scores["agent_collaboration"]
-                    + scores["output_quality"]
-                )
+                        scores["goal_alignment"]
+                        + scores["agent_collaboration"]
+                        + scores["output_quality"]
+                    )
                 scores["overall_score"] /= 3
                 return scores
             else:
@@ -340,7 +366,7 @@ Please be objective, technical, and specific in your feedback.
             print(f"❌ Error extracting scores: {str(e)}")
             return {}
 
-    def _update_state_result(self, scores, uuid: str, good_answer:bool=None):
+    def _update_state_result(self, scores, uuid: str):
         """Update the state result file with the evaluation scores.
 
         Args:
@@ -361,7 +387,6 @@ Please be objective, technical, and specific in your feedback.
 
             # Add scores to state result
             state_result["evaluation_scores"] = scores
-            state_result["good_answer"] = good_answer
 
             # Write updated state result back to file
             with open(state_result_path, "w") as f:
