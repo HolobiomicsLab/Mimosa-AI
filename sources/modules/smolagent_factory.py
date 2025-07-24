@@ -89,9 +89,9 @@ When calling final_answer tool, you you must return a long, detailed paragraph t
 - Specific sources and URLs where information was found
 - Any important context or background information
 - Any error codes or technical messages received
-- If specified, use special words like COMPLETED_TASK
+- If specified, use special words like SUCCESS
 Example:
-    final_answer('COMPLETED_TASK: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
+    final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 
 If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
 """
@@ -203,6 +203,7 @@ class SmolAgentFactory:
         {self.instruct_prompt}
         Avoid making overly complex code for simple tasks. Be patient and thorough.
         Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
+        Never use globals() to look for variables, all the variables you need are in the prompt.
         If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         Your final answer must contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA.
         """
