@@ -2,6 +2,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from sources.core.llm_provider import LLMProvider
 
@@ -236,7 +237,7 @@ Please analyze the system with the following structure:
 4. **Summary Judgment**
  """
 
-    def evaluate(self, uuid: str, short: bool = True):
+    def evaluate(self, uuid: str, short: bool = True,answer:str=None):
         """Evaluate the benchmark results.
 
         Args:
@@ -298,7 +299,15 @@ Please be objective, technical, and specific in your feedback.
         scores = self._extract_scores(output)
 
         # Update the state result file with the scores
-        self._update_state_result(scores, uuid)
+        
+        good_answer = None
+        if answer:
+            workflow_path = Path(self.workflow_dir) / uuid
+            with open(workflow_path / "state_result.json") as f:
+                last_answer = json.load(f).get("answers", [])[-1]
+                good_answer = answer in last_answer
+        
+        self._update_state_result(scores, uuid,good_answer)
         print("Scores extracted and saved to state result.")
 
     def _extract_scores(self, evaluation_text):
@@ -334,7 +343,7 @@ Please be objective, technical, and specific in your feedback.
             print(f"❌ Error extracting scores: {str(e)}")
             return {}
 
-    def _update_state_result(self, scores, uuid: str):
+    def _update_state_result(self, scores, uuid: str, good_answer:bool=None):
         """Update the state result file with the evaluation scores.
 
         Args:
@@ -355,6 +364,7 @@ Please be objective, technical, and specific in your feedback.
 
             # Add scores to state result
             state_result["evaluation_scores"] = scores
+            state_result["good_answer"] = good_answer
 
             # Write updated state result back to file
             with open(state_result_path, "w") as f:
