@@ -80,7 +80,7 @@ Create functions that take the `WorkflowState` and return the name of the next n
 def master_router(state: WorkflowState) -> str:
     last_answer = state["answers"][-1]
     current_agent = state["step_name"][-1] # researcher in this example
-    previous_agent = state["step_name"][-2]
+    previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else END
 
     if "SUCCESS:" in last_answer:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
@@ -98,9 +98,16 @@ def master_router(state: WorkflowState) -> str:
         print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
 
-    elif "RETRY" in last_answer: # The agent thinks he can succeed his task with another way
-        print(f"Retry from '{current_agent}'.")
-        return current_agent
+    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
+        retry_count = sum(
+            1 for step in state["step_name"][-3:] if step == current_agent
+        )
+        if retry_count <= 1:
+            print(f"Retry from '{current_agent}'.")
+            return current_agent
+        else:
+            print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
+            return previous_agent
     
     else :
         print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Go to the next agent")
@@ -109,6 +116,8 @@ def master_router(state: WorkflowState) -> str:
 
 ### Step 4: Assemble the Graph
 Put everything together into a `StateGraph`.
+Do not compile the workflow, it is already in the context.
+Be sure to name the StateGraph `workflow`.
 
 ```python
 # --- WORKFLOW SCRIPT ---
@@ -141,19 +150,11 @@ workflow.add_edge(START, "researcher")
 
 workflow.add_conditional_edges(
     "researcher",
-    master_router,
-    {
-        "coder": "coder", # If router returns "coder", go to coder node
-        END: END          # If router returns END, finish.
-    }
+    master_router
 )
 workflow.add_conditional_edges(
     "coder",
-    master_router,
-    {
-        "researcher": "researcher", # Allow coder to re-trigger research
-        END: END
-    }
+    master_router
 )
 
 # --- END OF SCRIPT ---
