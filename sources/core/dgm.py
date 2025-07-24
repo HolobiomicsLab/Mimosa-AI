@@ -147,13 +147,13 @@ Learn from this output and improve the workflow generation.
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
-        await self.recursive_self_improvement(
+        return await self.recursive_self_improvement(
             goal,
             goal,
             template_uuid=template_uuid,
             workflow_template=template,
             judge=judge,
-            max_depth = 1,
+            max_depth = 0,
             answer=answer
         )
 
@@ -167,7 +167,7 @@ Learn from this output and improve the workflow generation.
         max_depth: int = 5,
         judge: bool = False,
         answer: str=None,
-    ) -> str:
+    ):
         """Run a self-improvement loop for the workflow.
 
         Args:
@@ -180,7 +180,6 @@ Learn from this output and improve the workflow generation.
         Returns:
             str: Final execution status message
         """
-        flow_output = ""
         print(f"\n{'=' * 60}")
         print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
         print(f"{'=' * 60}")
@@ -191,7 +190,7 @@ Learn from this output and improve the workflow generation.
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.")
                 print()
-                return flow_output
+                return uuid  # noqa: F821
         
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
@@ -199,7 +198,7 @@ Learn from this output and improve the workflow generation.
         )
         if executed:
             if judge:
-                self.judge.evaluate(uuid, answer)
+                self.judge.evaluate(uuid=uuid, answer=answer)
             total_cost = self.judge.calculate_cost(uuid)
             print(f"Total workflow cost: {total_cost:.3f} USD")
         flow_state = self.load_flow_state_result(uuid)
@@ -214,7 +213,7 @@ Learn from this output and improve the workflow generation.
         template_uuid = None
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
-            return flow_output
+            return uuid
         await self.recursive_self_improvement(
             prompt,
             goal,
@@ -222,4 +221,4 @@ Learn from this output and improve the workflow generation.
             workflow_template=flow_code if flow_state else None,
             iteration_count=iteration_count + 1,
         )
-        return flow_output
+        return uuid
