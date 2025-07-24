@@ -6,6 +6,7 @@ import json
 import os
 
 from sources.core.judge import WorkflowJudge
+from sources.utils.visualization import VisualizationUtils
 
 from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
@@ -23,6 +24,7 @@ class GodelMachine:
         self.orchestrator = WorkflowOrchestrator(config)
         self.judge = WorkflowJudge(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
+        self.viz_utils = VisualizationUtils()
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -37,7 +39,7 @@ class GodelMachine:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
             print(
-                f"❌ Workflow state for UUID {uuid} not found in {self.workflow_dir}."
+                f"Workflow state for UUID {uuid} not found in {self.workflow_dir}."
             )
             return None
         except Exception as e:
@@ -60,6 +62,8 @@ class GodelMachine:
 
     def get_total_rewards(self, flow_state: any) -> float:
         """Calculate the total rewards from the workflow state."""
+        if not flow_state:
+            return 0.0
         if "evaluation_scores" not in flow_state:
             return 0.0
         return flow_state["evaluation_scores"]["overall_score"]
@@ -83,33 +87,32 @@ class GodelMachine:
         run_stdout: str,
         iteration_count: int,
     ) -> str:
-        flow_rewards = 0.0
         flow_answers = ""
 
         if flow_state is not None:
-            flow_rewards = self.get_total_rewards(flow_state)
             flow_answers = self.get_flow_answers(flow_state)
         else:
             flow_answers = (
                 run_stdout.strip()
             )
 
-        print(f"\n===\nTotal rewards accumulated: {flow_rewards:.1f}")
-
         return f"""
-You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
+You must iteratively improve the workflow based on the previous execution results.
 
-Previous workflow code you generated:
+Previous workflow code :
 {flow_code}
 
-Previous generation attempt ({iteration_count}) resulted in the following output:
+Previous generation attempt ({iteration_count}) result in the following output:
 
 {flow_answers}
 
-Learn from this output and improve the workflow generation.
+Given this output, you need to improve the workflow.
+Do not change the whole workflow. Change a prompt, add an agent, change a tool, etc.. 
+Create a new workflow that improves the previous one with the single change you choose.
+Add extensive comments in the code to explain your changes.
         """
 
-    def select_workflow_template(self, goal_prompt, template_uuid: str | None = None) -> str:
+    def select_workflow_template(self, goal_prompt, template_uuid: str = None) -> str:
         """Select and load a workflow template by UUID.
 
         Args:
@@ -124,7 +127,7 @@ Learn from this output and improve the workflow generation.
             return None
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
-                goal_prompt=goal_prompt,
+                goal=goal_prompt,
             )
             return candidates[0].code if candidates else None
         try:
@@ -144,15 +147,25 @@ Learn from this output and improve the workflow generation.
         goal_prompt: str,
         template_uuid: str | None = None,
         judge: bool = False,
+        human_validation: bool = False,
     ):
-        template = self.select_workflow_template(goal=goal_prompt,
+        template = self.select_workflow_template(goal_prompt,
                                                  template_uuid=template_uuid)
+        
+        rewards_history = []
+        # Create rewards curve plot using VisualizationUtils
+        plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
+        
         await self.recursive_self_improvement(
             goal_prompt,
             goal_prompt,
             template_uuid=template_uuid,
             workflow_template=template,
+            max_depth=10,
             judge=judge,
+            need_human_validation=human_validation,
+            rewards_history=rewards_history,
+            plot_data=plot_data,
         )
 
     async def recursive_self_improvement(
@@ -162,8 +175,11 @@ Learn from this output and improve the workflow generation.
         template_uuid: str | None = None,
         workflow_template: str | None = None,
         iteration_count: int = 0,
-        max_depth: int = 5,
+        max_depth: int = 10,
         judge: bool = False,
+        need_human_validation: bool = False,
+        rewards_history: list[float] = None,
+        plot_data: tuple = None,
     ) -> str:
         """Run a self-improvement loop for the workflow.
 
@@ -174,52 +190,76 @@ Learn from this output and improve the workflow generation.
             workflow_template: Optional workflow template code to use
             iteration_count: Current iteration count (for recursion)
             max_depth: Maximum depth of recursion
+            plot_data: Tuple containing (fig, ax, line) for VisualizationUtils plotting
         Returns:
             str: Final execution status message
         """
         flow_output = ""
-        print(f"\n{'=' * 60}")
-        print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
-        print(f"{'=' * 60}")
-        if iteration_count > 0:
+        total_cost = 0.0
+
+        if iteration_count > 0 and need_human_validation:
             human_validation = (
                 input("Continue with next iteration? (yes/no): ").strip().lower()
             )
             if human_validation not in ["yes", "y"]:
-                print("Exiting self-improvement loop.")
-                print()
+                print("Exiting self-improvement loop.\n")
                 return flow_output
+
+        print(f"\n{'=' * 60}")
+        print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
+        print(f"{'=' * 60}")
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─' * 60}")
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
-            prompt, template_uuid, workflow_template
+            goal_prompt=prompt,
+            workflow_template=workflow_template if iteration_count == 0 else None
         )
         if executed:
             if judge:
                 self.judge.evaluate(uuid)
             total_cost = self.judge.calculate_cost(uuid)
-            print(f"Total workflow cost: {total_cost:.3f} USD")
+
         flow_state = self.load_flow_state_result(uuid)
+        flow_rewards = self.get_total_rewards(flow_state)
+        rewards_history.append(flow_rewards)
+        
+        # Update plot in real-time using VisualizationUtils
+        if plot_data:
+            self.viz_utils.update_rewards_curve(plot_data, rewards_history)
+        
+        print(f"\n{'-' * 60}")
+        print(f"Total rewards: {flow_rewards:.1f}")
+        print(f"Total cost: {total_cost:.3f} USD")
+        print(f"{'-' * 60}\n")
         self.notifier.send_message(
-            str(flow_state) if flow_state else run_stdout,
+            f"Iteration {iteration_count + 1} completed.\n \
+            Cost: {total_cost:.3f} USD.\n \
+            Score : {self.get_total_rewards(flow_state):.2f}",
             title=f"Workflow {uuid} completed.",
         )
-        flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
+
+        #flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
+        flow_code = self.select_workflow_template(goal_prompt=goal,
+                                                  template_uuid=template_uuid)
         prompt = self.improvement_prompt(
             goal, flow_state, flow_code, run_stdout, iteration_count
         )
-        template_uuid = None
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
             return flow_output
         await self.recursive_self_improvement(
             prompt,
             goal,
-            template_uuid,
+            template_uuid=None,
             workflow_template=flow_code if flow_state else None,
             iteration_count=iteration_count + 1,
+            max_depth=max_depth,
+            judge=judge,
+            need_human_validation=need_human_validation,
+            rewards_history=rewards_history,
+            plot_data=plot_data,
         )
         return flow_output

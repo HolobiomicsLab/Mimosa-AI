@@ -20,6 +20,7 @@ from fastmcp import Client
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
+from sources.core.parallel_testing import ParallelTesting
 
 dotenv.load_dotenv()
 
@@ -34,7 +35,6 @@ def validate_environment() -> None:
         raise ValueError(
             "⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key."
         )
-
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
     """Add CLI arguments for config parameters that can be overridden."""
@@ -81,6 +81,47 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
+def collect_goals_from_user() -> List[str]:
+    """Collect goals from user input for mass testing.
+    
+    Returns:
+        List of goal strings entered by the user
+    """
+    goals = []
+    print("\n🎯 Mass Testing Mode - Enter your goals")
+    print("=" * 50)
+    print("Enter goals one at a time. Press Enter with empty input to finish.")
+    print("Type 'quit' or 'exit' to cancel.\n")
+    
+    goal_count = 1
+    while True:
+        try:
+            goal = input(f"Goal {goal_count}: ").strip()
+            
+            if not goal:
+                if goals:
+                    break
+                else:
+                    print("⚠️ Please enter at least one goal or type 'quit' to cancel.")
+                    continue
+                    
+            if goal.lower() in ['quit', 'exit']:
+                print("❌ Mass testing cancelled by user.")
+                return []
+                
+            goals.append(goal)
+            goal_count += 1
+            
+        except KeyboardInterrupt:
+            print("\n❌ Mass testing cancelled by user.")
+            return []
+    
+    print(f"\n✅ Collected {len(goals)} goals for mass testing:")
+    for i, goal in enumerate(goals, 1):
+        print(f"  {i}. {goal[:60]}{'...' if len(goal) > 60 else ''}")
+    
+    return goals
+
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
@@ -94,7 +135,26 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-
+async def mass_testing_mode(args, config):
+    if getattr(args, 'mass_testing', False):
+        # Mass testing mode
+        goals = collect_goals_from_user()
+        if not goals:
+            print("❌ No goals provided for mass testing. Exiting.")
+            return
+        parallel_testing = ParallelTesting(config)
+        results = parallel_testing.start_parallel_testing(
+            goals=goals,
+            template_uuid=args.load_template,
+            judge=args.judge,
+            human_validation=False,  # Disable human validation for mass testing
+            max_workers=getattr(args, 'max_workers', None)
+        )
+        print("\n📊 Mass Testing Results:")
+        print("=" * 50)
+        print(json.dumps(results, indent=2))
+        print("=" * 50)
+            
 async def main():
     """Main execution function"""
     config = Config()
@@ -107,13 +167,19 @@ async def main():
         "--goal", type=str, help="Goal prompt for the workflow"
     )
     parser.add_argument(
-        "--single_task",  type=str, help="Goal prompt for the workflow"
+        "--task",  type=str, help="Goal prompt for the workflow"
     )
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load"
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+    )
+    parser.add_argument(
+        "--mass-testing", action="store_true", default=False, help="Enable mass testing mode with multiple goals"
+    )
+    parser.add_argument(
+        "--max-workers", type=int, help="Maximum number of parallel processes for mass testing"
     )
 
     add_config_arguments(parser, config)
@@ -124,14 +190,20 @@ async def main():
     config.validate_paths()
 
     try:
-        dgm = GodelMachine(config)
-        planner = Planner(config)
-        if args.single_task:
-            await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
-        elif args.goal:
-            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+        if args.mass_testing:
+            # Mass testing mode
+            await mass_testing_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+            # Single execution mode
+            dgm = GodelMachine(config)
+            planner = Planner(config)
+            if args.task:
+                await dgm.start_dgm(goal_prompt=args.task, judge=args.judge, human_validation=False)
+            elif args.goal:
+                await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+            else:
+                raise ValueError("No goal provided. Use --task, --goal, or --mass-testing to start.")
+                
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user. Cleaning up...")
         raise
