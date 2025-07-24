@@ -128,31 +128,37 @@ async def main():
     validate_environment()
     config.validate_paths()
 
-    if (args.dataset):
-        print(f"Using {args.dataset} dataset")
-        dataset_questions = read_dataset(args.dataset, 1)
-        if dataset_questions and args.goal:
-            for question, answer in dataset_questions:
-                print(f"\nProcessing question: {question}...")
-                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge, answer=answer)
-        else:
-            print("❌ No questions found in dataset or no goal provided.")
-    else:
-        try:
-            dgm = GodelMachine(config)
-            planner = Planner(config)
+    dgm = GodelMachine(config)
+    planner = Planner(config)
+
+    try:
+        if (args.dataset):
+            print(f"Using {args.dataset} dataset")
+            dataset_questions = read_dataset(args.dataset, 15)
+            all_run = []
+            if dataset_questions:
+                for question, answer in dataset_questions:
+                    print(f"\nProcessing question: {question}...")
+                    uuid = await planner.start_planner(goal=question, template_uuid=args.load_template, judge=True, answer=answer)
+                    all_run.append(uuid)
+                
+                # Calculate average of good_answer values
+                calculate_good_answer_average(all_run)
+            else:
+                print("❌ No questions found in dataset or no goal provided.")
+        else:    
             if args.single_task:
                 await dgm.start_dgm(goal=args.single_task, judge=args.judge)
             elif args.goal:
                 await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
             else:
                 raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
-        except KeyboardInterrupt:
-            print("\n⚠️ Interrupted by user. Cleaning up...")
-            raise
-        except Exception as e:
-            print(f"❌ Error during execution: {e}")
-            raise
+    except KeyboardInterrupt:
+        print("\n⚠️ Interrupted by user. Cleaning up...")
+        raise
+    except Exception as e:
+        print(f"❌ Error during execution: {e}")
+        raise
 
 def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, str]]:
     """
@@ -177,7 +183,7 @@ def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, st
                         try:
                             data = json.loads(line)
                             if "question" in data and "answer" in data:
-                                match = re.search(r'#### (\d+)', data["answer"])
+                                match = re.search(r'#### (-?\d+)', data["answer"])
                                 if match:
                                     answer = match.group(1)
                                     results.append((data["question"], answer))
@@ -201,6 +207,52 @@ def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, st
     except Exception as e:
         print(f"❌ Error reading dataset: {e}")
         return []
+
+def calculate_good_answer_average(uuids: List[str]) -> float:
+    """
+    Calculate the average of good_answer values across all workflow runs.
+    
+    Args:
+        uuids: List of workflow UUIDs to analyze
+        
+    Returns:
+        Average of good_answer values (0.0 to 1.0)
+    """
+    if not uuids:
+        print("No workflow UUIDs to analyze")
+        return 0.0
+    
+    good_answer_count = 0
+    total_workflows = len(uuids)
+    
+    print(f"\nAnalyzing results for {total_workflows} workflows...")
+    
+    for uuid in uuids:
+        state_result_path = Path(f"sources/workflows/{uuid}/state_result.json")
+        
+        try:
+            if state_result_path.exists():
+                with open(state_result_path, 'r', encoding='utf-8') as f:
+                    state_result = json.load(f)
+                    
+                    if "good_answer" in state_result:
+                        if state_result["good_answer"]:
+                            good_answer_count += 1
+                    else:
+                        print(f"⚠️ No 'good_answer' key found in state_result for UUID: {uuid}")
+            else:
+                print(f"⚠️ State result file not found for UUID: {uuid}")
+        except Exception as e:
+            print(f"❌ Error processing state result for UUID {uuid}: {e}")
+    
+    average = good_answer_count / total_workflows if total_workflows > 0 else 0
+    
+    print(f"\n=== Results Summary ===")
+    print(f"Total workflows analyzed: {total_workflows}")
+    print(f"Workflows with good answer: {good_answer_count}")
+    print(f"Average good_answer rate: {average:.2f} ({good_answer_count}/{total_workflows})")
+    
+    return average
 
 if __name__ == "__main__":
     asyncio.run(main())
