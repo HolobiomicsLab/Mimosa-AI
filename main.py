@@ -8,10 +8,12 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import signal
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+import random
 
 import dotenv
 import requests
@@ -115,6 +117,9 @@ async def main():
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset to use (in csv format)"
+    )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
@@ -123,23 +128,79 @@ async def main():
     validate_environment()
     config.validate_paths()
 
-    print(f"goal {args.goal}")
-
-    try:
-        dgm = GodelMachine(config)
-        planner = Planner(config)
-        if args.single_task:
-            await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
-        elif args.goal:
-            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template, judge=args.judge)
+    if (args.dataset):
+        print(f"Using {args.dataset} dataset")
+        dataset_questions = read_dataset(args.dataset, 1)
+        if dataset_questions and args.goal:
+            for question, answer in dataset_questions:
+                print(f"\nProcessing question: {question}...")
+                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge, answer=answer)
         else:
-            raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
-    except KeyboardInterrupt:
-        print("\n⚠️ Interrupted by user. Cleaning up...")
-        raise
+            print("❌ No questions found in dataset or no goal provided.")
+    else:
+        try:
+            dgm = GodelMachine(config)
+            planner = Planner(config)
+            if args.single_task:
+                await dgm.start_dgm(goal=args.single_task, judge=args.judge)
+            elif args.goal:
+                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
+            else:
+                raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+        except KeyboardInterrupt:
+            print("\n⚠️ Interrupted by user. Cleaning up...")
+            raise
+        except Exception as e:
+            print(f"❌ Error during execution: {e}")
+            raise
+
+def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, str]]:
+    """
+    Read dataset files from the specified path and return a subset of questions.
+    
+    Args:
+        dataset_path: Path to the dataset directory or file
+        num_samples: Number of samples to return (default: 10)
+        
+    Returns:
+        List of tuples containing (question, answer) pairs
+    """
+    dataset_path = Path('datasets') / f"{dataset_file}.jsonl" 
+    results = []
+    
+    try:  
+        if dataset_path.exists():
+            with open(dataset_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            if "question" in data and "answer" in data:
+                                match = re.search(r'#### (\d+)', data["answer"])
+                                if match:
+                                    answer = match.group(1)
+                                    results.append((data["question"], answer))
+                                else:
+                                    print(f"No answer found for question: {data['question']}")
+                        except json.JSONDecodeError:
+                            print(f"⚠️ Error parsing JSON in {dataset_path}")
+        else:
+            print(f"❌ Dataset path {dataset_path} is neither a file nor a directory")
+            return []
+            
+        # Return a random subset of the results
+        if results:
+            if len(results) > num_samples:
+                return random.sample(results, num_samples)
+            return results
+        else:
+            print(f"⚠️ No valid questions found in {dataset_path}")
+            return []
+            
     except Exception as e:
-        print(f"❌ Error during execution: {e}")
-        raise
+        print(f"❌ Error reading dataset: {e}")
+        return []
 
 if __name__ == "__main__":
     asyncio.run(main())
