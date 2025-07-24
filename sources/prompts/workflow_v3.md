@@ -87,6 +87,8 @@ def master_router(state: WorkflowState) -> str:
         # Logic to determine the next step after success
         if last_step == "researcher":
             return "coder"
+        elif current_agent == "coder":
+            return "formatter"
         else:
             return END # End of the workflow
     
@@ -127,19 +129,22 @@ from typing import TypedDict, List
 from langgraph.graph import StateGraph, START, END
 
 # 2. MANDATORY Workflow Initialization
-workflow = StateGraph(WorkflowState)
+workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
 
 # 3. AGENT INSTRUCTIONS (Define all prompts here)
-instruct_researcher = "..."
-instruct_coder = "..."
+instruct_researcher = """..."""
+instruct_coder = """..."""
+instruct_formatter = """..."""
 
 # 4. AGENT CREATION (Instantiate all agents here)
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])
+agent_formatter = SmolAgentFactory("formatter", instruct_formatter, CSV_TOOLS))
 
 # 5. NODE DEFINITION (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
 workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
+workflow.add_node("formatter", WorkflowNodeFactory.create_agent_node(agent_formatter))
 
 # 6. ROUTING FUNCTION (Define routing logic here)
 def master_router(state: WorkflowState) -> str:
@@ -150,11 +155,18 @@ workflow.add_edge(START, "researcher")
 
 workflow.add_conditional_edges(
     "researcher",
-    master_router
+    master_router,
+    {"retry_path": "researcher", "next_node":"coder", END:END}
 )
 workflow.add_conditional_edges(
     "coder",
-    master_router
+    master_router,
+    {"fallback_path": "researcher", "retry_path": "coder", "next_node":"coder", END:END}
+)
+workflow.add_conditional_edges(
+    "formatter",
+    master_router,
+    {"fallback_path": "researcher", "retry_path": "coder", END:END}
 )
 
 # --- END OF SCRIPT ---
