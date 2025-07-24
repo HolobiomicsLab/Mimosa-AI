@@ -11,11 +11,11 @@ class Planner:
         self.dgm = GodelMachine(config)
 
     async def start_planner(
-        self, goal_prompt: str, template_uuid: str | None, judge: bool
+        self, goal: str, template_uuid: str | None, judge: bool, answer :str=None
     ) -> None:
         """Start the planner with a given goal prompt and optional template UUID."""
         # NOTE for now the planner just wrap the GodelMachine start_dgm method
         # So the global goal and task specific goal are the same
         await self.dgm.start_dgm(
-            goal_prompt=goal_prompt, template_uuid=template_uuid, judge=judge
+            goal=goal, template_uuid=template_uuid, judge=judge, answer = answer
         )
