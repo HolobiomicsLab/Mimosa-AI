@@ -21,6 +21,7 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.core.parallel_testing import ParallelTesting
+import shutil
 
 dotenv.load_dotenv()
 
@@ -206,10 +207,19 @@ async def main():
                 
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user. Cleaning up...")
+        cleanup()
         raise
     except Exception as e:
         print(f"❌ Error during execution: {e}")
+        cleanup()
         raise
+
+def cleanup():
+    """Cleanup function to run on exit"""
+    print("Cleaning up resources...")
+    shutil.rmtree("tmp/", ignore_errors=True)
+    pass
 
 if __name__ == "__main__":
     asyncio.run(main())
+    cleanup()

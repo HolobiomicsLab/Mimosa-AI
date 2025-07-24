@@ -2,8 +2,8 @@
 Darwin Godel Machine
 """
 
-import json
 import os
+import json
 
 from sources.core.judge import WorkflowJudge
 from sources.utils.visualization import VisualizationUtils
@@ -175,7 +175,7 @@ Add extensive comments in the code to explain your changes.
         template_uuid: str | None = None,
         workflow_template: str | None = None,
         iteration_count: int = 0,
-        max_depth: int = 10,
+        max_depth: int = 5,
         judge: bool = False,
         need_human_validation: bool = False,
         rewards_history: list[float] = None,

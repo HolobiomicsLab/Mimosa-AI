@@ -2,13 +2,12 @@
 VisualizationUtils class providing various curve plot functions.
 """
 
+from typing import Any
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Optional, Any
-import numpy as np
 
 
 class VisualizationUtils:
-    """Utility class for creating and managing various types of plots and visualizations."""
+    """Utility class for creating and managing types of plots and visualizations."""
     
     def __init__(self):
         """Initialize the VisualizationUtils class."""
@@ -19,13 +18,13 @@ class VisualizationUtils:
         title: str, 
         xlabel: str = "X", 
         ylabel: str = "Y",
-        figsize: Tuple[int, int] = (10, 6),
+        figsize: list[int, int] = (10, 6),
         grid: bool = True,
         grid_alpha: float = 0.3,
         line_style: str = 'b-o',
         line_width: int = 2,
         marker_size: int = 6
-    ) -> Tuple[Any, Any, Any]:
+    ) -> list[Any, Any, Any]:
         """
         Create a real-time curve plot that can be updated dynamically.
         
@@ -41,7 +40,7 @@ class VisualizationUtils:
             marker_size: Size of markers
             
         Returns:
-            Tuple containing (figure, axis, line) objects
+            list containing (figure, axis, line) objects
         """
         plt.ion()  # Turn on interactive mode
         fig, ax = plt.subplots(figsize=figsize)
@@ -52,7 +51,8 @@ class VisualizationUtils:
         if grid:
             ax.grid(True, alpha=grid_alpha)
             
-        line, = ax.plot([], [], line_style, linewidth=line_width, markersize=marker_size)
+        line, = ax.plot([], [], line_style,
+                        linewidth=line_width, markersize=marker_size)
         plt.show()
         
         # Store the plot for later reference
@@ -63,9 +63,9 @@ class VisualizationUtils:
     
     def update_curve_plot(
         self, 
-        plot_data: Tuple[Any, Any, Any], 
-        x_data: List[float], 
-        y_data: List[float],
+        plot_data: list[Any, Any, Any], 
+        x_data: list[float], 
+        y_data: list[float],
         auto_scale: bool = True,
         x_margin: float = 1.0
     ) -> None:
@@ -73,9 +73,9 @@ class VisualizationUtils:
         Update a real-time curve plot with new data.
         
         Args:
-            plot_data: Tuple containing (figure, axis, line) objects
-            x_data: List of x-axis values
-            y_data: List of y-axis values
+            plot_data: list containing (figure, axis, line) objects
+            x_data: list of x-axis values
+            y_data: list of y-axis values
             auto_scale: Whether to auto-scale the axes
             x_margin: Margin to add to x-axis limits
         """
@@ -98,8 +98,8 @@ class VisualizationUtils:
     def create_rewards_curve_plot(
         self, 
         goal_prompt: str,
-        figsize: Tuple[int, int] = (10, 6)
-    ) -> Tuple[Any, Any, Any]:
+        figsize: list[int, int] = (10, 6)
+    ) -> list[Any, Any, Any]:
         """
         Create a specialized rewards curve plot for tracking algorithm performance.
         
@@ -108,7 +108,7 @@ class VisualizationUtils:
             figsize: Figure size as (width, height)
             
         Returns:
-            Tuple containing (figure, axis, line) objects
+            list containing (figure, axis, line) objects
         """
         return self.create_real_time_curve_plot(
             title=f'Rewards Curve - {goal_prompt}',
@@ -124,15 +124,15 @@ class VisualizationUtils:
     
     def update_rewards_curve(
         self, 
-        plot_data: Tuple[Any, Any, Any], 
-        rewards_history: List[float]
+        plot_data: list[Any, Any, Any], 
+        rewards_history: list[float]
     ) -> None:
         """
         Update the rewards curve plot with new rewards data.
         
         Args:
-            plot_data: Tuple containing (figure, axis, line) objects
-            rewards_history: List of reward values
+            plot_data: list containing (figure, axis, line) objects
+            rewards_history: list of reward values
         """
         iterations = list(range(1, len(rewards_history) + 1))
         self.update_curve_plot(plot_data, iterations, rewards_history)
@@ -142,11 +142,11 @@ class VisualizationUtils:
         title: str,
         xlabel: str = "X",
         ylabel: str = "Y",
-        curve_configs: List[dict] = None,
-        figsize: Tuple[int, int] = (10, 6),
+        curve_configs: list[dict] = None,
+        figsize: list[int, int] = (10, 6),
         grid: bool = True,
         grid_alpha: float = 0.3
-    ) -> Tuple[Any, Any, List[Any]]:
+    ) -> list[Any, Any, list[Any]]:
         """
         Create a plot with multiple curves.
         
@@ -154,17 +154,19 @@ class VisualizationUtils:
             title: Title of the plot
             xlabel: Label for x-axis
             ylabel: Label for y-axis
-            curve_configs: List of dictionaries with curve configurations
+            curve_configs: list of dictionaries with curve configurations
                           Each dict can contain: 'style', 'width', 'size', 'label'
             figsize: Figure size as (width, height)
             grid: Whether to show grid
             grid_alpha: Grid transparency
             
         Returns:
-            Tuple containing (figure, axis, list_of_lines) objects
+            list containing (figure, axis, list_of_lines) objects
         """
         if curve_configs is None:
-            curve_configs = [{'style': 'b-o', 'width': 2, 'size': 6, 'label': 'Curve 1'}]
+            curve_configs = [
+                {'style': 'b-o', 'width': 2, 'size': 6, 'label': 'Curve 1'}
+            ]
         
         plt.ion()
         fig, ax = plt.subplots(figsize=figsize)
@@ -182,7 +184,8 @@ class VisualizationUtils:
             size = config.get('size', 6)
             label = config.get('label', f'Curve {len(lines) + 1}')
             
-            line, = ax.plot([], [], style, linewidth=width, markersize=size, label=label)
+            line, = ax.plot([], [], style, linewidth=width,
+                            markersize=size, label=label)
             lines.append(line)
         
         if len(curve_configs) > 1:
@@ -193,16 +196,16 @@ class VisualizationUtils:
     
     def update_multi_curve_plot(
         self,
-        plot_data: Tuple[Any, Any, List[Any]],
-        curves_data: List[Tuple[List[float], List[float]]],
+        plot_data: list[Any, Any, list[Any]],
+        curves_data: list[list[list[float], list[float]]],
         auto_scale: bool = True
     ) -> None:
         """
         Update a multi-curve plot with new data.
         
         Args:
-            plot_data: Tuple containing (figure, axis, list_of_lines) objects
-            curves_data: List of tuples, each containing (x_data, y_data) for a curve
+            plot_data: list containing (figure, axis, list_of_lines) objects
+            curves_data: list of lists, each containing (x_data, y_data) for a curve
             auto_scale: Whether to auto-scale the axes
         """
         fig, ax, lines = plot_data
@@ -221,23 +224,23 @@ class VisualizationUtils:
     def create_comparison_plot(
         self,
         title: str,
-        data_sets: List[Tuple[List[float], List[float], str]],
+        data_sets: list[list[list[float], list[float], str]],
         xlabel: str = "X",
         ylabel: str = "Y",
-        figsize: Tuple[int, int] = (12, 8)
-    ) -> Tuple[Any, Any]:
+        figsize: list[int, int] = (12, 8)
+    ) -> list[Any, Any]:
         """
         Create a comparison plot with multiple data sets.
         
         Args:
             title: Title of the plot
-            data_sets: List of tuples containing (x_data, y_data, label)
+            data_sets: list of lists containing (x_data, y_data, label)
             xlabel: Label for x-axis
             ylabel: Label for y-axis
             figsize: Figure size as (width, height)
             
         Returns:
-            Tuple containing (figure, axis) objects
+            list containing (figure, axis) objects
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
@@ -262,7 +265,7 @@ class VisualizationUtils:
     
     def save_plot(
         self, 
-        plot_data: Tuple[Any, Any, Any], 
+        plot_data: list[Any, Any, Any], 
         filename: str, 
         dpi: int = 300,
         bbox_inches: str = 'tight'
@@ -271,7 +274,7 @@ class VisualizationUtils:
         Save a plot to file.
         
         Args:
-            plot_data: Tuple containing plot objects (figure is first element)
+            plot_data: list containing plot objects (figure is first element)
             filename: Name of the file to save
             dpi: Resolution in dots per inch
             bbox_inches: Bounding box setting
@@ -280,12 +283,12 @@ class VisualizationUtils:
         fig.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
         print(f"Plot saved to {filename}")
     
-    def close_plot(self, plot_data: Tuple[Any, Any, Any]) -> None:
+    def close_plot(self, plot_data: list[Any, Any, Any]) -> None:
         """
         Close a plot and free up memory.
         
         Args:
-            plot_data: Tuple containing plot objects (figure is first element)
+            plot_data: list containing plot objects (figure is first element)
         """
         fig = plot_data[0]
         plt.close(fig)
@@ -297,20 +300,20 @@ class VisualizationUtils:
     
     def create_histogram(
         self,
-        data: List[float],
+        data: list[float],
         title: str,
         xlabel: str = "Value",
         ylabel: str = "Frequency",
         bins: int = 30,
-        figsize: Tuple[int, int] = (10, 6),
+        figsize: list[int, int] = (10, 6),
         color: str = 'blue',
         alpha: float = 0.7
-    ) -> Tuple[Any, Any]:
+    ) -> list[Any, Any]:
         """
         Create a histogram plot.
         
         Args:
-            data: List of values to plot
+            data: list of values to plot
             title: Title of the plot
             xlabel: Label for x-axis
             ylabel: Label for y-axis
@@ -320,7 +323,7 @@ class VisualizationUtils:
             alpha: Transparency of the bars
             
         Returns:
-            Tuple containing (figure, axis) objects
+            list containing (figure, axis) objects
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.hist(data, bins=bins, color=color, alpha=alpha, edgecolor='black')
