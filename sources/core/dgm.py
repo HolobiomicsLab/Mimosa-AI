@@ -7,8 +7,8 @@ import os
 
 from sources.core.judge import WorkflowJudge
 from sources.utils.visualization import VisualizationUtils
+from sources.utils.notify import PushNotifier
 
-from .notify import PushNotifier
 from .orchestrator import WorkflowOrchestrator
 from .workflow_selection import WorkflowSelector
 
