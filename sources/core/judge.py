@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
-from sources.core.llm_provider import LLMProvider
+from flask import Config
+
+from sources.core.llm_provider import LLMConfig, LLMProvider
 
 
 @dataclass
@@ -200,8 +202,8 @@ class WorkflowJudge:
                 text += f"Output: {step['result']}\n"
             text += "\n"
 
-        text += "--- MERMAID WORKFLOW ---\n"
-        with open(workflow_path / "mermaid.txt") as f:
+        text += "--- WORKFLOW CODE---\n"
+        with open(workflow_path / f"workflow_code_{uuid}.py") as f:
             workflow_mermaid = f.read()
         text += f"{workflow_mermaid}\n"
 
@@ -278,16 +280,9 @@ Be precise, constructive, and technical in your judgment."""
 Please be objective, technical, and specific in your feedback.
 """
         print("Calling LLMProvider to evaluate the workflow...")
-        history = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
-        output = LLMProvider().openai_completion(
-            history=history,
-            called_by="judge",
-            memory_path=self.memory_dir / uuid,
-            model="o4-mini-2025-04-16",
-        )
+        memory_path = Path(self.memory_dir) / uuid
+        config_llm = LLMConfig().from_dict({"model":"o4-mini-2025-04-16"})
+        output = LLMProvider('judge',memory_path,system_prompt,config_llm)(prompt)
 
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
@@ -302,10 +297,12 @@ Please be objective, technical, and specific in your feedback.
         
         good_answer = None
         if answer:
+            print("Judge compare output to real answer...")
             workflow_path = Path(self.workflow_dir) / uuid
             with open(workflow_path / "state_result.json") as f:
                 last_answer = json.load(f).get("answers", [])[-1]
                 good_answer = answer in last_answer
+                print("Good answer") if good_answer else print("Bad answer")
         
         self._update_state_result(scores, uuid,good_answer)
         print("Scores extracted and saved to state result.")
