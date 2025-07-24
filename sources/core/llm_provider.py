@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from dataclasses import dataclass, field
 
 import litellm
@@ -84,6 +85,7 @@ class LLMProvider:
         self.sys_msg = system_msg
         self.agent_name = agent_name
         self.memory_path = memory_path
+        self.max_retries = 3
 
     def save_call(self, call: dict) -> None:
         """
@@ -97,21 +99,30 @@ class LLMProvider:
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
-    def __call__(self, prompt: str):
+    def __call__(self, prompt: str, timeout: int = 120):
         message = []
         if self.sys_msg is not None:
             message.append({"content": self.sys_msg, "role": "system"})
 
         message.append({"role": "user", "content": prompt})
 
-        try:
-            response = litellm.completion(
-                model=f"{self.config.provider}/{self.config.model}",
-                messages=message,
-                temperature=self.config.temperature,
-            )
-        except Exception as e:
-            raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
+        for attempt in range(self.max_retries):
+            try:
+                response = litellm.completion(
+                    model=f"{self.config.provider}/{self.config.model}",
+                    messages=message,
+                    temperature=self.config.temperature,
+                    timeout=timeout,
+                )
+                break
+            except TimeoutError:
+                print(f"⌛ Timeout on attempt {attempt + 1}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(0.1)  # Small delay before retry
+                    continue
+                raise RuntimeError(f"❌ LLM Tiemout {self.max_retries} times") from None
+            except Exception as e:
+                raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
 

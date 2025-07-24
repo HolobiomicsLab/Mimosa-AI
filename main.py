@@ -235,8 +235,8 @@ def calculate_good_answer_average(uuids: List[str]) -> float:
                 with open(state_result_path, 'r', encoding='utf-8') as f:
                     state_result = json.load(f)
                     
-                    if "good_answer" in state_result:
-                        if state_result["good_answer"]:
+                    if "answer_correctness" in state_result["evaluation_scores"]:
+                        if state_result["evaluation_scores"]["answer_correctness"] >= 8:
                             good_answer_count += 1
                     else:
                         print(f"⚠️ No 'good_answer' key found in state_result for UUID: {uuid}")
