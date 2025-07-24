@@ -93,6 +93,8 @@ class GodelMachine:
         return f"""
 You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
 
+User goal : {goal}
+
 Previous workflow code you generated:
 {flow_code}
 
@@ -133,28 +135,38 @@ Learn from this output and improve the workflow generation.
 
     async def start_dgm(
         self,
-        goal_prompt: str,
+        goal: str,
         template_uuid: str | None = None,
         judge: bool = False,
+        answer: str = None,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
+
+        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"{'─' * 60}")
+        print(f"  {goal}")
+        print(f"{'─' * 60}\n")
+
         await self.recursive_self_improvement(
-            goal_prompt,
-            goal_prompt,
+            goal,
+            goal,
             template_uuid=template_uuid,
             workflow_template=template,
             judge=judge,
+            max_depth = 1,
+            answer=answer
         )
 
     async def recursive_self_improvement(
         self,
+        goal,
         prompt: str,
-        goal: str,
         template_uuid: str | None = None,
         workflow_template: str | None = None,
         iteration_count: int = 0,
         max_depth: int = 5,
         judge: bool = False,
+        answer: str=None,
     ) -> str:
         """Run a self-improvement loop for the workflow.
 
@@ -170,7 +182,7 @@ Learn from this output and improve the workflow generation.
         """
         flow_output = ""
         print(f"\n{'=' * 60}")
-        print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
+        print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
         print(f"{'=' * 60}")
         if iteration_count > 0:
             human_validation = (
@@ -180,17 +192,14 @@ Learn from this output and improve the workflow generation.
                 print("Exiting self-improvement loop.")
                 print()
                 return flow_output
-        print(f"\n{'📋 CURRENT GOAL':^60}")
-        print(f"{'─' * 60}")
-        print(f"  {goal}")
-        print(f"{'─' * 60}\n")
+        
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             prompt, template_uuid, workflow_template
         )
         if executed:
             if judge:
-                self.judge.evaluate(uuid)
+                self.judge.evaluate(uuid, answer)
             total_cost = self.judge.calculate_cost(uuid)
             print(f"Total workflow cost: {total_cost:.3f} USD")
         flow_state = self.load_flow_state_result(uuid)
