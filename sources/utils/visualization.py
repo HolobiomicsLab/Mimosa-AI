@@ -3,7 +3,11 @@ VisualizationUtils class providing various curve plot functions.
 """
 
 from typing import Any
+import matplotlib
 import matplotlib.pyplot as plt
+
+# Set matplotlib to use a non-interactive backend to avoid threading issues
+matplotlib.use('Agg')
 
 
 class VisualizationUtils:
@@ -42,7 +46,7 @@ class VisualizationUtils:
         Returns:
             list containing (figure, axis, line) objects
         """
-        plt.ion()  # Turn on interactive mode
+        # Use non-interactive mode to avoid threading issues
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
@@ -53,7 +57,7 @@ class VisualizationUtils:
             
         line, = ax.plot([], [], line_style,
                         linewidth=line_width, markersize=marker_size)
-        plt.show()
+        # Remove plt.show() to avoid GUI threading issues
         
         # Store the plot for later reference
         plot_id = f"{title}_{id(fig)}"
@@ -92,8 +96,8 @@ class VisualizationUtils:
             if x_data:
                 ax.set_xlim(0, max(5, max(x_data) + x_margin))
         
-        plt.draw()
-        plt.pause(0.01)
+        # Remove problematic GUI operations that cause threading issues on macOS
+        # plt.draw() and plt.pause() removed
     
     def create_rewards_curve_plot(
         self, 
@@ -168,7 +172,7 @@ class VisualizationUtils:
                 {'style': 'b-o', 'width': 2, 'size': 6, 'label': 'Curve 1'}
             ]
         
-        plt.ion()
+        # Use non-interactive mode to avoid threading issues
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
@@ -191,7 +195,7 @@ class VisualizationUtils:
         if len(curve_configs) > 1:
             ax.legend()
         
-        plt.show()
+        # Remove plt.show() to avoid GUI threading issues
         return fig, ax, lines
     
     def update_multi_curve_plot(
@@ -218,8 +222,8 @@ class VisualizationUtils:
             ax.relim()
             ax.autoscale_view()
         
-        plt.draw()
-        plt.pause(0.01)
+        # Remove problematic GUI operations that cause threading issues on macOS
+        # plt.draw() and plt.pause() removed
     
     def create_comparison_plot(
         self,

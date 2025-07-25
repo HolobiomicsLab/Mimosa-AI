@@ -136,9 +136,8 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-async def mass_testing_mode(args, config):
+async def parallel_execution_mode(args, config):
     if getattr(args, 'mass_testing', False):
-        # Mass testing mode
         goals = collect_goals_from_user()
         if not goals:
             print("❌ No goals provided for mass testing. Exiting.")
@@ -148,13 +147,23 @@ async def mass_testing_mode(args, config):
             goals=goals,
             template_uuid=args.load_template,
             judge=args.judge,
-            human_validation=False,  # Disable human validation for mass testing
+            human_validation=False,
             max_workers=getattr(args, 'max_workers', None)
         )
         print("\n📊 Mass Testing Results:")
         print("=" * 50)
         print(json.dumps(results, indent=2))
         print("=" * 50)
+
+async def normal_execution_mode(args, config):
+    dgm = GodelMachine(config)
+    planner = Planner(config)
+    if args.task:
+        await dgm.start_dgm(goal_prompt=args.task, judge=args.judge, human_validation=False)
+    elif args.goal:
+        await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+    else:
+        raise ValueError("No goal provided. Use --task, --goal, or --mass-testing to start.")
             
 async def main():
     """Main execution function"""
@@ -192,19 +201,9 @@ async def main():
 
     try:
         if args.mass_testing:
-            # Mass testing mode
-            await mass_testing_mode(args, config)
+            await parallel_execution_mode(args, config)
         else:
-            # Single execution mode
-            dgm = GodelMachine(config)
-            planner = Planner(config)
-            if args.task:
-                await dgm.start_dgm(goal_prompt=args.task, judge=args.judge, human_validation=False)
-            elif args.goal:
-                await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
-            else:
-                raise ValueError("No goal provided. Use --task, --goal, or --mass-testing to start.")
-                
+            await normal_execution_mode(args, config)
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user. Cleaning up...")
         cleanup()
