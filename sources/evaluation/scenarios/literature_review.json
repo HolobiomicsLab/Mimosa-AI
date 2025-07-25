@@ -1,0 +1,60 @@
+{
+  "id": "literature_review",
+  "goal": "Search for recent papers on CRISPR gene editing applications, analyze key findings, and summarize current research trends",
+  "assertions": [
+    {
+      "id": "1",
+      "description": "User received comprehensive summary of CRISPR research landscape",
+      "evaluation_criteria": "Output contains overview of current CRISPR applications and recent developments"
+    },
+    {
+      "id": "2",
+      "description": "Key research papers were identified and summarized",
+      "evaluation_criteria": "Summary includes titles, authors, and main findings of relevant papers"
+    },
+    {
+      "id": "3",
+      "description": "Research trends and patterns were analyzed",
+      "evaluation_criteria": "Output identifies emerging trends, popular applications, or research gaps"
+    },
+    {
+      "id": "4",
+      "description": "Results formatted as structured literature review",
+      "evaluation_criteria": "Final output organized with sections (Introduction, Methods, Findings, Conclusions)"
+    },
+    {
+      "id": "5",
+      "description": "Browser MCP used to search for scientific papers",
+      "evaluation_criteria": "browser_mcp.search() called with CRISPR-related queries on academic databases"
+    },
+    {
+      "id": "6",
+      "description": "PDF files downloaded from search results",
+      "evaluation_criteria": "browser_mcp.download_file() executed to obtain research papers"
+    },
+    {
+      "id": "7",
+      "description": "PDF MCP analyzed downloaded papers for content extraction",
+      "evaluation_criteria": "pdf_mcp.initialize_pdf_navigation() and rag_query_current_session() used"
+    },
+    {
+      "id": "8",
+      "description": "Search MCP used to find additional relevant tools or papers",
+      "evaluation_criteria": "search_mcp.search_mcp_servers() called to discover analysis capabilities"
+    },
+    {
+      "id": "9",
+      "description": "Systematic approach to paper analysis was followed",
+      "evaluation_criteria": "Multiple papers processed in organized sequence with consistent extraction methods"
+    },
+    {
+      "id": "10",
+      "description": "Final results compiled and saved to workspace",
+      "evaluation_criteria": "Literature review document saved as structured text or markdown file"
+    }
+  ],
+  "optional": {
+    "required_tools": ["browser_mcp", "pdf_mcp", "search_mcp"],
+    "judge_model": "gpt-4o"
+  }
+}

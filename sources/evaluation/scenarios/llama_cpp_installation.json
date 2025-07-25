@@ -1,0 +1,55 @@
+{
+  "id": "llama_cpp_installation",
+  "goal": "Search and install llama.cpp for this OS architecture",
+  "assertions": [
+    {
+      "id": "1",
+      "description": "User received information about their OS architecture",
+      "evaluation_criteria": "Output identifies the current operating system (macOS/Linux/Windows) and CPU architecture (x86_64/arm64/etc.)"
+    },
+    {
+      "id": "2",
+      "description": "User was informed about llama.cpp installation options",
+      "evaluation_criteria": "Output explains available installation methods (compilation from source, package managers, prebuilt binaries)"
+    },
+    {
+      "id": "3",
+      "description": "Installation was successfully completed",
+      "evaluation_criteria": "llama.cpp binary or executable is available on the system after workflow completion"
+    },
+    {
+      "id": "4",
+      "description": "User received confirmation and usage instructions",
+      "evaluation_criteria": "Final output confirms successful installation and provides basic usage examples or next steps"
+    },
+    {
+      "id": "5",
+      "description": "Shell MCP was used to detect system information",
+      "evaluation_criteria": "shell_mcp.execute_command() called with system detection commands (uname, arch, etc.)"
+    },
+    {
+      "id": "6",
+      "description": "Browser MCP searched for llama.cpp installation instructions",
+      "evaluation_criteria": "browser_mcp.search() or browser_mcp.navigate() used to find llama.cpp documentation or GitHub"
+    },
+    {
+      "id": "7",
+      "description": "Installation commands were executed via Shell MCP",
+      "evaluation_criteria": "shell_mcp.execute_command() called with installation commands (git clone, make, cmake, etc.)"
+    },
+    {
+      "id": "8",
+      "description": "Installation verification was performed",
+      "evaluation_criteria": "Commands executed to verify llama.cpp is properly installed and functional"
+    },
+    {
+      "id": "9",
+      "description": "Error handling for installation failures",
+      "evaluation_criteria": "Workflow handled potential errors (missing dependencies, compilation failures) appropriately"
+    }
+  ],
+  "optional": {
+    "required_tools": ["shell_mcp", "browser_mcp"],
+    "judge_model": "gpt-4o"
+  }
+}
