@@ -7,6 +7,7 @@ import json
 
 from sources.core.judge import WorkflowJudge
 from sources.utils.visualization import VisualizationUtils
+from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.notify import PushNotifier
 
 from .orchestrator import WorkflowOrchestrator
@@ -16,7 +17,7 @@ from .workflow_selection import WorkflowSelector
 class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, viz_utils: VisualizationUtils = None, shared_viz_data: SharedVisualizationData = None, process_id: int = None) -> None:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
@@ -24,7 +25,9 @@ class GodelMachine:
         self.orchestrator = WorkflowOrchestrator(config)
         self.judge = WorkflowJudge(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.viz_utils = VisualizationUtils()
+        self.viz_utils = viz_utils or VisualizationUtils()
+        self.shared_viz_data = shared_viz_data
+        self.process_id = process_id
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -153,8 +156,12 @@ Add extensive comments in the code to explain your changes.
                                                  template_uuid=template_uuid)
         
         rewards_history = []
-        # Create rewards curve plot using VisualizationUtils
-        plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
+        plot_data = None
+        
+        if self.shared_viz_data and self.process_id is not None:
+            plot_data = None
+        else:
+            plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
         
         await self.recursive_self_improvement(
             goal_prompt,
@@ -226,8 +233,17 @@ Add extensive comments in the code to explain your changes.
         flow_rewards = self.get_total_rewards(flow_state)
         rewards_history.append(flow_rewards)
         
-        # Update plot in real-time using VisualizationUtils
-        if plot_data:
+        # Update visualization - either shared (parallel mode) or individual plot
+        if self.shared_viz_data and self.process_id is not None:
+            iterations = list(range(1, len(rewards_history) + 1))
+            self.shared_viz_data.write_curve_data(
+                process_id=self.process_id,
+                iterations=iterations,
+                rewards=rewards_history,
+                goal=goal,
+                status="running"
+            )
+        elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
         
         print(f"\n{'-' * 60}")

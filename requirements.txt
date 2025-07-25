@@ -9,3 +9,4 @@ torch==1.0.2
 dotenv
 openai
 python_a2a
+psutil>=5.9.0
