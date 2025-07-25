@@ -110,7 +110,6 @@ def test_config_pricing_integration():
         config.refresh_pricing()
         assert config._model_pricing_cache is None, "Cache not cleared after refresh"
 
-        pricing3 = config.model_pricing  # Should trigger new API call
         assert mock_instance.get_model_pricing_dict.call_count == 2, (
             "Refresh didn't trigger new API call"
         )
@@ -154,10 +153,10 @@ def test_pricing_data_format():
         assert isinstance(pricing, dict), f"Pricing for {model_id} is not a dict"
         assert "input" in pricing, f"Missing 'input' key for {model_id}"
         assert "output" in pricing, f"Missing 'output' key for {model_id}"
-        assert isinstance(pricing["input"], (int, float)), (
+        assert isinstance(pricing["input"], int | float), (
             f"Input pricing for {model_id} is not numeric"
         )
-        assert isinstance(pricing["output"], (int, float)), (
+        assert isinstance(pricing["output"], int | float), (
             f"Output pricing for {model_id} is not numeric"
         )
 
