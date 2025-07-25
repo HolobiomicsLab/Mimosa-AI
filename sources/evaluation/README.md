@@ -24,7 +24,6 @@ sources/evaluation/
 
 ### Command Line
 
-**Note**: Make sure you have installed the required dependencies (see Requirements section below).
 
 ```bash
 # Evaluate a workflow against a scenario (run from project root)
@@ -121,29 +120,7 @@ Evaluation results are saved as JSON files with the following structure:
 
 Results are saved in the workflow's UUID directory (`sources/workflows/{workflow_id}/`) with filename format: `evaluation_{scenario_id}_{timestamp}.json`
 
-## Requirements
 
-### Environment Setup
-
-```bash
-# Install required dependencies
-pip install openai
-
-# Or using uv
-uv pip install openai
-```
-
-### API Configuration
-
-- **OpenAI API key**: Set `OPENAI_API_KEY` environment variable for LLM judge evaluation
-- **Workflow data access**: Requires workflow execution data in `sources/workflows/{workflow_id}/`
-  - `state_result.json` - Contains workflow execution results
-  - `workflow_code_{workflow_id}.py` - Contains generated workflow code
-
-### Python Dependencies
-
-- `openai` - For LLM judge API calls
-- Standard library modules: `pathlib`, `json`, `datetime`, `argparse`, `typing`
 
 ## Extension
 
@@ -154,12 +131,3 @@ To add new evaluation scenarios:
 3. **Test scenario**: Run evaluation against actual workflow executions
 4. **Refine assertions**: Iterate based on LLM judge performance and results
 
-### Implementation Details
-
-The `Evaluator` class provides the core functionality:
-- `evaluate_workflow(workflow_id, scenario_id)` - Main evaluation method
-- `_load_workflow_data()` - Loads state_result.json and workflow code
-- `_build_judge_prompt()` - Creates LLM judge prompt with raw workflow data
-- `_save_results()` - Saves evaluation results to workflow directory
-
-The system is designed to be simple and maintainable, with minimal data transformation between workflow execution and LLM judge evaluation.
