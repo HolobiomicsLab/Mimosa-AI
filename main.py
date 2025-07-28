@@ -143,8 +143,7 @@ async def normal_execution_mode(args, config):
         await planner.start_planner(goal_prompt=args.goal, 
                                     template_uuid=args.load_template, 
                                     judge=args.judge,
-                                    max_iteration=args.max_dgm_iterations,
-                                    judge=args.judge
+                                    max_iteration=args.max_dgm_iterations
                                    )
     else:
         raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
