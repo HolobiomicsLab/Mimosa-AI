@@ -161,6 +161,16 @@ Add extensive comments in the code to explain your changes.
         answer: str = None,
         human_validation: bool = False,
     ):
+        """
+        Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
+        Args:
+        - goal_prompt (str): The primary goal or objective to be accomplished.
+         template_uuid (str | None, optional): UUID of a workflow template to use.
+        - judge (bool, optional): Whether to enable judging mode for evaluation.
+        - answer (str, optional): A predefined correct answer for evaluation system.
+        - human_validation (bool, optional): Whether human validation is required.
+        """
+
         template = self.select_workflow_template(goal_prompt,
                                                  template_uuid=template_uuid)
 
@@ -236,7 +246,6 @@ Add extensive comments in the code to explain your changes.
         print(f"{'─' * 60}")
         print(f"  {goal}")
         print(f"{'─' * 60}\n")
-        
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             goal_prompt=prompt,
