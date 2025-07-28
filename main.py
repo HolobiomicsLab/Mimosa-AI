@@ -47,6 +47,7 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--runner_temp_dir", type=str, help="Override temp directory path for runners")
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
+    parser.add_argument("--single_task", type=str, help="single task to run without planner")
 
 def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     """Apply CLI argument overrides to config."""
