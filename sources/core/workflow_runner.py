@@ -240,10 +240,10 @@ class WorkflowRunner:
         """Clean up all resources and running processes."""
         for execution_id in list(self._active_processes.keys()):
             await self._kill_process(execution_id)
-        import shutil
+        #import shutil
 
-        if os.path.exists(self.config.temp_dir):
-            shutil.rmtree(self.config.temp_dir, ignore_errors=True)
+        #if os.path.exists(self.config.temp_dir):
+        #    shutil.rmtree(self.config.temp_dir, ignore_errors=True)
 
 
 async def main():

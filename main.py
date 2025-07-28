@@ -6,25 +6,20 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
-import json
 import os
 import signal
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional
 
 import dotenv
-import requests
-from fastmcp import Client
 
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.core.parallel_testing import ParallelTesting
-import shutil
+from sources.utils.dataset import calculate_good_answer_average, read_dataset
+from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
-
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -38,7 +33,7 @@ def validate_environment() -> None:
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
-    """Add CLI arguments for config parameters that can be overridden."""
+    """Add additional CLI arguments for config parameters that can be overridden."""
     parser.add_argument("--workflow_dir", type=str, help="Override workflow directory path")
     parser.add_argument("--schema_code_path", type=str, help="Override state schema file path")
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
@@ -82,52 +77,10 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
-def collect_goals_from_user() -> List[str]:
-    """Collect goals from user input for mass testing.
-    
-    Returns:
-        List of goal strings entered by the user
-    """
-    goals = []
-    print("\n🎯 Mass Testing Mode - Enter your goals")
-    print("=" * 50)
-    print("Enter goals one at a time. Press Enter with empty input to finish.")
-    print("Type 'quit' or 'exit' to cancel.\n")
-    
-    goal_count = 1
-    while True:
-        try:
-            goal = input(f"Goal {goal_count}: ").strip()
-            
-            if not goal:
-                if goals:
-                    break
-                else:
-                    print("⚠️ Please enter at least one goal or type 'quit' to cancel.")
-                    continue
-                    
-            if goal.lower() in ['quit', 'exit']:
-                print("❌ Mass testing cancelled by user.")
-                return []
-                
-            goals.append(goal)
-            goal_count += 1
-            
-        except KeyboardInterrupt:
-            print("\n❌ Mass testing cancelled by user.")
-            return []
-    
-    print(f"\n✅ Collected {len(goals)} goals for mass testing:")
-    for i, goal in enumerate(goals, 1):
-        print(f"  {i}. {goal[:60]}{'...' if len(goal) > 60 else ''}")
-    
-    return goals
-
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
         print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
-        # Cancel all running tasks
         for task in asyncio.all_tasks():
             if not task.done():
                 task.cancel()
@@ -136,24 +89,45 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-async def parallel_execution_mode(args, config):
-    if getattr(args, 'mass_testing', False):
+async def multigoal_mode(args, config):
+    if getattr(args, 'multi_goal', False):
         goals = collect_goals_from_user()
         if not goals:
-            print("❌ No goals provided for mass testing. Exiting.")
+            print("❌ No goals provided for multi-goal. Exiting.")
             return
         parallel_testing = ParallelTesting(config)
-        results = parallel_testing.start_parallel_testing(
+        parallel_testing.start_parallel_testing(
             goals=goals,
             template_uuid=args.load_template,
             judge=args.judge,
             human_validation=False,
-            max_workers=getattr(args, 'max_workers', None)
+            max_workers=getattr(args, 'max_concurrent', None)
         )
-        print("\n📊 Mass Testing Results:")
-        print("=" * 50)
-        print(json.dumps(results, indent=2))
-        print("=" * 50)
+
+async def dataset_execution_mode(args, config):
+    planner = Planner(config)
+    print(f"Using {args.dataset} dataset")
+    dataset_questions = read_dataset(args.dataset, args.num_samples)
+    if dataset_questions:
+        print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
+        semaphore = asyncio.Semaphore(args.max_concurrent)
+        async def run_with_semaphore(question, answer):
+            """Run a single question with semaphore to limit concurrency"""
+            async with semaphore:
+                return question, answer, await planner.start_planner(
+                    goal=question,
+                    template_uuid=args.load_template,
+                    judge=True,
+                    answer=answer
+                )
+        tasks = []
+        for question, answer in dataset_questions:
+            task = asyncio.create_task(run_with_semaphore(question, answer))
+            tasks.append(task)
+        all_run = await asyncio.gather(*tasks)
+        calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
+    else:
+        print("❌ No questions found in dataset or no goal provided.")
 
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
@@ -163,8 +137,8 @@ async def normal_execution_mode(args, config):
     elif args.goal:
         await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
     else:
-        raise ValueError("No goal provided. Use --task, --goal, or --mass-testing to start.")
-            
+        raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
+
 async def main():
     """Main execution function"""
     config = Config()
@@ -174,22 +148,28 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
-        "--goal", type=str, help="Goal prompt for the workflow"
+        "--goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
     )
     parser.add_argument(
-        "--task",  type=str, help="Goal prompt for the workflow"
+        "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--load_template", type=str, help="Optional workflow UUID to load"
+        "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
+    )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
+    )
+    parser.add_argument(
+        "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
     parser.add_argument(
-        "--mass-testing", action="store_true", default=False, help="Enable mass testing mode with multiple goals"
+        "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
     )
     parser.add_argument(
-        "--max-workers", type=int, help="Maximum number of parallel processes for mass testing"
+        "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
 
     add_config_arguments(parser, config)
@@ -199,26 +179,26 @@ async def main():
     validate_environment()
     config.validate_paths()
 
+    dgm = GodelMachine(config)
+    planner = Planner(config)
+
     try:
-        if args.mass_testing:
-            await parallel_execution_mode(args, config)
-        else:
-            await normal_execution_mode(args, config)
+        if (args.dataset):
+            await dataset_execution_mode(args, config)
+        elif (args.multi_goal):
+            await multigoal_mode(args, config)
+        else:    
+            if args.task:
+                await dgm.start_dgm(goal=args.task, judge=args.judge)
+            elif args.goal:
+                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
+            else:
+                raise ValueError("No goal provided. Use --task or --goal to start a task.")
     except KeyboardInterrupt:
-        print("\n⚠️ Interrupted by user. Cleaning up...")
-        cleanup()
         raise
     except Exception as e:
         print(f"❌ Error during execution: {e}")
-        cleanup()
         raise
-
-def cleanup():
-    """Cleanup function to run on exit"""
-    print("Cleaning up resources...")
-    shutil.rmtree("tmp/", ignore_errors=True)
-    pass
 
 if __name__ == "__main__":
     asyncio.run(main())
-    cleanup()

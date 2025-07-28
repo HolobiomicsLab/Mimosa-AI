@@ -17,7 +17,10 @@ from .workflow_selection import WorkflowSelector
 class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""
 
-    def __init__(self, config, viz_utils: VisualizationUtils = None, shared_viz_data: SharedVisualizationData = None, process_id: int = None) -> None:
+    def __init__(self, config,
+                 viz_utils: VisualizationUtils = None,
+                 shared_viz_data: SharedVisualizationData = None,
+                 process_id: int = None) -> None:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
@@ -101,6 +104,10 @@ class GodelMachine:
 
         return f"""
 You must iteratively improve the workflow based on the previous execution results.
+You are a self-improving AI agent.
+Your goal is to improve the workflow code iteratively based on results of previous run.
+
+User goal : {goal}
 
 Previous workflow code :
 {flow_code}
@@ -151,10 +158,27 @@ Add extensive comments in the code to explain your changes.
         goal_prompt: str,
         template_uuid: str | None = None,
         judge: bool = False,
+        answer: str = None,
         human_validation: bool = False,
     ):
+        """
+        Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
+        Args:
+        - goal_prompt (str): The primary goal or objective to be accomplished.
+         template_uuid (str | None, optional): UUID of a workflow template to use.
+        - judge (bool, optional): Whether to enable judging mode for evaluation.
+        - answer (str, optional): A predefined correct answer for evaluation system.
+        - human_validation (bool, optional): Whether human validation is required.
+        """
+
         template = self.select_workflow_template(goal_prompt,
                                                  template_uuid=template_uuid)
+
+        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"{'─' * 60}")
+        print(f"  {goal_prompt}")
+        print(f"{'─' * 60}\n")
+
         
         rewards_history = []
         plot_data = None
@@ -164,13 +188,14 @@ Add extensive comments in the code to explain your changes.
         else:
             plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
         
-        await self.recursive_self_improvement(
+        return await self.recursive_self_improvement(
             goal_prompt,
             goal_prompt,
             template_uuid=template_uuid,
             workflow_template=template,
             max_depth=10,
             judge=judge,
+            answer=answer,
             need_human_validation=human_validation,
             rewards_history=rewards_history,
             plot_data=plot_data,
@@ -178,8 +203,8 @@ Add extensive comments in the code to explain your changes.
 
     async def recursive_self_improvement(
         self,
+        goal,
         prompt: str,
-        goal: str,
         template_uuid: str | None = None,
         workflow_template: str | None = None,
         iteration_count: int = 0,
@@ -188,7 +213,8 @@ Add extensive comments in the code to explain your changes.
         need_human_validation: bool = False,
         rewards_history: list[float] = None,
         plot_data: tuple = None,
-    ) -> str:
+        answer: str=None,
+    ):
         """Run a self-improvement loop for the workflow.
 
         Args:
@@ -227,7 +253,7 @@ Add extensive comments in the code to explain your changes.
         )
         if executed:
             if judge:
-                self.judge.evaluate(uuid)
+                self.judge.evaluate(uuid=uuid, answer=answer)
             total_cost = self.judge.calculate_cost(uuid)
 
         flow_state = self.load_flow_state_result(uuid)
@@ -266,7 +292,7 @@ Add extensive comments in the code to explain your changes.
         )
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
-            return flow_output
+            return uuid
         await self.recursive_self_improvement(
             prompt,
             goal,
@@ -279,4 +305,4 @@ Add extensive comments in the code to explain your changes.
             rewards_history=rewards_history,
             plot_data=plot_data,
         )
-        return flow_output
+        return uuid
