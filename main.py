@@ -15,10 +15,11 @@ import dotenv
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
+from sources.core.parallel_testing import ParallelTesting
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
+from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
-
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -76,52 +77,10 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     if args.pushover_user:
         config.pushover_user = args.pushover_user
 
-def collect_goals_from_user() -> List[str]:
-    """Collect goals from user input for mass testing.
-    
-    Returns:
-        List of goal strings entered by the user
-    """
-    goals = []
-    print("\n🎯 Mass Testing Mode - Enter your goals")
-    print("=" * 50)
-    print("Enter goals one at a time. Press Enter with empty input to finish.")
-    print("Type 'quit' or 'exit' to cancel.\n")
-    
-    goal_count = 1
-    while True:
-        try:
-            goal = input(f"Goal {goal_count}: ").strip()
-            
-            if not goal:
-                if goals:
-                    break
-                else:
-                    print("⚠️ Please enter at least one goal or type 'quit' to cancel.")
-                    continue
-                    
-            if goal.lower() in ['quit', 'exit']:
-                print("❌ Mass testing cancelled by user.")
-                return []
-                
-            goals.append(goal)
-            goal_count += 1
-            
-        except KeyboardInterrupt:
-            print("\n❌ Mass testing cancelled by user.")
-            return []
-    
-    print(f"\n✅ Collected {len(goals)} goals for mass testing:")
-    for i, goal in enumerate(goals, 1):
-        print(f"  {i}. {goal[:60]}{'...' if len(goal) > 60 else ''}")
-    
-    return goals
-
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
         print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
-        # Cancel all running tasks
         for task in asyncio.all_tasks():
             if not task.done():
                 task.cancel()
@@ -130,24 +89,45 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-async def parallel_execution_mode(args, config):
+async def multigoal_mode(args, config):
     if getattr(args, 'mass_testing', False):
         goals = collect_goals_from_user()
         if not goals:
             print("❌ No goals provided for mass testing. Exiting.")
             return
         parallel_testing = ParallelTesting(config)
-        results = parallel_testing.start_parallel_testing(
+        parallel_testing.start_parallel_testing(
             goals=goals,
             template_uuid=args.load_template,
             judge=args.judge,
             human_validation=False,
             max_workers=getattr(args, 'max_workers', None)
         )
-        print("\n📊 Mass Testing Results:")
-        print("=" * 50)
-        print(json.dumps(results, indent=2))
-        print("=" * 50)
+
+async def dataset_execution_mode(args, config):
+    planner = Planner(config)
+    print(f"Using {args.dataset} dataset")
+    dataset_questions = read_dataset(args.dataset, args.num_samples)
+    if dataset_questions:
+        print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
+        semaphore = asyncio.Semaphore(args.max_concurrent)
+        async def run_with_semaphore(question, answer):
+            """Run a single question with semaphore to limit concurrency"""
+            async with semaphore:
+                return question, answer, await planner.start_planner(
+                    goal=question,
+                    template_uuid=args.load_template,
+                    judge=True,
+                    answer=answer
+                )
+        tasks = []
+        for question, answer in dataset_questions:
+            task = asyncio.create_task(run_with_semaphore(question, answer))
+            tasks.append(task)
+        all_run = await asyncio.gather(*tasks)
+        calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
+    else:
+        print("❌ No questions found in dataset or no goal provided.")
 
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
@@ -201,39 +181,7 @@ async def main():
 
     try:
         if (args.dataset):
-            print(f"Using {args.dataset} dataset")
-            # Default to 3 concurrent tasks, can be overridden with --max_concurrent
-            dataset_questions = read_dataset(args.dataset, args.num_samples)
-            
-            if dataset_questions:
-                print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
-                
-                # Create a semaphore to limit concurrent tasks
-                semaphore = asyncio.Semaphore(args.max_concurrent)
-                
-                async def run_with_semaphore(question, answer):
-                    """Run a single question with semaphore to limit concurrency"""
-                    async with semaphore:
-                        return question, answer, await planner.start_planner(
-                            goal=question,
-                            template_uuid=args.load_template,
-                            judge=True,
-                            answer=answer
-                        )
-                
-                # Create tasks for all questions
-                tasks = []
-                for question, answer in dataset_questions:
-                    task = asyncio.create_task(run_with_semaphore(question, answer))
-                    tasks.append(task)
-                
-                # Run all tasks with concurrency limited by semaphore
-                all_run = await asyncio.gather(*tasks)
-                
-                # Calculate average of good_answer values
-                calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
-            else:
-                print("❌ No questions found in dataset or no goal provided.")
+            await dataset_execution_mode(args, config)
         else:    
             if args.single_task:
                 await dgm.start_dgm(goal=args.single_task, judge=args.judge)
