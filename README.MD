@@ -67,7 +67,10 @@ uv run main.py --goal "Your objective here" --load_template <optional existing w
 
 ### Usage Options
 
-- `--goal GOAL`: Required. Specify your research objective or scientific question
+- `--goal GOAL`: Specify your research objective or scientific question
+- `--task`: Run for a single task goal (no planning)
+- `--dataset <evaluation dataset>`: Evaluate Mimosa on a dataset, spawn multiple thread for faster evaluation.
+- `--multi_goal`: Run in multi-goal mode for fast manual evaluation, prompt the user for a list of goals and then spawn multiple thread for parrallel execution. Display score evolution.
 - `--load_template TEMPLATE_UUID`: Optional. Load a predefined workflow template from workflows folder
 
 **Example:**
