@@ -160,6 +160,7 @@ Add extensive comments in the code to explain your changes.
         judge: bool = False,
         answer: str = None,
         human_validation: bool = False,
+        max_iteration: int = 5,
     ):
         """
         Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
@@ -193,7 +194,7 @@ Add extensive comments in the code to explain your changes.
             goal_prompt,
             template_uuid=template_uuid,
             workflow_template=template,
-            max_depth=10,
+            max_depth=max_iteration,
             judge=judge,
             answer=answer,
             need_human_validation=human_validation,

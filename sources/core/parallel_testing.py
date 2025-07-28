@@ -221,7 +221,9 @@ class ParallelTesting:
                     goal_prompt=goal,
                     template_uuid=template_uuid,
                     judge=judge,
-                    human_validation=human_validation
+                    human_validation=human_validation,
+                    max_iteration=5
+
                 )
             )
             

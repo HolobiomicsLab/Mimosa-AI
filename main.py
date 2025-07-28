@@ -118,7 +118,8 @@ async def dataset_execution_mode(args, config):
                     goal=question,
                     template_uuid=args.load_template,
                     judge=True,
-                    answer=answer
+                    answer=answer,
+                    max_iteration=1
                 )
         tasks = []
         for question, answer in dataset_questions:
@@ -133,9 +134,18 @@ async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
     planner = Planner(config)
     if args.task:
-        await dgm.start_dgm(goal_prompt=args.task, judge=args.judge, human_validation=False)
+        await dgm.start_dgm(goal_prompt=args.task,
+                            judge=args.judge, 
+                            human_validation=True,
+                            max_iteration=args.max_dgm_iterations
+                           )
     elif args.goal:
-        await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
+        await planner.start_planner(goal_prompt=args.goal, 
+                                    template_uuid=args.load_template, 
+                                    judge=args.judge,
+                                    max_iteration=args.max_dgm_iterations,
+                                    judge=args.judge
+                                   )
     else:
         raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
 
@@ -171,6 +181,9 @@ async def main():
     parser.add_argument(
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
+    parser.add_argument(
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations"
+    )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
@@ -179,21 +192,15 @@ async def main():
     validate_environment()
     config.validate_paths()
 
-    dgm = GodelMachine(config)
-    planner = Planner(config)
-
     try:
         if (args.dataset):
             await dataset_execution_mode(args, config)
         elif (args.multi_goal):
             await multigoal_mode(args, config)
-        else:    
-            if args.task:
-                await dgm.start_dgm(goal=args.task, judge=args.judge)
-            elif args.goal:
-                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
-            else:
-                raise ValueError("No goal provided. Use --task or --goal to start a task.")
+        elif args.task or args.goal:
+            await normal_execution_mode(args, config)
+        else:
+            raise ValueError("No goal provided. Use --task or --goal to start a task.")
     except KeyboardInterrupt:
         raise
     except Exception as e:
