@@ -28,7 +28,7 @@ class LLMConfig:
         """Alternative constructor from dictionary (maintains backward compatibility)."""
         config = config or {}
         return cls(
-            model=config.get("model", "gpt-4o-mini"),
+            model=config.get("model", "o3-2025-04-16"),
             provider=config.get("provider", "openai"),
             temperature=config.get("temperature", 1.0),
             key=config.get("key", os.getenv("OPENAI_API_KEY", "")),
@@ -45,7 +45,7 @@ class LLMProvider:
     def __init__(
         self,
         agent_name: str,
-        memory_path,
+        memory_path = None,
         system_msg: str = None,
         config: LLMConfig = None,
     ) -> None:
@@ -104,6 +104,7 @@ class LLMProvider:
             "message": message,
             "temperature": self.config.temperature,
         }
-        self.save_call(json_res)
+        if self.memory_path:
+            self.save_call(json_res)
 
         return res
