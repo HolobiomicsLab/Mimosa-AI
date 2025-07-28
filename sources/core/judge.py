@@ -166,18 +166,20 @@ class WorkflowJudge:
 
                     # Process steps for workflow
                     for step in steps:
+                        error = step.get("error", None)
+                        code_result = error if error else step.get("observations", "")
                         step_info = {
                             "agent": agent_name,
-                            "step_number": step.get("step_number", ""),
-                            "action": step.get("code_action", ""),
-                            "start_time": start_time,
-                            "error": step.get("error", ""),
-                            "result": step.get("observations", ""),
+                            "start_time":step["timing"]["start_time"],
+                            "step_number": step["step_number"],
+                            "prompt": step["model_input_messages"][1]["content"][0]["text"],
+                            "reasoning": step["model_output"],
+                            "code_action" : step.get("code_action", ""),
+                            "code_output": code_result
                         }
                         workflow_steps.append(step_info)
 
         # Sort agents and workflow steps by start time
-        agents.sort(key=lambda x: x["start_time"])
         workflow_steps.sort(key=lambda x: (x["start_time"], x["step_number"]))
 
         # Read the goal
@@ -195,13 +197,11 @@ class WorkflowJudge:
 
         text += "--- WORKFLOW ---\n"
         for step in workflow_steps:
-            text += f"Agent: {step['agent']}\n"
-            text += f"Step: {step['step_number']}\n"
-            text += f"Input: {step['action']}\n"
-            if step["error"]:
-                text += f"Output: ERROR - {step['error']}\n"
-            else:
-                text += f"Output: {step['result']}\n"
+            text += f"AGENT: {step['agent']}\n"
+            text += f"STEP: {step['step_number']}\n"
+            text += f"PROMPT: {step['prompt']}\n"
+            text += f"REASONING {step['reasoning']}\n"
+            text += f"OUTPUT: {step['code_output']}\n"
             text += "\n"
 
         text += "--- WORKFLOW CODE---\n"
@@ -305,7 +305,7 @@ Be precise, constructive, and technical in your judgment."""
 
         prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
 
-{self.get_text(uuid)!r}{expected_answer_info}
+{self.generate_text(uuid)!r}{expected_answer_info}
 
 --- EVALUATION REQUEST ---
 {self.long_prompt(answer is not None) if not short else ""}
