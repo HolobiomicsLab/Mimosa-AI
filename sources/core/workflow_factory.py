@@ -64,9 +64,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ]
-        return LLMProvider().openai_completion(
-            history, "orchestrator", path, verbose=False
-        )
+        return LLMProvider("workflow_creator",path,system_prompt)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -163,13 +161,9 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
     ) -> str:
         initial_state = {
             key: (
-                uuid_str
-                if key == "workflow_uuid"
-                else self.config.smolagent_model_id
-                if key == "model_id"
-                else goal_prompt
-                if key == "goal"
-                else []
+                uuid_str if key == "workflow_uuid"
+                else self.config.smolagent_model_id if key == "model_id" 
+                else goal_prompt if key == "goal" else []
             )
             for key in state_schema.WorkflowState.__annotations__
         }
@@ -211,11 +205,8 @@ try:
             png = app.get_graph().draw_mermaid_png()
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
                 f.write(png)
-            mermaid_code = app.get_graph().draw_mermaid()
-            with open(os.path.join(WORKFLOW_PATH, "mermaid.txt"), "w") as f:
-                f.write(mermaid_code)
         except Exception as e:
-            raise(f"Could not save workflow graph:" + str(e))
+            RuntimeError(f"Could not save workflow graph:" + str(e))
 except Exception as e:
     print(f"❌ Error saving PNG workflow:" + str(e))
     pass

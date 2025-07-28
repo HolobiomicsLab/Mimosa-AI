@@ -6,12 +6,16 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
+import csv
+import datetime
 import json
 import os
+import re
 import signal
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+import random
 
 import dotenv
 import requests
@@ -115,6 +119,15 @@ async def main():
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset to use (in csv format)"
+    )
+    parser.add_argument(
+        "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
+    )
+    parser.add_argument(
+        "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
+    )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
@@ -123,21 +136,193 @@ async def main():
     validate_environment()
     config.validate_paths()
 
+    dgm = GodelMachine(config)
+    planner = Planner(config)
+
     try:
-        dgm = GodelMachine(config)
-        planner = Planner(config)
-        if args.single_task:
-            await dgm.start_dgm(goal_prompt=args.single_task, judge=args.judge)
-        elif args.goal:
-            await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
-        else:
-            raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+        if (args.dataset):
+            print(f"Using {args.dataset} dataset")
+            # Default to 3 concurrent tasks, can be overridden with --max_concurrent
+            dataset_questions = read_dataset(args.dataset, args.num_samples)
+            
+            if dataset_questions:
+                print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
+                
+                # Create a semaphore to limit concurrent tasks
+                semaphore = asyncio.Semaphore(args.max_concurrent)
+                
+                async def run_with_semaphore(question, answer):
+                    """Run a single question with semaphore to limit concurrency"""
+                    async with semaphore:
+                        return question, answer, await planner.start_planner(
+                            goal=question,
+                            template_uuid=args.load_template,
+                            judge=True,
+                            answer=answer
+                        )
+                
+                # Create tasks for all questions
+                tasks = []
+                for question, answer in dataset_questions:
+                    task = asyncio.create_task(run_with_semaphore(question, answer))
+                    tasks.append(task)
+                
+                # Run all tasks with concurrency limited by semaphore
+                all_run = await asyncio.gather(*tasks)
+                
+                # Calculate average of good_answer values
+                calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
+            else:
+                print("❌ No questions found in dataset or no goal provided.")
+        else:    
+            if args.single_task:
+                await dgm.start_dgm(goal=args.single_task, judge=args.judge)
+            elif args.goal:
+                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
+            else:
+                raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user. Cleaning up...")
         raise
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         raise
+
+def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, str]]:
+    """
+    Read dataset files from the specified path and return a subset of questions.
+    
+    Args:
+        dataset_path: Path to the dataset directory or file
+        num_samples: Number of samples to return (default: 10)
+        
+    Returns:
+        List of tuples containing (question, answer) pairs
+    """
+    dataset_path = Path('datasets') / f"{dataset_file}.jsonl" 
+    results = []
+    
+    try:  
+        if dataset_path.exists():
+            with open(dataset_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            if "question" in data and "answer" in data:
+                                match = re.search(r'#### (-?\d+)', data["answer"])
+                                if match:
+                                    answer = match.group(1)
+                                    results.append((data["question"], data["answer"]))
+                                else:
+                                    print(f"No answer found for question: {data['question']}")
+                        except json.JSONDecodeError:
+                            print(f"⚠️ Error parsing JSON in {dataset_path}")
+        else:
+            print(f"❌ Dataset path {dataset_path} is neither a file nor a directory")
+            return []
+            
+        # Return a random subset of the results
+        if results:
+            if len(results) > num_samples:
+                return random.sample(results, num_samples)
+            return results
+        else:
+            print(f"⚠️ No valid questions found in {dataset_path}")
+            return []
+            
+    except Exception as e:
+        print(f"❌ Error reading dataset: {e}")
+        return []
+
+def calculate_good_answer_average(runs: List[str], dataset_name: str, workflow_prompt: str) -> float:
+    """
+    Calculate the average of good_answer values across all workflow runs
+    and save results to CSV and JSON files in the datasets folder.
+    
+    Args:
+        uuids: List of workflow UUIDs to analyze
+        dataset_name: Name of the dataset used for the workflows
+        template_uuid: UUID of the workflow template used
+        
+    Returns:
+        Average of good_answer values (0.0 to 1.0)
+    """
+    if not runs:
+        print("No workflow UUIDs to analyze")
+        return 0.0
+    
+    good_answer_count = 0
+    total_workflows = len(runs)
+    
+    print(f"\nAnalyzing results for {total_workflows} workflows...")
+    
+    # Create a timestamp for filenames
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_filename = f"datasets/runs/run_{dataset_name}_{timestamp}.json"
+
+    os.makedirs('datasets/runs',exist_ok=True)
+    
+    # Prepare data for CSV and JSON
+    csv_data = []
+    threshold = 7
+    
+    for question, answer, uuid in runs:
+        state_result_path = Path(f"sources/workflows/{uuid}/state_result.json")
+        is_good_answer = False
+        
+        try:
+            if state_result_path.exists():
+                with open(state_result_path, 'r', encoding='utf-8') as f:
+                    state_result = json.load(f)
+                    
+                    if "answer_correctness" in state_result["evaluation_scores"]:
+                        answer_correctness = state_result["evaluation_scores"]["answer_correctness"]
+                        is_good_answer = answer_correctness >= threshold
+                        if is_good_answer:
+                            good_answer_count += 1
+                        
+                        # Add data for CSV
+                        csv_data.append({
+                            "uuid": uuid,
+                            "answer_correctness": answer_correctness,
+                            "is_good_answer": is_good_answer,
+                            "question":question,
+                            "answer":answer
+                        })
+                    else:
+                        print(f"⚠️ No 'answer_correctness' key found in state_result for UUID: {uuid}")
+            else:
+                print(f"⚠️ State result file not found for UUID: {uuid}")
+        except Exception as e:
+            print(f"❌ Error processing state result for UUID {uuid}: {e}")
+    
+    average = good_answer_count / total_workflows if total_workflows > 0 else 0
+    
+    # Create and save JSON file with analysis results
+    try:
+        json_data = {
+            "dataset_name": dataset_name,
+            "workflow_prompt": workflow_prompt,
+            "average_good_answer": average,
+            "thresold in range 1-10": threshold,
+            "details": csv_data
+        }
+        
+        with open(json_filename, 'w', encoding='utf-8') as jsonfile:
+            json.dump(json_data, jsonfile, indent=2)
+            
+        print(f"✅ Analysis results saved to {json_filename}")
+    except Exception as e:
+        print(f"❌ Error writing to JSON file: {e}")
+    
+    print(f"\n=== Results Summary ===")
+    print(f"Total workflows analyzed: {total_workflows}")
+    print(f"Workflows with good answer: {good_answer_count}")
+    print(f"Average good_answer rate: {average:.2f} ({good_answer_count}/{total_workflows})")
+    
+    return average
 
 if __name__ == "__main__":
     asyncio.run(main())
