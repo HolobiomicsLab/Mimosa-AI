@@ -15,7 +15,7 @@ The Mass Testing feature allows you to run multiple DGM (Darwin Godel Machine) i
 ### Basic Usage
 
 ```bash
-python main.py --mass-testing
+python main.py --multi_goal
 ```
 
 This will prompt you to enter goals one by one:
@@ -35,16 +35,16 @@ Goal 3: [Press Enter to finish]
 
 ```bash
 # Enable judge evaluation for each goal
-python main.py --mass-testing --judge
+python main.py --multi_goal --judge
 
 # Set maximum number of parallel processes
-python main.py --mass-testing --max-workers 4
+python main.py --multi_goal --max-workers 4
 
 # Use a specific workflow template for all goals
-python main.py --mass-testing --load_template <UUID>
+python main.py --multi_goal --load_template <UUID>
 
 # Combine multiple options
-python main.py --mass-testing --judge --max-workers 2 --load_template <UUID>
+python main.py --multi_goal --judge --max-workers 2 --load_template <UUID>
 ```
 
 ## Results
@@ -88,19 +88,6 @@ The summary report includes:
 - Total costs and rewards
 - Detailed results for each process
 
-## Example Goals
-
-Here are some example goals you can test:
-
-1. "Create a simple calculator that can add, subtract, multiply and divide"
-2. "Generate a random password with specified length and complexity"
-3. "Create a function to validate email addresses using regex"
-4. "Implement a basic sorting algorithm (bubble sort or quick sort)"
-5. "Create a simple web scraper to extract titles from a webpage"
-6. "Build a basic todo list application"
-7. "Create a function to convert temperature between Celsius and Fahrenheit"
-8. "Implement a basic text encryption/decryption system"
-
 ## Performance Considerations
 
 - **CPU Usage**: Each parallel process will use one CPU core
@@ -128,26 +115,3 @@ During execution, you'll see real-time updates:
 📈 Summary: 2/3 goals completed successfully
 📄 Summary saved to: parallel_testing_results/parallel_testing_summary_1642781234.json
 ```
-
-## Error Handling
-
-The system handles various error scenarios:
-- Process crashes or exceptions
-- API failures or rate limits
-- Configuration errors
-- Keyboard interrupts (Ctrl+C)
-
-Failed processes are logged with detailed error messages in both individual result files and the summary report.
-
-## Integration with Existing Features
-
-Mass testing works with all existing DGM features:
-- **Judge Evaluation**: Use `--judge` to enable evaluation for each goal
-- **Workflow Templates**: Use `--load_template` to specify a template for all goals
-- **Configuration Overrides**: All config arguments work with mass testing
-
-## Limitations
-
-- Human validation is automatically disabled in mass testing mode
-- Visualization features may not work properly with parallel execution
-- Some interactive features are disabled during mass testing
