@@ -85,16 +85,11 @@ def master_router(state: WorkflowState) -> str:
     if "SUCCESS:" in last_answer:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
-        if current_agent == "researcher":
-            return "coder"
-        elif current_agent == "coder":
-            return "formatter"
-        else:
-            return END # End of the workflow
+        return "next_node"
     
     elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return previous_agent # Example of backtracking
+         return "fallback_path" # Example of backtracking
 
     elif  "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
@@ -106,14 +101,14 @@ def master_router(state: WorkflowState) -> str:
         )
         if retry_count <= 1:
             print(f"Retry from '{current_agent}'.")
-            return current_agent
+            return "retry_path"
         else:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
-            return previous_agent
+            return "fallback_path"
     
     else :
-        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Go to the next agent")
-        return "coder"
+        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Retry with good protocol")
+        return "retry_path"
 ```
 
 ### Step 4: Assemble the Graph
@@ -139,7 +134,7 @@ instruct_formatter = """..."""
 # 4. AGENT CREATION (Instantiate all agents here)
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])
-agent_formatter = SmolAgentFactory("formatter", instruct_formatter, CSV_TOOLS))
+agent_formatter = SmolAgentFactory("formatter", instruct_formatter, CSV_TOOLS)
 
 # 5. NODE DEFINITION (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
@@ -156,7 +151,7 @@ workflow.add_edge(START, "researcher")
 workflow.add_conditional_edges(
     "researcher",
     master_router,
-    {"retry_path": "researcher", "next_node":"coder", END:END}
+    {"fallback_path": END, "retry_path": "researcher", "next_node":"coder", END:END}
 )
 workflow.add_conditional_edges(
     "coder",
@@ -166,7 +161,7 @@ workflow.add_conditional_edges(
 workflow.add_conditional_edges(
     "formatter",
     master_router,
-    {"fallback_path": "researcher", "retry_path": "coder", END:END}
+    {"fallback_path": "researcher", "retry_path": "formatter", "next_node":END, END:END}
 )
 
 # --- END OF SCRIPT ---
