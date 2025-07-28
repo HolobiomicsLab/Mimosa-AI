@@ -10,7 +10,7 @@ import os
 import threading
 import psutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any, Dict, List, Set
+from typing import Any
 import json
 from pathlib import Path
 import logging
@@ -32,8 +32,8 @@ class ProcessManager:
     """Thread-safe process manager for tracking and controlling subprocesses."""
     
     def __init__(self):
-        self._processes: Dict[int, mp.Process] = {}
-        self._pids: Set[int] = set()
+        self._processes: dict[int, mp.Process] = {}
+        self._pids: set[int] = set()
         self._lock = threading.RLock()
         self._shutdown_event = threading.Event()
         
@@ -54,7 +54,7 @@ class ProcessManager:
                     self._pids.remove(process.pid)
                 logger.info(f"Unregistered process {process_id}")
     
-    def get_active_pids(self) -> Set[int]:
+    def get_active_pids(self):
         """Get set of active process PIDs."""
         with self._lock:
             return self._pids.copy()
@@ -165,7 +165,7 @@ class ParallelTesting:
         """
         # Set up signal handling in subprocess
         def subprocess_signal_handler(signum, frame):
-            logger.info(f"Subprocess {os.getpid()} received signal {signum}, shutting down...")
+            logger.info(f"Subprocess {os.getpid()} received signal {signum}")
             raise KeyboardInterrupt("Process interrupted by signal")
         
         signal.signal(signal.SIGINT, subprocess_signal_handler)
@@ -178,7 +178,7 @@ class ParallelTesting:
         human_validation = goal_data.get("human_validation", False)
         config_data = goal_data["config_data"]
         
-        logger.info(f"🚀 Starting DGM process {process_id} (PID: {os.getpid()}) for goal: {goal[:50]}...")
+        logger.info(f"Starting DGM process (PID: {os.getpid()}) for goal: {goal[:50]}")
         
         start_time = time.time()
         result = {
@@ -228,7 +228,7 @@ class ParallelTesting:
             result["status"] = "completed"
             result["execution_time"] = time.time() - start_time
             
-            logger.info(f"✅ Process {process_id} completed in {result['execution_time']:.2f}s")
+            logger.info(f"✅ Process {process_id} : {result['execution_time']:.2f}s")
             
         except KeyboardInterrupt:
             result["status"] = "interrupted"
@@ -251,7 +251,8 @@ class ParallelTesting:
                         task.cancel()
                     
                     if pending:
-                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        loop.run_until_complete(asyncio.gather(*pending,
+                                                               return_exceptions=True))
                 except Exception as e:
                     logger.warning(f"Error during loop cleanup: {e}")
                 finally:
@@ -315,7 +316,6 @@ class ParallelTesting:
         
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers)
-            
             # Submit all tasks and track futures
             future_to_goal = {}
             for goal_data in goal_data_list:
@@ -337,11 +337,9 @@ class ParallelTesting:
                     results.append(result)
                     self._save_individual_result(result)
                     completed_count += 1
-                    
                     # Track PID if available
                     if "pid" in result:
                         self.process_manager.unregister_process(result["process_id"])
-                    
                     logger.info(f"Completed {completed_count}/{len(goal_data_list)} tasks")
                     
                 except Exception as e:
@@ -358,12 +356,10 @@ class ParallelTesting:
         except KeyboardInterrupt:
             logger.info("\n⚠️ Parallel testing interrupted by user (Ctrl+C)")
             self._shutdown_requested = True
-            
             # Cancel remaining futures
             for future in future_to_goal:
                 if not future.done():
                     future.cancel()
-            
             # Terminate all processes
             self.process_manager.terminate_all(timeout=15.0)
             
@@ -376,16 +372,12 @@ class ParallelTesting:
             if executor:
                 logger.info("Shutting down executor...")
                 executor.shutdown(wait=False)
-                
                 # Force terminate any remaining processes
                 active_pids = self.process_manager.get_active_pids()
                 if active_pids:
-                    logger.warning(f"Force terminating {len(active_pids)} remaining processes")
                     self.process_manager.terminate_all(timeout=5.0)
-            
             # Restore signal handlers
             self._restore_signal_handlers()
-            
             # Stop the real-time plotting and save final plot
             if self.plot_manager:
                 try:
@@ -393,12 +385,10 @@ class ParallelTesting:
                     timestamp = int(time.time())
                     plot_filename = self.results_dir / f"parallel_curves_{timestamp}.png"
                     self.plot_manager.save_combined_plot(str(plot_filename))
-                    
                     # Stop the plotting thread
                     self.plot_manager.stop_plotting()
                 except Exception as e:
                     logger.warning(f"Error during plot cleanup: {e}")
-                
                 # Mark all processes as completed in shared data
                 for goal_data in goal_data_list:
                     self.shared_viz_data.mark_process_completed(goal_data["process_id"])
@@ -410,7 +400,7 @@ class ParallelTesting:
         
         # Print visualization summary
         viz_stats = self.shared_viz_data.get_summary_stats()
-        print(f"\n📊 Visualization Summary:")
+        print("\n📊 Visualization Summary:")
         print(f"   Total processes: {viz_stats['total_processes']}")
         print(f"   Completed processes: {viz_stats['completed_processes']}")
         print(f"   Average reward: {viz_stats['average_reward']:.3f}")
