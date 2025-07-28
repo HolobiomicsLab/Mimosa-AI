@@ -59,14 +59,13 @@ class WorkflowOrchestrator:
     async def orchestrate_workflow(
         self,
         goal_prompt: str,
-        template_uuid: str | None = None,
         workflow_template: str | None = None,
     ) -> str:
         """Execute a workflow with the given goal prompt.
 
         Args:
             goal_prompt: The goal description for the workflow
-            template_uuid: Optional UUID of a workflow template to load
+            workflow_template: Optional workflow template code to use
         Returns:
             str: Execution status message
         """
@@ -75,8 +74,7 @@ class WorkflowOrchestrator:
         workflow_code, uuid = await self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=workflow_template,
-            template_uuid=template_uuid,
-            save_workflow=(template_uuid is None),
+            save_workflow=True,
         )
         try:
             await self.workflow_requirements_install()
