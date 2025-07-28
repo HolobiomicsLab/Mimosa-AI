@@ -6,26 +6,16 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
-import csv
-import datetime
-import json
 import os
-import re
 import signal
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-import random
 
 import dotenv
-import requests
-from fastmcp import Client
 
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
-from sources.core.parallel_testing import ParallelTesting
-import shutil
+from sources.utils.dataset import calculate_good_answer_average, read_dataset
 
 dotenv.load_dotenv()
 
@@ -256,142 +246,6 @@ async def main():
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         raise
-
-def read_dataset(dataset_file: str, num_samples: int = 10) -> List[Tuple[str, str]]:
-    """
-    Read dataset files from the specified path and return a subset of questions.
-    
-    Args:
-        dataset_path: Path to the dataset directory or file
-        num_samples: Number of samples to return (default: 10)
-        
-    Returns:
-        List of tuples containing (question, answer) pairs
-    """
-    dataset_path = Path('datasets') / f"{dataset_file}.jsonl" 
-    results = []
-    
-    try:  
-        if dataset_path.exists():
-            with open(dataset_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            data = json.loads(line)
-                            if "question" in data and "answer" in data:
-                                match = re.search(r'#### (-?\d+)', data["answer"])
-                                if match:
-                                    answer = match.group(1)
-                                    results.append((data["question"], data["answer"]))
-                                else:
-                                    print(f"No answer found for question: {data['question']}")
-                        except json.JSONDecodeError:
-                            print(f"⚠️ Error parsing JSON in {dataset_path}")
-        else:
-            print(f"❌ Dataset path {dataset_path} is neither a file nor a directory")
-            return []
-            
-        # Return a random subset of the results
-        if results:
-            if len(results) > num_samples:
-                return random.sample(results, num_samples)
-            return results
-        else:
-            print(f"⚠️ No valid questions found in {dataset_path}")
-            return []
-            
-    except Exception as e:
-        print(f"❌ Error reading dataset: {e}")
-        return []
-
-def calculate_good_answer_average(runs: List[str], dataset_name: str, workflow_prompt: str) -> float:
-    """
-    Calculate the average of good_answer values across all workflow runs
-    and save results to CSV and JSON files in the datasets folder.
-    
-    Args:
-        uuids: List of workflow UUIDs to analyze
-        dataset_name: Name of the dataset used for the workflows
-        template_uuid: UUID of the workflow template used
-        
-    Returns:
-        Average of good_answer values (0.0 to 1.0)
-    """
-    if not runs:
-        print("No workflow UUIDs to analyze")
-        return 0.0
-    
-    good_answer_count = 0
-    total_workflows = len(runs)
-    
-    print(f"\nAnalyzing results for {total_workflows} workflows...")
-    
-    # Create a timestamp for filenames
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_filename = f"datasets/runs/run_{dataset_name}_{timestamp}.json"
-
-    os.makedirs('datasets/runs',exist_ok=True)
-    
-    # Prepare data for CSV and JSON
-    csv_data = []
-    threshold = 7
-    
-    for question, answer, uuid in runs:
-        state_result_path = Path(f"sources/workflows/{uuid}/state_result.json")
-        is_good_answer = False
-        
-        try:
-            if state_result_path.exists():
-                with open(state_result_path, 'r', encoding='utf-8') as f:
-                    state_result = json.load(f)
-                    
-                    if "answer_correctness" in state_result["evaluation_scores"]:
-                        answer_correctness = state_result["evaluation_scores"]["answer_correctness"]
-                        is_good_answer = answer_correctness >= threshold
-                        if is_good_answer:
-                            good_answer_count += 1
-                        
-                        # Add data for CSV
-                        csv_data.append({
-                            "uuid": uuid,
-                            "answer_correctness": answer_correctness,
-                            "is_good_answer": is_good_answer,
-                            "question":question,
-                            "answer":answer
-                        })
-                    else:
-                        print(f"⚠️ No 'answer_correctness' key found in state_result for UUID: {uuid}")
-            else:
-                print(f"⚠️ State result file not found for UUID: {uuid}")
-        except Exception as e:
-            print(f"❌ Error processing state result for UUID {uuid}: {e}")
-    
-    average = good_answer_count / total_workflows if total_workflows > 0 else 0
-    
-    # Create and save JSON file with analysis results
-    try:
-        json_data = {
-            "dataset_name": dataset_name,
-            "workflow_prompt": workflow_prompt,
-            "average_good_answer": average,
-            "thresold in range 1-10": threshold,
-            "details": csv_data
-        }
-        
-        with open(json_filename, 'w', encoding='utf-8') as jsonfile:
-            json.dump(json_data, jsonfile, indent=2)
-            
-        print(f"✅ Analysis results saved to {json_filename}")
-    except Exception as e:
-        print(f"❌ Error writing to JSON file: {e}")
-    
-    print(f"\n=== Results Summary ===")
-    print(f"Total workflows analyzed: {total_workflows}")
-    print(f"Workflows with good answer: {good_answer_count}")
-    print(f"Average good_answer rate: {average:.2f} ({good_answer_count}/{total_workflows})")
-    
-    return average
 
 if __name__ == "__main__":
     asyncio.run(main())

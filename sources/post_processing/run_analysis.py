@@ -60,9 +60,6 @@ def analyze_error(uuid: str, memory_data: dict[str, Any]) -> str:
     Returns:
         An explanation of the error causes
     """
-    # Create a directory for analysis results if it doesn't exist
-    analysis_dir = Path(f"sources/memory/{uuid}/analysis")
-    analysis_dir.mkdir(exist_ok=True)
 
     # Create LLMProvider
     llm_provider = LLMProvider(

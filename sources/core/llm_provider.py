@@ -44,7 +44,7 @@ class LLMProvider:
 
     def __init__(
         self,
-        agent_name: str,
+        agent_name: str = None,
         memory_path = None,
         system_msg: str = None,
         config: LLMConfig = None,
@@ -104,7 +104,7 @@ class LLMProvider:
             "message": message,
             "temperature": self.config.temperature,
         }
-        if self.memory_path:
+        if self.memory_path and self.agent_name:
             self.save_call(json_res)
 
         return res
