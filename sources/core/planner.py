@@ -17,6 +17,6 @@ class Planner:
         # NOTE for now the planner just wrap the GodelMachine start_dgm method
         # So the global goal and task specific goal are the same
         uuid = await self.dgm.start_dgm(
-            goal=goal, template_uuid=template_uuid, judge=judge, answer = answer
+            goal_prompt=goal, template_uuid=template_uuid, judge=judge, answer = answer
         )
         return uuid

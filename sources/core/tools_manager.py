@@ -49,7 +49,10 @@ class ToolManager:
                     name = None
                     try:
                         resp = await client.call_tool("get_mcp_name", {})
-                        name = resp.content[0].text if resp and resp.content else None
+                        if "content" in resp and resp.content: 
+                            name = resp.content[0].text
+                        else: # fallback because it randomly change ????
+                            name = resp[0].text if resp else None
                     except Exception as e:
                         print(
                             f"⚠️ Failed to get name for MCP server on port {port}: {e}"
