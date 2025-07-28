@@ -9,10 +9,12 @@ cookies.json
 .env.*
 */.env
 workflows/*
+parallel_testing_results/
 cached_server/cache/*
+sources/cache/*
 cached_server/config.yaml
-sources/tmp/
-sources/memory/
+sources/tmp/*
+sources/memory/*
 sources/workflows/
 mimosa-env/*
 

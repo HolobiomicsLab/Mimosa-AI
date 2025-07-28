@@ -12,16 +12,10 @@ from .tools_manager import ToolManager
 
 
 class WorkflowFactory:
-    """Handles the creation and management of Langraph-SmolAgent workflow generation.
-
-    Attributes:
-        tools_dir (str): Directory containing tool modules
-        workflow_dir (str): Base directory for workflow storage
-    """
+    """Handles the creation and management of Langraph-SmolAgent workflow generation"""
 
     def __init__(self, config) -> None:
         """Initialize the workflow crafting system.
-
         Args:
             config: Configuration object containing paths and settings
         """
@@ -34,7 +28,6 @@ class WorkflowFactory:
 
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
-
         Returns:
             str: The system prompt content
         """
@@ -51,6 +44,7 @@ class WorkflowFactory:
         existing_tool_prompt: str,
         path: str,
     ) -> str:
+        """Generate a workflow using the LLM."""
         prompt = f"""
 You are an expert in generating LangGraph workflows using SmolAgent nodes.
 
@@ -69,7 +63,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
     @staticmethod
     def extract_python_code(code: str) -> str:
         """Extract Python code blocks from text.
-
         Args:
             code: Text potentially containing Python code blocks
         Returns:
@@ -89,10 +82,10 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         return "\n".join(code_blocks)
 
     async def load_tools_code(self) -> tuple[str, str]:
-        """Load all tool code from the tools directory.
-
+        """Discover all MCP servers and format their client code.
         Returns:
-            Tuple[str, str]: Tuple containing (tools_code, existing_tool_prompt)
+            str: Combined code for all MCP clients.
+            str: Prompt of discovered MCP names for workflow generation tools-awareness.
         """
         tools_code = ""
         existing_tool_prompt = ""
@@ -114,7 +107,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         self, craft_instructions: str, existing_tool_prompt: str, path: str
     ) -> str:
         """Generate and validate workflow code.
-
         Args:
             craft_instructions: The goal description
             existing_tool_prompt: Description of available tools
@@ -134,7 +126,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
 
     def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
-
         Args:
             uuid_str: Unique identifier for the workflow
         Returns:
@@ -159,6 +150,19 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         uuid_str: str,
         goal_prompt: str,
     ) -> str:
+        """Assemble the complete workflow code.
+        Args:
+            tools_code: Code for all MCP clients
+            state_code: Code for the workflow state schema
+            smolagent_factory_code: Code for the SmolAgent factory
+            workflow_code: Generated workflow code by LLM
+            workflow_path: Path to save the workflow
+            memory_path: Path to save the workflow memory
+            uuid_str: Unique identifier for the workflow
+            goal_prompt: The goal description for the workflow
+        Returns:
+            str: Complete workflow code ready for execution
+        """
         initial_state = {
             key: (
                 uuid_str if key == "workflow_uuid"
@@ -232,11 +236,9 @@ if WORKFLOW_PATH:
         self,
         goal_prompt: str,
         template_workflow: str | None = None,
-        template_uuid: str | None = None,
         save_workflow: bool = True,
     ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
-
         Args:
             craft_instructions: The goal description
             template_workflow: pre-existing workflow template UUID
@@ -246,8 +248,6 @@ if WORKFLOW_PATH:
         """
         uuid_str = (
             str(uuid.uuid4()).replace("-", "")
-            if template_uuid is None
-            else template_uuid
         )
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
