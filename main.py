@@ -15,10 +15,11 @@ import dotenv
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
+from sources.core.parallel_testing import ParallelTesting
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
+from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
-
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -31,9 +32,8 @@ def validate_environment() -> None:
             "⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key."
         )
 
-
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
-    """Add CLI arguments for config parameters that can be overridden."""
+    """Add additional CLI arguments for config parameters that can be overridden."""
     parser.add_argument("--workflow_dir", type=str, help="Override workflow directory path")
     parser.add_argument("--schema_code_path", type=str, help="Override state schema file path")
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
@@ -81,7 +81,6 @@ def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
         print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
-        # Cancel all running tasks
         for task in asyncio.all_tasks():
             if not task.done():
                 task.cancel()
@@ -90,6 +89,64 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+async def multigoal_mode(args, config):
+    if getattr(args, 'multi_goal', False):
+        goals = collect_goals_from_user()
+        if not goals:
+            print("❌ No goals provided for multi-goal. Exiting.")
+            return
+        parallel_testing = ParallelTesting(config)
+        parallel_testing.start_parallel_testing(
+            goals=goals,
+            template_uuid=args.load_template,
+            judge=args.judge,
+            human_validation=False,
+            max_workers=getattr(args, 'max_concurrent', None)
+        )
+
+async def dataset_execution_mode(args, config):
+    planner = Planner(config)
+    print(f"Using {args.dataset} dataset")
+    dataset_questions = read_dataset(args.dataset, args.num_samples)
+    if dataset_questions:
+        print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
+        semaphore = asyncio.Semaphore(args.max_concurrent)
+        async def run_with_semaphore(question, answer):
+            """Run a single question with semaphore to limit concurrency"""
+            async with semaphore:
+                return question, answer, await planner.start_planner(
+                    goal=question,
+                    template_uuid=args.load_template,
+                    judge=True,
+                    answer=answer,
+                    max_iteration=1
+                )
+        tasks = []
+        for question, answer in dataset_questions:
+            task = asyncio.create_task(run_with_semaphore(question, answer))
+            tasks.append(task)
+        all_run = await asyncio.gather(*tasks)
+        calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
+    else:
+        print("❌ No questions found in dataset or no goal provided.")
+
+async def normal_execution_mode(args, config):
+    dgm = GodelMachine(config)
+    planner = Planner(config)
+    if args.task:
+        await dgm.start_dgm(goal_prompt=args.task,
+                            judge=args.judge, 
+                            human_validation=True,
+                            max_iteration=args.max_dgm_iterations
+                           )
+    elif args.goal:
+        await planner.start_planner(goal=args.goal, 
+                                    template_uuid=args.load_template, 
+                                    judge=args.judge,
+                                    max_iteration=args.max_dgm_iterations
+                                   )
+    else:
+        raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
 
 async def main():
     """Main execution function"""
@@ -100,25 +157,31 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
-        "--goal", type=str, help="Goal prompt for the workflow"
+        "--goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
     )
     parser.add_argument(
-        "--single_task",  type=str, help="Goal prompt for the workflow"
+        "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--load_template", type=str, help="Optional workflow UUID to load"
+        "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
+    )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
+    )
+    parser.add_argument(
+        "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
-    )
-    parser.add_argument(
-        "--dataset", type=str, help="Dataset to use (in csv format)"
     )
     parser.add_argument(
         "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
     )
     parser.add_argument(
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
+    )
+    parser.add_argument(
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
@@ -128,53 +191,16 @@ async def main():
     validate_environment()
     config.validate_paths()
 
-    dgm = GodelMachine(config)
-    planner = Planner(config)
-
     try:
         if (args.dataset):
-            print(f"Using {args.dataset} dataset")
-            # Default to 3 concurrent tasks, can be overridden with --max_concurrent
-            dataset_questions = read_dataset(args.dataset, args.num_samples)
-            
-            if dataset_questions:
-                print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
-                
-                # Create a semaphore to limit concurrent tasks
-                semaphore = asyncio.Semaphore(args.max_concurrent)
-                
-                async def run_with_semaphore(question, answer):
-                    """Run a single question with semaphore to limit concurrency"""
-                    async with semaphore:
-                        return question, answer, await planner.start_planner(
-                            goal=question,
-                            template_uuid=args.load_template,
-                            judge=True,
-                            answer=answer
-                        )
-                
-                # Create tasks for all questions
-                tasks = []
-                for question, answer in dataset_questions:
-                    task = asyncio.create_task(run_with_semaphore(question, answer))
-                    tasks.append(task)
-                
-                # Run all tasks with concurrency limited by semaphore
-                all_run = await asyncio.gather(*tasks)
-                
-                # Calculate average of good_answer values
-                calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
-            else:
-                print("❌ No questions found in dataset or no goal provided.")
-        else:    
-            if args.single_task:
-                await dgm.start_dgm(goal=args.single_task, judge=args.judge)
-            elif args.goal:
-                await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
-            else:
-                raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+            await dataset_execution_mode(args, config)
+        elif (args.multi_goal):
+            await multigoal_mode(args, config)
+        elif args.task or args.goal:
+            await normal_execution_mode(args, config)
+        else:
+            raise ValueError("No goal provided. Use --task or --goal to start a task.")
     except KeyboardInterrupt:
-        print("\n⚠️ Interrupted by user. Cleaning up...")
         raise
     except Exception as e:
         print(f"❌ Error during execution: {e}")

@@ -303,15 +303,17 @@ Be precise, constructive, and technical in your judgment."""
      }}
      ```"""
 
-        prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
+        prompt = f"""
+You are provided with a multi-agent system designed to achieve a specific goal.
+The system is composed of multiple specialized agents working in sequence or collaboration.
 
 {self.generate_text(uuid)!r}{expected_answer_info}
 
 --- EVALUATION REQUEST ---
 {self.long_prompt(answer is not None) if not short else ""}
-   - Provide an overall score (1–10) for each category in the following JSON format:{json_format}
-   {"- The 'answer_correctness' score should evaluate how well the system's final answer matches the expected answer." if answer else ""}
-   - After the JSON, briefly justify your scores.
+- Provide an overall score (1–10) for each category in the following JSON format:{json_format}
+{"- The 'answer_correctness' score should evaluate how well the system's final answer matches the expected answer." if answer else ""}
+- After the JSON, briefly justify your scores.
 
 Please be objective, technical, and specific in your feedback.
 """
