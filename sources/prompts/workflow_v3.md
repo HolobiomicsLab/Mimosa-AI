@@ -170,6 +170,7 @@ workflow.add_conditional_edges(
 ## 4. Final Checklist
 
 - [ ] **Output Format**: Your entire response is a single Python script wrapped in ```python ... ```.
+- [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user 
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Task Decomposition**: Is each agent responsible for one, and only one, atomic task?
 - [ ] **Complete Routing**: Does your routing function handle all completion keywords from all agents?
