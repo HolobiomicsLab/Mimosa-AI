@@ -247,6 +247,7 @@ class WorkflowRunner:
 
 
 async def main():
+    """Example usage of the WorkflowRunner."""
     config = RuntimeConfig(python_version="3.10", timeout=60, max_memory_mb=256)
     runner = WorkflowRunner(config)
     await runner.install_dependencies(["requests", "numpy"])
@@ -258,9 +259,7 @@ print("Hello from the workflow runner!")
         print(f"[PROGRESS] {line}")
 
     result = await runner.execute(code, progress_callback=progress_handler)
-    print(f"Status: {result.status}")
     print(f"Output: {result.stdout}")
-    print(f"Error: {result.stderr}")
     print(f"Execution time: {result.execution_time:.2f}s")
     await runner.cleanup()
 

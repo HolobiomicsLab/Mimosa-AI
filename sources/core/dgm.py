@@ -129,6 +129,7 @@ Add extensive comments in the code to explain your changes.
         if not workflows:
             return None
         if template_uuid is None:
+            print("Selecting best workflow template...")
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal_prompt,
             )
