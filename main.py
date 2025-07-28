@@ -140,7 +140,7 @@ async def normal_execution_mode(args, config):
                             max_iteration=args.max_dgm_iterations
                            )
     elif args.goal:
-        await planner.start_planner(goal_prompt=args.goal, 
+        await planner.start_planner(goal=args.goal, 
                                     template_uuid=args.load_template, 
                                     judge=args.judge,
                                     max_iteration=args.max_dgm_iterations
