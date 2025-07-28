@@ -90,10 +90,10 @@ def setup_signal_handlers():
     signal.signal(signal.SIGTERM, signal_handler)
 
 async def multigoal_mode(args, config):
-    if getattr(args, 'mass_testing', False):
+    if getattr(args, 'multi_goal', False):
         goals = collect_goals_from_user()
         if not goals:
-            print("❌ No goals provided for mass testing. Exiting.")
+            print("❌ No goals provided for multi-goal. Exiting.")
             return
         parallel_testing = ParallelTesting(config)
         parallel_testing.start_parallel_testing(
@@ -101,7 +101,7 @@ async def multigoal_mode(args, config):
             template_uuid=args.load_template,
             judge=args.judge,
             human_validation=False,
-            max_workers=getattr(args, 'max_workers', None)
+            max_workers=getattr(args, 'max_concurrent', None)
         )
 
 async def dataset_execution_mode(args, config):
@@ -137,8 +137,8 @@ async def normal_execution_mode(args, config):
     elif args.goal:
         await planner.start_planner(goal_prompt=args.goal, template_uuid=args.load_template)
     else:
-        raise ValueError("No goal provided. Use --task, --goal, or --mass-testing to start.")
-            
+        raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
+
 async def main():
     """Main execution function"""
     config = Config()
@@ -154,13 +154,13 @@ async def main():
         "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--multi-goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
+        "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
     )
     parser.add_argument(
         "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
     )
     parser.add_argument(
-        "--load_template", type=str, help="Optional workflow UUID to load"
+        "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
