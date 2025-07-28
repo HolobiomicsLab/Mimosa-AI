@@ -93,6 +93,8 @@ class GodelMachine:
         return f"""
 You are a self-improving AI agent. Your goal is to improve the workflow code iteratively based on the results of previous iterations.
 
+User goal : {goal}
+
 Previous workflow code you generated:
 {flow_code}
 
@@ -133,29 +135,39 @@ Learn from this output and improve the workflow generation.
 
     async def start_dgm(
         self,
-        goal_prompt: str,
+        goal: str,
         template_uuid: str | None = None,
         judge: bool = False,
+        answer: str = None,
     ):
         template = self.select_workflow_template(template_uuid=template_uuid)
-        await self.recursive_self_improvement(
-            goal_prompt,
-            goal_prompt,
+
+        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"{'─' * 60}")
+        print(f"  {goal}")
+        print(f"{'─' * 60}\n")
+
+        return await self.recursive_self_improvement(
+            goal,
+            goal,
             template_uuid=template_uuid,
             workflow_template=template,
             judge=judge,
+            max_depth = 0,
+            answer=answer
         )
 
     async def recursive_self_improvement(
         self,
+        goal,
         prompt: str,
-        goal: str,
         template_uuid: str | None = None,
         workflow_template: str | None = None,
         iteration_count: int = 0,
         max_depth: int = 5,
         judge: bool = False,
-    ) -> str:
+        answer: str=None,
+    ):
         """Run a self-improvement loop for the workflow.
 
         Args:
@@ -168,9 +180,8 @@ Learn from this output and improve the workflow generation.
         Returns:
             str: Final execution status message
         """
-        flow_output = ""
         print(f"\n{'=' * 60}")
-        print(f"ITERATION {iteration_count + 1}/5 - Self-Improvement Loop")
+        print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
         print(f"{'=' * 60}")
         if iteration_count > 0:
             human_validation = (
@@ -179,18 +190,15 @@ Learn from this output and improve the workflow generation.
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.")
                 print()
-                return flow_output
-        print(f"\n{'📋 CURRENT GOAL':^60}")
-        print(f"{'─' * 60}")
-        print(f"  {goal}")
-        print(f"{'─' * 60}\n")
+                return uuid  # noqa: F821
+        
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             prompt, template_uuid, workflow_template
         )
         if executed:
             if judge:
-                self.judge.evaluate(uuid)
+                self.judge.evaluate(uuid=uuid, answer=answer)
             total_cost = self.judge.calculate_cost(uuid)
             print(f"Total workflow cost: {total_cost:.3f} USD")
         flow_state = self.load_flow_state_result(uuid)
@@ -205,7 +213,7 @@ Learn from this output and improve the workflow generation.
         template_uuid = None
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
-            return flow_output
+            return uuid
         await self.recursive_self_improvement(
             prompt,
             goal,
@@ -213,4 +221,4 @@ Learn from this output and improve the workflow generation.
             workflow_template=flow_code if flow_state else None,
             iteration_count=iteration_count + 1,
         )
-        return flow_output
+        return uuid
