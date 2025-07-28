@@ -33,7 +33,7 @@ def validate_environment() -> None:
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
-    """Add CLI arguments for config parameters that can be overridden."""
+    """Add additional CLI arguments for config parameters that can be overridden."""
     parser.add_argument("--workflow_dir", type=str, help="Override workflow directory path")
     parser.add_argument("--schema_code_path", type=str, help="Override state schema file path")
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
@@ -47,7 +47,6 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--runner_temp_dir", type=str, help="Override temp directory path for runners")
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
-    parser.add_argument("--single_task", type=str, help="single task to run without planner")
 
 def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     """Apply CLI argument overrides to config."""
@@ -149,19 +148,22 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
-        "--goal", type=str, help="Goal prompt for the workflow"
+        "--goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
     )
     parser.add_argument(
-        "--task",  type=str, help="Goal prompt for the workflow"
+        "--task",  type=str, help="Single task mode (no planner)"
+    )
+    parser.add_argument(
+        "--multi-goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
+    )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
     )
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load"
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
-    )
-    parser.add_argument(
-        "--dataset", type=str, help="Dataset to use (in csv format)"
     )
     parser.add_argument(
         "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
@@ -183,13 +185,15 @@ async def main():
     try:
         if (args.dataset):
             await dataset_execution_mode(args, config)
+        elif (args.multi_goal):
+            await multigoal_mode(args, config)
         else:    
-            if args.single_task:
-                await dgm.start_dgm(goal=args.single_task, judge=args.judge)
+            if args.task:
+                await dgm.start_dgm(goal=args.task, judge=args.judge)
             elif args.goal:
                 await planner.start_planner(goal=args.goal, template_uuid=args.load_template, judge=args.judge)
             else:
-                raise ValueError("No goal provided. Use --single_task or --goal to start a task.")
+                raise ValueError("No goal provided. Use --task or --goal to start a task.")
     except KeyboardInterrupt:
         raise
     except Exception as e:
