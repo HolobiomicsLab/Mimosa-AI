@@ -41,7 +41,7 @@ class WorkflowOrchestrator:
         """Run the workflow code in a sandboxed environment."""
 
         def progress_handler(line: str):
-            print(f"[LOG] {line}")
+            print(f"{line}")
 
         print("Running workflow in python sandbox...")
         result = await self.workflow_runner.execute(

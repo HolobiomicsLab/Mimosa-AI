@@ -2,8 +2,11 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
-from sources.core.llm_provider import LLMProvider
+from flask import Config
+
+from sources.core.llm_provider import LLMConfig, LLMProvider
 
 
 @dataclass
@@ -45,7 +48,7 @@ class WorkflowJudge:
 
         # Orchestrator and Judge LLM calls
 
-        for call in ["orchestrator", "judge"]:
+        for call in ["workflow_creator", "judge"]:
             memory_file = memory_path / f"{call}.json"
             if not memory_file.exists():
                 continue
@@ -54,7 +57,11 @@ class WorkflowJudge:
                 json_call = json.load(f)
                 llm_calls.append(
                     TokenUsage(
-                        call, json_call["model"], *json_call["token_usage"].values()
+                        call,
+                        json_call["model"],
+                        json_call["usage"]["prompt_tokens"],
+                        json_call["usage"]["completion_tokens"],
+                        json_call["usage"]["total_tokens"],
                     )
                 )
 
@@ -159,18 +166,20 @@ class WorkflowJudge:
 
                     # Process steps for workflow
                     for step in steps:
+                        error = step.get("error", None)
+                        code_result = error if error else step.get("observations", "")
                         step_info = {
                             "agent": agent_name,
-                            "step_number": step.get("step_number", ""),
-                            "action": step.get("code_action", ""),
-                            "start_time": start_time,
-                            "error": step.get("error", ""),
-                            "result": step.get("observations", ""),
+                            "start_time":step["timing"]["start_time"],
+                            "step_number": step["step_number"],
+                            "prompt": step["model_input_messages"][1]["content"][0]["text"],
+                            "reasoning": step["model_output"],
+                            "code_action" : step.get("code_action", ""),
+                            "code_output": code_result
                         }
                         workflow_steps.append(step_info)
 
         # Sort agents and workflow steps by start time
-        agents.sort(key=lambda x: x["start_time"])
         workflow_steps.sort(key=lambda x: (x["start_time"], x["step_number"]))
 
         # Read the goal
@@ -188,17 +197,15 @@ class WorkflowJudge:
 
         text += "--- WORKFLOW ---\n"
         for step in workflow_steps:
-            text += f"Agent: {step['agent']}\n"
-            text += f"Step: {step['step_number']}\n"
-            text += f"Input: {step['action']}\n"
-            if step["error"]:
-                text += f"Output: ERROR - {step['error']}\n"
-            else:
-                text += f"Output: {step['result']}\n"
+            text += f"AGENT: {step['agent']}\n"
+            text += f"STEP: {step['step_number']}\n"
+            text += f"PROMPT: {step['prompt']}\n"
+            text += f"REASONING {step['reasoning']}\n"
+            text += f"OUTPUT: {step['code_output']}\n"
             text += "\n"
 
-        text += "--- MERMAID WORKFLOW ---\n"
-        with open(workflow_path / "mermaid.txt") as f:
+        text += "--- WORKFLOW CODE---\n"
+        with open(workflow_path / f"workflow_code_{uuid}.py") as f:
             workflow_mermaid = f.read()
         text += f"{workflow_mermaid}\n"
 
@@ -208,8 +215,20 @@ class WorkflowJudge:
 
         return text.strip()
 
-    def long_prompt(self):
-        return """
+    def long_prompt(self, include_answer_assessment=False):
+        answer_assessment = (
+            """
+4. **Answer Correctness Assessment**
+   - Evaluate whether the final answer produced by the system matches the expected answer
+   - Analyze any discrepancies between the system's answer and the expected answer
+   - Identify potential reasons for incorrect or incomplete answers
+
+"""
+            if include_answer_assessment
+            else ""
+        )
+
+        return f"""
 Please analyze the system with the following structure:
 
 1. **Step-by-step Critique**
@@ -230,17 +249,22 @@ Please analyze the system with the following structure:
      - Is there information loss or miscommunication between agents?
      - Is the final output aligned with the initial goal?
    - Suggest architectural or coordination-level improvements (e.g., adding intermediate validation, changing agent order, improving memory/context sharing)
-
-4. **Summary Judgment**
+{answer_assessment}
+{4 + (1 if include_answer_assessment else 0)}. **Summary Judgment**
  """
 
-    def evaluate(self, uuid: str, short: bool = True):
+    def evaluate(self, uuid: str, short: bool = True, answer: str = None):
         """Evaluate the benchmark results.
 
         Args:
             uuid: UUID of the workflow run to evaluate
         """
-        system_prompt = """You are a rigorous and objective evaluator of a multi-agent system designed to solve a complex goal through a coordinated workflow. You will be given:
+        # Adjust system prompt based on whether an expected answer is provided
+        answer_evaluation_task = ""
+        if answer:
+            answer_evaluation_task = "- Assess whether the final answer produced by the system matches the expected answer.\n"
+
+        system_prompt = f"""You are a rigorous and objective evaluator of a multi-agent system designed to solve a complex goal through a coordinated workflow. You will be given:
 
 1. A description of the system's **goal**.
 2. A list of **agents**, each with their assigned roles.
@@ -253,38 +277,50 @@ Your task is to:
 - Identify whether outputs are appropriate, helpful, or erroneous.
 - Pinpoint any bottlenecks, misunderstandings, or failures.
 - Evaluate how well the agents are collaborating to reach the goal.
-- Suggest what changes could improve the system's reliability, performance, or alignment with the goal.
+{answer_evaluation_task}- Suggest what changes could improve the system's reliability, performance, or alignment with the goal.
 
 Be precise, constructive, and technical in your judgment."""
-        prompt = f"""You are provided with a multi-agent system designed to achieve a specific goal. The system is composed of multiple specialized agents working in sequence or collaboration.
-
-{self.get_text(uuid)!r}
-
---- EVALUATION REQUEST ---
-{self.long_prompt() if not short else ""}
-   - Provide an overall score (1–10) for each category in the following JSON format:
+        # Prepare the expected answer information if available
+        expected_answer_info = ""
+        json_format = """
      ```json
      {{
         "goal_alignment": X,
         "agent_collaboration": Y,
         "output_quality": Z,
      }}
-     ```
-   - After the JSON, briefly justify your scores.
+     ```"""
+
+        if answer:
+            expected_answer_info = f"\n\n--- EXPECTED ANSWER ---\n{answer}\n"
+            json_format = """
+     ```json
+     {{
+        "goal_alignment": X,
+        "agent_collaboration": Y,
+        "output_quality": Z,
+        "answer_correctness": W
+     }}
+     ```"""
+
+        prompt = f"""
+You are provided with a multi-agent system designed to achieve a specific goal.
+The system is composed of multiple specialized agents working in sequence or collaboration.
+
+{self.generate_text(uuid)!r}{expected_answer_info}
+
+--- EVALUATION REQUEST ---
+{self.long_prompt(answer is not None) if not short else ""}
+- Provide an overall score (1–10) for each category in the following JSON format:{json_format}
+{"- The 'answer_correctness' score should evaluate how well the system's final answer matches the expected answer." if answer else ""}
+- After the JSON, briefly justify your scores.
 
 Please be objective, technical, and specific in your feedback.
 """
         print("Calling LLMProvider to evaluate the workflow...")
-        history = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
-        output = LLMProvider().openai_completion(
-            history=history,
-            called_by="judge",
-            memory_path=self.memory_dir / uuid,
-            model="o4-mini-2025-04-16",
-        )
+        memory_path = Path(self.memory_dir) / uuid
+        config_llm = LLMConfig().from_dict({"model": "o4-mini-2025-04-16"})
+        output = LLMProvider("judge", memory_path, system_prompt, config_llm)(prompt)
 
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
@@ -294,8 +330,7 @@ Please be objective, technical, and specific in your feedback.
 
         # Extract scores from the evaluation output
         scores = self._extract_scores(output)
-
-        # Update the state result file with the scores
+            
         self._update_state_result(scores, uuid)
         print("Scores extracted and saved to state result.")
 
@@ -318,11 +353,12 @@ Please be objective, technical, and specific in your feedback.
             if match:
                 json_str = match.group(1)
                 scores = json.loads(json_str)
+                # Calculate overall score including answer_correctness if available
                 scores["overall_score"] = (
-                    scores["goal_alignment"]
-                    + scores["agent_collaboration"]
-                    + scores["output_quality"]
-                )
+                        scores["goal_alignment"]
+                        + scores["agent_collaboration"]
+                        + scores["output_quality"]
+                    )
                 scores["overall_score"] /= 3
                 return scores
             else:
