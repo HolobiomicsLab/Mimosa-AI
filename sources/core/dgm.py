@@ -237,7 +237,7 @@ class GodelMachine:
             )
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.\n")
-                return flow_output
+                return uuid
 
         print(f"\n{'=' * 60}")
         print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
