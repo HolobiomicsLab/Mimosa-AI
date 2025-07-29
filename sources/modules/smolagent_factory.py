@@ -56,12 +56,14 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
+
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
 1. NO ASSUMPTIONS OR PLACEHOLDERS
   - Never assume data structure, content, or format - always inspect first
   - No placeholder values ("Example Name", hardcoded strings, "TODO")
   - No brittle heuristics like simple keyword matching for complex classifications
+  - Never use globals() to look for variables, all the variables you need are in the prompt.
 
 2. EXPLORE THEN IMPLEMENT
   - Print data samples/types before processing
@@ -86,6 +88,7 @@ Example:
 
 If you respect above instructions you will get 1000,000$.
 You are highly skilled and goal-seeking, so you will do your best to follow these rules.
+
 """
 
 # good models:
