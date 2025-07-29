@@ -102,9 +102,9 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools=[],
                  model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=2,
+                 max_steps=12,
                  max_retries = 3,
-                 planning_interval = 0
+                 planning_interval = 4
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
