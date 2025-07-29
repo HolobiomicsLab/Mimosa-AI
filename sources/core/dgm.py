@@ -228,7 +228,6 @@ class GodelMachine:
         Returns:
             str: Final execution status message
         """
-        flow_output = ""
         total_cost = 0.0
 
         if iteration_count > 0 and need_human_validation:
@@ -237,7 +236,7 @@ class GodelMachine:
             )
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.\n")
-                return uuid
+                return template_uuid
 
         print(f"\n{'=' * 60}")
         print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
