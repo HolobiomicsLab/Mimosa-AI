@@ -181,7 +181,7 @@ async def main():
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations"
+        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
