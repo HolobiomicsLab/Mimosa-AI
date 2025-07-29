@@ -116,7 +116,6 @@ class Config:
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "workflow_llm_provider": self.workflow_llm_provider,
-            "mcp_health_endpoint": self.mcp_health_endpoint,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -141,9 +140,6 @@ class Config:
         )
         self.workflow_llm_provider = data.get(
             "workflow_llm_provider", self.workflow_llm_provider
-        )
-        self.mcp_health_endpoint = data.get(
-            "mcp_health_endpoint", self.mcp_health_endpoint
         )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
@@ -170,7 +166,6 @@ class Config:
             f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
             f"workflow_llm_provider={self.workflow_llm_provider},\n"
-            f"mcp_health_endpoint={self.mcp_health_endpoint},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
             f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
