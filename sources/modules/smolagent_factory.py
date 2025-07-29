@@ -76,6 +76,10 @@ ADDED_SYSTEM_PROMPT = """
 4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
 - Focus on one task at a time, extracting data from one source before moving to the next
+
+5. TOOL USAGE CONSTRAINTS
+- Always use keyword arguments for tool calls, never positional arguments
+
 - To save time you could preview the data of multiple sources, but do not try to process it all at once.
 
 When calling final_answer tool, you you must return a long, detailed paragraph that includes:
