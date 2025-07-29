@@ -43,7 +43,6 @@ class Config:
         self.smolagent_model_provider: str = "deepseek"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v3.md"
         self.workflow_llm_provider: str = "openai"
-        self.mcp_health_endpoint: str = "http://localhost:5000/health"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024

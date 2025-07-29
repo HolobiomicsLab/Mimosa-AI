@@ -101,26 +101,23 @@ class GodelMachine:
             flow_answers = (
                 run_stdout.strip()
             )
-
-        return f"""
-You must iteratively improve the workflow based on the previous execution results.
-You are a self-improving AI agent.
-Your goal is to improve the workflow code iteratively based on results of previous run.
-
-User goal : {goal}
-
-Previous workflow code :
-{flow_code}
-
-Previous generation attempt ({iteration_count}) result in the following output:
-
-{flow_answers}
-
-Given this output, you need to improve the workflow.
-Do not change the whole workflow. Change a prompt, add an agent, change a tool, etc.. 
-Create a new workflow that improves the previous one with the single change you choose.
-Add extensive comments in the code to explain your changes.
-        """
+        improv_prompt = "You must generate a multi-agent workflow for the goal."
+        if flow_code is not None:
+            improv_prompt = '\n'.join([
+                "Previously written workflow code:",
+                flow_code,
+                "Previous attempt resulted in agents ending with following answers:",
+                flow_answers,
+                "You must improve the workflow based on previous execution results.",
+                "Only change a prompt, add an agent, change a tool, etc.. ",
+            ])
+        
+        return ''.join([
+            f"Attempt {iteration_count + 1} of workflow generation.\n",
+            improv_prompt,
+            "Target goal:",
+            goal,
+        ])
 
     def select_workflow_template(self, goal_prompt, template_uuid: str = None) -> str:
         """Select and load a workflow template by UUID.
@@ -131,15 +128,17 @@ Add extensive comments in the code to explain your changes.
             str: The workflow template content if found, None otherwise
         """
         if not os.path.exists(self.workflow_dir):
+            print(f"Workflow directory {self.workflow_dir} does not exist.")
             return None
         workflows = [f for f in os.listdir(self.workflow_dir)]
         if not workflows:
+            print(f"No workflows found in {self.workflow_dir}.")
             return None
         if template_uuid is None:
-            print("Selecting best workflow template...")
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal_prompt,
             )
+            print(f"Selected {len(candidates)} candidates for goal '{goal_prompt}'")
             return candidates[0].code if candidates else None
         try:
             with open(
@@ -285,7 +284,6 @@ Add extensive comments in the code to explain your changes.
             title=f"Workflow {uuid} completed.",
         )
 
-        #flow_code = self.load_workflow_code(template_uuid if template_uuid else uuid)
         flow_code = self.select_workflow_template(goal_prompt=goal,
                                                   template_uuid=template_uuid)
         prompt = self.improvement_prompt(

@@ -39,6 +39,15 @@ class WorkflowState(TypedDict):
     success: List[bool]         # History of task success flags
 ```
 
+### Tools
+
+Domain specific tools package will be provided to you. For example:
+
+The following tools packages are available for agents:
+`EXISTING_TOOLS_WEB`, `EXISTING_TOOLS_CHART`
+
+Assign exactly one tool package to each agent. Prefer creating additional specialized agents with distinct tool packages rather than assigning multiple tools to a single general-purpose agent.
+
 ## 3. How to Build a Workflow
 
 Your output must be a single, runnable Python script. Follow this structure precisely.
