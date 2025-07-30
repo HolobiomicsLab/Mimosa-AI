@@ -2,13 +2,14 @@
 Darwin Godel Machine
 """
 
-import os
 import json
+import os
 
-from sources.core.judge import WorkflowJudge
-from sources.utils.visualization import VisualizationUtils
-from sources.utils.shared_visualization import SharedVisualizationData
+from sources.core.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
+from sources.utils.pricing import PricingCalculator
+from sources.utils.shared_visualization import SharedVisualizationData
+from sources.utils.visualization import VisualizationUtils
 
 from .orchestrator import WorkflowOrchestrator
 from .workflow_selection import WorkflowSelector
@@ -26,11 +27,12 @@ class GodelMachine:
         self.model_pricing = config.model_pricing
         self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
-        self.judge = WorkflowJudge(config)
+        self.judge = WorkflowEvaluator(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         self.viz_utils = viz_utils or VisualizationUtils()
         self.shared_viz_data = shared_viz_data
         self.process_id = process_id
+        self.pricing = PricingCalculator(config)
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -159,6 +161,7 @@ Add extensive comments in the code to explain your changes.
         template_uuid: str | None = None,
         judge: bool = False,
         answer: str = None,
+        scenario_id: str = None,
         human_validation: bool = False,
         max_iteration: int = 5,
     ):
@@ -197,6 +200,7 @@ Add extensive comments in the code to explain your changes.
             max_depth=max_iteration,
             judge=judge,
             answer=answer,
+            scenario_id=scenario_id,
             need_human_validation=human_validation,
             rewards_history=rewards_history,
             plot_data=plot_data,
@@ -214,7 +218,8 @@ Add extensive comments in the code to explain your changes.
         need_human_validation: bool = False,
         rewards_history: list[float] = None,
         plot_data: tuple = None,
-        answer: str=None,
+        answer: str = None,
+        scenario_id: str = None,
     ):
         """Run a self-improvement loop for the workflow.
 
@@ -229,8 +234,8 @@ Add extensive comments in the code to explain your changes.
         Returns:
             str: Final execution status message
         """
-        flow_output = ""
         total_cost = 0.0
+        uuid = None  # Initialize uuid to avoid undefined reference
 
         if iteration_count > 0 and need_human_validation:
             human_validation = (
@@ -254,8 +259,8 @@ Add extensive comments in the code to explain your changes.
         )
         if executed:
             if judge:
-                self.judge.evaluate(uuid=uuid, answer=answer)
-            total_cost = self.judge.calculate_cost(uuid)
+                self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+            total_cost = self.pricing.calculate_cost(uuid)
 
         flow_state = self.load_flow_state_result(uuid)
         flow_rewards = self.get_total_rewards(flow_state)
@@ -305,5 +310,6 @@ Add extensive comments in the code to explain your changes.
             need_human_validation=need_human_validation,
             rewards_history=rewards_history,
             plot_data=plot_data,
+            scenario_id=scenario_id,
         )
         return uuid
