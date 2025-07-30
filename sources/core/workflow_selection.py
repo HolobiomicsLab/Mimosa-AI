@@ -1,11 +1,11 @@
 
+import json
+import sys
 from pathlib import Path
-from config import Config
+
 from sentence_transformers import SentenceTransformer
 
-import sys
-import json
-
+from config import Config
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -17,7 +17,7 @@ class WorkflowInfo:
         self.code = code
         self.overall_score = overall_score
 
-WF = WorkflowInfo  # Alias for easier reference
+#WF = WorkflowInfo  # Alias for easier reference
 
 class WorkflowSelector:
     def __init__(self, config: Config) -> None:
@@ -26,7 +26,7 @@ class WorkflowSelector:
         self.workflows_info = self.discover_workflows()
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
     
-    def discover_workflows(self) -> dict[str, WF]:
+    def discover_workflows(self) -> dict[str, WorkflowInfo]:
         workflows = {}
 
         if not self.workflows_folder.exists():
@@ -75,13 +75,13 @@ class WorkflowSelector:
     def cosine_similarity(self, a: str, b: str) -> float:
         """Calculate cosine similarity between two strings."""
         import torch.nn.functional as F
-        embeddings_a = self.model.encode(a, convert_to_tensor=True)
-        embeddings_b = self.model.encode(b, convert_to_tensor=True)
+        embeddings_a = self.model.encode(a, convert_to_tensor=True, show_progress_bar=False)
+        embeddings_b = self.model.encode(b, convert_to_tensor=True, show_progress_bar=False)
         return F.cosine_similarity(embeddings_a, embeddings_b, dim=0).item()
     
     def sort_similar_workflows(self, goal: str,
                                      threshold=0.8,
-                                     debug=False) -> list[WF]:
+                                     debug=False) -> list[WorkflowInfo]:
         """Find workflows with similar goals."""
         assert threshold >= 0.0, "Threshold must be non-negative"
         assert threshold <= 1.0, "Threshold must be at most 1.0"
@@ -100,7 +100,7 @@ class WorkflowSelector:
         return [wf for wf in similar_workflows
                 if self.cosine_similarity(wf.goal, goal) >= threshold]
     
-    def sort_workflows_by_score(self, workflows_info: list[WF]) -> list[WF]:
+    def sort_workflows_by_score(self, workflows_info: list[WorkflowInfo]) -> list[WorkflowInfo]:
         """Sort workflows by their overall score."""
         sorted_workflows = sorted(
             workflows_info,
@@ -109,7 +109,7 @@ class WorkflowSelector:
         )
         return [wf for wf in sorted_workflows]
     
-    def select_best_workflows(self, goal: str, threshold=0.5) -> WF | None:
+    def select_best_workflows(self, goal: str, threshold=0.5) -> WorkflowInfo | None:
         """Choose a workflow that matches the goal with a minimum threshold."""
         similar_workflows = self.sort_similar_workflows(goal, threshold)
         best_workflows = self.sort_workflows_by_score(similar_workflows)

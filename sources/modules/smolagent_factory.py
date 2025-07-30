@@ -79,7 +79,8 @@ ADDED_SYSTEM_PROMPT = """
 
 5. TOOL USAGE CONSTRAINTS
 - Always use keyword arguments for tool calls, never positional arguments
-
+- Do not make assumptions about the data returned by the tools. 
+- Try a tool, see its output, then you might write code to process it.
 - To save time you could preview the data of multiple sources, but do not try to process it all at once.
 
 When calling final_answer tool, you you must return a long, detailed paragraph that includes:
@@ -87,6 +88,7 @@ When calling final_answer tool, you you must return a long, detailed paragraph t
 - Specific sources and URLs where information was found
 - Any important context or background information
 - Any error codes or technical messages received
+- Your final answer MUST contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA
 Example:
     final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 

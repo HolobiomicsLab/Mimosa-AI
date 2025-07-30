@@ -16,6 +16,7 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.core.parallel_testing import ParallelTesting
+from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
@@ -130,10 +131,14 @@ async def dataset_execution_mode(args, config):
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
     planner = Planner(config)
+    if args.scenario:
+        scenario_file = ScenarioLoader().load_scenario(args.scenario)
+        args.task = scenario_file["goal"]
+        args.judge = True
     if args.task:
         await dgm.start_dgm(goal_prompt=args.task,
                             judge=args.judge, 
-                            scenario=args.scenario,
+                            scenario_id=args.scenario,
                             human_validation=True,
                             max_iteration=args.max_dgm_iterations
                            )
@@ -199,7 +204,7 @@ async def main():
             await dataset_execution_mode(args, config)
         elif (args.multi_goal):
             await multigoal_mode(args, config)
-        elif args.task or args.goal:
+        elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
             raise ValueError("No goal provided. Use --task or --goal to start a task.")
