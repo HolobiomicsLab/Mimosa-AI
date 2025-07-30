@@ -223,3 +223,4 @@ CLAUDE.md
 docs/project.xml
 
 sources/cache
+tests/browser.py

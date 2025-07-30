@@ -2,11 +2,134 @@
 OpenRouter API client for real-time model pricing
 """
 
+from dataclasses import dataclass
 import json
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests
+
+@dataclass
+class TokenUsage:
+    agent: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+
+
+class PricingCalculator:
+    def __init__(self, config):
+        self.memory_dir = Path(config.memory_dir)
+        self.workflow_dir = Path(config.workflow_dir)
+        self.model_pricing = config.model_pricing
+
+    def calculate_cost(self, uuid: str) -> float:
+        """Calculate the cost of a workflow run based on token usage.
+
+        Args:
+            config: The configuration object
+            uuid: Optional UUID of the workflow run to calculate cost for.
+                If not provided, will try to find the most recent run.
+
+        Returns:
+            float: The total cost in USD
+        """
+
+        print("\n📊 Calculating final cost...")
+
+        memory_path = Path(self.memory_dir) / uuid
+
+        if not memory_path.exists():
+            print(f"❌ Memory directory not found: {memory_path}")
+            return 0.0
+
+        llm_calls: list[TokenUsage] = []
+
+        # Orchestrator and Judge LLM calls
+
+        for call in ["workflow_creator", "judge"]:
+            memory_file = memory_path / f"{call}.json"
+            if not memory_file.exists():
+                continue
+
+            with open(memory_file) as f:
+                json_call = json.load(f)
+                llm_calls.append(
+                    TokenUsage(
+                        call,
+                        json_call["model"],
+                        json_call["usage"]["prompt_tokens"],
+                        json_call["usage"]["completion_tokens"],
+                        json_call["usage"]["total_tokens"],
+                    )
+                )
+
+        workflow_path = Path(self.workflow_dir) / uuid
+
+        if not workflow_path.exists():
+            print(f"❌ Workflow directory not found: {workflow_path}")
+            return 0.0
+
+        try:
+            with open(workflow_path / "state_result.json") as f:
+                state_results = json.load(f)
+                model_id = state_results.get("model_id", None)
+        except FileNotFoundError:
+            print(f"❌ State result file not found for UUID {uuid} in {workflow_path}.")
+            return 0.0
+
+        try:
+            for file in os.listdir(memory_path):
+                if file.startswith("task_") and file.endswith(".json"):
+                    with open(memory_path / file) as f:
+                        steps = json.load(f)
+                        token_usage = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                        }
+                        for step in steps:
+                            step_usage = step.get("token_usage", None)
+                            if token_usage:
+                                token_usage = {
+                                    key: token_usage[key] + step_usage[key]
+                                    for key in step_usage
+                                }
+                        llm_calls.append(
+                            TokenUsage(
+                                file.replace("task_", "").replace(".json", ""),
+                                model_id,
+                                *token_usage.values(),
+                            )
+                        )
+        except Exception as e:
+            print(f"❌ Error reading workflow steps: {str(e)}")
+            return 0.0
+
+        total_cost = 0.0
+        print("\n💰 Cost Breakdown:")
+        print("=" * 60)
+        for call in llm_calls:
+            pricing = self.model_pricing.get(
+                call.model,
+                self.model_pricing.get("default", {"input": 0.70, "output": 2.50}),
+            )
+            cost = (
+                call.input_tokens * pricing["input"]
+                + call.output_tokens * pricing["output"]
+            ) / 1_000_000
+            print("Agent:", call.agent)
+            print(f"  Model: {call.model}")
+            print(f"  Tokens: {call.total_tokens:,}")
+            print(f"  Cost: {cost:.3f} USD")
+            print("-" * 40)
+            total_cost += cost
+
+        return total_cost
 
 
 class OpenRouterPricingClient:
