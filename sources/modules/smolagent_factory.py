@@ -24,7 +24,6 @@ from smolagents import (
     LiteLLMModel
 )
 
-
 from smolagents import InferenceClientModel # HfApiModel was renamed to InferenceClientModel in v1.14 https://github.com/huggingface/smolagents/releases
 
 from opentelemetry.sdk.trace import TracerProvider
@@ -57,43 +56,43 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
+
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
 1. NO ASSUMPTIONS OR PLACEHOLDERS
   - Never assume data structure, content, or format - always inspect first
   - No placeholder values ("Example Name", hardcoded strings, "TODO")
   - No brittle heuristics like simple keyword matching for complex classifications
+  - Never use globals() to look for variables, all the variables you need are in the prompt.
 
 2. EXPLORE THEN IMPLEMENT
   - Print data samples/types before processing
   - Build extraction logic from observed patterns, not assumptions
   - Use defensive programming: check existence, handle missing values
 
-4. REAL EXTRACTION ONLY
-  - Write actual parsing logic based on inspected data structure
-  - If you can't determine extraction method, explore the data first
-  - No assumptions about URL patterns, page structure, or content format
-
-5. NO REGEX OR PATTERN MATCHING
+3. NO REGEX OR PATTERN MATCHING
   - Do not use regex or pattern matching to extract data from tools output
 
-6. AVOID CONTEXT SATURATION
+4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
 - Focus on one task at a time, extracting data from one source before moving to the next
-- To save time you could preview the data of multiple sources, but do not try to process it all at once.
 
-Build robust code that handles real-world data variability, not idealized scenarios.
+5. TOOL USAGE CONSTRAINTS
+- Always use keyword arguments for tool calls, never positional arguments
+
+- To save time you could preview the data of multiple sources, but do not try to process it all at once.
 
 When calling final_answer tool, you you must return a long, detailed paragraph that includes:
 - All key findings and data points you discovered
 - Specific sources and URLs where information was found
 - Any important context or background information
 - Any error codes or technical messages received
-- If specified, use special words like SUCCESS
 Example:
     final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 
-If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
+If you respect above instructions you will get 1000,000$.
+You are highly skilled and goal-seeking, so you will do your best to follow these rules.
+
 """
 
 # good models:
@@ -107,9 +106,9 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools=[],
                  model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=2,
+                 max_steps=12,
                  max_retries = 3,
-                 planning_interval = 0
+                 planning_interval = 4
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -191,21 +190,18 @@ class SmolAgentFactory:
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
         if state_answers:
-            prev_infos = f"""Previens {state["step_name"][-1]} provided the following information:
+            prev_infos = f"""Previous agent {state["step_name"][-1]} provided the following information:
             {state_answers[-1]}"""
         else:
-            prev_infos = f"""You are the first agent. The user provided the following information:
-            {GOAL}"""
+            prev_infos = f"""You are the first agent. No information is available from previous agents."""
         return f"""
-        You are an AI agent designed to assist with a specific task.
+        You must pursue a goal for accomplishing a task. You are part of a multi-agent system.
+        You might receive informations from other agents, these informations might be incomplete or incorrect.
+        You must try your best to accomplish the task with the information you have. If impossible you might give up and return a failure message.
         {prev_infos}
-        Your need to follow instructions:
+
+        Your goal is:
         {self.instruct_prompt}
-        Avoid making overly complex code for simple tasks. Be patient and thorough.
-        Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
-        Never use globals() to look for variables, all the variables you need are in the prompt.
-        If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
-        Your final answer must contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA.
         """
 
     def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
@@ -341,12 +337,12 @@ class SmolAgentFactory:
             raise e
         actions, observations, success = self.parse_memory_output()
         action: Action = {
-            "tool": actions[-1] if actions else "No action",
+            "tool": actions if actions else [],
         }
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        success_bool = success[-1] if len(success) > 0 else True
+        success_bool = any(success) if success else True # no success means no actions were taken
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],

@@ -102,6 +102,11 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             tools_code += client_code + "\n"
             existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
+    
+    def remove_imports(self, code: str) -> str:
+        # remove attempt from LLM to import modules/class
+        lines = code.splitlines()
+        return "\n".join(line for line in lines if not line.strip().startswith("import "))
 
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str
@@ -119,6 +124,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             system_prompt, craft_instructions, existing_tool_prompt, path
         )
         workflow_code = self.extract_python_code(llm_output)
+        workflow_code = self.remove_imports(workflow_code)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
         print("✅ LLM generated workflow code successfully")
@@ -179,10 +185,10 @@ import json
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
 
-MEMORY_PATH = "{memory_path}"
-WORKFLOW_PATH = "{workflow_path}"
+MEMORY_PATH = {memory_path!r}
+WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = "{goal_prompt}"
+GOAL = {goal_prompt!r}
 
 # Load tools
 {tools_code}
