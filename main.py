@@ -39,7 +39,6 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
     parser.add_argument("--prompt_workflow_creator", type=str, help="Override system prompt file path")
     parser.add_argument("--workflow_llm_provider", type=str, help="Override LLM provider for workflows")
-    parser.add_argument("--mcp_health_endpoint", type=str, help="Override MCP health endpoint URL")
     parser.add_argument("--runner_default_python_version", type=str, help="Override default Python version for runners")
     parser.add_argument("--runner_default_timeout", type=int, help="Override default timeout for runners (seconds)")
     parser.add_argument("--runner_default_max_memory_mb", type=int, help="Override default max memory for runners (MB)")
@@ -60,8 +59,6 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.prompt_workflow_creator = args.prompt_workflow_creator
     if args.workflow_llm_provider:
         config.workflow_llm_provider = args.workflow_llm_provider
-    if args.mcp_health_endpoint:
-        config.mcp_health_endpoint = args.mcp_health_endpoint
     if args.runner_default_python_version:
         config.runner_default_python_version = args.runner_default_python_version
     if args.runner_default_timeout:
@@ -181,7 +178,7 @@ async def main():
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations"
+        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
@@ -189,6 +186,8 @@ async def main():
     apply_config_overrides(args, config)
 
     validate_environment()
+
+    config.create_paths()
     config.validate_paths()
 
     try:

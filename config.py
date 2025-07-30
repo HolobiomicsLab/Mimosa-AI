@@ -43,7 +43,6 @@ class Config:
         self.smolagent_model_provider: str = "deepseek"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v3.md"
         self.workflow_llm_provider: str = "openai"
-        self.mcp_health_endpoint: str = "http://localhost:5000/health"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
@@ -87,6 +86,12 @@ class Config:
     def refresh_pricing(self) -> None:
         """Force refresh of model pricing from OpenRouter API."""
         self._model_pricing_cache = None
+    
+    def create_paths(self) -> None:
+        """Create necessary directories if they do not exist."""
+        os.makedirs(self.workflow_dir, exist_ok=True)
+        os.makedirs(self.memory_dir, exist_ok=True)
+        os.makedirs(self.runner_temp_dir, exist_ok=True)
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
@@ -117,7 +122,6 @@ class Config:
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "workflow_llm_provider": self.workflow_llm_provider,
-            "mcp_health_endpoint": self.mcp_health_endpoint,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -142,9 +146,6 @@ class Config:
         )
         self.workflow_llm_provider = data.get(
             "workflow_llm_provider", self.workflow_llm_provider
-        )
-        self.mcp_health_endpoint = data.get(
-            "mcp_health_endpoint", self.mcp_health_endpoint
         )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
@@ -171,7 +172,6 @@ class Config:
             f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
             f"workflow_llm_provider={self.workflow_llm_provider},\n"
-            f"mcp_health_endpoint={self.mcp_health_endpoint},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
             f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
