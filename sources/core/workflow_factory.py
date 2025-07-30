@@ -185,10 +185,10 @@ import json
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
 
-MEMORY_PATH = "{memory_path}"
-WORKFLOW_PATH = "{workflow_path}"
+MEMORY_PATH = {memory_path!r}
+WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = "{goal_prompt}"
+GOAL = {goal_prompt!r}
 
 # Load tools
 {tools_code}
