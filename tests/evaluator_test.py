@@ -8,9 +8,11 @@ import json
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from sources.core.evaluator import WorkflowEvaluator
 
-
+load_dotenv()
 class TestConfig:
     """Simple config class for testing."""
     
