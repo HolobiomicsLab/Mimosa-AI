@@ -337,7 +337,7 @@ class SmolAgentFactory:
             raise e
         actions, observations, success = self.parse_memory_output()
         action: Action = {
-            "tool": actions if actions else "No action",
+            "tool": actions if actions else [],
         }
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"

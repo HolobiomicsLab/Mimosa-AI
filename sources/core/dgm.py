@@ -278,8 +278,12 @@ class GodelMachine:
         print(f"{'-' * 60}\n")
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n \
+            Goal: {goal}\n \
+            UUID: {uuid}\n \
+            Reward : {self.get_total_rewards(flow_state):.2f}\n \
+            Answers: {self.get_flow_answers(flow_state)}\n \
             Cost: {total_cost:.3f} USD.\n \
-            Score : {self.get_total_rewards(flow_state):.2f}",
+            Rewards history: {rewards_history}",
             title=f"Workflow {uuid} completed.",
         )
 
@@ -292,8 +296,8 @@ class GodelMachine:
             print(f"Maximum iterations reached ({max_depth}).")
             return uuid
         await self.recursive_self_improvement(
-            prompt,
             goal,
+            prompt,
             template_uuid=None,
             workflow_template=flow_code if flow_state else None,
             iteration_count=iteration_count + 1,
