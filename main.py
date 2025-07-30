@@ -133,6 +133,7 @@ async def normal_execution_mode(args, config):
     if args.task:
         await dgm.start_dgm(goal_prompt=args.task,
                             judge=args.judge, 
+                            scenario=args.scenario,
                             human_validation=True,
                             max_iteration=args.max_dgm_iterations
                            )
@@ -170,6 +171,9 @@ async def main():
     )
     parser.add_argument(
         "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+    )
+    parser.add_argument(
+        "--scenario", type=str, help="Scenario for workflow evaluation"
     )
     parser.add_argument(
         "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
