@@ -2,13 +2,14 @@
 Darwin Godel Machine
 """
 
-import os
 import json
+import os
 
-from sources.core.judge import WorkflowJudge
-from sources.utils.visualization import VisualizationUtils
-from sources.utils.shared_visualization import SharedVisualizationData
+from sources.core.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
+from sources.utils.pricing import PricingCalculator
+from sources.utils.shared_visualization import SharedVisualizationData
+from sources.utils.visualization import VisualizationUtils
 
 from .orchestrator import WorkflowOrchestrator
 from .workflow_selection import WorkflowSelector
@@ -26,11 +27,12 @@ class GodelMachine:
         self.model_pricing = config.model_pricing
         self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
-        self.judge = WorkflowJudge(config)
+        self.judge = WorkflowEvaluator(config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         self.viz_utils = viz_utils or VisualizationUtils()
         self.shared_viz_data = shared_viz_data
         self.process_id = process_id
+        self.pricing = PricingCalculator(config)
 
     def load_flow_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -66,13 +68,16 @@ class GodelMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, flow_state: any) -> float:
+    def get_total_rewards(self, flow_state: any, eval_type:str) -> float:
         """Calculate the total rewards from the workflow state."""
-        if not flow_state:
+        if not flow_state or not eval_type:
             return 0.0
-        if "evaluation_scores" not in flow_state:
+        if eval_type == 'generic':
+            return flow_state["evaluation"]['generic']["overall_score"]
+        elif eval_type == 'scenario':
+            return flow_state["evaluation"]['scenario']["score"]
+        else:
             return 0.0
-        return flow_state["evaluation_scores"]["overall_score"]
 
     def get_flow_answers(self, flow_state: any) -> str:
         """Extract the answers from the workflow state."""
@@ -158,6 +163,7 @@ class GodelMachine:
         template_uuid: str | None = None,
         judge: bool = False,
         answer: str = None,
+        scenario_id: str = None,
         human_validation: bool = False,
         max_iteration: int = 5,
     ):
@@ -196,6 +202,7 @@ class GodelMachine:
             max_depth=max_iteration,
             judge=judge,
             answer=answer,
+            scenario_id=scenario_id,
             need_human_validation=human_validation,
             rewards_history=rewards_history,
             plot_data=plot_data,
@@ -213,7 +220,8 @@ class GodelMachine:
         need_human_validation: bool = False,
         rewards_history: list[float] = None,
         plot_data: tuple = None,
-        answer: str=None,
+        answer: str = None,
+        scenario_id: str = None,
     ):
         """Run a self-improvement loop for the workflow.
 
@@ -229,6 +237,7 @@ class GodelMachine:
             str: Final execution status message
         """
         total_cost = 0.0
+        uuid = None  # Initialize uuid to avoid undefined reference
 
         if iteration_count > 0 and need_human_validation:
             human_validation = (
@@ -250,13 +259,14 @@ class GodelMachine:
             goal_prompt=prompt,
             workflow_template=workflow_template if iteration_count == 0 else None
         )
+        eval_type = None
         if executed:
             if judge:
-                self.judge.evaluate(uuid=uuid, answer=answer)
-            total_cost = self.judge.calculate_cost(uuid)
+                eval_type=  self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+            total_cost = self.pricing.calculate_cost(uuid)
 
         flow_state = self.load_flow_state_result(uuid)
-        flow_rewards = self.get_total_rewards(flow_state)
+        flow_rewards = self.get_total_rewards(flow_state, eval_type)
         rewards_history.append(flow_rewards)
         
         # Update visualization - either shared (parallel mode) or individual plot
@@ -280,7 +290,7 @@ class GodelMachine:
             f"Iteration {iteration_count + 1} completed.\n \
             Goal: {goal}\n \
             UUID: {uuid}\n \
-            Reward : {self.get_total_rewards(flow_state):.2f}\n \
+            Reward : {flow_rewards:.2f}\n \
             Answers: {self.get_flow_answers(flow_state)}\n \
             Cost: {total_cost:.3f} USD.\n \
             Rewards history: {rewards_history}",
@@ -306,5 +316,6 @@ class GodelMachine:
             need_human_validation=need_human_validation,
             rewards_history=rewards_history,
             plot_data=plot_data,
+            scenario_id=scenario_id,
         )
         return uuid

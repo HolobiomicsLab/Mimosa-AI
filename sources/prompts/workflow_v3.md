@@ -85,6 +85,8 @@ A prompt must specify:
 - If it receive input from previous agent, specify how it will help the agent.
 - A completion protocol
 
+An agent should never try to install any R packages
+
 ### Step 2: Create Agents
 Instantiate each agent using `SmolAgentFactory`, assigning a name, the instruction prompt, and a single tool package. For agents that only need to write and execute Python code, pass an empty list `[]` for the tools.
 
