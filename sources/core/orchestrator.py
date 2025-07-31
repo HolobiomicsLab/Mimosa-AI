@@ -42,9 +42,10 @@ class WorkflowOrchestrator:
 
     async def workflow_sandbox_run(self, workflow_code: str) -> str:
         """Run the workflow code in a sandboxed environment."""
+        logger = logging.getLogger(__name__)
 
         def progress_handler(line: str):
-            print(f"\033[96m  🔄 {line}\033[0m")
+            print(line)
 
         print("\033[96m🚀 Executing workflow in Python sandbox...\033[0m")
         result = await self.workflow_runner.execute(
