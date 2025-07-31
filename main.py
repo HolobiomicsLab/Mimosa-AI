@@ -14,7 +14,6 @@ import dotenv
 
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.core.planner import Planner
 from sources.core.parallel_testing import ParallelTesting
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.dataset import calculate_good_answer_average, read_dataset

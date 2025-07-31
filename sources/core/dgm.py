@@ -54,16 +54,22 @@ class GodelMachine:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
         return None
 
-    def load_workflow_code(self, uuid: str) -> str:
+    def load_workflow_code(self, workflow_id: str) -> str:
         """
-        Load the workflow code for a given UUID.
+        Load the workflow code for a given workflow ID.
         """
+        workflow_path = f"{self.workflow_dir}/{workflow_id}"
+        if not os.path.exists(workflow_path):
+            raise ValueError(
+                f"❌ Workflow for ID {workflow_id} not found in {self.workflow_dir}."
+            )
+            
         try:
-            with open(f"{self.workflow_dir}/{uuid}/workflow_code_{uuid}.py") as f:
+            with open(f"{workflow_path}/workflow_code_{workflow_id}.py") as f:
                 return f.read()
         except FileNotFoundError as e:
             raise ValueError(
-                f"❌ Workflow code for UUID {uuid} not found in {self.workflow_dir}."
+                f"❌ Workflow code file not found for ID {workflow_id} in {workflow_path}."
             ) from e
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
@@ -124,6 +130,7 @@ class GodelMachine:
             goal,
         ])
 
+
     def select_workflow_template(self, goal_prompt, template_uuid: str = None) -> str:
         """Select and load a workflow template by UUID.
 
@@ -145,14 +152,20 @@ class GodelMachine:
             )
             print(f"Selected {len(candidates)} candidates for goal '{goal_prompt}'")
             return candidates[0].code if candidates else None
+        workflow_path = f"{self.workflow_dir}/{template_uuid}"
+        if not os.path.exists(workflow_path):
+            raise ValueError(
+                f"❌ Workflow for ID {template_uuid} not found in {self.workflow_dir}."
+            )
+            
         try:
             with open(
-                f"{self.workflow_dir}/{template_uuid}/workflow_code_{template_uuid}.py",
+                f"{workflow_path}/workflow_code_{template_uuid}.py",
             ) as f:
                 return f.read()
         except FileNotFoundError as e:
             raise ValueError(
-                f"❌ Workflow for UUID {template_uuid} not in {self.workflow_dir}."
+                f"❌ Workflow code file not found for ID {template_uuid} in {workflow_path}."
             ) from e
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow template: {str(e)}") from e
@@ -297,14 +310,15 @@ class GodelMachine:
             title=f"Workflow {uuid} completed.",
         )
 
+        if iteration_count >= max_depth:
+            print(f"Maximum iterations reached ({max_depth}).")
+            return uuid
+            
         flow_code = self.select_workflow_template(goal_prompt=goal,
                                                   template_uuid=template_uuid)
         prompt = self.improvement_prompt(
             goal, flow_state, flow_code, run_stdout, iteration_count
         )
-        if iteration_count >= max_depth:
-            print(f"Maximum iterations reached ({max_depth}).")
-            return uuid
         await self.recursive_self_improvement(
             goal,
             prompt,

@@ -5,6 +5,7 @@ This module provides an asynchronous workflow execution engine for Python code.
 import asyncio
 import logging
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -117,7 +118,8 @@ class WorkflowRunner:
     ) -> ExecutionResult:
         """Execute workflow code with full async support and monitoring."""
 
-        execution_id = execution_id or f"exec_{id(code)}"
+        # Generate human-readable execution ID: exec_MMDD_HHMMSS_shortid  
+        execution_id = execution_id or f"exec_{time.strftime('%m%d_%H%M%S')}_{id(code) % 10000}"
 
         script_path = os.path.join(self.config.temp_dir, f"{execution_id}.py")
         with open(script_path, "w") as f:

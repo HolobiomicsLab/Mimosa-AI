@@ -3,6 +3,7 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 """
 
 import os
+import time
 import uuid
 
 from sources.modules import state_schema
@@ -252,9 +253,10 @@ if WORKFLOW_PATH:
         Returns:
             str: Complete executable workflow code
         """
-        uuid_str = (
-            str(uuid.uuid4()).replace("-", "")
-        )
+        # Generate chronologically sortable workflow ID: YYYYMMDD_HHMMSS_shortUUID
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        short_uuid = str(uuid.uuid4())[:8]
+        uuid_str = f"{timestamp}_{short_uuid}"
         tools_code, existing_tool_prompt = await self.load_tools_code()
 
         workflow_path, memory_path = (
