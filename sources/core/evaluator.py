@@ -4,6 +4,7 @@ Combines WorkflowJudge and scenario-based Evaluator functionality.
 """
 
 import json
+import logging
 import os
 import re
 from datetime import datetime
@@ -27,6 +28,7 @@ class WorkflowEvaluator:
         self.scenario_loader = ScenarioLoader()
         self.judge_model = "gpt-4o-mini"  # Default model, using gpt-4o-mini
         self.llm_config = LLMConfig().from_dict({"model": self.judge_model})
+        self.logger = logging.getLogger(__name__)
         
     def generate_text(self, uuid: str) -> str:
         """Generate formatted text for evaluation.
@@ -226,7 +228,7 @@ The system is composed of multiple specialized agents working in sequence or col
 
 Please be objective, technical, and specific in your feedback.
 """
-        print("Calling LLMProvider to evaluate the workflow...")
+        self.logger.info(f"Evaluating workflow {uuid} with LLM judge")
         memory_path = Path(self.memory_dir) / uuid
         config_llm = LLMConfig().from_dict({"model": "gpt-4o-mini"})
         output = LLMProvider("judge", memory_path, system_prompt, config_llm)(prompt)
@@ -235,7 +237,7 @@ Please be objective, technical, and specific in your feedback.
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
         with open(evaluation_path, "w") as file:
             file.write(output)
-        print("Evaluation completed. Results saved to:", evaluation_path)
+        self.logger.info(f"Evaluation completed for {uuid}. Results saved to: {evaluation_path}")
 
         # Extract scores from the evaluation output
         scores = self._extract_scores(output)

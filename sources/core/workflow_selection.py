@@ -53,7 +53,11 @@ class WorkflowSelector:
 
             try:
                 with open(state_file) as f:
-                    state_result = json.load(f)
+                    content = f.read().strip()
+                    if not content:
+                        print(f"Skipping workflow {uuid}: empty state_result.json")
+                        continue
+                    state_result = json.loads(content)
                 with open(code_file) as f:
                     code = f.read()
             except Exception as e:
@@ -66,8 +70,8 @@ class WorkflowSelector:
                 scores = []
                 if evaluation:
                     if 'generic' in evaluation:
-                        scores.append(evaluation['genetic']['overall_score'])
-                    else:
+                        scores.append(evaluation['generic']['overall_score'])
+                    elif 'scenario' in evaluation:
                         scores.append(evaluation['scenario']['score'])
                 overall_score = mean(scores) if scores else 0.0
 
