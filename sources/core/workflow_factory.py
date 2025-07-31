@@ -57,11 +57,7 @@ The following tools packages are available for agents:
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
-        history = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
-        return LLMProvider("workflow_creator",path,system_prompt)(prompt)
+        return LLMProvider("workflow_creator", path, system_prompt)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -105,11 +101,13 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             tools_code += client_code + "\n"
             existing_tool_prompt += client_prompt + "\n"
         return tools_code, existing_tool_prompt
-    
+
     def remove_imports(self, code: str) -> str:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
-        return "\n".join(line for line in lines if not line.strip().startswith("import "))
+        return "\n".join(
+            line for line in lines if not line.strip().startswith("import ")
+        )
 
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str
@@ -174,9 +172,13 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         initial_state = {
             key: (
-                uuid_str if key == "workflow_uuid"
-                else self.config.smolagent_model_id if key == "model_id" 
-                else goal_prompt if key == "goal" else []
+                uuid_str
+                if key == "workflow_uuid"
+                else self.config.smolagent_model_id
+                if key == "model_id"
+                else goal_prompt
+                if key == "goal"
+                else []
             )
             for key in state_schema.WorkflowState.__annotations__
         }
@@ -256,7 +258,7 @@ if WORKFLOW_PATH:
             str: Complete executable workflow code
         """
         # Generate chronologically sortable workflow ID: YYYYMMDD_HHMMSS_shortUUID
-        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"{timestamp}_{short_uuid}"
         tools_code, existing_tool_prompt = await self.load_tools_code()
@@ -282,7 +284,9 @@ if WORKFLOW_PATH:
             )
         )
         if workflow_code is None or workflow_code.strip() == "":
-            self.logger.warning(f"Generated workflow is empty or invalid: {workflow_code[:100]}...")
+            self.logger.warning(
+                f"Generated workflow is empty or invalid: {workflow_code[:100]}..."
+            )
             raise ValueError("❌ Generated workflow code is empty or invalid")
 
         complete_code = self.assemble_workflow(
@@ -312,14 +316,17 @@ if WORKFLOW_PATH:
         try:
             with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
                 f.write(workflow_code)
-            self.logger.info(f"Saved workflow code to: {path}/workflow_code_{uuid_str}.py")
+            self.logger.info(
+                f"Saved workflow code to: {path}/workflow_code_{uuid_str}.py"
+            )
         except Exception as e:
             self.logger.error(f"Failed to save workflow code: {str(e)}")
 
         try:
             with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), "w") as f:
                 f.write(self.get_system_prompt())
-            self.logger.info(f"Saved system prompt to: {path}/system_prompt_{uuid_str}.md")
+            self.logger.info(
+                f"Saved system prompt to: {path}/system_prompt_{uuid_str}.md"
+            )
         except Exception as e:
             self.logger.error(f"Failed to save system prompt: {str(e)}")
-

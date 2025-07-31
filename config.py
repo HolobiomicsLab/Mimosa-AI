@@ -86,7 +86,7 @@ class Config:
     def refresh_pricing(self) -> None:
         """Force refresh of model pricing from OpenRouter API."""
         self._model_pricing_cache = None
-    
+
     def create_paths(self) -> None:
         """Create necessary directories if they do not exist."""
         os.makedirs(self.workflow_dir, exist_ok=True)

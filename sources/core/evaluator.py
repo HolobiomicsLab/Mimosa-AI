@@ -17,19 +17,19 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 
 class WorkflowEvaluator:
     """Combined workflow evaluator with both judge and scenario-based evaluation capabilities."""
-    
+
     def __init__(self, config):
         # Initialize with configuration from both original classes
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
-        
+
         # Initialize scenario loader and LLMProvider for scenario-based evaluation
         self.scenario_loader = ScenarioLoader()
         self.judge_model = "gpt-4o-mini"  # Default model, using gpt-4o-mini
         self.llm_config = LLMConfig().from_dict({"model": self.judge_model})
         self.logger = logging.getLogger(__name__)
-        
+
     def generate_text(self, uuid: str) -> str:
         """Generate formatted text for evaluation.
 
@@ -72,12 +72,14 @@ class WorkflowEvaluator:
                         code_result = error if error else step.get("observations", "")
                         step_info = {
                             "agent": agent_name,
-                            "start_time":step["timing"]["start_time"],
+                            "start_time": step["timing"]["start_time"],
                             "step_number": step["step_number"],
-                            "prompt": step["model_input_messages"][1]["content"][0]["text"],
+                            "prompt": step["model_input_messages"][1]["content"][0][
+                                "text"
+                            ],
                             "reasoning": step["model_output"],
-                            "code_action" : step.get("code_action", ""),
-                            "code_output": code_result
+                            "code_action": step.get("code_action", ""),
+                            "code_output": code_result,
                         }
                         workflow_steps.append(step_info)
 
@@ -155,7 +157,9 @@ Please analyze the system with the following structure:
 {4 + (1 if include_answer_assessment else 0)}. **Summary Judgment**
  """
 
-    def evaluate(self, uuid: str, short: bool = True, answer: str = None, scenario_id: str = None) -> str:
+    def evaluate(
+        self, uuid: str, short: bool = True, answer: str = None, scenario_id: str = None
+    ) -> str:
         """Evaluate the workflow results.
 
         Args:
@@ -167,8 +171,8 @@ Please analyze the system with the following structure:
         # If scenario_id is provided, use scenario-based evaluation
         if scenario_id:
             self.evaluate_workflow(uuid, scenario_id)
-            return 'scenario'
-            
+            return "scenario"
+
         # Otherwise, use the original judge-based evaluation
         # Adjust system prompt based on whether an expected answer is provided
         answer_evaluation_task = ""
@@ -237,15 +241,17 @@ Please be objective, technical, and specific in your feedback.
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
         with open(evaluation_path, "w") as file:
             file.write(output)
-        self.logger.info(f"Evaluation completed for {uuid}. Results saved to: {evaluation_path}")
+        self.logger.info(
+            f"Evaluation completed for {uuid}. Results saved to: {evaluation_path}"
+        )
 
         # Extract scores from the evaluation output
         scores = self._extract_scores(output)
-            
+
         self._update_state_result(scores, uuid)
         print("Scores extracted and saved to state result.")
-        
-        return 'generic'
+
+        return "generic"
 
     def _extract_scores(self, evaluation_text):
         """Extract scores from the evaluation text.
@@ -266,10 +272,10 @@ Please be objective, technical, and specific in your feedback.
                 scores = json.loads(json_str)
                 # Calculate overall score including answer_correctness if available
                 scores["overall_score"] = (
-                        scores["goal_alignment"]
-                        + scores["agent_collaboration"]
-                        + scores["output_quality"]
-                    )
+                    scores["goal_alignment"]
+                    + scores["agent_collaboration"]
+                    + scores["output_quality"]
+                )
                 scores["overall_score"] /= 3
                 return scores
             else:
@@ -326,54 +332,54 @@ Please be objective, technical, and specific in your feedback.
     def evaluate_workflow(self, workflow_id: str, scenario_id: str):
         """Evaluate a workflow against a scenario with scoring."""
         print(f"Evaluating workflow {workflow_id} against scenario {scenario_id}")
-        
+
         # Load scenario and workflow data
         scenario = self.scenario_loader.load_scenario(scenario_id)
         if not scenario:
             raise ValueError(f"Scenario {scenario_id} not found")
-            
+
         workflow_data = self._load_workflow_data(workflow_id)
-        
+
         # Evaluate all assertions
         assertion_results = []
         for assertion in scenario["assertions"]:
             result = self._evaluate_assertion(workflow_data, assertion)
             assertion_results.append(result)
-        
+
         # Calculate score (only partial score)
         passed_count = sum(1 for result in assertion_results if result["passed"])
         total_count = len(assertion_results)
         score = passed_count / total_count if total_count > 0 else 0.0
-        
+
         # Generate results
         results = {
-            #"workflow_id": workflow_id,
+            # "workflow_id": workflow_id,
             "scenario_id": scenario_id,
             "timestamp": datetime.now().isoformat(),
-            #"goal": scenario.get("goal", ""),
+            # "goal": scenario.get("goal", ""),
             "score": score,
             "passed_assertions": passed_count,
             "total_assertions": total_count,
             "assertion_results": assertion_results,
-            "judge_model": self.judge_model
+            "judge_model": self.judge_model,
         }
-        
+
         # Save results
         self._save_scenario_results(workflow_id, scenario_id, results)
-    
+
     def _load_workflow_data(self, workflow_id: str) -> dict[str, Any]:
         """Load workflow execution data from UUID folder."""
         workflow_path = Path(self.workflow_dir) / workflow_id
-        
+
         if not workflow_path.exists():
             raise FileNotFoundError(f"Workflow {workflow_id} not found")
-            
+
         workflow_data = {
-            "workflow_id": workflow_id, 
-            "state_result": {}, 
-            "workflow_code": ""
+            "workflow_id": workflow_id,
+            "state_result": {},
+            "workflow_code": "",
         }
-        
+
         # Load state_result.json
         state_result_path = workflow_path / "state_result.json"
         if state_result_path.exists():
@@ -382,7 +388,7 @@ Please be objective, technical, and specific in your feedback.
                     workflow_data["state_result"] = json.load(f)
             except Exception as e:
                 print(f"Warning: Could not load state_result.json: {e}")
-        
+
         # Load workflow code
         workflow_code_path = workflow_path / f"workflow_code_{workflow_id}.py"
         if workflow_code_path.exists():
@@ -391,39 +397,37 @@ Please be objective, technical, and specific in your feedback.
                     workflow_data["workflow_code"] = f.read()
             except Exception as e:
                 print(f"Warning: Could not load workflow code: {e}")
-        
+
         return workflow_data
-    
+
     def _evaluate_assertion(
-        self, 
-        workflow_data: dict[str, Any],
-        assertion: dict
+        self, workflow_data: dict[str, Any], assertion: dict
     ) -> dict[str, Any]:
         """Evaluate single assertion using existing LLM prompt format."""
         # Build judge prompt using existing format
         judge_prompt = self._build_judge_prompt(workflow_data, assertion)
-        
+
         try:
             # Use LLMProvider instead of direct OpenAI call
             llm_provider = LLMProvider(
                 agent_name="scenario_judge",
                 memory_path=self.memory_dir / workflow_data["workflow_id"],
                 system_msg=self._get_judge_system_prompt(),
-                config=self.llm_config
+                config=self.llm_config,
             )
-            
+
             # Call LLMProvider with the judge prompt
             judge_text = llm_provider(judge_prompt).strip()
             passed, evidence, confidence = self._parse_judge_response(judge_text)
-            
+
             return {
                 "id": assertion["id"],
                 "description": assertion["description"],
                 "passed": passed,
                 "evidence": evidence,
-                "confidence": confidence
+                "confidence": confidence,
             }
-            
+
         except Exception as e:
             print(f"Error evaluating assertion {assertion['id']}: {e}")
             return {
@@ -431,26 +435,24 @@ Please be objective, technical, and specific in your feedback.
                 "description": assertion["description"],
                 "passed": False,
                 "evidence": f"Evaluation error: {str(e)}",
-                "confidence": 0.0
+                "confidence": 0.0,
             }
-    
+
     def _build_judge_prompt(
-        self, 
-        workflow_data: dict[str, Any],
-        assertion: dict
+        self, workflow_data: dict[str, Any], assertion: dict
     ) -> str:
         """Build judge prompt with workflow data."""
         state_result = workflow_data.get("state_result", {})
         workflow_code = workflow_data.get("workflow_code", "")
-        goal = state_result.get('goal', 'Goal not specified')
-        criteria = assertion.get('evaluation_criteria', 'Standard evaluation')
-        
+        goal = state_result.get("goal", "Goal not specified")
+        criteria = assertion.get("evaluation_criteria", "Standard evaluation")
+
         return f"""
 You are evaluating a scientific workflow execution.
 
 ASSERTION TO EVALUATE:
-ID: {assertion['id']}
-Description: {assertion['description']}
+ID: {assertion["id"]}
+Description: {assertion["description"]}
 Evaluation Criteria: {criteria}
 
 WORKFLOW GOAL:
@@ -475,7 +477,7 @@ VERDICT: [TRUE/FALSE]
 EVIDENCE: [Specific evidence from the execution that supports your verdict]
 CONFIDENCE: [0.0-1.0 confidence score]
 """
-    
+
     def _get_judge_system_prompt(self) -> str:
         """Get system prompt for LLM judge (keeping existing format)."""
         prompt = "You are an expert scientific researcher evaluating whether "
@@ -489,15 +491,15 @@ CONFIDENCE: [0.0-1.0 confidence score]
         prompt += "Evaluate based on available evidence, considering user "
         prompt += "satisfaction and system quality."
         return prompt
-    
+
     def _parse_judge_response(self, judge_text: str) -> tuple[bool, str, float]:
         """Parse LLM judge response (keeping existing format)."""
         try:
-            lines = judge_text.strip().split('\n')
+            lines = judge_text.strip().split("\n")
             verdict = False
             evidence = "No evidence provided"
             confidence = 0.5
-            
+
             for line in lines:
                 if line.startswith("VERDICT:"):
                     verdict_str = line.split(":", 1)[1].strip().upper()
@@ -509,27 +511,30 @@ CONFIDENCE: [0.0-1.0 confidence score]
                         confidence = float(line.split(":", 1)[1].strip())
                     except ValueError:
                         confidence = 0.5
-            
+
             return verdict, evidence, confidence
-            
+
         except Exception as e:
             print(f"Error parsing judge response: {e}")
             return False, f"Parse error: {str(e)}", 0.0
-    
-    def _save_scenario_results(self, workflow_id: str, scenario_id: str, 
-                      results: dict[str, Any]):
+
+    def _save_scenario_results(
+        self, workflow_id: str, scenario_id: str, results: dict[str, Any]
+    ):
         """Save evaluation results to workflow UUID directory."""
         # Save to workflow UUID directory instead of global results directory
         workflow_dir = Path(self.workflow_dir) / workflow_id
-        
+
         if not workflow_dir.exists():
-            print(f"Warning: Workflow directory {workflow_dir} does not exist. "
-                  f"Creating it.")
+            print(
+                f"Warning: Workflow directory {workflow_dir} does not exist. "
+                f"Creating it."
+            )
             workflow_dir.mkdir(parents=True, exist_ok=True)
-        
-        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = "state_result.json"
-        
+
         with open(workflow_dir / filename) as f:
             state_json = json.load(f)
 
@@ -537,10 +542,10 @@ CONFIDENCE: [0.0-1.0 confidence score]
         state_json.setdefault("evaluation", {})["scenario"] = results
 
         # Then write back
-        with open(workflow_dir / filename, 'w') as f:
+        with open(workflow_dir / filename, "w") as f:
             json.dump(state_json, f, indent=2)
-            
+
         print(f"Results saved to: {workflow_dir / filename}")
-        
+
     def __str__(self):
         return "WorkflowEvaluator instance"

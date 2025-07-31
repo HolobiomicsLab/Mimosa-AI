@@ -1,7 +1,6 @@
-
 def collect_goals_from_user() -> list[str]:
     """Collect goals from user input for mass testing.
-    
+
     Returns:
         List of goal strings entered by the user
     """
@@ -10,7 +9,7 @@ def collect_goals_from_user() -> list[str]:
     print("=" * 50)
     print("Enter goals one at a time. Press Enter with empty input to finish.")
     print("Type 'quit' or 'exit' to cancel.\n")
-    
+
     goal_count = 1
     while True:
         try:
@@ -21,7 +20,7 @@ def collect_goals_from_user() -> list[str]:
                 else:
                     print("⚠️ Please enter at least one goal or type 'quit' to cancel.")
                     continue
-            if goal.lower() in ['quit', 'exit']:
+            if goal.lower() in ["quit", "exit"]:
                 print("❌ Mass testing cancelled by user.")
                 return []
             goals.append(goal)

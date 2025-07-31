@@ -45,7 +45,7 @@ class LLMProvider:
     def __init__(
         self,
         agent_name: str = None,
-        memory_path = None,
+        memory_path=None,
         system_msg: str = None,
         config: LLMConfig = None,
     ) -> None:

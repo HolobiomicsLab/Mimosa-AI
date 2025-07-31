@@ -20,10 +20,13 @@ from .workflow_selection import WorkflowSelector
 class GodelMachine:
     """Darwin Godel Machine for self-improvement workflows."""
 
-    def __init__(self, config,
-                 viz_utils: VisualizationUtils = None,
-                 shared_viz_data: SharedVisualizationData = None,
-                 process_id: int = None) -> None:
+    def __init__(
+        self,
+        config,
+        viz_utils: VisualizationUtils = None,
+        shared_viz_data: SharedVisualizationData = None,
+        process_id: int = None,
+    ) -> None:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
@@ -48,9 +51,7 @@ class GodelMachine:
             with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
-            print(
-                f"Workflow state for UUID {uuid} not found in {self.workflow_dir}."
-            )
+            print(f"Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
             return None
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
@@ -65,7 +66,7 @@ class GodelMachine:
             raise ValueError(
                 f"❌ Workflow for ID {workflow_id} not found in {self.workflow_dir}."
             )
-            
+
         try:
             with open(f"{workflow_path}/workflow_code_{workflow_id}.py") as f:
                 return f.read()
@@ -76,14 +77,14 @@ class GodelMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, flow_state: any, eval_type:str) -> float:
+    def get_total_rewards(self, flow_state: any, eval_type: str) -> float:
         """Calculate the total rewards from the workflow state."""
         if not flow_state or not eval_type:
             return 0.0
-        if eval_type == 'generic':
-            return flow_state["evaluation"]['generic']["overall_score"]
-        elif eval_type == 'scenario':
-            return flow_state["evaluation"]['scenario']["score"]
+        if eval_type == "generic":
+            return flow_state["evaluation"]["generic"]["overall_score"]
+        elif eval_type == "scenario":
+            return flow_state["evaluation"]["scenario"]["score"]
         else:
             return 0.0
 
@@ -111,27 +112,28 @@ class GodelMachine:
         if flow_state is not None:
             flow_answers = self.get_flow_answers(flow_state)
         else:
-            flow_answers = (
-                run_stdout.strip()
-            )
+            flow_answers = run_stdout.strip()
         improv_prompt = "You must generate a multi-agent workflow for the goal."
         if flow_code is not None:
-            improv_prompt = '\n'.join([
-                "Previously written workflow code:",
-                flow_code,
-                "Previous attempt resulted in agents ending with following answers:",
-                flow_answers,
-                "You must improve the workflow based on previous execution results.",
-                "Only change a prompt, add an agent, change a tool, etc.. ",
-            ])
-        
-        return ''.join([
-            f"Attempt {iteration_count + 1} of workflow generation.\n",
-            improv_prompt,
-            "Target goal:",
-            goal,
-        ])
+            improv_prompt = "\n".join(
+                [
+                    "Previously written workflow code:",
+                    flow_code,
+                    "Previous attempt resulted in agents ending with following answers:",
+                    flow_answers,
+                    "You must improve the workflow based on previous execution results.",
+                    "Only change a prompt, add an agent, change a tool, etc.. ",
+                ]
+            )
 
+        return "".join(
+            [
+                f"Attempt {iteration_count + 1} of workflow generation.\n",
+                improv_prompt,
+                "Target goal:",
+                goal,
+            ]
+        )
 
     def select_workflow_template(self, goal_prompt, template_uuid: str = None) -> str:
         """Select and load a workflow template by UUID.
@@ -159,7 +161,7 @@ class GodelMachine:
             raise ValueError(
                 f"❌ Workflow for ID {template_uuid} not found in {self.workflow_dir}."
             )
-            
+
         try:
             with open(
                 f"{workflow_path}/workflow_code_{template_uuid}.py",
@@ -192,23 +194,23 @@ class GodelMachine:
         - human_validation (bool, optional): Whether human validation is required.
         """
 
-        template = self.select_workflow_template(goal_prompt,
-                                                 template_uuid=template_uuid)
+        template = self.select_workflow_template(
+            goal_prompt, template_uuid=template_uuid
+        )
 
         print(f"\n{'📋 CURRENT GOAL':^60}")
         print(f"{'─' * 60}")
         print(f"  {goal_prompt}")
         print(f"{'─' * 60}\n")
 
-        
         rewards_history = []
         plot_data = None
-        
+
         if self.shared_viz_data and self.process_id is not None:
             plot_data = None
         else:
             plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
-        
+
         return await self.recursive_self_improvement(
             goal_prompt,
             goal_prompt,
@@ -265,18 +267,22 @@ class GodelMachine:
                 return template_uuid
 
         print(f"\n\033[94m{'=' * 60}\033[0m")
-        print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop\033[0m")
+        print(
+            f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop\033[0m"
+        )
         print(f"\033[94m{'=' * 60}\033[0m")
         print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
         print(f"\033[94m  {goal}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m\n")
-        
-        logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
+
+        logger.info(
+            f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}..."
+        )
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             goal_prompt=prompt,
-            workflow_template=workflow_template if iteration_count == 0 else None
+            workflow_template=workflow_template if iteration_count == 0 else None,
         )
         eval_type = None
         if executed:
@@ -284,11 +290,17 @@ class GodelMachine:
                 print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
                 print(f"\033[94m{'=' * 80}\033[0m")
                 eval_start = time.time()
-                eval_type=  self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+                eval_type = self.judge.evaluate(
+                    uuid=uuid, answer=answer, scenario_id=scenario_id
+                )
                 eval_time = time.time() - eval_start
-                logger.info(f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s")
-                print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
-            
+                logger.info(
+                    f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s"
+                )
+                print(
+                    f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m"
+                )
+
             cost_start = time.time()
             total_cost = self.pricing.calculate_cost(uuid)
             cost_time = time.time() - cost_start
@@ -297,7 +309,7 @@ class GodelMachine:
         flow_state = self.load_flow_state_result(uuid)
         flow_rewards = self.get_total_rewards(flow_state, eval_type)
         rewards_history.append(flow_rewards)
-        
+
         # Update visualization - either shared (parallel mode) or individual plot
         if self.shared_viz_data and self.process_id is not None:
             iterations = list(range(1, len(rewards_history) + 1))
@@ -306,14 +318,16 @@ class GodelMachine:
                 iterations=iterations,
                 rewards=rewards_history,
                 goal=goal,
-                status="running"
+                status="running",
             )
         elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
-        
+
         iteration_time = time.time() - iteration_start_time
-        logger.info(f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - Rewards: {flow_rewards:.1f}, Cost: {total_cost:.3f} USD")
-        
+        logger.info(
+            f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - Rewards: {flow_rewards:.1f}, Cost: {total_cost:.3f} USD"
+        )
+
         print(f"\n\033[94m{'-' * 60}\033[0m")
         print(f"\033[94mTotal rewards: {flow_rewards:.1f}\033[0m")
         print(f"\033[94mTotal cost: {total_cost:.3f} USD\033[0m")
@@ -333,9 +347,10 @@ class GodelMachine:
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
             return uuid
-            
-        flow_code = self.select_workflow_template(goal_prompt=goal,
-                                                  template_uuid=template_uuid)
+
+        flow_code = self.select_workflow_template(
+            goal_prompt=goal, template_uuid=template_uuid
+        )
         prompt = self.improvement_prompt(
             goal, flow_state, flow_code, run_stdout, iteration_count
         )

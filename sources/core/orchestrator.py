@@ -2,8 +2,8 @@
 This class orchestrates the execution of workflows in a sandboxed environment.
 """
 
-import time
 import logging
+import time
 
 from .workflow_factory import WorkflowFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
@@ -42,7 +42,7 @@ class WorkflowOrchestrator:
 
     async def workflow_sandbox_run(self, workflow_code: str) -> str:
         """Run the workflow code in a sandboxed environment."""
-        logger = logging.getLogger(__name__)
+        logging.getLogger(__name__)
 
         def progress_handler(line: str):
             print(line)
@@ -52,7 +52,9 @@ class WorkflowOrchestrator:
             workflow_code, progress_callback=progress_handler
         )
         if result.status == ExecutionStatus.COMPLETED:
-            print(f"\033[96m✅ Workflow execution completed successfully in {result.execution_time:.3f}s\033[0m")
+            print(
+                f"\033[96m✅ Workflow execution completed successfully in {result.execution_time:.3f}s\033[0m"
+            )
             return (
                 result.stdout or result.stderr or "No output from workflow execution."
             )
@@ -74,7 +76,7 @@ class WorkflowOrchestrator:
             tuple[str, str, bool]: (execution_output, workflow_uuid, success_flag)
         """
         logger = logging.getLogger(__name__)
-        
+
         workflow_start_time = time.time()
         execution_output = ""
 
@@ -91,7 +93,9 @@ class WorkflowOrchestrator:
         )
         generation_time = time.time() - generation_start
         logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
-        print(f"\033[96m✅ Workflow {uuid} generated successfully in {generation_time:.3f}s\033[0m")
+        print(
+            f"\033[96m✅ Workflow {uuid} generated successfully in {generation_time:.3f}s\033[0m"
+        )
 
         try:
             # Dependencies installation phase
@@ -100,9 +104,13 @@ class WorkflowOrchestrator:
             deps_start = time.time()
             await self.workflow_requirements_install()
             deps_time = time.time() - deps_start
-            logger.info(f"[WORKFLOW DEPS] {uuid} dependencies installed in {deps_time:.3f}s")
-            print(f"\033[96m✅ Dependencies installed successfully in {deps_time:.3f}s\033[0m")
-            
+            logger.info(
+                f"[WORKFLOW DEPS] {uuid} dependencies installed in {deps_time:.3f}s"
+            )
+            print(
+                f"\033[96m✅ Dependencies installed successfully in {deps_time:.3f}s\033[0m"
+            )
+
             # Execution phase
             print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
             print(f"\033[96m{'=' * 80}\033[0m")
@@ -110,11 +118,15 @@ class WorkflowOrchestrator:
             execution_output = await self.workflow_sandbox_run(workflow_code)
             exec_time = time.time() - exec_start
             logger.info(f"[WORKFLOW EXECUTION] {uuid} executed in {exec_time:.3f}s")
-            print(f"\033[96m✅ Workflow executed successfully in {exec_time:.3f}s\033[0m")
-            
+            print(
+                f"\033[96m✅ Workflow executed successfully in {exec_time:.3f}s\033[0m"
+            )
+
         except Exception as e:
             workflow_time = time.time() - workflow_start_time
-            logger.info(f"[WORKFLOW ERROR] {uuid} failed after {workflow_time:.3f}s - {str(e)}")
+            logger.info(
+                f"[WORKFLOW ERROR] {uuid} failed after {workflow_time:.3f}s - {str(e)}"
+            )
             print(f"❌ Error during {uuid} workflow execution: {e}")
             import traceback
 
@@ -122,10 +134,10 @@ class WorkflowOrchestrator:
             return str(e), uuid, False
         finally:
             print("\nCleaning up sandbox...")
-            
+
         workflow_time = time.time() - workflow_start_time
         logger.info(f"[WORKFLOW END] {uuid} completed in {workflow_time:.3f}s")
-        
+
         print(f"\n\033[96m{'✨ WORKFLOW COMPLETION SUMMARY':^80}\033[0m")
         print(f"\033[96m{'=' * 80}\033[0m")
         print(f"\033[96m📋 Workflow UUID: {uuid}\033[0m")
@@ -134,7 +146,7 @@ class WorkflowOrchestrator:
         print(f"\033[96m  • Dependencies: {deps_time:.3f}s\033[0m")
         print(f"\033[96m  • Execution: {exec_time:.3f}s\033[0m")
         print(f"\033[96m{'=' * 80}\033[0m\n")
-        
+
         output = (
             execution_output.strip()
             if execution_output
@@ -157,20 +169,21 @@ class WorkflowOrchestrator:
             traceback.print_exc()
 
     def __del__(self):
-        """Cleanup resources on deletion - sync fallback.""" 
+        """Cleanup resources on deletion - sync fallback."""
         # Note: This is a fallback - proper cleanup should use async context manager
         try:
             # Check if we're during Python shutdown
             import sys
+
             if sys.meta_path is None:
                 return
-            
+
             # Import at module level to avoid shutdown issues
             import asyncio
             from contextlib import suppress
 
             # Only attempt cleanup if workflow_runner still exists
-            if hasattr(self, 'workflow_runner') and self.workflow_runner is not None:
+            if hasattr(self, "workflow_runner") and self.workflow_runner is not None:
                 # Try to get current event loop and schedule cleanup
                 with suppress(RuntimeError, AttributeError):
                     try:
