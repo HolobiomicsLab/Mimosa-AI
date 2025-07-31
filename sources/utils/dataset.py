@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 def resolve_dataset_path(dataset_file: str) -> Path:
-    path_1 = Path("datasets") / f"{dataset_file}.jsonl"
-    path_2 = Path("datasets") / dataset_file
+    path_1 = Path("evaluation/datasets") / f"{dataset_file}.jsonl"
+    path_2 = Path("evaluation/datasets") / dataset_file
     if os.path.exists(path_1):
         return path_1
     if os.path.exists(path_2):
