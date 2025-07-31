@@ -64,16 +64,17 @@ class WorkflowOrchestrator:
         self,
         goal_prompt: str,
         workflow_template: str | None = None,
-    ) -> str:
+    ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
         Args:
             goal_prompt: The goal description for the workflow
             workflow_template: Optional workflow template code to use
         Returns:
-            str: Execution status message
+            tuple[str, str, bool]: (execution_output, workflow_uuid, success_flag)
         """
         logger = logging.getLogger(__name__)
+        
         workflow_start_time = time.time()
         execution_output = ""
 
@@ -156,18 +157,23 @@ class WorkflowOrchestrator:
             traceback.print_exc()
 
     def __del__(self):
-        """Cleanup resources on deletion - sync fallback."""
+        """Cleanup resources on deletion - sync fallback.""" 
         # Note: This is a fallback - proper cleanup should use async context manager
-        import asyncio
-        from contextlib import suppress
-
         try:
-            # Only attempt sync cleanup if no event loop is running
-            with suppress(RuntimeError):
-                # If we have a running loop, schedule cleanup as a task
-                asyncio.create_task(self.workflow_runner.cleanup())
-        except Exception as e:
-            print(f"❌ Error during cleanup: {e}")
-            import traceback
+            # Check if we're during Python shutdown
+            import sys
+            if sys.meta_path is None:
+                return
+            
+            # Import at module level to avoid shutdown issues
+            import asyncio
+            from contextlib import suppress
 
-            traceback.print_exc()
+            # Only attempt cleanup if workflow_runner still exists
+            if hasattr(self, 'workflow_runner') and self.workflow_runner is not None:
+                # Attempt to schedule cleanup if event loop exists
+                with suppress(RuntimeError, AttributeError):
+                    asyncio.create_task(self.workflow_runner.cleanup())
+        except Exception:
+            # Silently ignore cleanup errors during shutdown
+            pass
