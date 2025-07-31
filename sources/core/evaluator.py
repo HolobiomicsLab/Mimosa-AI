@@ -118,8 +118,8 @@ class WorkflowEvaluator:
             file.write(text.strip())
 
         return text.strip()
-    
-    def workflow_execution_text(goal:str, state_result, workflow_code:str):
+
+    def workflow_execution_text(goal: str, state_result, workflow_code: str):
         return f"""You are evaluating a scientific workflow execution.
 
     WORKFLOW GOAL:
@@ -232,23 +232,59 @@ Be precise, constructive, and technical in your judgment."""
      }}
      ```"""
 
+        catogories = ["goal alignement", "agent collaboration", "output quality"]
+        if answer:
+            catogories.append("answer correctness")
+
+        format = ""
+        for category in catogories:
+            format += f"""{{
+        "category" : "{category}",
+        "score": [0.0-1.0],
+        "evidence" : [Specific evidence from the execution that supports your judgement]
+    }}"""
+
         prompt = f"""
-You are provided with a multi-agent system designed to achieve a specific goal.
-The system is composed of multiple specialized agents working in sequence or collaboration.
-
 {self.workflow_execution_text()}
-{self.generate_text(uuid)!r}{expected_answer_info}
 
---- EVALUATION REQUEST ---
-- Provide an overall score (1–10) for each category in the following JSON format:{json_format}
-{"- The 'answer_correctness' score should evaluate how well the system's final answer matches the expected answer." if answer else ""}
-- After the JSON, briefly justify your scores.
-
+EVALUATION TASK:
+Based on the complete execution state and workflow code above, provide a score for each category.
+Give your score as a float on a scale of 0.0 to 1.0, where 0.0 means is a total failure, and 1.0 means a perfect execution.
+Analyse the full JSON state and workflow implementation to make your judgement.
 Please be objective, technical, and specific in your feedback.
+
+Respond in this exact format:
+[
+    {
+        "category": "goal_alignment",
+        "score": [0.0-1.0],
+        "evidence": "[Specific JSON paths/logs proving objective fulfillment]"
+    },
+    {
+        "category": "agent_collaboration", 
+        "score": [0.0-1.0],
+        "evidence": "[Message history snippets or error logs]"
+    },
+    {
+        "category": "output_quality",
+        "score": [0.0-1.0], 
+        "evidence": "[Output validation errors or missing fields]"
+    }""" + ("""
+    ,{
+        "category": "answer_correctness",
+        "score": [0.0-1.0],
+        "evidence": "[Factual accuracy verification]"
+    }""" if answer else "") + """
+]
 """
         self.logger.info(f"Evaluating workflow {uuid} with LLM judge")
         memory_path = Path(self.memory_dir) / uuid
-        output = LLMProvider("judge", memory_path, system_msg=self._get_judge_system_prompt(), self.llm_config)(prompt)
+        output = LLMProvider(
+            "generic_judge",
+            memory_path,
+            system_msg=self._get_judge_system_prompt(),
+            config=self.llm_config,
+        )(prompt)
 
         # Save the evaluation to a file
         evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
@@ -461,10 +497,9 @@ Please be objective, technical, and specific in your feedback.
         criteria = assertion.get("evaluation_criteria", "Standard evaluation")
 
         return f"""
-{self.workflow_execution_text()}
+{self.workflow_execution_text(goal, state_result, workflow_code)}
 
 ASSERTION TO EVALUATE:
-ID: {assertion["id"]}
 Description: {assertion["description"]}
 Evaluation Criteria: {criteria}
 
@@ -484,26 +519,26 @@ CONFIDENCE: [0.0-1.0 confidence score]
         """Get system prompt for LLM judge (keeping existing format)."""
         prompt = """You are an expert scientific researcher and rigorous multi-agent system evaluator. Your task is to assess whether a computational workflow achieved its intended goals through coordinated agent collaboration, while ensuring scientific validity and technical correctness.
 
-You will evaluate:
-System Description
-- The workflow's goal (scientific/research objective)
-- The agents involved, their roles, and expected behaviors
-- The workflow trace (inputs, outputs, execution steps)
-- The Python workflow implementation
+    You will evaluate:
+    System Description
+    - The workflow's goal (scientific/research objective)
+    - The agents involved, their roles, and expected behaviors
+    - The workflow trace (inputs, outputs, execution steps)
+    - The Python workflow implementation
 
-Multi-Agent System Evaluation Criteria
-- Role Consistency: Does each agent behave as expected given its role?
-- Logical Flow: Does each step follow coherently from the previous one?
-- Output Quality: Are outputs correct, useful, and free of errors?
-- Bottlenecks/Failures: Are there inefficiencies, misunderstandings, or failures?
-- Collaboration Effectiveness: Do agents work together optimally?
+    Multi-Agent System Evaluation Criteria
+    - Role Consistency: Does each agent behave as expected given its role?
+    - Logical Flow: Does each step follow coherently from the previous one?
+    - Output Quality: Are outputs correct, useful, and free of errors?
+    - Bottlenecks/Failures: Are there inefficiencies, misunderstandings, or failures?
+    - Collaboration Effectiveness: Do agents work together optimally?
 
-Scientific Research Evaluation Criteria
--Result Accuracy: Were the requested scientific results/analysis produced correctly?
-- Research Question Addressed: Was the core problem adequately solved?
-- Tool Usage: Were tools (agents, algorithms, data) applied correctly and in sequence?
-- Error Handling: Did the system detect and manage errors appropriately?
-- Clarity & Professionalism: Are results presented clearly and in a usable format?"""
+    Scientific Research Evaluation Criteria
+    -Result Accuracy: Were the requested scientific results/analysis produced correctly?
+    - Research Question Addressed: Was the core problem adequately solved?
+    - Tool Usage: Were tools (agents, algorithms, data) applied correctly and in sequence?
+    - Error Handling: Did the system detect and manage errors appropriately?
+    - Clarity & Professionalism: Are results presented clearly and in a usable format?"""
         return prompt
 
     def _parse_judge_response(self, judge_text: str) -> tuple[bool, str, float]:
