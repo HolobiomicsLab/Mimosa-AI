@@ -17,7 +17,7 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.utils.scenario_loader import ScenarioLoader
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
