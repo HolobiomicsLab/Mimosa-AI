@@ -68,13 +68,16 @@ class GodelMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, flow_state: any) -> float:
+    def get_total_rewards(self, flow_state: any, eval_type:str) -> float:
         """Calculate the total rewards from the workflow state."""
-        if not flow_state:
+        if not flow_state or not eval_type:
             return 0.0
-        if "evaluation_scores" not in flow_state:
+        if eval_type == 'generic':
+            return flow_state["evaluation"]['generic']["overall_score"]
+        elif eval_type == 'scenario':
+            return flow_state["evaluation"]['scenario']["score"]
+        else:
             return 0.0
-        return flow_state["evaluation_scores"]["overall_score"]
 
     def get_flow_answers(self, flow_state: any) -> str:
         """Extract the answers from the workflow state."""
@@ -256,13 +259,14 @@ class GodelMachine:
             goal_prompt=prompt,
             workflow_template=workflow_template if iteration_count == 0 else None
         )
+        eval_type = None
         if executed:
             if judge:
-                self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+                eval_type=  self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
             total_cost = self.pricing.calculate_cost(uuid)
 
         flow_state = self.load_flow_state_result(uuid)
-        flow_rewards = self.get_total_rewards(flow_state)
+        flow_rewards = self.get_total_rewards(flow_state, eval_type)
         rewards_history.append(flow_rewards)
         
         # Update visualization - either shared (parallel mode) or individual plot
@@ -286,7 +290,7 @@ class GodelMachine:
             f"Iteration {iteration_count + 1} completed.\n \
             Goal: {goal}\n \
             UUID: {uuid}\n \
-            Reward : {self.get_total_rewards(flow_state):.2f}\n \
+            Reward : {flow_rewards:.2f}\n \
             Answers: {self.get_flow_answers(flow_state)}\n \
             Cost: {total_cost:.3f} USD.\n \
             Rewards history: {rewards_history}",

@@ -75,6 +75,7 @@ ADDED_SYSTEM_PROMPT = """
 
 4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
+- Do not try to see a whole file. Better is to see a subset of this file.
 - Focus on one task at a time, extracting data from one source before moving to the next
 
 5. TOOL USAGE CONSTRAINTS
@@ -217,8 +218,7 @@ class SmolAgentFactory:
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                else:
-                    continue
+                
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
@@ -353,7 +353,6 @@ class SmolAgentFactory:
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
             "answers": state.get("answers", []) + [answer],
-            "retries" : state.get("retries",0)
         }
 
 class WorkflowNodeFactory:
