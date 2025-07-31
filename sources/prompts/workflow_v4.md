@@ -118,7 +118,7 @@ def master_router(state: WorkflowState) -> str:
     
     elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return previous_agent # Backtrack to actual previous node
+         return "fallback_path" # Example of backtracking
     
     elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
         retry_count = sum(
@@ -126,10 +126,10 @@ def master_router(state: WorkflowState) -> str:
         )
         if retry_count <= 1:
             print(f"🔄 Retry from '{current_agent}'.")
-            return current_agent # Retry same node
+            return "retry_path"
         else:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
-            return previous_agent
+            return "fallback_path"
 
     elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
@@ -176,17 +176,17 @@ workflow.add_edge(START, "researcher")
 workflow.add_conditional_edges(
     "researcher",
     master_router,
-    {"researcher": "researcher", "coder":"coder", END:END}
+    {"fallback_path": "researcher", "retry_path": "researcher", "next_node":"coder", END:END}
 )
 workflow.add_conditional_edges(
     "coder",
     master_router,
-    {"researcher": "researcher", "coder": "coder", "formatter":"formatter", END:END}
+    {"fallback_path": "researcher", "retry_path": "coder", "next_node":"formatter", END:END}
 )
 workflow.add_conditional_edges(
     "formatter",
     master_router,
-    {"researcher": "researcher", "formatter": "formatter", END:END}
+    {"fallback_path": "researcher", "retry_path": "formatter", "next_node":END, END:END}
 )
 
 # --- END OF SCRIPT ---
