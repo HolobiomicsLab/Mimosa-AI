@@ -75,11 +75,13 @@ ADDED_SYSTEM_PROMPT = """
 
 4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
+- Do not try to see a whole file. Better is to see a subset of this file.
 - Focus on one task at a time, extracting data from one source before moving to the next
 
 5. TOOL USAGE CONSTRAINTS
 - Always use keyword arguments for tool calls, never positional arguments
-
+- Do not make assumptions about the data returned by the tools. 
+- Try a tool, see its output, then you might write code to process it.
 - To save time you could preview the data of multiple sources, but do not try to process it all at once.
 
 When calling final_answer tool, you you must return a long, detailed paragraph that includes:
@@ -87,6 +89,7 @@ When calling final_answer tool, you you must return a long, detailed paragraph t
 - Specific sources and URLs where information was found
 - Any important context or background information
 - Any error codes or technical messages received
+- Your final answer MUST contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA
 Example:
     final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
 
@@ -215,8 +218,7 @@ class SmolAgentFactory:
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                else:
-                    continue
+                
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
@@ -351,7 +353,6 @@ class SmolAgentFactory:
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],
             "answers": state.get("answers", []) + [answer],
-            "retries" : state.get("retries",0)
         }
 
 class WorkflowNodeFactory:

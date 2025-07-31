@@ -19,6 +19,7 @@ class Evaluator:
     
     def __init__(self, judge_model: str = "gpt-4o"):
         self.judge_model = judge_model
+        
         self.scenario_loader = ScenarioLoader()
         self.client = openai.OpenAI()
         

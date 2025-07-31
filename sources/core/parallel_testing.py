@@ -3,25 +3,26 @@ Massive Testing Module for parallel DGM execution
 """
 
 import asyncio
-import multiprocessing as mp
-import time
-import signal
-import os
-import threading
-import psutil
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Any
 import json
-from pathlib import Path
 import logging
+import multiprocessing as mp
+import os
+import signal
+import threading
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any
+
+import psutil
 
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.utils.visualization import VisualizationUtils
 from sources.utils.shared_visualization import (
+    ParallelPlotManager,
     SharedVisualizationData,
-    ParallelPlotManager
 )
+from sources.utils.visualization import VisualizationUtils
 
 # Configure logging for better debugging
 logging.basicConfig(level=logging.INFO)
