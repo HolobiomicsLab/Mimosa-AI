@@ -153,7 +153,7 @@ Please analyze the system with the following structure:
 {4 + (1 if include_answer_assessment else 0)}. **Summary Judgment**
  """
 
-    def evaluate(self, uuid: str, short: bool = True, answer: str = None, scenario_id: str = None):
+    def evaluate(self, uuid: str, short: bool = True, answer: str = None, scenario_id: str = None) -> str:
         """Evaluate the workflow results.
 
         Args:
@@ -164,7 +164,8 @@ Please analyze the system with the following structure:
         """
         # If scenario_id is provided, use scenario-based evaluation
         if scenario_id:
-            return self.evaluate_workflow(uuid, scenario_id)
+            self.evaluate_workflow(uuid, scenario_id)
+            return 'scenario'
             
         # Otherwise, use the original judge-based evaluation
         # Adjust system prompt based on whether an expected answer is provided
@@ -242,7 +243,7 @@ Please be objective, technical, and specific in your feedback.
         self._update_state_result(scores, uuid)
         print("Scores extracted and saved to state result.")
         
-        return scores
+        return 'generic'
 
     def _extract_scores(self, evaluation_text):
         """Extract scores from the evaluation text.
@@ -296,7 +297,7 @@ Please be objective, technical, and specific in your feedback.
                 return
 
             # Add scores to state result
-            state_result["evaluation_scores"] = scores
+            state_result.setdefault("evaluation", {})["generic"] = scores
 
             # Write updated state result back to file
             with open(state_result_path, "w") as f:
@@ -320,7 +321,7 @@ Please be objective, technical, and specific in your feedback.
         return open(formated_path).read()
 
     # Methods from scenario-based evaluator
-    def evaluate_workflow(self, workflow_id: str, scenario_id: str) -> dict[str, Any]:
+    def evaluate_workflow(self, workflow_id: str, scenario_id: str):
         """Evaluate a workflow against a scenario with scoring."""
         print(f"Evaluating workflow {workflow_id} against scenario {scenario_id}")
         
@@ -344,10 +345,10 @@ Please be objective, technical, and specific in your feedback.
         
         # Generate results
         results = {
-            "workflow_id": workflow_id,
+            #"workflow_id": workflow_id,
             "scenario_id": scenario_id,
             "timestamp": datetime.now().isoformat(),
-            "goal": scenario.get("goal", ""),
+            #"goal": scenario.get("goal", ""),
             "score": score,
             "passed_assertions": passed_count,
             "total_assertions": total_count,
@@ -357,17 +358,6 @@ Please be objective, technical, and specific in your feedback.
         
         # Save results
         self._save_scenario_results(workflow_id, scenario_id, results)
-        
-        # Update state result with evaluation scores
-        evaluation_scores = {
-            "goal_alignment": score * 10,  # Convert to 1-10 scale
-            "agent_collaboration": score * 10,
-            "output_quality": score * 10,
-            "overall_score": score * 10
-        }
-        self._update_state_result(evaluation_scores, workflow_id)
-        
-        return results
     
     def _load_workflow_data(self, workflow_id: str) -> dict[str, Any]:
         """Load workflow execution data from UUID folder."""
@@ -535,11 +525,18 @@ CONFIDENCE: [0.0-1.0 confidence score]
                   f"Creating it.")
             workflow_dir.mkdir(parents=True, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"evaluation_{scenario_id}_{timestamp}.json"
+        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = "state_result.json"
         
+        with open(workflow_dir / filename) as f:
+            state_json = json.load(f)
+
+        # Modify data
+        state_json.setdefault("evaluation", {})["scenario"] = results
+
+        # Then write back
         with open(workflow_dir / filename, 'w') as f:
-            json.dump(results, f, indent=2)
+            json.dump(state_json, f, indent=2)
             
         print(f"Results saved to: {workflow_dir / filename}")
         

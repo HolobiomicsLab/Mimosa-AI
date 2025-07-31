@@ -2,6 +2,7 @@
 import json
 import sys
 from pathlib import Path
+from statistics import mean
 
 from sentence_transformers import SentenceTransformer
 
@@ -61,8 +62,14 @@ class WorkflowSelector:
 
             if state_result:
                 goal = state_result.get("goal", "")
-                scores = state_result.get("evaluation_scores", {})
-                overall_score = scores.get("overall_score", 0.0)
+                evaluation = state_result.get("evaluation", {})
+                scores = []
+                if evaluation:
+                    if 'generic' in evaluation:
+                        scores.append(evaluation['genetic']['overall_score'])
+                    else:
+                        scores.append(evaluation['scenario']['score'])
+                overall_score = mean(scores) if scores else 0.0
 
             uuid = workflow_folder.name
             workflows[uuid] = WorkflowInfo(uuid,
@@ -100,19 +107,19 @@ class WorkflowSelector:
         return [wf for wf in similar_workflows
                 if self.cosine_similarity(wf.goal, goal) >= threshold]
     
-    def sort_workflows_by_score(self, workflows_info: list[WorkflowInfo]) -> list[WorkflowInfo]:
+    def sort_workflows_by_score(self, workflows_info: list[WorkflowInfo], threshold:float) -> list[WorkflowInfo]:
         """Sort workflows by their overall score."""
         sorted_workflows = sorted(
             workflows_info,
             key=lambda wf: wf.overall_score,
             reverse=True
         )
-        return [wf for wf in sorted_workflows]
+        return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
     
-    def select_best_workflows(self, goal: str, threshold=0.5) -> WorkflowInfo | None:
+    def select_best_workflows(self, goal: str, threshold_similary=0.8, threshod_score = 0.7) -> list[WorkflowInfo]:
         """Choose a workflow that matches the goal with a minimum threshold."""
-        similar_workflows = self.sort_similar_workflows(goal, threshold)
-        best_workflows = self.sort_workflows_by_score(similar_workflows)
+        similar_workflows = self.sort_similar_workflows(goal, threshold_similary)
+        best_workflows = self.sort_workflows_by_score(similar_workflows,threshod_score)
         return best_workflows
 
 if __name__ == "__main__":
@@ -120,7 +127,7 @@ if __name__ == "__main__":
     config.workflow_dir = "../workflows"
     mcts = WorkflowSelector(config)
     goal = "install prima.cpp and run a simple script"
-    matching_workflow = mcts.select_best_workflows(goal, threshold=0.2)
+    matching_workflow = mcts.select_best_workflows(goal)
     print("Best matching workflow:")
     for wf in matching_workflow:
         print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
