@@ -171,9 +171,16 @@ class WorkflowOrchestrator:
 
             # Only attempt cleanup if workflow_runner still exists
             if hasattr(self, 'workflow_runner') and self.workflow_runner is not None:
-                # Attempt to schedule cleanup if event loop exists
+                # Try to get current event loop and schedule cleanup
                 with suppress(RuntimeError, AttributeError):
-                    asyncio.create_task(self.workflow_runner.cleanup())
+                    try:
+                        loop = asyncio.get_running_loop()
+                        if not loop.is_closed():
+                            loop.create_task(self.workflow_runner.cleanup())
+                    except RuntimeError:
+                        # No running loop, try to run cleanup synchronously if possible
+                        # This is a last resort and may not work for all cleanup operations
+                        pass
         except Exception:
             # Silently ignore cleanup errors during shutdown
             pass
