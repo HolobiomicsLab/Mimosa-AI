@@ -3,7 +3,7 @@ import sys
 
 from dotenv import load_dotenv
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from sources.evaluation.simple_evaluator import Evaluator
 
@@ -15,7 +15,7 @@ def test_evaluation(workflow_id: str, scenario_id: str):
 
     # Run evaluation
     result = evaluator.evaluate_workflow(workflow_id, scenario_id)
-    
+
     print(f"Evaluation completed for workflow {workflow_id}")
     print(f"Scenario: {scenario_id}")
     print(f"Score: {result.get('score', 'N/A')}")

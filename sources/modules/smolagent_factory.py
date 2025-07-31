@@ -10,6 +10,7 @@ import json
 import re
 import time
 import uuid
+import logging
 from typing import Callable
 from dataclasses import dataclass, asdict
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
@@ -332,12 +333,20 @@ class SmolAgentFactory:
         return res
 
     def run(self, state: WorkflowState) -> dict:
+        logger = logging.getLogger(__name__)
+        start_time = time.time()
+        
         instructions = self.build_workflow_step_prompt(state)
         try:
             answer = self.run_cached(state, instructions)
         except Exception as e:
+            execution_time = time.time() - start_time
+            logger.info(f"[AGENT] {self.name} failed after {execution_time:.3f}s")
             raise e
+            
         actions, observations, success = self.parse_memory_output()
+        execution_time = time.time() - start_time
+        logger.info(f"[AGENT] {self.name} completed in {execution_time:.3f}s")
         action: Action = {
             "tool": actions if actions else [],
         }

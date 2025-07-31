@@ -6,6 +6,7 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
+import logging
 import os
 import signal
 import sys
@@ -14,13 +15,74 @@ import dotenv
 
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.core.planner import Planner
 from sources.core.parallel_testing import ParallelTesting
+from sources.core.planner import Planner
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
+
+def setup_logging():
+    """Configure logging with timing, line numbers, and log rotation."""
+    import logging.handlers
+    import os
+    
+    # Create logs directory
+    logs_dir = "sources/logs"
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Configure root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # Remove existing handlers to avoid duplication
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Rotating file handler for general logs
+    file_handler = logging.handlers.RotatingFileHandler(
+        os.path.join(logs_dir, 'mimosa.log'),
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Separate handler for workflow execution logs
+    workflow_handler = logging.handlers.RotatingFileHandler(
+        os.path.join(logs_dir, 'workflows.log'),
+        maxBytes=50*1024*1024,  # 50MB
+        backupCount=10
+    )
+    workflow_handler.setLevel(logging.INFO)
+    workflow_handler.setFormatter(formatter)
+    
+    # Add workflow handler to specific loggers
+    workflow_loggers = [
+        'sources.core.dgm',
+        'sources.core.orchestrator', 
+        'sources.core.workflow_factory',
+        'sources.core.workflow_runner',
+        'sources.core.evaluator'
+    ]
+    
+    for logger_name in workflow_loggers:
+        workflow_logger = logging.getLogger(logger_name)
+        workflow_logger.addHandler(workflow_handler)
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -153,6 +215,7 @@ async def normal_execution_mode(args, config):
 
 async def main():
     """Main execution function"""
+    setup_logging()
     config = Config()
     setup_signal_handlers()
     

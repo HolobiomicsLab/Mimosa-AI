@@ -49,9 +49,9 @@ class ToolManager:
                     name = None
                     try:
                         resp = await client.call_tool("get_mcp_name", {})
-                        if "content" in resp and resp.content: 
+                        if "content" in resp and resp.content:
                             name = resp.content[0].text
-                        else: # fallback because it randomly change ????
+                        else:  # fallback because it randomly change ????
                             name = resp[0].text if resp else None
                     except Exception as e:
                         print(
