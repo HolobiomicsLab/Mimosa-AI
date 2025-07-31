@@ -4,6 +4,7 @@ import os
 import random
 from pathlib import Path
 
+
 def resolve_dataset_path(dataset_file: str) -> Path:
     path_1 = Path("datasets") / f"{dataset_file}.jsonl"
     path_2 = Path("datasets") / dataset_file
@@ -12,6 +13,7 @@ def resolve_dataset_path(dataset_file: str) -> Path:
     if os.path.exists(path_2):
         return path_2
     return Path(dataset_file)  # Fallback to raw file path if neither exists
+
 
 def read_dataset(dataset_file: str, num_samples: int = 10) -> list[tuple[str, str]]:
     """

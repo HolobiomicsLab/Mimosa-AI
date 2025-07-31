@@ -2,13 +2,14 @@
 OpenRouter API client for real-time model pricing
 """
 
-from dataclasses import dataclass
 import json
 import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
 
 @dataclass
 class TokenUsage:
@@ -17,8 +18,6 @@ class TokenUsage:
     input_tokens: int
     output_tokens: int
     total_tokens: int
-
-
 
 
 class PricingCalculator:
