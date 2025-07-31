@@ -9,6 +9,7 @@ import asyncio
 import os
 import signal
 import sys
+import logging
 
 import dotenv
 
@@ -20,6 +21,56 @@ from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors based on component type."""
+    
+    # ANSI color codes
+    COLORS = {
+        'DGM': '\033[94m',        # Blue
+        'AGENT': '\033[92m',      # Green  
+        'WORKFLOW': '\033[96m',   # Cyan
+        'ERROR': '\033[91m',      # Red
+        'WARNING': '\033[93m',    # Yellow
+        'RESET': '\033[0m'        # Reset
+    }
+    
+    def format(self, record):
+        # Determine component type from logger name and message
+        component_color = self.COLORS['RESET']  # Default
+        
+        if 'dgm' in record.name.lower():
+            component_color = self.COLORS['DGM']
+        elif 'smolagent' in record.name.lower() or '[AGENT' in record.getMessage():
+            component_color = self.COLORS['AGENT']  
+        elif 'orchestrator' in record.name.lower() or 'workflow' in record.name.lower() or '[WORKFLOW' in record.getMessage():
+            component_color = self.COLORS['WORKFLOW']
+        
+        # Color by log level for errors/warnings
+        if record.levelno >= logging.ERROR:
+            component_color = self.COLORS['ERROR']
+        elif record.levelno >= logging.WARNING:
+            component_color = self.COLORS['WARNING']
+        
+        # Apply color to the entire log message
+        original_format = super().format(record)
+        return f"{component_color}{original_format}{self.COLORS['RESET']}"
+
+def setup_logging():
+    """Configure logging with timing, line numbers, and colors."""
+    # Create custom handler with colored formatter
+    handler = logging.StreamHandler()
+    formatter = ColoredFormatter(
+        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler.setFormatter(formatter)
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[handler]
+    )
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -152,6 +203,7 @@ async def normal_execution_mode(args, config):
 
 async def main():
     """Main execution function"""
+    setup_logging()
     config = Config()
     setup_signal_handlers()
     

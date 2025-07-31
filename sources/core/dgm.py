@@ -3,7 +3,9 @@ Darwin Godel Machine
 """
 
 import json
+import logging
 import os
+import time
 
 from sources.core.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
@@ -249,6 +251,8 @@ class GodelMachine:
         Returns:
             str: Final execution status message
         """
+        logger = logging.getLogger(__name__)
+        iteration_start_time = time.time()
         total_cost = 0.0
         uuid = None  # Initialize uuid to avoid undefined reference
 
@@ -260,13 +264,15 @@ class GodelMachine:
                 print("Exiting self-improvement loop.\n")
                 return template_uuid
 
-        print(f"\n{'=' * 60}")
-        print(f"ITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop")
-        print(f"{'=' * 60}")
-        print(f"\n{'📋 CURRENT GOAL':^60}")
-        print(f"{'─' * 60}")
-        print(f"  {goal}")
-        print(f"{'─' * 60}\n")
+        print(f"\n\033[94m{'=' * 60}\033[0m")
+        print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop\033[0m")
+        print(f"\033[94m{'=' * 60}\033[0m")
+        print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
+        print(f"\033[94m{'─' * 60}\033[0m")
+        print(f"\033[94m  {goal}\033[0m")
+        print(f"\033[94m{'─' * 60}\033[0m\n")
+        
+        logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
 
         run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
             goal_prompt=prompt,
@@ -275,8 +281,18 @@ class GodelMachine:
         eval_type = None
         if executed:
             if judge:
+                print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
+                print(f"\033[94m{'=' * 80}\033[0m")
+                eval_start = time.time()
                 eval_type=  self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+                eval_time = time.time() - eval_start
+                logger.info(f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s")
+                print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
+            
+            cost_start = time.time()
             total_cost = self.pricing.calculate_cost(uuid)
+            cost_time = time.time() - cost_start
+            logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
 
         flow_state = self.load_flow_state_result(uuid)
         flow_rewards = self.get_total_rewards(flow_state, eval_type)
@@ -295,10 +311,14 @@ class GodelMachine:
         elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
         
-        print(f"\n{'-' * 60}")
-        print(f"Total rewards: {flow_rewards:.1f}")
-        print(f"Total cost: {total_cost:.3f} USD")
-        print(f"{'-' * 60}\n")
+        iteration_time = time.time() - iteration_start_time
+        logger.info(f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - Rewards: {flow_rewards:.1f}, Cost: {total_cost:.3f} USD")
+        
+        print(f"\n\033[94m{'-' * 60}\033[0m")
+        print(f"\033[94mTotal rewards: {flow_rewards:.1f}\033[0m")
+        print(f"\033[94mTotal cost: {total_cost:.3f} USD\033[0m")
+        print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
+        print(f"\033[94m{'-' * 60}\033[0m\n")
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n \
             Goal: {goal}\n \

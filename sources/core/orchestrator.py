@@ -2,6 +2,9 @@
 This class orchestrates the execution of workflows in a sandboxed environment.
 """
 
+import time
+import logging
+
 from .workflow_factory import WorkflowFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
@@ -32,7 +35,7 @@ class WorkflowOrchestrator:
 
     async def workflow_requirements_install(self):
         deps = self.config.runner_requirements
-        print("Installing dependencies...")
+        print(f"\033[96m📦 Installing workflow dependencies: {deps}\033[0m")
         dep_result = await self.workflow_runner.install_dependencies(deps)
         if dep_result.status != ExecutionStatus.COMPLETED:
             raise RuntimeError(f"Dependency installation failed: {dep_result.stderr}")
@@ -41,19 +44,19 @@ class WorkflowOrchestrator:
         """Run the workflow code in a sandboxed environment."""
 
         def progress_handler(line: str):
-            print(f"{line}")
+            print(f"\033[96m  🔄 {line}\033[0m")
 
-        print("Running workflow in python sandbox...")
+        print("\033[96m🚀 Executing workflow in Python sandbox...\033[0m")
         result = await self.workflow_runner.execute(
             workflow_code, progress_callback=progress_handler
         )
         if result.status == ExecutionStatus.COMPLETED:
-            print("Workflow execution completed successfully.")
+            print(f"\033[96m✅ Workflow execution completed successfully in {result.execution_time:.3f}s\033[0m")
             return (
                 result.stdout or result.stderr or "No output from workflow execution."
             )
         else:
-            print(f"Workflow failed: {result.stderr}")
+            print(f"\033[91m❌ Workflow execution failed: {result.stderr}\033[0m")
             raise Exception(f"Workflow execution failed: {result.stderr}")
 
     async def orchestrate_workflow(
@@ -69,17 +72,47 @@ class WorkflowOrchestrator:
         Returns:
             str: Execution status message
         """
+        logger = logging.getLogger(__name__)
+        workflow_start_time = time.time()
         execution_output = ""
 
+        logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal_prompt[:50]}...")
+        print(f"\n\033[96m{'🏗️  WORKFLOW GENERATION PHASE':^80}\033[0m")
+        print(f"\033[96m{'=' * 80}\033[0m")
+
+        # Workflow generation timing
+        generation_start = time.time()
         workflow_code, uuid = await self.workflow_factory.craft_workflow(
             goal_prompt,
             template_workflow=workflow_template,
             save_workflow=True,
         )
+        generation_time = time.time() - generation_start
+        logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
+        print(f"\033[96m✅ Workflow {uuid} generated successfully in {generation_time:.3f}s\033[0m")
+
         try:
+            # Dependencies installation phase
+            print(f"\n\033[96m{'📦 DEPENDENCIES INSTALLATION PHASE':^80}\033[0m")
+            print(f"\033[96m{'=' * 80}\033[0m")
+            deps_start = time.time()
             await self.workflow_requirements_install()
+            deps_time = time.time() - deps_start
+            logger.info(f"[WORKFLOW DEPS] {uuid} dependencies installed in {deps_time:.3f}s")
+            print(f"\033[96m✅ Dependencies installed successfully in {deps_time:.3f}s\033[0m")
+            
+            # Execution phase
+            print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
+            print(f"\033[96m{'=' * 80}\033[0m")
+            exec_start = time.time()
             execution_output = await self.workflow_sandbox_run(workflow_code)
+            exec_time = time.time() - exec_start
+            logger.info(f"[WORKFLOW EXECUTION] {uuid} executed in {exec_time:.3f}s")
+            print(f"\033[96m✅ Workflow executed successfully in {exec_time:.3f}s\033[0m")
+            
         except Exception as e:
+            workflow_time = time.time() - workflow_start_time
+            logger.info(f"[WORKFLOW ERROR] {uuid} failed after {workflow_time:.3f}s - {str(e)}")
             print(f"❌ Error during {uuid} workflow execution: {e}")
             import traceback
 
@@ -87,6 +120,19 @@ class WorkflowOrchestrator:
             return str(e), uuid, False
         finally:
             print("\nCleaning up sandbox...")
+            
+        workflow_time = time.time() - workflow_start_time
+        logger.info(f"[WORKFLOW END] {uuid} completed in {workflow_time:.3f}s")
+        
+        print(f"\n\033[96m{'✨ WORKFLOW COMPLETION SUMMARY':^80}\033[0m")
+        print(f"\033[96m{'=' * 80}\033[0m")
+        print(f"\033[96m📋 Workflow UUID: {uuid}\033[0m")
+        print(f"\033[96m⏱️  Total Time: {workflow_time:.3f}s\033[0m")
+        print(f"\033[96m  • Generation: {generation_time:.3f}s\033[0m")
+        print(f"\033[96m  • Dependencies: {deps_time:.3f}s\033[0m")
+        print(f"\033[96m  • Execution: {exec_time:.3f}s\033[0m")
+        print(f"\033[96m{'=' * 80}\033[0m\n")
+        
         output = (
             execution_output.strip()
             if execution_output
