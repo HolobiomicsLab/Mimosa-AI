@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from sources.utils.pricing import OpenRouterPricingClient
+
 
 @dataclass
 class AddressMCP:
@@ -12,13 +14,13 @@ class AddressMCP:
     port_max: int
 
     def _validate_port(self, port_number: int) -> None:
-        assert port_number >= 0 and port_number <= 65535, "Port number must be between 0 and 65535"
-    
+        assert port_number >= 0 and port_number <= 65535, "Port not between 0 and 65535"
+
     def _validate_ip(self, ip: str) -> None:
-        if not self.ip:
+        if not ip:
             raise ValueError("IP address cannot be empty")
-        if not isinstance(self.ip, str):
-            raise TypeError(f"IP address must be a string, got {type(self.ip).__name__} instead.")
+        if not isinstance(ip, str):
+            raise TypeError(f"IP address must be string, got {type(ip).__name__}")
 
     def __post_init__(self):
         """Validate the address and port range."""
@@ -34,11 +36,13 @@ class Config:
 
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
+        self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_creator.md"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_provider: str = "deepseek"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v4.md"
         self.workflow_llm_provider: str = "openai"
-        self.mcp_health_endpoint: str = "http://localhost:5000/health"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
@@ -63,6 +67,31 @@ class Config:
         ]
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
+        self._pricing_client = OpenRouterPricingClient()
+        self._model_pricing_cache = None
+
+    @property
+    def model_pricing(self) -> dict[str, dict[str, float]]:
+        """Get model pricing with fallback to cached or default values."""
+        if self._model_pricing_cache is None:
+            # Try to fetch real-time pricing
+            pricing_data = self._pricing_client.get_model_pricing_dict()
+            if pricing_data:
+                self._model_pricing_cache = pricing_data
+            else:
+                # Fallback to static pricing if API fails
+                self._model_pricing_cache = self._pricing_client.get_fallback_pricing()
+        return self._model_pricing_cache
+
+    def refresh_pricing(self) -> None:
+        """Force refresh of model pricing from OpenRouter API."""
+        self._model_pricing_cache = None
+
+    def create_paths(self) -> None:
+        """Create necessary directories if they do not exist."""
+        os.makedirs(self.workflow_dir, exist_ok=True)
+        os.makedirs(self.memory_dir, exist_ok=True)
+        os.makedirs(self.runner_temp_dir, exist_ok=True)
 
     def validate_paths(self) -> None:
         """Validate that all required paths exist."""
@@ -93,7 +122,6 @@ class Config:
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "workflow_llm_provider": self.workflow_llm_provider,
-            "mcp_health_endpoint": self.mcp_health_endpoint,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -119,9 +147,6 @@ class Config:
         self.workflow_llm_provider = data.get(
             "workflow_llm_provider", self.workflow_llm_provider
         )
-        self.mcp_health_endpoint = data.get(
-            "mcp_health_endpoint", self.mcp_health_endpoint
-        )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
@@ -142,10 +167,14 @@ class Config:
     def __str__(self) -> str:
         """String representation of the configuration."""
         return (
-            f"Config(workflow_dir={self.workflow_dir}, "
-            f"schema_code_path={self.schema_code_path}, smolagent_factory_code_path={self.smolagent_factory_code_path}, "
-            f"prompt_workflow_creator={self.prompt_workflow_creator}, workflow_llm_provider={self.workflow_llm_provider}, "
-            f"mcp_health_endpoint={self.mcp_health_endpoint}, runner_default_python_version={self.runner_default_python_version}, "
-            f"runner_default_timeout={self.runner_default_timeout}, runner_default_max_memory_mb={self.runner_default_max_memory_mb}, "
-            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}, runner_temp_dir={self.runner_temp_dir})"
+            f"Config(workflow_dir={self.workflow_dir},\n"
+            f"schema_code_path={self.schema_code_path},\n"
+            f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
+            f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
+            f"workflow_llm_provider={self.workflow_llm_provider},\n"
+            f"runner_default_python_version={self.runner_default_python_version},\n"
+            f"runner_default_timeout={self.runner_default_timeout},\n"
+            f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
+            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
+            f"runner_temp_dir={self.runner_temp_dir})\n"
         )

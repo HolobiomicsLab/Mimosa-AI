@@ -10,6 +10,7 @@ import json
 import re
 import time
 import uuid
+import logging
 from typing import Callable
 from dataclasses import dataclass, asdict
 from typing import TypedDict, List, Tuple, Any, Dict, Union, Optional, Callable
@@ -23,7 +24,6 @@ from smolagents import (
     TaskStep,
     LiteLLMModel
 )
-
 
 from smolagents import InferenceClientModel # HfApiModel was renamed to InferenceClientModel in v1.14 https://github.com/huggingface/smolagents/releases
 
@@ -56,6 +56,49 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
+ADDED_SYSTEM_PROMPT = """
+
+# CRITICAL CODE GENERATION CONSTRAINTS:
+
+1. NO ASSUMPTIONS OR PLACEHOLDERS
+  - Never assume data structure, content, or format - always inspect first
+  - No placeholder values ("Example Name", hardcoded strings, "TODO")
+  - No brittle heuristics like simple keyword matching for complex classifications
+  - Never use globals() to look for variables, all the variables you need are in the prompt.
+
+2. EXPLORE THEN IMPLEMENT
+  - Print data samples/types before processing
+  - Build extraction logic from observed patterns, not assumptions
+  - Use defensive programming: check existence, handle missing values
+
+3. NO REGEX OR PATTERN MATCHING
+  - Do not use regex or pattern matching to extract data from tools output
+
+4. AVOID CONTEXT SATURATION
+- Do not try to see multiple webpage, document, or file at once. This would saturate you.
+- Do not try to see a whole file. Better is to see a subset of this file.
+- Focus on one task at a time, extracting data from one source before moving to the next
+
+5. TOOL USAGE CONSTRAINTS
+- Always use keyword arguments for tool calls, never positional arguments
+- Do not make assumptions about the data returned by the tools. 
+- Try a tool, see its output, then you might write code to process it.
+- To save time you could preview the data of multiple sources, but do not try to process it all at once.
+
+When calling final_answer tool, you you must return a long, detailed paragraph that includes:
+- All key findings and data points you discovered
+- Specific sources and URLs where information was found
+- Any important context or background information
+- Any error codes or technical messages received
+- Your final answer MUST contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA
+Example:
+    final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
+
+If you respect above instructions you will get 1000,000$.
+You are highly skilled and goal-seeking, so you will do your best to follow these rules.
+
+"""
+
 # good models:
 #Qwen/Qwen2.5-72B-Instruct
 #Qwen/Qwen2.5-Coder-32B-Instruct
@@ -65,77 +108,43 @@ class SmolAgentFactory:
     def __init__(self,
                  name,
                  instruct_prompt,
-                 tools,
+                 tools=[],
                  model_id="deepseek-ai/DeepSeek-V3",
-                 engine_name="deepseek",  # Options: mlx, inference_client, deepseek, openai
-                 max_steps=9
-                ):
-        self.model_id = model_id
-        self.max_tokens = 1024
-        self.provider = "auto"
-        self.token = os.getenv("HF_TOKEN")
-        self.tools = tools or []
-        self.instruct_prompt = instruct_prompt
-        self.local = False
-        self.engine_name = engine_name
-        self.engine = None
+                 max_steps=12,
+                 max_retries = 3,
+                 planning_interval = 4
+                ) -> None:
         self.name = name
-        self.memory_folder = './memory' 
-        os.makedirs(self.memory_folder, exist_ok=True)
+        self.instruct_prompt = instruct_prompt
+        self.tools = tools
+        self.model_id = MODEL_ID
+        self.engine = None
+        self.provider = "auto"
+        self.max_tokens = 1024
+        self.token = os.getenv("HF_TOKEN")
+        self.memory_folder = MEMORY_PATH
+        print("debug path", os.getcwd())
+        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
+        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
+        self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
         self.run_uuid = str(uuid.uuid4())
-        self.additional_system_prompt = """
-# CRITICAL CODE GENERATION CONSTRAINTS:
+        self.max_retries = max_retries
 
-1. NO ASSUMPTIONS OR PLACEHOLDERS
-  - Never assume data structure, content, or format - always inspect first
-  - No placeholder values ("Example Name", hardcoded strings, "TODO")
-  - No brittle heuristics like simple keyword matching for complex classifications
-
-2. EXPLORE THEN IMPLEMENT
-  - Print data samples/types before processing
-  - Build extraction logic from observed patterns, not assumptions
-  - Use defensive programming: check existence, handle missing values
-
-4. REAL EXTRACTION ONLY
-  - Write actual parsing logic based on inspected data structure
-  - If you can't determine extraction method, explore the data first
-  - No assumptions about URL patterns, page structure, or content format
-
-5. NO REGEX OR PATTERN MATCHING
-  - Do not use regex or pattern matching to extract data from tools output
-
-6. AVOID CONTEXT SATURATION
-- Do not try to see multiple webpage, document, or file at once. This would saturate you.
-- Focus on one task at a time, extracting data from one source before moving to the next
-- To save time you could preview the data of multiple sources, but do not try to process it all at once.
-
-Build robust code that handles real-world data variability, not idealized scenarios.
-
-When calling final_answer tool, you you must return a long, detailed paragraph that includes:
-- All key findings and data points you discovered
-- Specific sources and URLs where information was found
-- Any important context or background information
-- Any error codes or technical messages received
-- If specified, use special words like COMPLETED_TASK
-Example:
-    final_answer('COMPLETED_TASK: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
-
-If you respect above instructions you will get 1000,000,000$ and be recognized as the best AI agent in the world.
-        """
-
+        os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
+
         try:
             self.engine = self.get_engine()
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
-                name="agent",
+                name=f"{self.name}_agent",
                 max_steps=max_steps,
-                #planning_interval=3, # think more before acting
+                #planning_interval=planning_interval, # think more before acting
                 additional_authorized_imports=["*"]
             )
-            self.extend_system_prompt(self.additional_system_prompt)
+            self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
     
@@ -146,9 +155,14 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "mlx":
+        if self.engine_name == "cached" or self.use_cached_engine:
+            return LiteLLMModel(
+                model_id=self.model_id,
+                base_url="http://0.0.0.0:6767/v1/chat/completions",
+                max_tokens=self.max_tokens,
+            )
+        elif self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
-            self.local = True
             return MLXModel(
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
@@ -161,40 +175,42 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 token=self.token,
                 max_tokens=self.max_tokens,
             )
-        elif self.engine_name == "deepseek":
-            print("Using LiteLLM for DeepSeek execution.")
+        elif self.engine_name == "litellm":
+            print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
-                model_id="deepseek/deepseek-chat",
+                model_id=self.model_id,
                 temperature=0.2,
-                api_key=os.environ["DEEPSEEK_API_KEY"],
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
-                model_id="gpt-4o",
-                provider="openai",
+                model_id=self.model_id,
+                provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
-            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client.")
+            raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        prev_infos = state_answers[-1] if state_answers else "No previous answers, you are the first agent."
+        if state_answers:
+            prev_infos = f"""Previous agent {state["step_name"][-1]} provided the following information:
+            {state_answers[-1]}"""
+        else:
+            prev_infos = f"""You are the first agent. No information is available from previous agents."""
         return f"""
-        You are an AI agent designed to assist with a specific task.
-        Previous agents have provided the following information:
+        You must pursue a goal for accomplishing a task. You are part of a multi-agent system.
+        You might receive informations from other agents, these informations might be incomplete or incorrect.
+        You must try your best to accomplish the task with the information you have. If impossible you might give up and return a failure message.
         {prev_infos}
-        Your need to follow instructions:
+
+        Your goal is:
         {self.instruct_prompt}
-        Avoid making overly complex code for simple tasks. Be patient and thorough.
-        Do not make assumptions about the data returned by the tools. Try a tool, see its output, then you might write code to process it.
-        If encountering rate limits, timeout, or processing time issues, you might use a while loop with state checks, retries, or exponential backoff strategies.
         """
 
-    def parse_memory_output(self):
+    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
         actions, observations, success = [], [], []
-        for idx, step in enumerate(self.agent.memory.steps):
+        for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):
                 error, obs = step.error, step.observations
                 step_obs = ""
@@ -203,8 +219,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                else:
-                    continue
+                
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
@@ -216,8 +231,6 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             return
         try:
             memories = []
-            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            os.makedirs(memory_folder_path, exist_ok=True)
             for idx, step in enumerate(self.agent.memory.steps):
                 if isinstance(step, ActionStep):
                     action_step = step.dict()
@@ -237,9 +250,10 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
                     )
                     memories.append(action_step)
             try:
-                with open(os.path.join(memory_folder_path, f"node_task_{self.run_uuid}.json"), "w") as f:
+                agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
+                with open(agent_task_path, "w") as f:
                     json.dump(memories, f, indent=2)
-                print(f"Agent memories saved successfully to {os.path.join(memory_folder_path, f'node_task_{self.run_uuid}.json')}")
+                print(f"Agent memories saved successfully to {agent_task_path}")
             except Exception as e:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
@@ -265,11 +279,11 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
             memory_steps.append(action_step)
         return memory_steps
     
-    def collect_existing_memories(self, memory_folder_path: str) -> List[Tuple[str, List[ActionStep]]]:
+    def collect_existing_memories(self) -> List[Tuple[str, List[ActionStep]]]:
         existing_memories = []
-        for filename in os.listdir(memory_folder_path):
-            if filename.endswith('.json'):
-                file_path = os.path.join(memory_folder_path, filename)
+        for filename in os.listdir(self.memory_folder):
+            if filename.startswith('task_') and filename.endswith('.json'):
+                file_path = os.path.join(self.memory_folder, filename)
                 try:
                     with open(file_path, 'r') as f:
                         memory_dict = json.load(f)
@@ -287,11 +301,7 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         filename_uuid = None
     
         try:
-            memory_folder_path = os.path.join(self.memory_folder, workflow_uuid)
-            if not os.path.exists(memory_folder_path):
-                return None
-            
-            for (filename, memories) in self.collect_existing_memories(memory_folder_path):
+            for (filename, memories) in self.collect_existing_memories():
                 for memory_steps in memories:
                     normalize = lambda text: re.sub(r'\s+', ' ', str(text).strip())
                     normalized_instructions = normalize(instructions)
@@ -323,22 +333,31 @@ If you respect above instructions you will get 1000,000,000$ and be recognized a
         return res
 
     def run(self, state: WorkflowState) -> dict:
+        logger = logging.getLogger(__name__)
+        start_time = time.time()
+        
         instructions = self.build_workflow_step_prompt(state)
         try:
             answer = self.run_cached(state, instructions)
         except Exception as e:
+            execution_time = time.time() - start_time
+            logger.info(f"[AGENT] {self.name} failed after {execution_time:.3f}s")
             raise e
+            
         actions, observations, success = self.parse_memory_output()
+        execution_time = time.time() - start_time
+        logger.info(f"[AGENT] {self.name} completed in {execution_time:.3f}s")
         action: Action = {
-            "tool": actions[-1] if actions else "No action",
+            "tool": actions if actions else [],
         }
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        success_bool = success[-1] if len(success) > 0 else True
+        success_bool = any(success) if success else True # no success means no actions were taken
         return {
             **state,
-            "step_uuid": state.get("step_uuid", []) + [self.name],
+            "step_name": state.get("step_name", []) + [self.name],
+            "task_prompt": state.get("task_prompt", []) + [instructions],
             "actions": state.get("actions", []) + [action],
             "observations": state.get("observations", []) + [obs],
             "success": state.get("success", []) + [success_bool],

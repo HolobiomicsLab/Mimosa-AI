@@ -5,6 +5,7 @@ This module provides an asynchronous workflow execution engine for Python code.
 import asyncio
 import logging
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -75,12 +76,27 @@ class WorkflowRunner:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
+    async def ensure_pip(self) -> None:
+        """Ensure pip is installed and up-to-date."""
+        import subprocess
+
+        try:
+            subprocess.run(
+                [f"python{self.config.python_version}", "-m", "ensurepip"],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Failed to ensure pip: {e}")
+
     async def install_dependencies(
         self, requirements: list[str] | None = None
     ) -> ExecutionResult:
         """Install dependencies asynchronously."""
+
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
+
+        await self.ensure_pip()
 
         cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
 
@@ -102,11 +118,15 @@ class WorkflowRunner:
     ) -> ExecutionResult:
         """Execute workflow code with full async support and monitoring."""
 
-        execution_id = execution_id or f"exec_{id(code)}"
+        # Generate human-readable execution ID: exec_MMDD_HHMMSS_shortid
+        execution_id = (
+            execution_id or f"exec_{time.strftime('%m%d_%H%M%S')}_{id(code) % 10000}"
+        )
 
         script_path = os.path.join(self.config.temp_dir, f"{execution_id}.py")
         with open(script_path, "w") as f:
             f.write(code)
+        print(f"Executing script: {script_path}")
         cmd = [f"python{self.config.python_version}", str(script_path)]
         return await self._run_command(cmd, execution_id, progress_callback)
 
@@ -126,6 +146,7 @@ class WorkflowRunner:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=1024 * 1024,  # 1MB buffer limit
+                env=dict(os.environ),  # Pass host environment variables
             )
 
             if execution_id:
@@ -223,13 +244,14 @@ class WorkflowRunner:
         """Clean up all resources and running processes."""
         for execution_id in list(self._active_processes.keys()):
             await self._kill_process(execution_id)
-        import shutil
+        # import shutil
 
-        if os.path.exists(self.config.temp_dir):
-            shutil.rmtree(self.config.temp_dir, ignore_errors=True)
+        # if os.path.exists(self.config.temp_dir):
+        #    shutil.rmtree(self.config.temp_dir, ignore_errors=True)
 
 
 async def main():
+    """Example usage of the WorkflowRunner."""
     config = RuntimeConfig(python_version="3.10", timeout=60, max_memory_mb=256)
     runner = WorkflowRunner(config)
     await runner.install_dependencies(["requests", "numpy"])
@@ -241,9 +263,7 @@ print("Hello from the workflow runner!")
         print(f"[PROGRESS] {line}")
 
     result = await runner.execute(code, progress_callback=progress_handler)
-    print(f"Status: {result.status}")
     print(f"Output: {result.stdout}")
-    print(f"Error: {result.stderr}")
     print(f"Execution time: {result.execution_time:.2f}s")
     await runner.cleanup()
 

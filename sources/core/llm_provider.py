@@ -1,77 +1,110 @@
-"""
-This is the LLMProvider class that handles interactions with various LLM APIs.
-"""
-
+import json
 import os
+import time
+from dataclasses import dataclass, field
 
-from openai import OpenAI
+import litellm
+
+
+@dataclass
+class LLMConfig:
+    """Configuration for Large Language Model interactions."""
+
+    model: str = "o3-2025-04-16"
+    provider: str = "openai"
+    temperature: float = 1.0
+    key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.key:
+            raise ValueError(
+                "API key not provided and OPENAI_API_KEY environment variable not set"
+            )
+        self.temperature = float(self.temperature)  # Ensure numeric type
+
+    @classmethod
+    def from_dict(cls, config: dict = None) -> "LLMConfig":
+        """Alternative constructor from dictionary (maintains backward compatibility)."""
+        config = config or {}
+        return cls(
+            model=config.get("model", "o3-2025-04-16"),
+            provider=config.get("provider", "openai"),
+            temperature=config.get("temperature", 1.0),
+            key=config.get("key", os.getenv("OPENAI_API_KEY", "")),
+        )
 
 
 class LLMProvider:
     """Handles interactions with various LLM APIs.
-
     Attributes:
         deepseek_client (OpenAI): Client for Deepseek API
         openai_client (OpenAI): Client for OpenAI API
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        agent_name: str = None,
+        memory_path=None,
+        system_msg: str = None,
+        config: LLMConfig = None,
+    ) -> None:
         """Initialize the LLM provider with API clients."""
-        self.deepseek_client = OpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"), base_url="https://api.deepseek.com"
-        )
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        if not config:
+            config = LLMConfig()
 
-    def deepseek_completion(
-        self, history: list[dict[str, str]], verbose: bool = False
-    ) -> str:
-        """Generate text using Deepseek API.
+        self.config = config
+        self.sys_msg = system_msg
+        self.agent_name = agent_name
+        self.memory_path = memory_path
+        self.max_retries = 3
+
+    def save_call(self, call: dict) -> None:
+        """
+        Save the API call details to a JSON file.
 
         Args:
-            history: Conversation history in OpenAI format
-            verbose: Whether to print the response
-
-        Returns:
-            str: Generated text from Deepseek
-
-        Raises:
-            RuntimeError: If API request fails
+            call: Dictionary containing API call details
+            uuid_str: Unique identifier for the request
         """
-        try:
-            response = self.deepseek_client.chat.completions.create(
-                model="deepseek-reasoner", messages=history, stream=False
-            )
-            thought = response.choices[0].message.content
-            if verbose:
-                print(thought)
-            return thought
-        except Exception as e:
-            raise RuntimeError(f"❌ Deepseek API error: {str(e)}") from e
+        path = os.path.join(self.memory_path, f"{self.agent_name}.json")
+        with open(path, "w") as f:
+            json.dump(call, f, indent=2)
 
-    def openai_completion(
-        self, history: list[dict[str, str]], verbose: bool = False
-    ) -> str:
-        """Generate text using OpenAI API.
+    def __call__(self, prompt: str, timeout: int = 120):
+        message = []
+        if self.sys_msg is not None:
+            message.append({"content": self.sys_msg, "role": "system"})
 
-        Args:
-            history: Conversation history in OpenAI format
-            verbose: Whether to print the response
+        message.append({"role": "user", "content": prompt})
 
-        Returns:
-            str: Generated text from OpenAI
+        for attempt in range(self.max_retries):
+            try:
+                response = litellm.completion(
+                    model=f"{self.config.provider}/{self.config.model}",
+                    messages=message,
+                    temperature=self.config.temperature,
+                    timeout=timeout,
+                )
+                break
+            except TimeoutError:
+                print(f"⌛ Timeout on attempt {attempt + 1}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(0.1)  # Small delay before retry
+                    continue
+                raise RuntimeError(f"❌ LLM Tiemout {self.max_retries} times") from None
+            except Exception as e:
+                raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
-        Raises:
-            RuntimeError: If API request fails
-        """
-        try:
-            response = self.openai_client.chat.completions.create(
-                model="o3-2025-04-16", messages=history
-            )
-            if response is None:
-                raise RuntimeError("❌ OpenAI response is empty")
-            thought = response.choices[0].message.content
-            if verbose:
-                print(thought)
-            return thought
-        except Exception as e:
-            raise RuntimeError(f"❌ OpenAI API error: {str(e)}") from e
+        res = response.choices[0].message.content
+
+        json_res = {
+            **response.json(),
+            "response": res,
+            "message": message,
+            "temperature": self.config.temperature,
+        }
+        if self.memory_path and self.agent_name:
+            self.save_call(json_res)
+
+        return res
