@@ -1,4 +1,3 @@
-
 """
 This class manages the discovery and interaction with MCP tools.
 """
@@ -49,13 +48,19 @@ class ToolManager:
                     tools = await client.list_tools()
                     name = None
                     try:
-                        name = await client.call_tool("get_mcp_name", {})
+                        resp = await client.call_tool("get_mcp_name", {})
+                        if "content" in resp and resp.content:
+                            name = resp.content[0].text
+                        else:  # fallback because it randomly change ????
+                            name = resp[0].text if resp else None
                     except Exception as e:
                         print(
                             f"⚠️ Failed to get name for MCP server on port {port}: {e}"
                         )
+                        name = f"mcp_{port}"
+                    assert name, "MCP name must be set"
                     if tools:
-                        print(f"✅ Found MCP server on port {port}")
+                        print(f"✅ Found MCP server on port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
                         mcps.append(
                             MCP(
@@ -73,7 +78,8 @@ class ToolManager:
 
         if not found_servers:
             print(
-                f"❌ No MCP servers found on ports {port_min}-{port_max}. Please ensure at least one server is running."
+                f"❌ No MCP servers found on ports {port_min}-{port_max}. \
+                Please ensure toolomics MCPs server is running."
             )
             raise RuntimeError(
                 "No MCP servers found. Please start Toolomics MCP server."
@@ -91,20 +97,20 @@ class ToolManager:
                 if mcps:
                     print(f"✅ Found {len(mcps)} MCP server(s) at {addr.ip}.")
                     return mcps
-            except Exception as _:
+            except Exception as e:
                 raise ValueError(
-                    f"❌ Error discovering MCP servers at {addr.ip}, no MCP servers found."
-                )
+                    f"❌ Error discovering MCP servers at {addr.ip}, no MCPs found."
+                ) from e
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
-        name = mcp.name if mcp.name else "Unknown"
-        name = mcp.name[0].text if mcp.name else "Unknown"
+        name = mcp.name
         name = name.replace(" ", "_").upper()
         return name + "_TOOLS"
 
     def get_client_prompt(self, mcp: MCP) -> str:
         """Generate a prompt for the MCP client."""
+        assert isinstance(mcp, MCP), "Expected MCP instance"
         if not mcp.address or not mcp.port:
             raise ValueError("MCP address and port must be set.")
         if not mcp.tools:

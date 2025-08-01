@@ -1,1 +1,0 @@
-search the research paper titled Measurement and prediction of small molecule retention by Gram-negative bacteria based on a large-scale LC/MS screen. Then proceed to extract and install all the software used in the paper

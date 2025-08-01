@@ -14,14 +14,14 @@
 #### Step 1: Environment Setup
 
 **Option A: Using pip**
-```bash
+```sh
 # Create and activate virtual environment
 python3 -m venv .venv
 source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
 ```
 
 **Option B: Using uv (faster alternative)**
-```bash
+```sh
 # Install uv if not already installed
 pip install uv
 
@@ -38,17 +38,17 @@ Configure your `.env` file with the following API keys:
 #### Step 2: Install Dependencies
 
 First go into the `mimosa` folder
-```bash
+```sh
 cd mimosa
 ```
 
 **Using pip:**
-```bash
+```sh
 pip3 install -r requirements.txt
 ```
 
 **Using uv (faster):**
-```bash
+```sh
 uv pip install -r requirements.txt
 ```
 
@@ -57,25 +57,97 @@ Launch the toolomics MCP server following the instructions at [HolobiomicsLab/to
 
 #### Step 4: Run Mimosa-AI
 
-```bash
-python3 main.py --goal "Your objective here"
+```sh
+python3 main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
 # or
-uv run main.py --goal "Your objective here"
+uv run main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
 
-### Usage Options
+## 🛠️ Command Line Arguments
 
-- `--goal GOAL`: Required. Specify your research objective or scientific question
-- `--load_template TEMPLATE_UUID`: Optional. Load a predefined workflow template from workflows folder
+Mimosa-AI supports various command line arguments to customize execution:
+
+### Execution Modes
+- `--goal GOAL`: Specify your research objective or scientific question (planner mode)
+- `--task TASK`: Run a single task without planning (direct execution mode)
+- `--multi_goal`: Run in multi-goal mode for fast manual evaluation, prompts for multiple goals and spawns parallel threads with score evolution display
+- `--dataset DATASET_FOLDER`: Evaluate Mimosa on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
+
+### Evaluation & Performance
+- `--load_template TEMPLATE_UUID`: Optional. Instead of generating workflow, use  a predefined workflow template from workflows folder (only for `--task` mode)
+- `--judge`: Enable judge for workflow evaluation (default: disabled)
+- `--max_concurrent N`: Maximum number of concurrent tasks, only for `--multi_goal` and `--dataset` mode. (default: 16)
+- `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
+- `--max_dgm_iterations N`: Maximum number of DGM retry for a task (default: 3)
 
 **Example:**
-```bash
-python3 main.py --goal "search and install llama.cpp for this OS architecture" --load_template 64a644cf1ef449a684a8a369e47387e2
+
+Normal usage, try to accomplish a goal.
+```sh
+uv run main.py --goal "Search the paper Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results, read and install all the required software of code required to reproduce the experiments"
+```
+
+Single task mode, no long-term planning.
+```sh
+ uv run main.py --task "search and install llama.cpp for this OS architecture" --judge 
+```
+
+Dataset evaluation on GSMK8.
+```sh
+ uv run main.py --dataset datasets/GSMK8.jsonl --num_samples 16 --max_concurrent 4
+```
+
+Multi-goal, enter a series of goal to run in parrallel.
+```sh
+ uv run main.py --multi_goal --judge
 ```
 
 **`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
+
+## Use Caching system
+
+You'll need to open 2 terminal.
+
+### First terminal 
+
+1. **Create a config.yaml file in cached_server**
+
+```sh
+server:
+  port: 6767
+  storage_path: "./cache"
+  cache_enabled: true
+
+providers:
+  - name: "deepseek"
+    base_url: "https://api.deepseek.com"
+    api_key: "xxxxxxxx"
+    weight: 1
+```
+
+2. **Start the cached server**
+
+```sh
+go run main.go
+```
+
+### Second terminal 
+
+First export this:
+
+```sh
+export USE_CACHED_ENGINE="true"
+```
+
+Then run *Mimosa* as usual.
+
+```sh
+python3 main.py --goal "<goal>" --load_template <optional existing workflow uuid>
+```
+
+
 
 ## 📈 Telemetry Setup
 
@@ -84,7 +156,7 @@ Monitor and debug your AI agents with real-time observability dashboards.
 ### Quick Start
 
 1. **Deploy Langfuse locally**:
-    ```bash
+    ```sh
     git clone https://github.com/langfuse/langfuse.git
     cd langfuse
     docker compose up -d

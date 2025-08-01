@@ -9,8 +9,12 @@ cookies.json
 .env.*
 */.env
 workflows/*
-sources/tmp/
-sources/memory/
+parallel_testing_results/
+cached_server/cache/*
+sources/cache/*
+cached_server/config.yaml
+sources/tmp/*
+sources/memory/*
 sources/workflows/
 mimosa-env/*
 
@@ -202,6 +206,9 @@ cython_debug/
 .pypirc
 .aider*
 
+sources/workflows/*
+sources/memory/*
+tmp/*
 # Ruff stuff:
 .ruff_cache/
 
@@ -213,3 +220,7 @@ memory/
 tmp/
 ./config.py
 CLAUDE.md
+docs/project.xml
+
+sources/cache
+tests/browser.py

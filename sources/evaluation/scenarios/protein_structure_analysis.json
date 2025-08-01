@@ -1,0 +1,55 @@
+{
+  "id": "protein_structure_analysis",
+  "goal": "Download protein structure 1A2B from PDB, analyze its binding sites, and create a 3D visualization showing active sites and secondary structure",
+  "assertions": [
+    {
+      "id": "1",
+      "description": "User received information about protein 1A2B function and properties",
+      "evaluation_criteria": "Workflow output contains protein description, molecular weight, and biological function"
+    },
+    {
+      "id": "2", 
+      "description": "User received 3D visualization of the protein structure",
+      "evaluation_criteria": "Generated image/plot file shows protein backbone and secondary structures"
+    },
+    {
+      "id": "3",
+      "description": "User was informed about identified binding sites and their coordinates",
+      "evaluation_criteria": "Output includes specific amino acid residues and spatial coordinates of active sites"
+    },
+    {
+      "id": "4",
+      "description": "Results were presented in an understandable format for research use",
+      "evaluation_criteria": "Final summary is structured with clear sections and scientific terminology"
+    },
+    {
+      "id": "5",
+      "description": "Browser MCP was used to access PDB database before downloading",
+      "evaluation_criteria": "Browser MCP tool called with PDB URL (rcsb.org) in conversation history"
+    },
+    {
+      "id": "6",
+      "description": "File download was completed successfully via Browser MCP", 
+      "evaluation_criteria": "download_file() tool executed and PDB file saved to workspace"
+    },
+    {
+      "id": "7",
+      "description": "Python script execution for structure analysis occurred",
+      "evaluation_criteria": "Shell MCP or R Script MCP executed code containing structure parsing libraries"
+    },
+    {
+      "id": "8",
+      "description": "Data was validated before analysis",
+      "evaluation_criteria": "Workflow included file format verification or structure integrity checks"
+    },
+    {
+      "id": "9",
+      "description": "Proper error handling for missing or invalid data",
+      "evaluation_criteria": "Agents handled potential failures (network issues, file corruption) gracefully"
+    }
+  ],
+  "optional": {
+    "required_tools": ["browser_mcp", "shell_mcp"],
+    "judge_model": "gpt-4o"
+  }
+}
