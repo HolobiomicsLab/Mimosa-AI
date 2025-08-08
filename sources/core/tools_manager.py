@@ -3,6 +3,10 @@ This class manages the discovery and interaction with MCP tools.
 """
 
 import asyncio
+import json
+import subprocess
+import re
+from typing import Optional, Dict, Any
 
 from fastmcp import Client
 
@@ -14,11 +18,19 @@ class MCP:
         tools: list[str] = None,
         address: str | None = None,
         port: int | None = None,
+        toolhive_name: str | None = None,
+        transport: str = "streamable-http",
+        discovery_url: str | None = None,
+        client_url: str | None = None,
     ):
         self.name = name
         self.tools = tools if tools is not None else []
         self.address = address
         self.port = port
+        self.toolhive_name = toolhive_name  # Store toolhive server name for management
+        self.transport = transport  # Transport type: streamable-http, sse, stdio
+        self.discovery_url = discovery_url  # URL used for discovery/testing
+        self.client_url = client_url  # URL used for client connections
 
 
 class ToolManager:
@@ -27,6 +39,112 @@ class ToolManager:
     def __init__(self, config, mcps: list[MCP] | None = None):
         self.discovery_address = config.discovery_addresses
         self.mcps = mcps if mcps is not None else []
+        self.use_toolhive = self._check_toolhive_available()
+        
+    def _check_toolhive_available(self) -> bool:
+        """Check if ToolHive is available on the system."""
+        try:
+            result = subprocess.run(['thv', 'version'], 
+                                  capture_output=True, text=True, timeout=5)
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+            return False
+    
+    async def discover_toolhive_servers(self) -> list[MCP]:
+        """Discover all MCP servers running via ToolHive."""
+        try:
+            # Get list of running servers from ToolHive
+            result = subprocess.run(['thv', 'list', '--format', 'json'], 
+                                  capture_output=True, text=True, timeout=10)
+            
+            if result.returncode != 0:
+                print(f"❌ Failed to get ToolHive server list: {result.stderr}")
+                return []
+            
+            # Parse JSON output
+            servers_data = json.loads(result.stdout)
+            mcps = []
+            
+            for server in servers_data:
+                name = server.get('name', '')
+                status = server.get('status', '')
+                
+                if status != 'running':
+                    print(f"⚠️ ToolHive server {name} is not running (status: {status})")
+                    continue
+                
+                # Extract connection info
+                url = server.get('url', '')
+                if not url:
+                    print(f"⚠️ No URL found for ToolHive server {name}")
+                    continue
+                
+                # Parse URL to extract address and port
+                # URL format: http://address:port/sse#server-name
+                import urllib.parse
+                parsed = urllib.parse.urlparse(url)
+                address = parsed.hostname or 'localhost'
+                port = parsed.port
+                
+                if not port:
+                    print(f"⚠️ Could not extract port from URL {url} for server {name}")
+                    continue
+                
+                # For ToolHive SSE servers, we need to use the SSE endpoint for MCP communication
+                # The url already contains the SSE endpoint
+                sse_url = f"http://{address}:{port}/sse"
+                
+                # Try to connect and get tools
+                try:
+                    async with Client(sse_url, timeout=5.0) as client:
+                        tools = await client.list_tools()
+                        
+                        # Get server name
+                        server_name = None
+                        try:
+                            resp = await client.call_tool("get_mcp_name", {})
+                            if "content" in resp and resp.content:
+                                server_name = resp.content[0].text
+                            else:
+                                server_name = resp[0].text if resp else None
+                        except Exception as e:
+                            print(f"⚠️ Failed to get name for server {name}: {e}")
+                            # Fallback to a readable name based on toolhive server name
+                            server_name = name.replace('-', ' ').title() + ' MCP'
+                        
+                        if tools:
+                            print(f"✅ Found ToolHive MCP server {name} ({server_name})")
+                            print(f"📋 Available tools: {[tool.name for tool in tools]}")
+                            
+                            # For ToolHive servers, both discovery and client use the SSE endpoint
+                            mcps.append(
+                                MCP(
+                                    name=server_name,
+                                    tools=[tool.name for tool in tools],
+                                    address=address,
+                                    port=port,
+                                    toolhive_name=name,
+                                    transport="sse",  # ToolHive uses SSE transport
+                                    discovery_url=sse_url,  # /sse for discovery
+                                    client_url=sse_url  # /sse for client connections
+                                )
+                            )
+                
+                except Exception as e:
+                    print(f"❌ Failed to connect to ToolHive server {name} at {url}: {e}")
+                    continue
+            
+            return mcps
+            
+        except subprocess.TimeoutExpired:
+            print("❌ ToolHive command timed out")
+            return []
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse ToolHive JSON output: {e}")
+            return []
+        except Exception as e:
+            print(f"❌ Error discovering ToolHive servers: {e}")
+            return []
 
     async def discover_mcp_at_address(
         self,
@@ -62,12 +180,19 @@ class ToolManager:
                     if tools:
                         print(f"✅ Found MCP server on port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
+                        
+                        # Original servers use streamable-http with /mcp endpoint
+                        mcp_endpoint = f"http://{address}:{port}/mcp"
+                        
                         mcps.append(
                             MCP(
                                 name=name,
                                 tools=[tool.name for tool in tools],
                                 address=address,
                                 port=port,
+                                transport="streamable-http",  # Original transport
+                                discovery_url=mcp_endpoint,  # /mcp for discovery
+                                client_url=mcp_endpoint  # /mcp for client too
                             )
                         )
             except asyncio.TimeoutError:
@@ -81,26 +206,31 @@ class ToolManager:
                 f"❌ No MCP servers found on ports {port_min}-{port_max}. \
                 Please ensure toolomics MCPs server is running."
             )
+            toolhive_hint = " Or start with ToolHive: ./start-toolhive.sh" if self.use_toolhive else ""
             raise RuntimeError(
-                "No MCP servers found. Please start Toolomics MCP server."
+                f"No MCP servers found. Please start Toolomics MCP server.{toolhive_hint}"
             )
         self.mcps.extend(mcps)
         return mcps
 
     async def discover_mcp_servers(self, timeout: float = 2.0) -> list[MCP]:
-        for addr in self.discovery_address:
-            print(f"🔍 Discovering MCP servers at {addr.ip}...")
-            try:
-                mcps = await self.discover_mcp_at_address(
-                    addr.ip, addr.port_min, addr.port_max, timeout
-                )
-                if mcps:
-                    print(f"✅ Found {len(mcps)} MCP server(s) at {addr.ip}.")
-                    return mcps
-            except Exception as e:
-                raise ValueError(
-                    f"❌ Error discovering MCP servers at {addr.ip}, no MCPs found."
-                ) from e
+        # ToolHive-only discovery
+        if not self.use_toolhive:
+            raise RuntimeError("ToolHive is required. Please install ToolHive: curl -sSL https://get.toolhive.dev | sh")
+        
+        print("🔍 Discovering MCP servers via ToolHive...")
+        try:
+            mcps = await self.discover_toolhive_servers()
+            if mcps:
+                print(f"✅ Found {len(mcps)} MCP server(s) via ToolHive.")
+                self.mcps.extend(mcps)
+                return mcps
+            else:
+                print("⚠️ No running MCP servers found via ToolHive.")
+                return []
+        except Exception as e:
+            print(f"❌ ToolHive discovery failed: {e}")
+            raise RuntimeError(f"Failed to discover MCP servers via ToolHive: {e}") from e
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
@@ -123,14 +253,35 @@ class ToolManager:
         """
 
     def get_client_code(self, mcp: MCP) -> str:
-        """Generate client code for a specific MCP server."""
+        """Generate transport-aware client code for a specific MCP server."""
         if not mcp.address or not mcp.port:
             raise ValueError("MCP address and port must be set.")
         if not mcp.tools:
             raise ValueError("MCP tools list cannot be empty.")
-        api_url = f"http://{mcp.address}:{mcp.port}/mcp"
+        
+        # Use client_url if available, otherwise fallback to discovery_url or construct one
+        if mcp.client_url:
+            api_url = mcp.client_url
+        elif mcp.discovery_url:
+            api_url = mcp.discovery_url
+        else:
+            # Fallback for backward compatibility
+            api_url = f"http://{mcp.address}:{mcp.port}/mcp"
+        
         name = self._get_client_variable_name(mcp)
-        return f'''
+        transport = mcp.transport
+        
+        # Generate transport-specific client code
+        if transport == "sse":
+            return f'''
+from smolagents import MCPClient
+params = {{"url": "{api_url}", "transport": "sse"}}
+client = MCPClient(params)
+tools = client.get_tools()
+{name} = tools
+'''
+        else:  # streamable-http (default/fallback)
+            return f'''
 from smolagents import MCPClient
 params = {{"url": "{api_url}", "transport": "streamable-http"}}
 client = MCPClient(params)
