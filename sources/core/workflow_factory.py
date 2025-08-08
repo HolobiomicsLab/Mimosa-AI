@@ -129,6 +129,14 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         workflow_code = self.remove_imports(workflow_code)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
+        
+        # Validate syntax before returning
+        try:
+            compile(workflow_code, '<workflow>', 'exec')
+        except SyntaxError as e:
+            self.logger.error(f"Generated workflow has syntax error: {e}")
+            raise ValueError(f"LLM generated invalid Python syntax: {e}")
+        
         self.logger.info("LLM generated workflow code successfully")
         return workflow_code
 
@@ -277,13 +285,23 @@ if WORKFLOW_PATH:
             state_code = f.read()
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
-        workflow_code = (
-            template_workflow
-            if template_workflow
-            else self.create_workflow_code(
-                goal_prompt, existing_tool_prompt, memory_path
-            )
-        )
+        # Generate workflow code with retry on syntax errors
+        if template_workflow:
+            workflow_code = template_workflow
+        else:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    workflow_code = self.create_workflow_code(
+                        goal_prompt, existing_tool_prompt, memory_path
+                    )
+                    break
+                except ValueError as e:
+                    if "syntax" in str(e).lower() and attempt < max_retries - 1:
+                        self.logger.warning(f"Syntax error in generated code (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    else:
+                        raise e
         if workflow_code is None or workflow_code.strip() == "":
             self.logger.warning(
                 f"Generated workflow is empty or invalid: {workflow_code[:100]}..."
