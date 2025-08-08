@@ -106,7 +106,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
         return "\n".join(
-            line for line in lines if not line.strip().startswith("import ")
+            line for line in lines 
+            if not (line.strip().startswith("import ") or line.strip().startswith("from "))
         )
 
     def create_workflow_code(
