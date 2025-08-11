@@ -5,10 +5,70 @@ This class manages the discovery and interaction with MCP tools.
 import asyncio
 import json
 import subprocess
-import re
-from typing import Optional, Dict, Any
+from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from fastmcp import Client
+from smolagents import MCPClient
+
+
+def normalize_mcp_endpoint(
+    raw_url: str, transport: str
+) -> tuple[str, str, dict[str, Any]]:
+    """
+    Normalize MCP endpoint URL and transport for consistent client usage.
+
+    Returns (url, transport, extra_params)
+    - Strips URL fragments (not sent over HTTP)
+    - Forces /mcp/ endpoint path for streamable-http
+    - Raises error for deprecated SSE transport
+
+    Args:
+        raw_url: Raw URL from ToolHive (may include fragment)
+        transport: Transport type (streamable-http/http only)
+
+    Returns:
+        Tuple of (normalized_url, normalized_transport, extras_dict)
+    
+    Raises:
+        ValueError: If SSE transport is used (deprecated)
+    """
+    extras = {}
+
+    parsed = urlparse(raw_url)
+    # Capture fragment (container name) if present
+    container = parsed.fragment if parsed.fragment else None
+
+    # Strip fragment (HTTP clients won't send it anyway)
+    parsed = parsed._replace(fragment="")
+
+    # Normalize transport string
+    t = transport.lower().strip()
+    if t in ("stdio", "sse"):
+        raise ValueError(f"SSE transport is deprecated and no longer supported. Please use 'streamable-http' transport instead.")
+    elif t in ("http", "streamable-http", "streamable"):
+        t = "streamable-http"  # Use full name for Smolagents compatibility
+        # Force /mcp/ path (note the trailing slash is important for FastMCP)
+        path = parsed.path.rstrip("/")
+        if not path.endswith("/mcp"):
+            path = f"{path}/mcp" if path else "/mcp"
+        # Add trailing slash for FastMCP compatibility
+        path = f"{path}/"
+        parsed = parsed._replace(path=path)
+    else:
+        raise ValueError(f"Unsupported transport: {transport}. Only 'streamable-http' is supported.")
+
+    url = urlunparse(parsed)
+
+    # Store container hint for logging/debugging
+    if container:
+        extras["container_hint"] = container
+        print(
+            f"⚠️ ToolHive container fragment '{container}' detected but fragments are not sent over HTTP. "
+            f"Container selection may be ignored unless handled by the MCP server."
+        )
+
+    return url, t, extras
 
 
 class MCP:
@@ -40,65 +100,80 @@ class ToolManager:
         self.discovery_address = config.discovery_addresses
         self.mcps = mcps if mcps is not None else []
         self.use_toolhive = self._check_toolhive_available()
-        
+
     def _check_toolhive_available(self) -> bool:
         """Check if ToolHive is available on the system."""
         try:
-            result = subprocess.run(['thv', 'version'], 
-                                  capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["thv", "version"], capture_output=True, text=True, timeout=5
+            )
             return result.returncode == 0
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+        ):
             return False
-    
+
     async def discover_toolhive_servers(self) -> list[MCP]:
         """Discover all MCP servers running via ToolHive."""
         try:
             # Get list of running servers from ToolHive
-            result = subprocess.run(['thv', 'list', '--format', 'json'], 
-                                  capture_output=True, text=True, timeout=10)
-            
+            result = subprocess.run(
+                ["thv", "list", "--format", "json"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
             if result.returncode != 0:
                 print(f"❌ Failed to get ToolHive server list: {result.stderr}")
                 return []
-            
+
             # Parse JSON output
             servers_data = json.loads(result.stdout)
             mcps = []
-            
+
             for server in servers_data:
-                name = server.get('name', '')
-                status = server.get('status', '')
-                
-                if status != 'running':
+                name = server.get("name", "")
+                status = server.get("status", "")
+
+                if status != "running":
                     print(f"⚠️ ToolHive server {name} is not running (status: {status})")
                     continue
-                
+
                 # Extract connection info
-                url = server.get('url', '')
+                url = server.get("url", "")
                 if not url:
                     print(f"⚠️ No URL found for ToolHive server {name}")
                     continue
-                
+
                 # Parse URL to extract address and port
                 # URL format: http://address:port/sse#server-name
                 import urllib.parse
+
                 parsed = urllib.parse.urlparse(url)
-                address = parsed.hostname or 'localhost'
+                address = parsed.hostname or "localhost"
                 port = parsed.port
-                
+
                 if not port:
                     print(f"⚠️ Could not extract port from URL {url} for server {name}")
                     continue
+
+                # For ToolHive servers, normalize URL for streamable-http transport
+                # The url from ToolHive may contain fragments, normalize it for consistent client usage
+                raw_url = url  # Use the full URL from ToolHive (includes fragment if present)
                 
-                # For ToolHive SSE servers, we need to use the SSE endpoint for MCP communication
-                # The url already contains the SSE endpoint
-                sse_url = f"http://{address}:{port}/sse"
-                
-                # Try to connect and get tools
+                # Always use streamable-http transport (SSE is deprecated)
+                normalized_url, normalized_transport, extras = normalize_mcp_endpoint(
+                    raw_url, "streamable-http"
+                )
+
+                # Try to connect and get tools using normalized URL
                 try:
-                    async with Client(sse_url, timeout=5.0) as client:
+                    async with Client(normalized_url, timeout=5.0) as client:
                         tools = await client.list_tools()
-                        
+
                         # Get server name
                         server_name = None
                         try:
@@ -110,13 +185,19 @@ class ToolManager:
                         except Exception as e:
                             print(f"⚠️ Failed to get name for server {name}: {e}")
                             # Fallback to a readable name based on toolhive server name
-                            server_name = name.replace('-', ' ').title() + ' MCP'
-                        
+                            server_name = name.replace("-", " ").title() + " MCP"
+
                         if tools:
-                            print(f"✅ Found ToolHive MCP server {name} ({server_name})")
-                            print(f"📋 Available tools: {[tool.name for tool in tools]}")
-                            
-                            # For ToolHive servers, both discovery and client use the SSE endpoint
+                            print(
+                                f"✅ Found ToolHive MCP server {name} ({server_name})"
+                            )
+                            print(
+                                f"📋 Available tools: {[tool.name for tool in tools]}"
+                            )
+                            if extras.get("container_hint"):
+                                print(f"🏷️ Container: {extras['container_hint']}")
+
+                            # For ToolHive servers, store normalized URLs for consistent client usage
                             mcps.append(
                                 MCP(
                                     name=server_name,
@@ -124,18 +205,20 @@ class ToolManager:
                                     address=address,
                                     port=port,
                                     toolhive_name=name,
-                                    transport="sse",  # ToolHive uses SSE transport
-                                    discovery_url=sse_url,  # /sse for discovery
-                                    client_url=sse_url  # /sse for client connections
+                                    transport=normalized_transport,  # Normalized transport
+                                    discovery_url=normalized_url,  # Normalized URL for discovery
+                                    client_url=normalized_url,  # Normalized URL for client connections
                                 )
                             )
-                
+
                 except Exception as e:
-                    print(f"❌ Failed to connect to ToolHive server {name} at {url}: {e}")
+                    print(
+                        f"❌ Failed to connect to ToolHive server {name} at {url}: {e}"
+                    )
                     continue
-            
+
             return mcps
-            
+
         except subprocess.TimeoutExpired:
             print("❌ ToolHive command timed out")
             return []
@@ -159,9 +242,13 @@ class ToolManager:
 
         for port in range(port_min, port_max + 1):
             try:
-                async with Client(
-                    f"http://{address}:{port}/mcp", timeout=3.0
-                ) as client:
+                # Try MCP endpoint with streamable-http transport
+                raw_mcp_url = f"http://{address}:{port}"
+                normalized_url, normalized_transport, extras = normalize_mcp_endpoint(
+                    raw_mcp_url, "streamable-http"
+                )
+
+                async with Client(normalized_url, timeout=3.0) as client:
                     found_servers = True
                     tools = await client.list_tools()
                     name = None
@@ -180,19 +267,16 @@ class ToolManager:
                     if tools:
                         print(f"✅ Found MCP server on port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
-                        
-                        # Original servers use streamable-http with /mcp endpoint
-                        mcp_endpoint = f"http://{address}:{port}/mcp"
-                        
+
                         mcps.append(
                             MCP(
                                 name=name,
                                 tools=[tool.name for tool in tools],
                                 address=address,
                                 port=port,
-                                transport="streamable-http",  # Original transport
-                                discovery_url=mcp_endpoint,  # /mcp for discovery
-                                client_url=mcp_endpoint  # /mcp for client too
+                                transport=normalized_transport,  # Normalized transport
+                                discovery_url=normalized_url,  # Normalized URL for discovery
+                                client_url=normalized_url,  # Normalized URL for client connections
                             )
                         )
             except asyncio.TimeoutError:
@@ -206,7 +290,11 @@ class ToolManager:
                 f"❌ No MCP servers found on ports {port_min}-{port_max}. \
                 Please ensure toolomics MCPs server is running."
             )
-            toolhive_hint = " Or start with ToolHive: ./start-toolhive.sh" if self.use_toolhive else ""
+            toolhive_hint = (
+                " Or start with ToolHive: ./start-toolhive.sh"
+                if self.use_toolhive
+                else ""
+            )
             raise RuntimeError(
                 f"No MCP servers found. Please start Toolomics MCP server.{toolhive_hint}"
             )
@@ -216,8 +304,10 @@ class ToolManager:
     async def discover_mcp_servers(self, timeout: float = 2.0) -> list[MCP]:
         # ToolHive-only discovery
         if not self.use_toolhive:
-            raise RuntimeError("ToolHive is required. Please install ToolHive: curl -sSL https://get.toolhive.dev | sh")
-        
+            raise RuntimeError(
+                "ToolHive is required. Please install ToolHive: curl -sSL https://get.toolhive.dev | sh"
+            )
+
         print("🔍 Discovering MCP servers via ToolHive...")
         try:
             mcps = await self.discover_toolhive_servers()
@@ -230,7 +320,9 @@ class ToolManager:
                 return []
         except Exception as e:
             print(f"❌ ToolHive discovery failed: {e}")
-            raise RuntimeError(f"Failed to discover MCP servers via ToolHive: {e}") from e
+            raise RuntimeError(
+                f"Failed to discover MCP servers via ToolHive: {e}"
+            ) from e
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
         """Generate a variable name for the MCP client based on its name."""
@@ -258,7 +350,7 @@ class ToolManager:
             raise ValueError("MCP address and port must be set.")
         if not mcp.tools:
             raise ValueError("MCP tools list cannot be empty.")
-        
+
         # Use client_url if available, otherwise fallback to discovery_url or construct one
         if mcp.client_url:
             api_url = mcp.client_url
@@ -267,23 +359,15 @@ class ToolManager:
         else:
             # Fallback for backward compatibility
             api_url = f"http://{mcp.address}:{mcp.port}/mcp"
-        
+
         name = self._get_client_variable_name(mcp)
         transport = mcp.transport
-        
-        # Generate transport-specific client code
-        if transport == "sse":
-            return f'''
+
+        # Generate transport-specific client code with normalized transport
+        # Both sse and streamable-http should work with normalized URLs/transports
+        return f'''
 from smolagents import MCPClient
-params = {{"url": "{api_url}", "transport": "sse"}}
-client = MCPClient(params)
-tools = client.get_tools()
-{name} = tools
-'''
-        else:  # streamable-http (default/fallback)
-            return f'''
-from smolagents import MCPClient
-params = {{"url": "{api_url}", "transport": "streamable-http"}}
+params = {{"url": "{api_url}", "transport": "{transport}"}}
 client = MCPClient(params)
 tools = client.get_tools()
 {name} = tools
