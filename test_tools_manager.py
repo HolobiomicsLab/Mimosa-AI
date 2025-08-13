@@ -24,23 +24,31 @@ def test_normalize_endpoint():
     """Test the normalize_mcp_endpoint function"""
     print("Testing normalize_mcp_endpoint function...")
     
-    # Test streamable-http normalization
+    # Test streamable-http normalization - adds /mcp when missing
     url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002", "streamable-http")
     print(f"✅ streamable-http: {url} (transport: {transport})")
-    assert url == "http://127.0.0.1:5002/mcp/", f"Expected /mcp/ endpoint, got {url}"
+    assert url == "http://127.0.0.1:5002/mcp", f"Expected /mcp endpoint, got {url}"
     
     # Test http alias
     url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002", "http")
     print(f"✅ http alias: {url} (transport: {transport})")
-    assert url == "http://127.0.0.1:5002/mcp/", f"Expected /mcp/ endpoint, got {url}"
+    assert url == "http://127.0.0.1:5002/mcp", f"Expected /mcp endpoint, got {url}"
     
-    # Test SSE normalization - should raise error as SSE is deprecated
-    try:
-        url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002", "sse")
-        print(f"❌ sse: Should have raised ValueError but got {url} (transport: {transport})")
-        assert False, "SSE transport should raise ValueError"
-    except ValueError as e:
-        print(f"✅ sse correctly raises error: {e}")
+    # Test preserving existing /mcp path (no trailing slash)
+    url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002/mcp", "streamable-http")
+    print(f"✅ preserve /mcp: {url} (transport: {transport})")
+    assert url == "http://127.0.0.1:5002/mcp", f"Expected preserved /mcp endpoint, got {url}"
+    
+    # Test preserving existing /mcp/ path (with trailing slash)
+    url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002/mcp/", "streamable-http")
+    print(f"✅ preserve /mcp/: {url} (transport: {transport})")
+    assert url == "http://127.0.0.1:5002/mcp/", f"Expected preserved /mcp/ endpoint, got {url}"
+    
+    # Test SSE normalization - should now be supported
+    url, transport, extras = normalize_mcp_endpoint("http://127.0.0.1:5002/sse#server", "sse")
+    print(f"✅ sse: {url} (transport: {transport})")
+    assert transport == "sse", f"Expected sse transport, got {transport}"
+    assert url == "http://127.0.0.1:5002/sse", f"Expected /sse endpoint preserved, got {url}"
     
     print("✅ All normalize_mcp_endpoint tests passed!\n")
 

@@ -20,18 +20,18 @@ def normalize_mcp_endpoint(
 
     Returns (url, transport, extra_params)
     - Strips URL fragments (not sent over HTTP)
-    - Forces /mcp/ endpoint path for streamable-http
-    - Raises error for deprecated SSE transport
+    - Forces /mcp/ endpoint path for streamable-http servers
+    - Preserves /sse endpoint path for SSE servers
 
     Args:
         raw_url: Raw URL from ToolHive (may include fragment)
-        transport: Transport type (streamable-http/http only)
+        transport: Transport type (sse, streamable-http)
 
     Returns:
         Tuple of (normalized_url, normalized_transport, extras_dict)
     
     Raises:
-        ValueError: If SSE transport is used (deprecated)
+        ValueError: If transport type is unsupported
     """
     extras = {}
 
@@ -45,18 +45,20 @@ def normalize_mcp_endpoint(
     # Normalize transport string
     t = transport.lower().strip()
     if t in ("stdio", "sse"):
-        raise ValueError(f"SSE transport is deprecated and no longer supported. Please use 'streamable-http' transport instead.")
+        t = "sse"  # Keep SSE transport for ToolHive default servers
+        # For SSE servers, keep original path (/sse) - don't force /mcp
+        # SSE servers from ToolHive use /sse endpoint, not /mcp
     elif t in ("http", "streamable-http", "streamable"):
         t = "streamable-http"  # Use full name for Smolagents compatibility
-        # Force /mcp/ path (note the trailing slash is important for FastMCP)
-        path = parsed.path.rstrip("/")
-        if not path.endswith("/mcp"):
-            path = f"{path}/mcp" if path else "/mcp"
-        # Add trailing slash for FastMCP compatibility
-        path = f"{path}/"
-        parsed = parsed._replace(path=path)
+        # Ensure /mcp path exists, but preserve original trailing slash preference
+        if not parsed.path.endswith("/mcp") and not parsed.path.endswith("/mcp/"):
+            # Only add /mcp if it's missing entirely
+            base_path = parsed.path.rstrip("/")
+            path = f"{base_path}/mcp" if base_path else "/mcp"
+            parsed = parsed._replace(path=path)
+        # Otherwise, keep the original path as-is (including trailing slash preference)
     else:
-        raise ValueError(f"Unsupported transport: {transport}. Only 'streamable-http' is supported.")
+        raise ValueError(f"Unsupported transport: {transport}. Supported transports: 'sse', 'streamable-http'")
 
     url = urlunparse(parsed)
 
@@ -160,13 +162,22 @@ class ToolManager:
                     print(f"⚠️ Could not extract port from URL {url} for server {name}")
                     continue
 
-                # For ToolHive servers, normalize URL for streamable-http transport
+                # For ToolHive servers, auto-detect transport from URL path
                 # The url from ToolHive may contain fragments, normalize it for consistent client usage
                 raw_url = url  # Use the full URL from ToolHive (includes fragment if present)
                 
-                # Always use streamable-http transport (SSE is deprecated)
+                # Auto-detect transport type from URL path
+                parsed_url = urllib.parse.urlparse(raw_url)
+                if "/sse" in parsed_url.path:
+                    detected_transport = "sse"
+                elif "/mcp" in parsed_url.path:
+                    detected_transport = "streamable-http"
+                else:
+                    # Default based on URL pattern - if has fragment, likely SSE
+                    detected_transport = "sse" if parsed_url.fragment else "streamable-http"
+                
                 normalized_url, normalized_transport, extras = normalize_mcp_endpoint(
-                    raw_url, "streamable-http"
+                    raw_url, detected_transport
                 )
 
                 # Try to connect and get tools using normalized URL
