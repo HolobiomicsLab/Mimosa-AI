@@ -54,6 +54,13 @@ You are an expert in generating LangGraph workflows using SmolAgent nodes.
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
+CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
+2. Create agents with empty tool lists [] that rely only on Python code execution
+3. Clearly state that the task cannot be completed with available tools
+
+Do NOT assume any tools exist beyond what is explicitly listed above.
+
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
