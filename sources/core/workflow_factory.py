@@ -54,6 +54,13 @@ You are an expert in generating LangGraph workflows using SmolAgent nodes.
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
+CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
+2. Create agents with empty tool lists [] that rely only on Python code execution
+3. Clearly state that the task cannot be completed with available tools
+
+Do NOT assume any tools exist beyond what is explicitly listed above.
+
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
@@ -106,7 +113,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
         return "\n".join(
-            line for line in lines if not line.strip().startswith("import ")
+            line for line in lines 
+            if not (line.strip().startswith("import ") or line.strip().startswith("from "))
         )
 
     def create_workflow_code(
@@ -128,6 +136,14 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         workflow_code = self.remove_imports(workflow_code)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
+        
+        # Validate syntax before returning
+        try:
+            compile(workflow_code, '<workflow>', 'exec')
+        except SyntaxError as e:
+            self.logger.error(f"Generated workflow has syntax error: {e}")
+            raise ValueError(f"LLM generated invalid Python syntax: {e}")
+        
         self.logger.info("LLM generated workflow code successfully")
         return workflow_code
 
@@ -276,13 +292,23 @@ if WORKFLOW_PATH:
             state_code = f.read()
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
-        workflow_code = (
-            template_workflow
-            if template_workflow
-            else self.create_workflow_code(
-                goal_prompt, existing_tool_prompt, memory_path
-            )
-        )
+        # Generate workflow code with retry on syntax errors
+        if template_workflow:
+            workflow_code = template_workflow
+        else:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    workflow_code = self.create_workflow_code(
+                        goal_prompt, existing_tool_prompt, memory_path
+                    )
+                    break
+                except ValueError as e:
+                    if "syntax" in str(e).lower() and attempt < max_retries - 1:
+                        self.logger.warning(f"Syntax error in generated code (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    else:
+                        raise e
         if workflow_code is None or workflow_code.strip() == "":
             self.logger.warning(
                 f"Generated workflow is empty or invalid: {workflow_code[:100]}..."
