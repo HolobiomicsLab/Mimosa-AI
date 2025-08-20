@@ -82,7 +82,8 @@ You are a master web researcher in a multi-agent system tasked with synthesizing
 A prompt must specify:
 - The overall goal (the bigger picture of what we are trying to do)
 - The goal specific to the agent.
-- If it receive input from previous agent, specify how it will help the agent.
+- If it receive input from previous agent, specify how it will help the agent. 
+- If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
 - A completion protocol
 
 ### Step 2: Create Agents
