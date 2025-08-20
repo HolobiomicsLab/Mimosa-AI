@@ -4,7 +4,20 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = "==3.10.18"
-dependencies = []
+dependencies = [
+    "dotenv",
+    "fastmcp>=2.5.0",
+    "langgraph>=0.4.7",
+    "matplotlib>=3.9.0",
+    "numpy>=2.0.0",
+    "openai>=1.100.2",
+    "psutil>=5.9.0",
+    "python-a2a>=0.5.9",
+    "requests>=2.31.0",
+    "sentence-transformers==5.0.0",
+    "smolagents[all]>=1.21.1",
+    "torch>=1.11.0",
+]
 
 [tool.ruff]
 line-length = 88

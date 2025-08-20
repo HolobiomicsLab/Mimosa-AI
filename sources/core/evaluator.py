@@ -29,7 +29,7 @@ class WorkflowEvaluator:
         self.llm_config = LLMConfig().from_dict({"model": self.judge_model})
         self.logger = logging.getLogger(__name__)
     
-    def _load_workflow_data(self, workflow_id: str) -> dict[str, Any]:
+    def _load_workflow_data(self, workflow_id: str) -> dict[dict, str]:
         """Load workflow execution data from UUID folder."""
         workflow_path = Path(self.workflow_dir) / workflow_id
 
@@ -57,6 +57,7 @@ class WorkflowEvaluator:
     def workflow_execution_text(self, uuid:str):
         state_result, workflow_code = self._load_workflow_data(uuid)
         goal = state_result.get("goal", "Goal not specified")
+        state_result.pop("evaluation", None)  # Remove evaluation part for clarity
         return f"""You are evaluating a scientific workflow execution.
 
         WORKFLOW GOAL:
@@ -312,7 +313,7 @@ class WorkflowEvaluator:
         try:
             # Use LLMProvider instead of direct OpenAI call
             llm_provider = LLMProvider(
-                agent_name="scenario_judge",
+                agent_name=f"scenario_judge_{assertion['id']}",
                 memory_path=self.memory_dir / uuid,
                 system_msg=self._get_judge_system_prompt(),
                 config=self.llm_config,
@@ -355,16 +356,16 @@ Evaluation Criteria: {criteria}
 
 EVALUATION TASK:
 Based on the complete execution state and workflow code above, determine if the 
-assertion is TRUE or FALSE.
+assertion is true or false.
 Focus on whether the workflow achieved the goals and execution was successful.
 Analyze the full JSON state and workflow implementation to make your judgment.
 
 Respond in this exact format:
-{
-    "verdict": [TRUE/FALSE], 
+{{
+    "verdict": [true/false], 
     "evidence": [Specific evidence from the execution that supports your verdict],
     "confidence": [0.0-1.0 confidence score]
-}
+}}
 """
 
     def _get_judge_system_prompt(self) -> str:
