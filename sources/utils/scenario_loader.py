@@ -78,11 +78,8 @@ class ScenarioLoader:
             return False
 
         # Validate optional section if present
-        if "optional" in scenario and not self._validate_optional_config(scenario["optional"]):
-            return False
-
-        return True
-
+        return not ("optional" in scenario and not self._validate_optional_config(scenario["optional"]))
+    
     def _validate_assertions(self, assertions: list[dict]) -> bool:
         """
         Validate assertion structure.
