@@ -5,9 +5,15 @@ Test for the combined WorkflowEvaluator.
 
 import argparse
 import json
+import os
+import sys
 
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from config import Config
+from sources.core.dgm import GodelMachine
 from sources.core.evaluator import WorkflowEvaluator
 
 load_dotenv()
@@ -23,35 +29,26 @@ class TestConfig:
         self.pushover_token = None
         self.pushover_user = None
 
+config = Config()
 
-def test_judge_evaluation(workflow_id):
+
+def test_judge_evaluation(workflow_id, answer):
     """Test the judge-based evaluation."""
-    config = TestConfig()
+    
     evaluator = WorkflowEvaluator(config)
 
     print(f"Testing judge evaluation for workflow {workflow_id}")
-    scores = evaluator.evaluate(workflow_id, short=True)
-
-    print("Evaluation scores:")
-    print(json.dumps(scores, indent=2))
-
-    return scores
+    return evaluator.evaluate(workflow_id, answer=answer)
 
 
 def test_scenario_evaluation(workflow_id, scenario_id):
     """Test the scenario-based evaluation."""
-    config = TestConfig()
     evaluator = WorkflowEvaluator(config)
 
     print(
         f"Testing scenario evaluation for workflow {workflow_id} with scenario {scenario_id}"
     )
-    results = evaluator.evaluate(workflow_id, scenario_id=scenario_id)
-
-    print("Evaluation results:")
-    print(json.dumps(results, indent=2))
-
-    return results
+    return evaluator.evaluate(workflow_id, scenario_id=scenario_id)
 
 
 def main():
@@ -70,11 +67,18 @@ def main():
     args = parser.parse_args()
 
     if args.scenario_id:
-        test_scenario_evaluation(args.workflow_id, args.scenario_id)
+        eval_type = test_scenario_evaluation(args.workflow_id, args.scenario_id)
     else:
-        test_judge_evaluation(args.workflow_id)
+        eval_type = test_judge_evaluation(args.workflow_id, args.answer)
 
-    return 0
+    dgm = GodelMachine(config)
+
+    flow_state = dgm.load_flow_state_result(args.workflow_id)
+    flow_rewards = dgm.get_total_rewards(flow_state, eval_type)
+
+    print(f"Evaluation type: {eval_type}")
+    print(f"Flow state: {json.dumps(flow_state, indent=2)}")
+    print(f"Total rewards: {flow_rewards}")
 
 
 if __name__ == "__main__":

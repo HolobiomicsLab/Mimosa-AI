@@ -62,7 +62,7 @@ You are a master web researcher in a multi-agent system tasked with synthesizing
 
 ## BIGGER PICTURE
 - The multi-agent system is designed to <describe system purpose, e.g., provide strategic insights for policy development>.
-- You receive input from a previous agent: <description of prior agent's output, e.g., a preliminary data summary or specific query>.
+- You receive input from a previous agent: <description of prior agent's output, e.g., a preliminary data summary or specific query>. (for the first agent only describe the task, it won't receive any input)
 - Your task is to refine, validate, or expand this input using web research to meet the system's goal.
 
 ## YOUR TASK
@@ -82,7 +82,8 @@ You are a master web researcher in a multi-agent system tasked with synthesizing
 A prompt must specify:
 - The overall goal (the bigger picture of what we are trying to do)
 - The goal specific to the agent.
-- If it receive input from previous agent, specify how it will help the agent.
+- If it receive input from previous agent, specify how it will help the agent. 
+- If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
 - A completion protocol
 
 ### Step 2: Create Agents
@@ -103,6 +104,7 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - NEVER return `START` as a routing target - it's only for graph initialization
 - Always use actual node names or `END` for routing targets
 - Ensure all returned routing targets are defined in your conditional edges mapping
+- The agent can't see the state by itself
 
 ```python
 def master_router(state: WorkflowState) -> str:
