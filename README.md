@@ -106,6 +106,54 @@ Multi-goal, enter a series of goal to run in parrallel.
 
 **`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
 
+## 🔧 Tool Discovery
+
+Mimosa-AI provides a convenient script to discover and list all available MCP (Model Context Protocol) tools:
+
+### List Available Tools
+
+```sh
+# Quick overview (most concise)
+./list_tools.sh --compact
+
+# Standard detailed view with descriptions
+./list_tools.sh --format detailed
+
+# Table format (clean and structured)
+./list_tools.sh --format table
+
+# JSON output for automation/scripting
+./list_tools.sh --format json
+
+# Include generated client code examples
+./list_tools.sh --format table --show-code
+```
+
+### Tool Discovery Options
+
+- **`--compact`**: Most concise output showing server names and tool lists
+- **`--format FORMAT`**: Choose output format (table, json, detailed, compact)
+- **`--show-code`**: Display generated Python client code for workflow integration
+- **`--help`**: Show usage information and all available options
+
+**Example Output (Compact Format):**
+```
+🔧 TOOL SUMMARY
+========================================
+Git MCP (12 tools)
+  git_status, git_diff_unstaged, git_diff_staged, git_commit, git_add
+
+Browser MCP (7 tools)  
+  search, navigate, get_links, download_file, take_screenshot
+
+Time MCP (2 tools)
+  get_current_time, convert_time
+
+Total: 3 server(s), 21 tool(s)
+```
+
+> **Note**: Requires ToolHive to be installed and MCP servers to be running. Use `thv list` to see available servers and `thv start <server-name>` to start them.
+
 ## Use Caching system
 
 You'll need to open 2 terminal.

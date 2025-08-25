@@ -82,11 +82,10 @@ class WorkflowEvaluator:
         """
         # If scenario_id is provided, use scenario-based evaluation
         if scenario_id:
-            self.scenario(uuid, scenario_id)
-            return "scenario"
+            return self.scenario(uuid, scenario_id)
         else:
             self.generic(uuid, answer)
-            return 'generic'
+            return {'evaluation_type': 'generic'}
 
         
     def generic(self,uuid, answer):
@@ -301,6 +300,14 @@ class WorkflowEvaluator:
 
         # Save results
         self._save_results(results, uuid, 'scenario')
+        
+        # Return assertion metrics for DGM tracking
+        return {
+            'passed_assertions': passed_count,
+            'total_assertions': total_count,
+            'score': score,
+            'scenario_id': scenario_id
+        }
 
 
     def _evaluate_assertion(
