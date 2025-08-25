@@ -204,12 +204,23 @@ class GodelMachine:
         print(f"{'─' * 60}\n")
 
         rewards_history = []
+        assertion_history = []  # Track [passed, total] per iteration
         plot_data = None
+        assertion_plot_data = None
 
         if self.shared_viz_data and self.process_id is not None:
             plot_data = None
         else:
             plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
+            # Create assertion plot only for scenario evaluation
+            if scenario_id and judge:
+                from sources.utils.scenario_loader import ScenarioLoader
+                scenario = ScenarioLoader().load_scenario(scenario_id)
+                if scenario:
+                    total_assertions = len(scenario.get("assertions", []))
+                    assertion_plot_data = self.viz_utils.create_assertion_progress_plot(
+                        scenario_id, total_assertions
+                    )
 
         return await self.recursive_self_improvement(
             goal_prompt,
@@ -222,7 +233,9 @@ class GodelMachine:
             scenario_id=scenario_id,
             need_human_validation=human_validation,
             rewards_history=rewards_history,
+            assertion_history=assertion_history,
             plot_data=plot_data,
+            assertion_plot_data=assertion_plot_data,
         )
 
     async def recursive_self_improvement(
@@ -236,7 +249,9 @@ class GodelMachine:
         judge: bool = False,
         need_human_validation: bool = False,
         rewards_history: list[float] = None,
+        assertion_history: list[list[int]] = None,
         plot_data: tuple = None,
+        assertion_plot_data: tuple = None,
         answer: str = None,
         scenario_id: str = None,
     ):
@@ -290,9 +305,13 @@ class GodelMachine:
                 print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
                 print(f"\033[94m{'=' * 80}\033[0m")
                 eval_start = time.time()
-                eval_type = self.judge.evaluate(
+                eval_result = self.judge.evaluate(
                     uuid=uuid, answer=answer, scenario_id=scenario_id
                 )
+                
+                # Extract evaluation type for compatibility
+                eval_type = eval_result.get('scenario_id') if isinstance(eval_result, dict) else eval_result
+                eval_type = 'scenario' if scenario_id else 'generic'
                 eval_time = time.time() - eval_start
                 logger.info(
                     f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s"
@@ -300,6 +319,13 @@ class GodelMachine:
                 print(
                     f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m"
                 )
+                
+                # Track assertion progress for scenario evaluation
+                if scenario_id and isinstance(eval_result, dict) and assertion_history is not None:
+                    passed = eval_result.get('passed_assertions', 0)
+                    total = eval_result.get('total_assertions', 0)
+                    assertion_history.append([passed, total])
+                    print(f"\033[94m📊 Assertions Progress: {passed}/{total} ({passed/total*100 if total > 0 else 0:.0f}%)\033[0m")
 
             cost_start = time.time()
             total_cost = self.pricing.calculate_cost(uuid)
@@ -322,6 +348,19 @@ class GodelMachine:
             )
         elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
+            
+        # Update assertion plot if available
+        if assertion_plot_data and assertion_history:
+            from sources.utils.scenario_loader import ScenarioLoader
+            scenario = ScenarioLoader().load_scenario(scenario_id)
+            total_assertions = len(scenario.get("assertions", [])) if scenario else 0
+            self.viz_utils.update_assertion_progress_plot(
+                assertion_plot_data, assertion_history, total_assertions
+            )
+            # Save plot after each update for real-time monitoring
+            plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
+            self.viz_utils.save_plot(assertion_plot_data, plot_filename)
+            print(f"\033[94m📊 Assertion progress plot updated: {plot_filename}\033[0m")
 
         iteration_time = time.time() - iteration_start_time
         logger.info(
@@ -346,6 +385,11 @@ class GodelMachine:
 
         if iteration_count >= max_depth:
             print(f"Maximum iterations reached ({max_depth}).")
+            # Save assertion plot at the end
+            if assertion_plot_data and assertion_history:
+                plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
+                self.viz_utils.save_plot(assertion_plot_data, plot_filename)
+                print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
             return uuid
 
         flow_code = self.select_workflow_template(
@@ -364,7 +408,17 @@ class GodelMachine:
             judge=judge,
             need_human_validation=need_human_validation,
             rewards_history=rewards_history,
+            assertion_history=assertion_history,
             plot_data=plot_data,
+            assertion_plot_data=assertion_plot_data,
+            answer=answer,
             scenario_id=scenario_id,
         )
+        
+        # Save assertion plot when returning from final iteration
+        if assertion_plot_data and assertion_history:
+            plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
+            self.viz_utils.save_plot(assertion_plot_data, plot_filename)
+            print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
+            
         return uuid
