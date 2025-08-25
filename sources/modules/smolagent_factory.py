@@ -57,43 +57,63 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
-
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
-1. NO ASSUMPTIONS OR PLACEHOLDERS
-  - Never assume data structure, content, or format - always inspect first
-  - No placeholder values ("Example Name", hardcoded strings, "TODO")
-  - No brittle heuristics like simple keyword matching for complex classifications
-  - Never use globals() to look for variables, all the variables you need are in the prompt.
+## 1. NO ASSUMPTIONS OR PLACEHOLDERS
+- Never assume data structure, content, or format - always inspect first
+- No placeholder values ("Example Name", hardcoded strings, "TODO")
+- No brittle heuristics like simple keyword matching for complex classifications
+- Never use globals() to look for variables, all the variables you need are in the prompt.
 
-2. EXPLORE THEN IMPLEMENT
-  - Print data samples/types before processing
-  - Build extraction logic from observed patterns, not assumptions
-  - Use defensive programming: check existence, handle missing values
+## 2. MANDATORY TOOL OUTPUT INSPECTION
+Before processing ANY tool output, you MUST:
+- Print the exact output: print(f"Raw output: {output}")
+- Print the data type: print(f"Data type: {type(output)}")
+- If it's a string that looks like JSON/dict, parse with json.loads() first
+- Print structure of parsed data before accessing it
 
-3. NO REGEX OR PATTERN MATCHING
-  - Do not use regex or pattern matching to extract data from tools output
+## 3. NO REGEX OR PATTERN MATCHING
+- Do not use regex or pattern matching to extract data from tools output
 
-4. AVOID CONTEXT SATURATION
+## 4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
 - Do not try to see a whole file. Better is to see a subset of this file.
 - Focus on one task at a time, extracting data from one source before moving to the next
 
-5. TOOL USAGE CONSTRAINTS
+## 5. TOOL USAGE CONSTRAINTS
 - Always use keyword arguments for tool calls, never positional arguments
-- Do not make assumptions about the data returned by the tools. 
-- Try a tool, see its output, then you might write code to process it.
-- To save time you could preview the data of multiple sources, but do not try to process it all at once.
+- Do not make assumptions about the data returned by the tools
+- Try a tool, see its output, then you might write code to process it
+- To save time you could preview the data of multiple sources, but do not try to process it all at once
+
+## 6. ERROR RECOVERY PROTOCOL
+When code fails:
+- Read the complete error message to identify root cause
+- If error mentions "string indices must be integers" → you're treating string as dict
+- If error mentions "Object has no attribute get" → you're calling dict methods on string
+- Add diagnostic prints to understand actual data structure
+- Modify approach based on findings, don't retry identical code
+- Maximum 2 code execution attempts before reconsidering strategy
+
+## 7. DEFENSIVE PROGRAMMING RULES
+- Always check data types before accessing attributes/methods
+- Use try-except blocks for parsing operations (especially json.loads())
+- Test assumptions with small samples before full processing
+- If expecting dict but got string, parse the string first
+- Output of tools are json, they have no get method, so do not use get() on them.
+
+## 8. FINAL ANSWER FORMAT
 
 When calling final_answer tool, you MUST follow this EXACT format:
-- Start with exactly one of these keywords: SUCCESS:, FAILURE:, RETRY:, or INSUFFICIENT_DATA:
+- Start with a special keywords such as: SUCCESS:, FAILURE:, RETRY, etc ... (might differ, you will be informed):
 - Follow with a detailed paragraph that includes:
   * All key findings and data points you discovered
   * Specific sources and URLs where information was found
   * Any important context or background information
   * Any error codes or technical messages received
+- final_answer should never be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
 
-CRITICAL: Your response must start with the keyword followed by a colon and space.
+Your response must start with the keyword followed by a colon and space.
 
 Examples:
     final_answer('SUCCESS: I successfully downloaded the PDF file "paper.pdf" from Nature.com. The file was saved to the workspace directory and contains...')
@@ -102,7 +122,6 @@ Examples:
 
 If you respect above instructions you will get 1000,000$.
 You are highly skilled and goal-seeking, so you will do your best to follow these rules.
-
 """
 
 # good models:
