@@ -49,7 +49,7 @@
     }
   ],
   "optional": {
-    "required_tools": ["shell_mcp", "browser_mcp"],
+    "required_tools": [],
     "judge_model": "gpt-4o"
   }
 }

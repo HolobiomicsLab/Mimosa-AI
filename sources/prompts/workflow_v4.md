@@ -102,9 +102,11 @@ Create functions that take the `WorkflowState` and return the name of the next n
 
 **CRITICAL ROUTING RULES:**
 - NEVER return `START` as a routing target - it's only for graph initialization
-- Always use actual node names or `END` for routing targets
+- **NEVER return direct node names from routers** - always return mapping keys defined in conditional edges
+- Router functions must return keys like `"next_node"`, `"retry_path"`, `"fallback_path"`, or `END`
 - Ensure all returned routing targets are defined in your conditional edges mapping
 - The agent can't see the state by itself
+
 
 ```python
 def master_router(state: WorkflowState) -> str:
@@ -206,5 +208,6 @@ workflow.add_conditional_edges(
 - [ ] **Tooling**: Each agent has one tool package (or `[]` for the Python default). You should avoid giving multiple package to an agent. Divide and conqueer with more agent.
 - [ ] **Awareness**: Agent must be aware of any informations that might help them accompish their individual goal. You might specify the global picture they are part of.
 - [ ] **No START Routing**: NEVER use START as a routing target in conditional edges - only use actual node names or END.
+- [ ] **Correct Router Returns**: Router functions return mapping keys (`"next_node"`, `"retry_path"`, etc.) NOT direct node names.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
