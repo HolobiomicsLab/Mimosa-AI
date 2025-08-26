@@ -4,6 +4,7 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 
 import logging
 import os
+import re
 import time
 import uuid
 
@@ -87,6 +88,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
 
+
     async def load_tools_code(self) -> tuple[str, str]:
         """Discover all MCP servers and format their client code.
         Returns:
@@ -147,6 +149,141 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         self.logger.info("LLM generated workflow code successfully")
         return workflow_code
 
+    def validate_workflow_structure(self, workflow_code: str) -> None:
+        """Validate LangGraph workflow structure before execution."""
+        self.logger.info("Validating workflow structure...")
+        
+        # Pre-compile regex patterns for efficiency
+        patterns = {
+            'state_graph': r"workflow = StateGraph\(WorkflowState\)",
+            'start_edge': r"workflow\.add_edge\(START,\s*[\"'](\w+)[\"']\)",
+            'nodes': r"workflow\.add_node\([\"'](\w+)[\"'],.*?\)",
+            'routers': r"def\s+(\w*router\w*)\s*\(",
+            'conditional_edges': r"workflow\.add_conditional_edges\(",
+            'edge_mappings': r'workflow\.add_conditional_edges\(\s*["\'](\w+)["\'],\s*(\w+),\s*\{([^}]+)\}',
+            'router_returns': r'return\s+["\']([^"\']+)["\']',
+            'instructions': r'instruct_\w+\s*=\s*"""(.*?)"""',
+            'agent_factory': r"SmolAgentFactory\(",
+            'node_factory': r"WorkflowNodeFactory\.create_agent_node\("
+        }
+        
+        # Basic structure validation
+        required_checks = [
+            (patterns['state_graph'], "Missing 'workflow = StateGraph(WorkflowState)' initialization"),
+            (patterns['conditional_edges'], "No conditional edges found - workflows require conditional routing"),
+            (patterns['agent_factory'], "No SmolAgentFactory usage found"),
+            (patterns['node_factory'], "No WorkflowNodeFactory usage found")
+        ]
+        
+        for pattern, error_msg in required_checks:
+            if not re.search(pattern, workflow_code):
+                raise ValueError(error_msg)
+        
+        # Extract and validate core components
+        start_match = re.search(patterns['start_edge'], workflow_code)
+        if not start_match:
+            raise ValueError("Graph must have entry point: workflow.add_edge(START, 'node_name')")
+        
+        nodes = set(re.findall(patterns['nodes'], workflow_code))
+        if not nodes:
+            raise ValueError("No workflow nodes found")
+        self.logger.debug(f"📋 Workflow nodes discovered: {', '.join(sorted(nodes))}")
+        
+        routers = set(re.findall(patterns['routers'], workflow_code))
+        if not routers:
+            raise ValueError("No router functions found")
+        self.logger.debug(f"🔀 Router functions found: {', '.join(sorted(routers))}")
+        
+        # Validate START edge target exists
+        entry_node = start_match.group(1)
+        if entry_node not in nodes:
+            raise ValueError(f"START targets non-existent node '{entry_node}'")
+        self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
+        
+        # Validate routing consistency
+        self._validate_routing_consistency(workflow_code, patterns, nodes, routers)
+        
+        # Check completion keywords (warning only)
+        self._check_completion_keywords(workflow_code, patterns['instructions'])
+        
+        self.logger.info("✅ Workflow structure validation passed")
+    
+    def _validate_routing_consistency(self, workflow_code: str, patterns: dict, nodes: set, routers: set) -> None:
+        """Validate routing logic consistency."""
+        conditional_edges = re.findall(patterns['edge_mappings'], workflow_code)
+        all_mapping_keys = set()
+        used_routers = set()
+        
+        self.logger.debug(f"🔗 Analyzing {len(conditional_edges)} conditional edges:")
+        
+        for i, (source_node, _router_func, mapping_content) in enumerate(conditional_edges, 1):
+            if source_node not in nodes:
+                raise ValueError(f"Conditional edge source '{source_node}' doesn't exist")
+            
+            used_routers.add(_router_func)
+            
+            # Parse and display mapping in human-readable format
+            mapping_pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', mapping_content)
+            readable_mappings = []
+            
+            for key, target in mapping_pairs:
+                all_mapping_keys.add(key)
+                target_clean = target.strip().strip('"\'')
+                
+                if target_clean == "START":
+                    raise ValueError("Router mapping contains START - use node names or END")
+                if target_clean not in nodes and target_clean != "END":
+                    raise ValueError(f"Router target '{target_clean}' doesn't exist")
+                
+                readable_mappings.append(f"'{key}' → {target_clean}")
+            
+            self.logger.debug(f"   {i}. {source_node} --({_router_func})--> {{ {', '.join(readable_mappings)} }}")
+        
+        self.logger.debug(f"🗝️  Available routing keys: {', '.join(sorted(all_mapping_keys))}")
+        self.logger.debug(f"⚙️  Routers in use: {', '.join(sorted(used_routers))}")
+        
+        # Validate router functions exist
+        missing_routers = used_routers - routers
+        if missing_routers:
+            raise ValueError(f"Missing router functions: {sorted(missing_routers)}")
+        
+        # Check router return values don't use START
+        router_returns = re.findall(patterns['router_returns'], workflow_code)
+        unique_returns = sorted(set(router_returns))
+        self.logger.debug(f"🔄 Router return values used: {', '.join(unique_returns)}")
+        
+        for return_val in router_returns:
+            if return_val == "START":
+                raise ValueError("Router returns 'START' - use mapping keys or END")
+            if return_val != "END" and return_val not in all_mapping_keys:
+                raise ValueError(f"Router returns invalid key '{return_val}'")
+    
+    def _check_completion_keywords(self, workflow_code: str, instruction_pattern: str) -> None:
+        """Check for completion protocol keywords in instructions."""
+        required_keywords = ["SUCCESS:", "FAILURE:", "RETRY:"]
+        instructions = re.findall(instruction_pattern, workflow_code, re.DOTALL)
+        
+        self.logger.debug(f"📝 Checking completion protocol in {len(instructions)} agent instructions:")
+        
+        for i, instruction in enumerate(instructions):
+            # Extract agent name from instruction variable
+            agent_names = re.findall(r'instruct_(\w+)\s*=', workflow_code)
+            agent_name = agent_names[i] if i < len(agent_names) else f"agent_{i+1}"
+            
+            # Get first meaningful line as preview
+            lines = [line.strip() for line in instruction.split('\n') if line.strip()]
+            preview = lines[1] if len(lines) > 1 and lines[0].startswith('You are') else lines[0] if lines else "Empty instruction"
+            preview = preview[:80] + "..." if len(preview) > 80 else preview
+            
+            missing = [kw for kw in required_keywords if kw not in instruction]
+            if missing:
+                self.logger.warning(f"   ❌ {agent_name}: Missing completion keywords {missing}")
+                self.logger.debug(f"      Preview: {preview}")
+            else:
+                present = [kw for kw in required_keywords if kw in instruction]
+                self.logger.debug(f"   ✅ {agent_name}: Has all completion keywords ({', '.join(present)})")
+                self.logger.debug(f"      Preview: {preview}")
+
     def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
         Args:
@@ -186,6 +323,8 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         Returns:
             str: Complete workflow code ready for execution
         """
+
+        
         initial_state = {
             key: (
                 uuid_str
@@ -292,9 +431,13 @@ if WORKFLOW_PATH:
             state_code = f.read()
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
-        # Generate workflow code with retry on syntax errors
+        # Generate workflow code with retry on compilation errors
         if template_workflow:
             workflow_code = template_workflow
+            complete_code = self.assemble_workflow(
+                tools_code, state_code, smolagent_factory_code,
+                workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
+            )
         else:
             max_retries = 3
             for attempt in range(max_retries):
@@ -302,29 +445,48 @@ if WORKFLOW_PATH:
                     workflow_code = self.create_workflow_code(
                         goal_prompt, existing_tool_prompt, memory_path
                     )
+
+                    # Validate workflow structure before assembly
+                    self.validate_workflow_structure(workflow_code)
+                    
+                    # Assemble and validate complete workflow
+                    complete_code = self.assemble_workflow(
+                        tools_code, state_code, smolagent_factory_code,
+                        workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
+                    )
+                    
+                    # Skip validation - compilation happens during execution
+                    self.logger.info("Workflow generation completed")
                     break
+                    
                 except ValueError as e:
-                    if "syntax" in str(e).lower() and attempt < max_retries - 1:
-                        self.logger.warning(f"Syntax error in generated code (attempt {attempt + 1}/{max_retries}), retrying...")
+                    error_str = str(e).lower()
+                    is_retryable_error = (
+                        "syntax" in error_str or 
+                        "langgraph" in error_str or 
+                        "keyerror" in error_str or
+                        "router mapping" in error_str or
+                        "structural errors" in error_str or
+                        "missing required" in error_str or
+                        "entry point" in error_str or
+                        "router functions" in error_str or
+                        "conditional edges" in error_str or
+                        "smolagentfactory" in error_str or
+                        "workflownodefactory" in error_str or
+                        "does not exist" in error_str or
+                        "returns invalid key" in error_str or
+                        "reference undefined" in error_str
+                    )
+                    
+                    if is_retryable_error and attempt < max_retries - 1:
+                        self.logger.warning(f"Workflow error (attempt {attempt + 1}/{max_retries}): {e}")
+                        self.logger.warning("Retrying workflow generation...")
                         continue
                     else:
                         raise e
-        if workflow_code is None or workflow_code.strip() == "":
-            self.logger.warning(
-                f"Generated workflow is empty or invalid: {workflow_code[:100]}..."
-            )
-            raise ValueError("❌ Generated workflow code is empty or invalid")
-
-        complete_code = self.assemble_workflow(
-            tools_code,
-            state_code,
-            smolagent_factory_code,
-            workflow_code,
-            workflow_path,
-            memory_path,
-            uuid_str,
-            goal_prompt,
-        )
+            
+            if 'complete_code' not in locals():
+                raise ValueError("❌ Failed to generate valid workflow after all retries")
 
         self.logger.debug(f"Workflow path: {workflow_path}")
         self.logger.debug(f"Memory path: {memory_path}")
@@ -356,3 +518,12 @@ if WORKFLOW_PATH:
             )
         except Exception as e:
             self.logger.error(f"Failed to save system prompt: {str(e)}")
+        
+        try:
+            with open(os.path.join(path, f"goal_{uuid_str}.txt"), "w") as f:
+                f.write(goal_prompt)
+            self.logger.info(
+                f"Saved goal to: {path}/goal_{uuid_str}.txt"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to save goal: {str(e)}")
