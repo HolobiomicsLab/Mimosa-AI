@@ -144,7 +144,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             compile(workflow_code, '<workflow>', 'exec')
         except SyntaxError as e:
             self.logger.error(f"Generated workflow has syntax error: {e}")
-            raise ValueError(f"LLM generated invalid Python syntax: {e}")
+            raise ValueError(f"LLM generated invalid Python syntax: {e}") from e
         
         self.logger.info("LLM generated workflow code successfully")
         return workflow_code
@@ -162,7 +162,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             'conditional_edges': r"workflow\.add_conditional_edges\(",
             'edge_mappings': r'workflow\.add_conditional_edges\(\s*["\'](\w+)["\'],\s*(\w+),\s*\{([^}]+)\}',
             'router_returns': r'return\s+["\']([^"\']+)["\']',
-            'instructions': r'instruct_\w+\s*=\s*"""(.*?)"""',
             'agent_factory': r"SmolAgentFactory\(",
             'node_factory': r"WorkflowNodeFactory\.create_agent_node\("
         }
@@ -202,9 +201,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         
         # Validate routing consistency
         self._validate_routing_consistency(workflow_code, patterns, nodes, routers)
-        
-        # Check completion keywords (warning only)
-        self._check_completion_keywords(workflow_code, patterns['instructions'])
         
         self.logger.info("✅ Workflow structure validation passed")
     
@@ -258,31 +254,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             if return_val != "END" and return_val not in all_mapping_keys:
                 raise ValueError(f"Router returns invalid key '{return_val}'")
     
-    def _check_completion_keywords(self, workflow_code: str, instruction_pattern: str) -> None:
-        """Check for completion protocol keywords in instructions."""
-        required_keywords = ["SUCCESS:", "FAILURE:", "RETRY:"]
-        instructions = re.findall(instruction_pattern, workflow_code, re.DOTALL)
-        
-        self.logger.debug(f"📝 Checking completion protocol in {len(instructions)} agent instructions:")
-        
-        for i, instruction in enumerate(instructions):
-            # Extract agent name from instruction variable
-            agent_names = re.findall(r'instruct_(\w+)\s*=', workflow_code)
-            agent_name = agent_names[i] if i < len(agent_names) else f"agent_{i+1}"
-            
-            # Get first meaningful line as preview
-            lines = [line.strip() for line in instruction.split('\n') if line.strip()]
-            preview = lines[1] if len(lines) > 1 and lines[0].startswith('You are') else lines[0] if lines else "Empty instruction"
-            preview = preview[:80] + "..." if len(preview) > 80 else preview
-            
-            missing = [kw for kw in required_keywords if kw not in instruction]
-            if missing:
-                self.logger.warning(f"   ❌ {agent_name}: Missing completion keywords {missing}")
-                self.logger.debug(f"      Preview: {preview}")
-            else:
-                present = [kw for kw in required_keywords if kw in instruction]
-                self.logger.debug(f"   ✅ {agent_name}: Has all completion keywords ({', '.join(present)})")
-                self.logger.debug(f"      Preview: {preview}")
+
 
     def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
@@ -431,70 +403,36 @@ if WORKFLOW_PATH:
             state_code = f.read()
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
-        # Generate workflow code with retry on compilation errors
+        # Generate workflow code - let DGM handle retries
         if template_workflow:
             workflow_code = template_workflow
-            complete_code = self.assemble_workflow(
-                tools_code, state_code, smolagent_factory_code,
-                workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
-            )
         else:
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    workflow_code = self.create_workflow_code(
-                        goal_prompt, existing_tool_prompt, memory_path
-                    )
-
-                    # Validate workflow structure before assembly
-                    self.validate_workflow_structure(workflow_code)
-                    
-                    # Assemble and validate complete workflow
-                    complete_code = self.assemble_workflow(
-                        tools_code, state_code, smolagent_factory_code,
-                        workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
-                    )
-                    
-                    # Skip validation - compilation happens during execution
-                    self.logger.info("Workflow generation completed")
-                    break
-                    
-                except ValueError as e:
-                    error_str = str(e).lower()
-                    is_retryable_error = (
-                        "syntax" in error_str or 
-                        "langgraph" in error_str or 
-                        "keyerror" in error_str or
-                        "router mapping" in error_str or
-                        "structural errors" in error_str or
-                        "missing required" in error_str or
-                        "entry point" in error_str or
-                        "router functions" in error_str or
-                        "conditional edges" in error_str or
-                        "smolagentfactory" in error_str or
-                        "workflownodefactory" in error_str or
-                        "does not exist" in error_str or
-                        "returns invalid key" in error_str or
-                        "reference undefined" in error_str
-                    )
-                    
-                    if is_retryable_error and attempt < max_retries - 1:
-                        self.logger.warning(f"Workflow error (attempt {attempt + 1}/{max_retries}): {e}")
-                        self.logger.warning("Retrying workflow generation...")
-                        continue
-                    else:
-                        raise e
-            
-            if 'complete_code' not in locals():
-                raise ValueError("❌ Failed to generate valid workflow after all retries")
-
-        self.logger.debug(f"Workflow path: {workflow_path}")
-        self.logger.debug(f"Memory path: {memory_path}")
-
+            workflow_code = self.create_workflow_code(
+                goal_prompt, existing_tool_prompt, memory_path
+            )
+            # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(
                 workflow_path, uuid_str, workflow_code, goal_prompt
             )
+        try :
+            # Validate workflow structure before assembly
+            self.validate_workflow_structure(workflow_code)
+        except Exception as e:
+            # Include UUID in exception so orchestrator can return it
+            raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
+        
+        # Assemble complete workflow
+        complete_code = self.assemble_workflow(
+            tools_code, state_code, smolagent_factory_code,
+            workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
+        )
+        
+        self.logger.info("Workflow generation completed")
+
+        self.logger.debug(f"Workflow path: {workflow_path}")
+        self.logger.debug(f"Memory path: {memory_path}")
+
         return complete_code, uuid_str
 
     def save_workflow_files(

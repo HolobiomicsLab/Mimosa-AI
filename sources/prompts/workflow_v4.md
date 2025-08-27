@@ -124,7 +124,7 @@ def master_router(state: WorkflowState) -> str:
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
          return "fallback_path" # Example of backtracking
     
-    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
+    elif "RETRY:" in last_answer: # The agent thinks he can succeed his task ins another way
         retry_count = sum(
             1 for step in state["step_name"][-3:] if step == current_agent
         )
@@ -135,7 +135,7 @@ def master_router(state: WorkflowState) -> str:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
             return "fallback_path"
 
-    elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+    elif "FAILURE:" in last_answer: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
     
