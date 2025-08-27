@@ -134,26 +134,25 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 model_id="deepseek-ai/DeepSeek-V3",
                  max_steps=12,
-                 max_retries = 3,
-                 planning_interval = 4
+                 max_retries=3
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools
+        # variable defined by workflow factory
         self.model_id = MODEL_ID
+        self.memory_folder = MEMORY_PATH
+        self.engine_name = ENGINE_NAME
+        # additional engine parameters
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = MEMORY_PATH
-        print("debug path", os.getcwd())
-        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
-        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
-        self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
+        # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.max_retries = max_retries
+        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
@@ -180,7 +179,7 @@ class SmolAgentFactory:
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "cached" or self.use_cached_engine:
+        if self.engine_name == "cached":
             return LiteLLMModel(
                 model_id=self.model_id,
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
