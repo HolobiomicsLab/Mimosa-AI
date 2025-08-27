@@ -39,7 +39,7 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
-        self.smolagent_model_id: str = "deepseek-chat"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v4.md"
         self.workflow_llm_provider: str = "openai"
