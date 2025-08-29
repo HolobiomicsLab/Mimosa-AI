@@ -78,7 +78,9 @@ class Tool:
     def __init__(self, name: str, description: str = ""):
         self.name = name
         self.description = description
-
+    
+    def __repr__(self):
+        return f"""{self.name}: {self.description}"""
 
 class MCP:
     def __init__(
@@ -105,6 +107,9 @@ class MCP:
     def tool_names(self) -> list[str]:
         """Get list of tool names for backwards compatibility."""
         return [tool.name for tool in self.tools]
+    
+    def __repr__(self):
+        return f"""{self.name}: {len(self.tools)} tools available | running on {self.address}:{self.port}"""
 
 
 class ToolManager:
