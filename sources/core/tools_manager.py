@@ -128,6 +128,46 @@ class ToolManager:
         ):
             return False
 
+    def _attempt_mcp_stop(self, mcp_name) -> bool:
+        """Attempt to stop ToolHive MCP servers if they are not running."""
+        try:
+            result = subprocess.run(
+                ["thv", 
+                "stop", mcp_name],
+                capture_output=True, text=True, timeout=5
+            )
+            return result.returncode == 0
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+        ):
+            return False
+    
+    def _attempt_mcp_restart(self, mcp_name) -> bool:
+        """Attempt to start ToolHive MCP servers if they are not running."""
+        try:
+            result = subprocess.run(
+                ["thv", 
+                "restart", mcp_name], # no start command, use restart
+                capture_output=True, text=True, timeout=5
+            )
+            return result.returncode == 0
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+        ):
+            return False
+    
+    def _attempt_full_mcp_restart(self, mcp_name) -> bool:
+        """Attempt to fully restart a MCP server.
+        It appears mcp restart does not always work if the server is already running or hanging.
+        """
+        if not self._attempt_mcp_stop(mcp_name):
+            return False
+        return self._attempt_mcp_restart(mcp_name)
+
     def _get_tools_with_descriptions(self, server_url: str) -> list[Tool]:
         """Get tools with descriptions using thv mcp list tools command."""
         try:
@@ -267,7 +307,12 @@ class ToolManager:
                         )
                     )
                 else:
-                    print(f"⚠️ No tools found for ToolHive server {name}")
+                    print(f"⚠️ Attempting full restart for ToolHive server {name}...")
+                    if self._attempt_full_mcp_restart(name):
+                        print(f"✅ Successfully restarted ToolHive server {name}")
+                    else:
+                        print(f"❌ Failed to restart ToolHive server {name}")
+                        return self.discover_toolhive_servers()  # Retry discovery after restart
 
             return mcps
 
