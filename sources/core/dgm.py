@@ -113,18 +113,43 @@ class GodelMachine:
             flow_answers = self.get_flow_answers(flow_state)
         else:
             flow_answers = run_stdout.strip()
-        improv_prompt = "You must generate a multi-agent workflow for the goal."
+        print(f"\nPrevious workflow answers:\n{flow_answers}\n")
+        improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
-            improv_prompt = "\n".join(
-                [
-                    "Previously written workflow code:",
-                    flow_code,
-                    "Previous attempt resulted in agents ending with following answers:",
-                    flow_answers,
-                    "You must improve the workflow based on previous execution results.",
-                    "Only change a prompt, add an agent, change a tool, etc.. ",
-                ]
-            )
+            improv_prompt = "\n".join([
+                "WORKFLOW IMPROVEMENT ANALYSIS",
+                "",
+                "Previous workflow code:",
+                flow_code,
+                "",
+                "Previous execution results:",
+                flow_answers,
+                "",
+                "MANDATORY FAILURE ANALYSIS:",
+                "1. ROOT CAUSE IDENTIFICATION:",
+                "   - What specific step(s) failed and why?",
+                "   - Was it a tool limitation, incorrect parameters, or wrong approach?",
+                "   - Did the workflow make incorrect assumptions about data availability?",
+                "",
+                "2. ALTERNATIVE APPROACH EVALUATION:",
+                "   - What are 3 different ways to accomplish this task?",
+                "   - Which tools were NOT used that could be relevant?",
+                "   - Are there backup strategies if primary approach fails?",
+                "",
+                "3. TOOL USAGE OPTIMIZATION:",
+                "   - Were search parameters too narrow/broad?",
+                "   - Should multiple search strategies be combined?",
+                "   - Are there preprocessing steps needed before tool usage?",
+                "",
+                "REQUIRED IMPROVEMENTS:",
+                "- Add fallback mechanisms for when primary tools fail",
+                "- Implement broader search strategies (multiple APIs, different keywords)",
+                "- Include validation steps to verify results before proceeding",
+                "- Add conditional logic to try alternative approaches automatically",
+                "",
+                "Generate an IMPROVED workflow that addresses identified failure modes.",
+                "The new workflow must be structurally different from the previous attempt."
+            ])
 
         return "".join(
             [
