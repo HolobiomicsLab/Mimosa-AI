@@ -93,11 +93,16 @@ class GodelMachine:
         if not flow_state or "answers" not in flow_state:
             return ""
 
-        return (
+        flow_answers = (
             "\n".join(str(x) for x in flow_state["answers"])
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
+        print(f"\n\033[96m{'📝 WORKFLOW AGENTS ANSWERS':^60}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m")
+        print(f"\033[96m{flow_answers}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m\n")
+        return flow_answers
 
     def improvement_prompt(
         self,
@@ -113,7 +118,6 @@ class GodelMachine:
             flow_answers = self.get_flow_answers(flow_state)
         else:
             flow_answers = run_stdout.strip()
-        print(f"\nPrevious workflow answers:\n{flow_answers}\n")
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
