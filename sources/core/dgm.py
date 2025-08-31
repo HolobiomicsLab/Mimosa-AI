@@ -183,7 +183,11 @@ class GodelMachine:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal_prompt,
             )
-            print(f"Selected {len(candidates)} candidates for goal '{goal_prompt}'")
+            print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m")
+            print(f"\033[96mSelected {len(candidates)} candidates for goal:\033[0m")
+            print(f"\033[96m{goal_prompt}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m\n")
             return candidates[0].code if candidates else None
         workflow_path = f"{self.workflow_dir}/{template_uuid}"
         if not os.path.exists(workflow_path):
@@ -223,14 +227,14 @@ class GodelMachine:
         - human_validation (bool, optional): Whether human validation is required.
         """
 
-        template = self.select_workflow_template(
-            goal_prompt, template_uuid=template_uuid
-        )
-
-        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"\n{'📋 CURRENT TASK':^60}")
         print(f"{'─' * 60}")
         print(f"  {goal_prompt}")
         print(f"{'─' * 60}\n")
+
+        template = self.select_workflow_template(
+            goal_prompt, template_uuid=template_uuid
+        )
 
         rewards_history = []
         plot_data = None
@@ -309,7 +313,7 @@ class GodelMachine:
             f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}..."
         )
 
-        run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal_prompt=prompt,
             workflow_template=workflow_template if iteration_count == 0 else None,
         )
@@ -377,17 +381,14 @@ class GodelMachine:
             print(f"Maximum iterations reached ({max_depth}).")
             return uuid
 
-        flow_code = self.select_workflow_template(
-            goal_prompt=goal, template_uuid=template_uuid
-        )
         prompt = self.improvement_prompt(
-            goal, flow_state, flow_code, run_stdout, iteration_count
+            goal, flow_state, workflow_code, run_stdout, iteration_count
         )
         await self.recursive_self_improvement(
             goal,
             prompt,
             template_uuid=None,
-            workflow_template=flow_code if flow_state else None,
+            workflow_template=workflow_code if flow_state else None,
             iteration_count=iteration_count + 1,
             max_depth=max_depth,
             judge=judge,
