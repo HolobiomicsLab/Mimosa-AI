@@ -166,7 +166,7 @@ class WorkflowOrchestrator:
             if execution_output
             else "Workflow executed successfully with no output."
         )
-        return output, uuid, True
+        return output, uuid, workflow_code, True
 
     async def __aenter__(self):
         """Async context manager entry."""
