@@ -73,7 +73,7 @@ class WorkflowOrchestrator:
             goal_prompt: The goal description for the workflow
             workflow_template: Optional workflow template code to use
         Returns:
-            tuple[str, str, bool]: (execution_output, workflow_uuid, success_flag)
+            tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
         """
         logger = logging.getLogger(__name__)
 
@@ -100,10 +100,10 @@ class WorkflowOrchestrator:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
                 logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
-                return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, False
+                return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
                 logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
-                return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", False
+                return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
         
         generation_time = time.time() - generation_start
         logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
@@ -145,7 +145,7 @@ class WorkflowOrchestrator:
             import traceback
 
             traceback.print_exc()
-            return str(e), uuid, False
+            return str(e), uuid, workflow_code, False
         finally:
             print("\nCleaning up sandbox...")
 
