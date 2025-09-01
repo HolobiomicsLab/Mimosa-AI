@@ -20,7 +20,8 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
-from sources.utils.scenario_loader import ScenarioLoader
+from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.extensibility.human_mode import HumanMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
@@ -152,6 +153,10 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+async def manual_mode(args, config):
+    hm = HumanMode(config)
+    await hm.shellLoop()
+
 async def multigoal_mode(args, config):
     if getattr(args, 'multi_goal', False):
         goals = collect_goals_from_user()
@@ -234,6 +239,9 @@ async def main():
         "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
     )
     parser.add_argument(
+        "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
+    )
+    parser.add_argument(
         "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
     )
     parser.add_argument(
@@ -276,6 +284,8 @@ async def main():
             await dataset_execution_mode(args, config)
         elif (args.multi_goal):
             await multigoal_mode(args, config)
+        elif (args.manual):
+            await manual_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
