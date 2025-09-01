@@ -29,7 +29,7 @@
     }
   ],
   "optional": {
-    "required_tools": ["xcms_mcp", "openms_mcp"],
+    "required_tools": ["xcms_mcp"],
     "judge_model": "gpt-4o",
     "timeout": 600
   }

@@ -86,11 +86,25 @@ class WorkflowOrchestrator:
 
         # Workflow generation timing
         generation_start = time.time()
-        workflow_code, uuid = await self.workflow_factory.craft_workflow(
-            goal_prompt,
-            template_workflow=workflow_template,
-            save_workflow=True,
-        )
+        try:
+            workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                goal_prompt,
+                template_workflow=workflow_template,
+                save_workflow=True,
+            )
+        except Exception as e:
+            generation_time = time.time() - generation_start
+            # Extract UUID from exception message if available
+            error_msg = str(e)
+            if error_msg.startswith("UUID:") and "|" in error_msg:
+                uuid_part, actual_error = error_msg.split("|", 1)
+                workflow_uuid = uuid_part.replace("UUID:", "")
+                logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
+                return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, False
+            else:
+                logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
+                return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", False
+        
         generation_time = time.time() - generation_start
         logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
         print(
@@ -152,7 +166,7 @@ class WorkflowOrchestrator:
             if execution_output
             else "Workflow executed successfully with no output."
         )
-        return output, uuid, True
+        return output, uuid, workflow_code, True
 
     async def __aenter__(self):
         """Async context manager entry."""

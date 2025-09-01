@@ -19,7 +19,7 @@ dotenv.load_dotenv()
 
 # Constants
 MEMORY_DIR = Path("sources/memory")
-RESULTS_DIR = Path("datasets/runs")
+RESULTS_DIR = Path("evaluation/runs")
 config_llm = LLMConfig.from_dict({"model": "gpt-4o-mini"})
 
 
