@@ -346,3 +346,72 @@ class VisualizationUtils:
         plt.show()
 
         return fig, ax
+
+    def create_assertion_progress_plot(
+        self,
+        scenario_id: str,
+        total_assertions: int,
+        figsize: list[int, int] = (10, 6),
+    ) -> list[Any, Any, Any]:
+        """
+        Create a plot for tracking assertion validation progress over DGM iterations.
+
+        Args:
+            scenario_id: The scenario identifier
+            total_assertions: Total number of assertions in the scenario
+            figsize: Figure size as (width, height)
+
+        Returns:
+            list containing (figure, axis, line) objects
+        """
+        return self.create_real_time_curve_plot(
+            title=f"Assertion Validation Progress - {scenario_id}",
+            xlabel="DGM Iteration",
+            ylabel="Assertions Passed",
+            figsize=figsize,
+            grid=True,
+            grid_alpha=0.3,
+            line_style="g-o",
+            line_width=2,
+            marker_size=6,
+        )
+
+    def update_assertion_progress_plot(
+        self,
+        plot_data: list[Any, Any, Any],
+        assertion_history: list[list[int]],
+        total_assertions: int,
+    ) -> None:
+        """
+        Update assertion progress plot with new data.
+
+        Args:
+            plot_data: list containing (figure, axis, line) objects
+            assertion_history: list of [passed_count, total_count] for each iteration
+            total_assertions: total number of assertions in the scenario
+        """
+        if not assertion_history:
+            return
+
+        fig, ax, line = plot_data
+        iterations = list(range(1, len(assertion_history) + 1))
+        passed_counts = [entry[0] for entry in assertion_history]
+
+        # Update the main line
+        self.update_curve_plot(plot_data, iterations, passed_counts)
+
+        # Add target line showing total assertions
+        ax.axhline(y=total_assertions, color='red', linestyle='--', 
+                  alpha=0.7, label=f'Target ({total_assertions})')
+
+        # Set y-axis limits
+        ax.set_ylim(0, max(total_assertions + 1, max(passed_counts) + 1) if passed_counts else total_assertions + 1)
+
+        # Add percentage on last point
+        if passed_counts:
+            last_count = passed_counts[-1]
+            percentage = (last_count / total_assertions) * 100 if total_assertions > 0 else 0
+            ax.annotate(f'{last_count}/{total_assertions} ({percentage:.0f}%)', 
+                       xy=(iterations[-1], last_count),
+                       xytext=(5, 5), textcoords='offset points',
+                       fontsize=9, ha='left')

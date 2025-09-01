@@ -13,6 +13,9 @@ import sys
 
 import dotenv
 
+# Prevent tokenizers parallelism warnings when forking processes
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.parallel_testing import ParallelTesting
@@ -24,7 +27,7 @@ from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
 
-def setup_logging():
+def setup_logging(debug=False):
     """Configure logging with timing, line numbers, and log rotation."""
     import logging.handlers
     import os
@@ -35,7 +38,7 @@ def setup_logging():
     
     # Configure root logger
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Remove existing handlers to avoid duplication
     for handler in logger.handlers[:]:
@@ -49,7 +52,7 @@ def setup_logging():
     
     # Console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
@@ -220,7 +223,6 @@ async def normal_execution_mode(args, config):
 
 async def main():
     """Main execution function"""
-    setup_logging()
     config = Config()
     setup_signal_handlers()
     
@@ -258,11 +260,18 @@ async def main():
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
+        "--debug", action="store_true", help="Enable debug logging to console"
+    )
+    parser.add_argument(
         "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
+    
+    # Setup logging with debug flag
+    setup_logging(debug=args.debug)
+    
     apply_config_overrides(args, config)
 
     validate_environment()

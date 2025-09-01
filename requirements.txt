@@ -7,6 +7,7 @@ numpy>=2.0.0
 sentence-transformers==5.0.0
 torch>=1.11.0
 dotenv
-openai
+litellm
+openai==1.99.9
 python_a2a
 psutil>=5.9.0
