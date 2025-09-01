@@ -1,0 +1,38 @@
+graph TB
+    subgraph "🧠 MIMOSA CORE"
+        DC[Discovery Controller<br/>📡 Scan MCP Network]
+        CW[Create Workflow<br/>📋 Design Experiment]
+        WE[Workflow Engine<br/>⚙️ Task Orchestration]
+        MP[Memory<br/>🧠 Success/Failure History]
+        LA[Learning<br/>📈 Continuous Improvement]
+    end
+    
+    subgraph "🌐 NETWORK CAPABILITIES"
+        MS[📊 Mass Spec<br/>MCP Protocol]
+        PCR[🧬 PCR Machine<br/>MCP Protocol]
+        SA[🔬 Analysis Software<br/>localhost]
+    end
+    
+    T[📋 Research Task] --> DC
+    MS --> DC
+    PCR --> DC
+    SA --> DC
+    
+    DC --> |Available Tools| CW
+    CW --> |Experiment Plan| WE
+    
+    WE --> |Execute| MS
+    WE --> |Execute| PCR
+    WE --> |Execute| SA
+    
+    WE --> LA
+    LA --> |Success/Failure| MP
+    MP --> |Historical Patterns| CW
+    LA --> |Optimization| CW
+    
+    style DC fill:#e3f2fd
+    style CW fill:#fff3e0
+    style WE fill:#f3e5f5
+    style MP fill:#fff3e0
+    style LA fill:#e8f5e8
+    style T fill:#fce4ec
