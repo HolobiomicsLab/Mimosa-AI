@@ -265,11 +265,18 @@ class HumanMode:
             async with Client(f"http://{addr}:{port}/mcp") as client:
                 result = await client.call_tool(tool_name, arguments)
                 if result:
-                    try:
-                        dict_result = json.loads(result[0].text)
-                        print(self._format_output(dict_result))
-                    except json.JSONDecodeError:
-                        print(self._format_output(result[0].text))
+                    if hasattr(result, 'content') and result.content:
+                        if hasattr(result.content[0], 'text'):
+                            text_content = result.content[0].text
+                        else:
+                            text_content = str(result.content[0])
+                        try:
+                            dict_result = json.loads(text_content)
+                            print(self._format_output(dict_result))
+                        except json.JSONDecodeError:
+                            print(self._format_output(text_content))
+                    else:
+                        print("Error in parsing tool output, raw output:", (str(result)))
                     self._print_success("Tool execution completed!")
                 else:
                     self._print_info("No result returned from tool")
