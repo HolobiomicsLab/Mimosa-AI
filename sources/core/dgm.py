@@ -93,11 +93,16 @@ class GodelMachine:
         if not flow_state or "answers" not in flow_state:
             return ""
 
-        return (
+        flow_answers = (
             "\n".join(str(x) for x in flow_state["answers"])
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
+        print(f"\n\033[96m{'📝 WORKFLOW AGENTS ANSWERS':^60}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m")
+        print(f"\033[96m{flow_answers}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m\n")
+        return flow_answers
 
     def improvement_prompt(
         self,
@@ -113,18 +118,42 @@ class GodelMachine:
             flow_answers = self.get_flow_answers(flow_state)
         else:
             flow_answers = run_stdout.strip()
-        improv_prompt = "You must generate a multi-agent workflow for the goal."
+        improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
-            improv_prompt = "\n".join(
-                [
-                    "Previously written workflow code:",
-                    flow_code,
-                    "Previous attempt resulted in agents ending with following answers:",
-                    flow_answers,
-                    "You must improve the workflow based on previous execution results.",
-                    "Only change a prompt, add an agent, change a tool, etc.. ",
-                ]
-            )
+            improv_prompt = "\n".join([
+                "WORKFLOW IMPROVEMENT ANALYSIS",
+                "",
+                "Previous workflow code:",
+                flow_code,
+                "",
+                "Previous execution results:",
+                flow_answers,
+                "",
+                "MANDATORY FAILURE ANALYSIS:",
+                "1. ROOT CAUSE IDENTIFICATION:",
+                "   - What specific step(s) failed and why?",
+                "   - Was it a tool limitation, incorrect parameters, or wrong approach?",
+                "   - Did the workflow make incorrect assumptions about data availability?",
+                "",
+                "2. ALTERNATIVE APPROACH EVALUATION:",
+                "   - What are 3 different ways to accomplish this task?",
+                "   - Which tools were NOT used that could be relevant?",
+                "   - Are there backup strategies if primary approach fails?",
+                "",
+                "3. TOOL USAGE OPTIMIZATION:",
+                "   - Were search parameters too narrow/broad?",
+                "   - Should multiple search strategies be combined?",
+                "   - Are there preprocessing steps needed before tool usage?",
+                "",
+                "REQUIRED IMPROVEMENTS:",
+                "- Add fallback mechanisms for when primary tools fail",
+                "- Implement broader search strategies (multiple APIs, different keywords)",
+                "- Include validation steps to verify results before proceeding",
+                "- Add conditional logic to try alternative approaches automatically",
+                "",
+                "Generate an IMPROVED workflow that addresses identified failure modes.",
+                "The new workflow must be structurally different from the previous attempt."
+            ])
 
         return "".join(
             [
@@ -154,7 +183,11 @@ class GodelMachine:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal_prompt,
             )
-            print(f"Selected {len(candidates)} candidates for goal '{goal_prompt}'")
+            print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m")
+            print(f"\033[96mSelected {len(candidates)} candidates for goal:\033[0m")
+            print(f"\033[96m{goal_prompt}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m\n")
             return candidates[0].code if candidates else None
         workflow_path = f"{self.workflow_dir}/{template_uuid}"
         if not os.path.exists(workflow_path):
@@ -194,14 +227,14 @@ class GodelMachine:
         - human_validation (bool, optional): Whether human validation is required.
         """
 
-        template = self.select_workflow_template(
-            goal_prompt, template_uuid=template_uuid
-        )
-
-        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"\n{'📋 CURRENT TASK':^60}")
         print(f"{'─' * 60}")
         print(f"  {goal_prompt}")
         print(f"{'─' * 60}\n")
+
+        template = self.select_workflow_template(
+            goal_prompt, template_uuid=template_uuid
+        )
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
@@ -295,7 +328,7 @@ class GodelMachine:
             f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}..."
         )
 
-        run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal_prompt=prompt,
             workflow_template=workflow_template if iteration_count == 0 else None,
         )
@@ -392,17 +425,14 @@ class GodelMachine:
                 print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
             return uuid
 
-        flow_code = self.select_workflow_template(
-            goal_prompt=goal, template_uuid=template_uuid
-        )
         prompt = self.improvement_prompt(
-            goal, flow_state, flow_code, run_stdout, iteration_count
+            goal, flow_state, workflow_code, run_stdout, iteration_count
         )
         await self.recursive_self_improvement(
             goal,
             prompt,
             template_uuid=None,
-            workflow_template=flow_code if flow_state else None,
+            workflow_template=workflow_code if flow_state else None,
             iteration_count=iteration_count + 1,
             max_depth=max_depth,
             judge=judge,

@@ -87,6 +87,7 @@ A prompt must specify:
 - A completion protocol
 
 ### Step 2: Create Agents
+
 Instantiate each agent using `SmolAgentFactory`, assigning a name, the instruction prompt, and a single tool package. For agents that only need to write and execute Python code, pass an empty list `[]` for the tools.
 
 ```python
@@ -96,6 +97,8 @@ agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_
 # Agent that only writes and executes Python code (no special tools).
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])
 ```
+
+Filesystem consideration: Agent should NOT use they base python coding ability to list files or interact with local directory, this is because their PATH is different from the PATH for Tools execution. If possible provide agent with filesystem related tools (even if that mean an agent has 2 tools package). You might specify this limitation in agent prompt.
 
 ### Step 3: Define Conditional Routing Function(s)
 Create functions that take the `WorkflowState` and return the name of the next node. This is the brain of your workflow. Inspect `state["answers"][-1]` for the completion keywords.

@@ -320,6 +320,7 @@ from typing import TypedDict, List
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
+ENGINE_NAME = {self.config.engine_name!r}
 GOAL = {goal_prompt!r}
 
 # Load tools
