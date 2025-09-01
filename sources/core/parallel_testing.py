@@ -221,7 +221,7 @@ class ParallelTesting:
 
             loop.run_until_complete(
                 dgm.start_dgm(
-                    goal_prompt=goal,
+                    goal=goal,
                     template_uuid=template_uuid,
                     judge=judge,
                     human_validation=human_validation,

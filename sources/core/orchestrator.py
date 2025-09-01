@@ -64,13 +64,14 @@ class WorkflowOrchestrator:
 
     async def orchestrate_workflow(
         self,
-        goal_prompt: str,
-        workflow_template: str | None = None,
+        goal: str,
+        craft_instructions: str
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
         Args:
-            goal_prompt: The goal description for the workflow
+            goal: The goal for the workflow
+            craft_instructions: Instructions for crafting the workflow, usually output from previous failed attempt
             workflow_template: Optional workflow template code to use
         Returns:
             tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
@@ -80,16 +81,16 @@ class WorkflowOrchestrator:
         workflow_start_time = time.time()
         execution_output = ""
 
-        logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal_prompt[:50]}...")
+        logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
         print(f"\n\033[96m{'🏗️  WORKFLOW GENERATION PHASE':^80}\033[0m")
         print(f"\033[96m{'=' * 80}\033[0m")
 
         # Workflow generation timing
         generation_start = time.time()
         try:
-            workflow_code, uuid = await self.workflow_factory.craft_workflow(
-                goal_prompt,
-                template_workflow=workflow_template,
+            complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                goal,
+                craft_instructions,
                 save_workflow=True,
             )
         except Exception as e:
@@ -129,7 +130,7 @@ class WorkflowOrchestrator:
             print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
             print(f"\033[96m{'=' * 80}\033[0m")
             exec_start = time.time()
-            execution_output = await self.workflow_sandbox_run(workflow_code)
+            execution_output = await self.workflow_sandbox_run(complete_code)
             exec_time = time.time() - exec_start
             logger.info(f"[WORKFLOW EXECUTION] {uuid} executed in {exec_time:.3f}s")
             print(

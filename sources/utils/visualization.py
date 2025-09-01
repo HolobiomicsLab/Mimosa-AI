@@ -102,20 +102,20 @@ class VisualizationUtils:
         # plt.draw() and plt.pause() removed
 
     def create_rewards_curve_plot(
-        self, goal_prompt: str, figsize: list[int, int] = (10, 6)
+        self, goal: str, figsize: list[int, int] = (10, 6)
     ) -> list[Any, Any, Any]:
         """
         Create a specialized rewards curve plot for tracking algorithm performance.
 
         Args:
-            goal_prompt: The goal prompt to include in the title
+            goal: The goal prompt to include in the title
             figsize: Figure size as (width, height)
 
         Returns:
             list containing (figure, axis, line) objects
         """
         return self.create_real_time_curve_plot(
-            title=f"Rewards Curve - {goal_prompt}",
+            title=f"Rewards Curve - {goal}",
             xlabel="Iteration",
             ylabel="Rewards",
             figsize=figsize,
