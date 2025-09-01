@@ -209,7 +209,7 @@ async def normal_execution_mode(args, config):
         await dgm.start_dgm(goal_prompt=args.task,
                             judge=args.judge, 
                             scenario_id=args.scenario,
-                            human_validation=True,
+                            human_validation=False,
                             max_iteration=args.max_dgm_iterations
                            )
     elif args.goal:

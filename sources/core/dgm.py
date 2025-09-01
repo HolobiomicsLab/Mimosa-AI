@@ -308,7 +308,7 @@ class GodelMachine:
 
         if iteration_count > 0 and need_human_validation:
             human_validation = (
-                input("Continue with next iteration? (yes/no): ").strip().lower()
+                input("Attempt to retry task? (yes/no): ").strip().lower()
             )
             if human_validation not in ["yes", "y"]:
                 print("Exiting self-improvement loop.\n")
@@ -316,7 +316,8 @@ class GodelMachine:
 
         print(f"\n\033[94m{'=' * 60}\033[0m")
         print(
-            f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop\033[0m"
+            f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
+            f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m"
         )
         print(f"\033[94m{'=' * 60}\033[0m")
         print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
