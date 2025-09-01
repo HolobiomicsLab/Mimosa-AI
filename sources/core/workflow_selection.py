@@ -1,26 +1,11 @@
-import json
 import sys
 from pathlib import Path
-from statistics import mean
-
 from sentence_transformers import SentenceTransformer
-
-from config import Config
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-
-class WorkflowInfo:
-    def __init__(self, uuid, state_result, goal, code, overall_score=0.0):
-        self.uuid = uuid
-        self.goal = goal
-        self.state_result = state_result
-        self.code = code
-        self.overall_score = overall_score
-
-
-# WF = WorkflowInfo  # Alias for easier reference
-
+from config import Config
+from sources.core.workflow_info import WorkflowInfo
 
 class WorkflowSelector:
     def __init__(self, config: Config) -> None:
@@ -35,52 +20,30 @@ class WorkflowSelector:
         if not self.workflows_folder.exists():
             print(f"Workflows directory {self.workflows_folder} does not exist.")
             return workflows
+            
         for workflow_folder in self.workflows_folder.iterdir():
-            goal = ""
-            code = None
-            state_result = None
-            uuid = workflow_folder.name
-            overall_score = 0.0
-            state_file = workflow_folder / "state_result.json"
-            code_file = workflow_folder / f"workflow_code_{uuid}.py"
-
             if not workflow_folder.is_dir():
                 continue
-            if not state_file.exists():
-                continue
-            if not code_file.exists():
-                raise ValueError(
-                    f"Workflow code file {code_file} does not exist for UUID {uuid}."
-                )
-
-            try:
-                with open(state_file) as f:
-                    content = f.read().strip()
-                    if not content:
-                        print(f"Skipping workflow {uuid}: empty state_result.json")
-                        continue
-                    state_result = json.loads(content)
-                with open(code_file) as f:
-                    code = f.read()
-            except Exception as e:
-                print(f"can't read workflow files for UUID {uuid}: {e}")
-                continue
-
-            if state_result:
-                goal = state_result.get("goal", "")
-                evaluation = state_result.get("evaluation", {})
-                scores = []
-                if evaluation:
-                    if "generic" in evaluation:
-                        scores.append(evaluation["generic"]["overall_score"])
-                    elif "scenario" in evaluation:
-                        scores.append(evaluation["scenario"]["score"])
-                overall_score = mean(scores) if scores else 0.0
-
+                
             uuid = workflow_folder.name
-            workflows[uuid] = WorkflowInfo(
-                uuid, state_result, goal, code, overall_score
-            )
+            workflow_info = WorkflowInfo(uuid, workflow_folder)
+            
+            if not workflow_info.is_valid():
+                print(f"Skipping workflow {uuid}: missing required files")
+                continue
+                
+            # Check if state_result is empty
+            if not workflow_info.load_state_result():
+                print(f"Skipping workflow {uuid}: empty state_result.json")
+                continue
+        
+            workflow_info.load_code()
+            if not workflow_info.code:
+                print(f"Skipping workflow {uuid}: unable to load code")
+                continue
+                
+            workflows[uuid] = workflow_info
+            
         return workflows
 
     def cosine_similarity(self, a: str, b: str) -> float:
@@ -129,7 +92,7 @@ class WorkflowSelector:
         return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
 
     def select_best_workflows(
-        self, goal: str, threshold_similary=0.8, threshod_score=0.7
+        self, goal: str, threshold_similary=0.5, threshod_score=0.0
     ) -> list[WorkflowInfo]:
         """Choose a workflow that matches the goal with a minimum threshold."""
         similar_workflows = self.sort_similar_workflows(goal, threshold_similary)
@@ -141,7 +104,7 @@ if __name__ == "__main__":
     config = Config()
     config.workflow_dir = "../workflows"
     mcts = WorkflowSelector(config)
-    goal = "install prima.cpp and run a simple script"
+    goal = "Search the paper Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results, read and install all the required software of code required to reproduce the experiments"
     matching_workflow = mcts.select_best_workflows(goal)
     print("Best matching workflow:")
     for wf in matching_workflow:
