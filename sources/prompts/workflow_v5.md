@@ -26,7 +26,7 @@ The following components are pre-loaded in the execution environment. You must u
 | `WorkflowState`       | The `TypedDict` for graph state. You cannot modify its schema.           |
 | `SmolAgentFactory`    | Class to create agent instances. `SmolAgentFactory(name, prompt, tools)` |
 | `WorkflowNodeFactory` | Class to create graph nodes. `create_agent_node(agent_instance)`         |
-| `EXISTING_TOOLS_*`    | Pre-defined tool packages (e.g., `EXISTING_TOOLS_WEB`, `EXISTING_TOOLS_FILE`). |
+| `EXISTING_TOOLS_*`    | Pre-defined tool packages (e.g., `WEB_SEARCH_MCP`, `EXISTING_TOOLS_FILE`). |
 
 ### Workflow State Schema
 ```python
@@ -42,7 +42,7 @@ class WorkflowState(TypedDict):
 Domain specific tools package will be provided to you. For example:
 
 The following tools packages are available for agents:
-`EXISTING_TOOLS_WEB`, `EXISTING_TOOLS_CHART`
+`WEB_SEARCH_MCP`, `EXISTING_TOOLS_CHART`
 
 Assign exactly one tool package to each agent. Prefer creating additional specialized agents with distinct tool packages rather than assigning multiple tools to a single general-purpose agent.
 
@@ -68,12 +68,12 @@ You are a master web researcher tasked with conducting thorough online research 
 
 You will only receive a research goal from the user. Likely a research paper title.
 
-
 ## COMPLETION PROTOCOL
 - On success, end with:
-    SUCCESS: [Structured summary of research findings with key points, credible sources, and relevant hyperlinks]
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
 - On failure, end with:
-    FAILURE: [Explanation of search efforts attempted, challenges encountered, and why the research objective couldn't be completed]
+    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
 """
 ```
 
@@ -90,7 +90,7 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 
 # Agent that only writes and executes Python code (no special tools).
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])
@@ -107,41 +107,21 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - Router functions must return keys like `"next_node"`, `"retry_path"`, `"fallback_path"`, or `END`
 - Ensure all returned routing targets are defined in your conditional edges mapping
 - The agent can't see the state by itself
+- Make one router for each node. Do not make a generic router.
 
 ```python
-def master_router(state: WorkflowState) -> str:
-    last_answer = state["answers"][-1]
-    current_agent = state["step_name"][-1] # researcher in this example
-    # IMPORTANT: Use first node name as fallback, NEVER use START
-    previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
-
+def route_after_researcher(state: WorkflowState) -> str:
+    last_answer = state["answers"][-1] if state["answers"] else ""
+    
     if "SUCCESS:" in last_answer:
-        print(f"✅ Success from '{current_agent}'. Proceeding.")
-        # Logic to determine the next step after success
-        return "next_node"
-    
-    elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
-         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return "fallback_path" # Example of backtracking
-    
-    elif "RETRY:" in last_answer: # The agent thinks he can succeed his task ins another way
-        retry_count = sum(
-            1 for step in state["step_name"][-3:] if step == current_agent
-        )
-        if retry_count <= 1:
-            print(f"🔄 Retry from '{current_agent}'.")
-            return "retry_path"
-        else:
-            print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
-            return "fallback_path"
-
-    elif "FAILURE:" in last_answer: # Catches FAILURE or any other unhandled response
-        print(f"❌ Failure from '{current_agent}'. Aborting.")
-        return END
-    
-    else :
-        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Terminating.")
-        return END # workflow need to be modified to avoid such failure case
+        print("✅ Researcher completed. Proceeding to writing.")
+        return "to_writer"
+    elif "FAILURE:" in last_answer:
+        print("❌ Researcher failed. Cannot proceed.")
+        return "to_end"
+    else:
+        print("⛔ Protocol violation by researcher. Terminating.")
+        return "to_end"
 ```
 
 ### Step 4: Assemble the Graph
@@ -150,47 +130,122 @@ Do not compile the workflow, it is already in the context.
 Be sure to name the StateGraph `workflow`.
 
 ```python
+
 # --- WORKFLOW SCRIPT ---
 
 # 1. MANDATORY Workflow Initialization
-workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
+workflow = StateGraph(WorkflowState)
 
-# 2. AGENT INSTRUCTIONS (Define all prompts here)
-instruct_researcher = """..."""
-instruct_coder = """..."""
-instruct_formatter = """..."""
+# 2. AGENT INSTRUCTIONS
+instruct_researcher = """
+You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
 
-# 3. AGENT CREATION (Instantiate all agents here)
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
-agent_coder = SmolAgentFactory("coder", instruct_coder, [])
-agent_formatter = SmolAgentFactory("formatter", instruct_formatter, CSV_TOOLS)
+## TASK
+Conduct thorough web searches to collect accurate information from reliable sources. Cross-reference multiple sources and provide structured findings with proper attribution.
 
-# 4. NODE DEFINITION (Add agents to the workflow here)
+## RECEIVED INFORMATION
+You will receive a research topic or question from the user that needs investigation.
+
+## COMPLETION PROTOCOL
+- On success, end with:
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
+- On failure, end with:
+    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On impossible task, end with:
+    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+"""
+
+instruct_coder = """
+You are a Python coding specialist responsible for writing, executing, and debugging code based on research data.
+
+## TASK
+Create and execute Python code to process information, generate outputs, or solve computational problems. Write clean, well-documented code that handles edge cases.
+
+## RECEIVED INFORMATION
+You will receive research findings or data from previous agents that you need to process or analyze through code.
+
+## COMPLETION PROTOCOL
+
+- On success, end with:
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
+- On coding failure, end with:
+    final_answer('{"status": "CODING_FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On missing data, end with:
+    final_answer('{"status": "MISSING_DATA", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On impossible task, end with:
+    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+"""
+
+# 3. AGENT CREATION
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, [])  # Uses base Python execution
+
+# 4. NODE DEFINITION
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
 workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
-workflow.add_node("formatter", WorkflowNodeFactory.create_agent_node(agent_formatter))
 
-# 5. ROUTING FUNCTION (Define routing logic here)
-def master_router(state: WorkflowState) -> str:
-    # ... (implementation from above) ...
+# 5. AGENT-SPECIFIC ROUTING FUNCTIONS
+def route_after_researcher(state: WorkflowState) -> str:
+    last_answer = state["answers"][-1] if state["answers"] else ""
+    
+    if "SUCCESS:" in last_answer:
+        print("✅ Research completed. Proceeding to coding.")
+        return "to_coder"
+    elif "RETRY:" in last_answer:
+        print("🔄 Research needs retry. Attempting again.")
+        return "retry_researcher"
+    elif "IMPOSSIBLE:" in last_answer:
+        print("❌ Research deemed impossible. Terminating workflow.")
+        return "end_workflow"
+    else:
+        print("⛔ Protocol violation by researcher. Terminating.")
+        return "end_workflow"
 
-# 6. EDGE DEFINITION (Wire the graph together here)
+def route_after_coder(state: WorkflowState) -> str:
+    last_answer = state["answers"][-1] if state["answers"] else ""
+    
+    if "SUCCESS:" in last_answer:
+        print("✅ Coding task completed successfully!")
+        return "end_workflow"
+    elif "CODING_FAILURE:" in last_answer:
+        print("🔄 Coding failed. Retrying with fixes.")
+        return "retry_coder"
+    elif "MISSING_DATA:" in last_answer:
+        print("📊 Need more data. Routing back to researcher.")
+        return "back_to_researcher"
+    elif "IMPOSSIBLE:" in last_answer:
+        print("❌ Coding task impossible. Terminating.")
+        return "end_workflow"
+    else:
+        print("⛔ Protocol violation by coder. Terminating.")
+        return "end_workflow"
+
+# 6. EDGE DEFINITION
 workflow.add_edge(START, "researcher")
 
 workflow.add_conditional_edges(
     "researcher",
-    master_router,
-    {"fallback_path": "researcher", "retry_path": "researcher", "next_node":"coder", END:END}
+    route_after_researcher,
+    {
+        "to_coder": "coder",
+        "retry_researcher": "researcher",
+        "end_workflow": END
+    }
 )
+
 workflow.add_conditional_edges(
     "coder",
-    master_router,
-    {"fallback_path": "researcher", "retry_path": "coder", "next_node":"formatter", END:END}
-)
-workflow.add_conditional_edges(
-    "formatter",
-    master_router,
-    {"fallback_path": "researcher", "retry_path": "formatter", "next_node":END, END:END}
+    route_after_coder,
+    {
+        "retry_coder": "coder",
+        "back_to_researcher": "researcher",
+        "end_workflow": END
+    }
 )
 
 # --- END OF SCRIPT ---
