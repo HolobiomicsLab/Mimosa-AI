@@ -224,3 +224,5 @@ docs/project.xml
 
 sources/cache
 tests/browser.py
+
+tests/perso
