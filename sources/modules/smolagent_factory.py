@@ -219,22 +219,35 @@ class SmolAgentFactory:
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        if state_answers:
-            prev_infos = f"""Previous agent {state["step_name"][-1]} provided the following information:
-            {state_answers[-1]}"""
+        step_names = state.get("step_name", [])
+        
+        if not state_answers or len(state_answers) == 0:
+            prev_infos = "\n"
         else:
-            prev_infos = f"""You are the first agent. No information is available from previous agents."""
-        return f"""
-        You must pursue a goal for accomplishing a task. You are part of a multi-agent system.
-        You might receive informations from other agents, these informations might be incomplete or incorrect.
-        You must try your best to accomplish the task with the information you have. If impossible you might give up and return a failure message.
-        {prev_infos}
+            min_length = min(len(step_names), len(state_answers))
+            step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
+            recent_steps = step_pairs[-3:]
 
-        Your goal is:
-        {self.instruct_prompt}
-        """
+            prev_infos = "Informations given by previous agents:\n"
+            for step_name, answer in recent_steps:
+                truncated_answer = str(answer)[:500] + "..." if len(str(answer)) > 500 else str(answer)
+                prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
+        
+        return f"""You must pursue a goal.
+    {prev_infos}
+    IMPORTANT INSTRUCTIONS:
+    - You might receive information from other agents that could be incomplete or incorrect.
+    - If the task is impossible with available information, provide a clear failure message explaining why.
+    - Giving up is fine as long as you clearly explain why.
+    - Do not obsess over a single approach, be flexible and adapt.
+    - final_answer must start with a keyword such as SUCCESS:, FAILURE:, RETRY, etc... followed by a very very detailed explanation.
+    - final_answer tool should NEVER be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
 
-    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
+    Your specific goal is:
+    {self.instruct_prompt}
+    """
+
+    def parse_memory_output(self):
         actions, observations, success = [], [], []
         for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):
