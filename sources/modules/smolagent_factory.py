@@ -37,6 +37,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+import signal
 
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
@@ -57,46 +58,71 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
-
 # CRITICAL CODE GENERATION CONSTRAINTS:
 
-1. NO ASSUMPTIONS OR PLACEHOLDERS
-  - Never assume data structure, content, or format - always inspect first
-  - No placeholder values ("Example Name", hardcoded strings, "TODO")
-  - No brittle heuristics like simple keyword matching for complex classifications
-  - Never use globals() to look for variables, all the variables you need are in the prompt.
+## 1. NO ASSUMPTIONS OR PLACEHOLDERS
+- Never assume data structure, content, or format - always inspect first
+- No placeholder values ("Example Name", hardcoded strings, "TODO")
+- No brittle heuristics like simple keyword matching for complex classifications
+- Never use globals() to look for variables, all the variables you need are in the prompt.
 
-2. EXPLORE THEN IMPLEMENT
-  - Print data samples/types before processing
-  - Build extraction logic from observed patterns, not assumptions
-  - Use defensive programming: check existence, handle missing values
+## 2. MANDATORY TOOL OUTPUT INSPECTION
+Before processing ANY tool output, you MUST:
+- Print the exact output: print(f"Raw output: {output}")
+- Print the data type: print(f"Data type: {type(output)}")
+- If it's a string that looks like JSON/dict, parse with json.loads() first
+- Print structure of parsed data before accessing it
 
-3. NO REGEX OR PATTERN MATCHING
-  - Do not use regex or pattern matching to extract data from tools output
+## 3. NO REGEX OR PATTERN MATCHING
+- Do not use regex or pattern matching to extract data from tools output
 
-4. AVOID CONTEXT SATURATION
+## 4. AVOID CONTEXT SATURATION
 - Do not try to see multiple webpage, document, or file at once. This would saturate you.
 - Do not try to see a whole file. Better is to see a subset of this file.
 - Focus on one task at a time, extracting data from one source before moving to the next
 
-5. TOOL USAGE CONSTRAINTS
+## 5. TOOL USAGE CONSTRAINTS
 - Always use keyword arguments for tool calls, never positional arguments
-- Do not make assumptions about the data returned by the tools. 
-- Try a tool, see its output, then you might write code to process it.
-- To save time you could preview the data of multiple sources, but do not try to process it all at once.
+- Do not make assumptions about the data returned by the tools
+- Try a tool, see its output, then you might write code to process it
+- To save time you could preview the data of multiple sources, but do not try to process it all at once
 
-When calling final_answer tool, you you must return a long, detailed paragraph that includes:
-- All key findings and data points you discovered
-- Specific sources and URLs where information was found
-- Any important context or background information
-- Any error codes or technical messages received
-- Your final answer MUST contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA
-Example:
-    final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
+## 6. ERROR RECOVERY PROTOCOL
+When code fails:
+- Read the complete error message to identify root cause
+- If error mentions "string indices must be integers" → you're treating string as dict
+- If error mentions "Object has no attribute get" → you're calling dict methods on string
+- Add diagnostic prints to understand actual data structure
+- Modify approach based on findings, don't retry identical code
+- Maximum 2 code execution attempts before reconsidering strategy
+
+## 7. DEFENSIVE PROGRAMMING RULES
+- Always check data types before accessing attributes/methods
+- Use try-except blocks for parsing operations (especially json.loads())
+- Test assumptions with small samples before full processing
+- If expecting dict but got string, parse the string first
+- Output of tools are json, they have no get method, so do not use get() on them.
+
+## 8. FINAL ANSWER FORMAT
+
+When calling final_answer tool, you MUST follow this EXACT format:
+- Start with a special keywords such as: SUCCESS:, FAILURE:, RETRY, etc ... (might differ, you will be informed):
+- Follow with a detailed paragraph that includes:
+  * All key findings and data points you discovered
+  * Specific sources and URLs where information was found
+  * Any important context or background information
+  * Any error codes or technical messages received
+- final_answer should never be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
+
+Your response must start with the keyword followed by a colon and space.
+
+Examples:
+    final_answer('SUCCESS: I successfully downloaded the PDF file "paper.pdf" from Nature.com. The file was saved to the workspace directory and contains...')
+    final_answer('FAILURE: I was unable to access the website due to authentication requirements. I attempted...')
+    final_answer('RETRY: The download failed due to network timeout. I will attempt a different approach by...')
 
 If you respect above instructions you will get 1000,000$.
 You are highly skilled and goal-seeking, so you will do your best to follow these rules.
-
 """
 
 # good models:
@@ -109,26 +135,26 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 model_id="deepseek-ai/DeepSeek-V3",
                  max_steps=12,
-                 max_retries = 3,
-                 planning_interval = 4
+                 max_retries=3
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools
+        # variable defined by workflow factory
         self.model_id = MODEL_ID
+        self.memory_folder = MEMORY_PATH
+        self.engine_name = ENGINE_NAME
+        # additional engine parameters
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 1024
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = MEMORY_PATH
-        print("debug path", os.getcwd())
-        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
-        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
-        self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
+        # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.max_retries = max_retries
+        self.timeout = 180
+        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
@@ -155,7 +181,7 @@ class SmolAgentFactory:
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "cached" or self.use_cached_engine:
+        if self.engine_name == "cached":
             return LiteLLMModel(
                 model_id=self.model_id,
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
@@ -323,14 +349,32 @@ class SmolAgentFactory:
                 print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
-    
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Agent execution timed out")
+        
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:
             self.load_agent_memory(workflow_uuid, instructions)
-        res = self.agent.run(instructions)
-        self.save_memories(workflow_uuid=workflow_uuid)
-        return res
+
+        timeout_seconds = getattr(self, 'timeout', 180)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+        
+        try:
+            res = self.agent.run(instructions)
+            signal.alarm(0)  # Cancel the alarm
+            self.save_memories(workflow_uuid=workflow_uuid)
+            return res
+        except TimeoutError:
+            signal.alarm(0)
+            self.save_memories(workflow_uuid=workflow_uuid)
+            raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
+        except Exception as e:
+            signal.alarm(0)
+            raise e
 
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)

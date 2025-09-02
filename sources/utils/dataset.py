@@ -4,10 +4,11 @@ import os
 import random
 from pathlib import Path
 
+eval_path = Path('sources/evaluation')
 
 def resolve_dataset_path(dataset_file: str) -> Path:
-    path_1 = Path("datasets") / f"{dataset_file}.jsonl"
-    path_2 = Path("datasets") / dataset_file
+    path_1 = eval_path /"datasets" / f"{dataset_file}.jsonl"
+    path_2 = Path("evaluation/datasets") / dataset_file
     if os.path.exists(path_1):
         return path_1
     if os.path.exists(path_2):
@@ -85,7 +86,7 @@ def calculate_good_answer_average(
 
     # Create a timestamp for filenames
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_filename = f"datasets/runs/run_{dataset_name}_{timestamp}.json"
+    json_filename = eval_path / "runs" / f"run_{dataset_name}_{timestamp}.json"
 
     os.makedirs("datasets/runs", exist_ok=True)
 

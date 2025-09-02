@@ -58,9 +58,9 @@ Launch the toolomics MCP server following the instructions at [HolobiomicsLab/to
 #### Step 4: Run Mimosa-AI
 
 ```sh
-python3 main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
+python3 main.py --goal "Your objective here"
 # or
-uv run main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
+uv run main.py --goal "Your objective here"
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
@@ -76,7 +76,6 @@ Mimosa-AI supports various command line arguments to customize execution:
 - `--dataset DATASET_FOLDER`: Evaluate Mimosa on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
 
 ### Evaluation & Performance
-- `--load_template TEMPLATE_UUID`: Optional. Instead of generating workflow, use  a predefined workflow template from workflows folder (only for `--task` mode)
 - `--judge`: Enable judge for workflow evaluation (default: disabled)
 - `--max_concurrent N`: Maximum number of concurrent tasks, only for `--multi_goal` and `--dataset` mode. (default: 16)
 - `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
@@ -104,7 +103,53 @@ Multi-goal, enter a series of goal to run in parrallel.
  uv run main.py --multi_goal --judge
 ```
 
-**`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
+## 🔧 Tool Discovery
+
+Mimosa-AI provides a convenient script to discover and list all available MCP (Model Context Protocol) tools:
+
+### List Available Tools
+
+```sh
+# Quick overview (most concise)
+./list_tools.sh --compact
+
+# Standard detailed view with descriptions
+./list_tools.sh --format detailed
+
+# Table format (clean and structured)
+./list_tools.sh --format table
+
+# JSON output for automation/scripting
+./list_tools.sh --format json
+
+# Include generated client code examples
+./list_tools.sh --format table --show-code
+```
+
+### Tool Discovery Options
+
+- **`--compact`**: Most concise output showing server names and tool lists
+- **`--format FORMAT`**: Choose output format (table, json, detailed, compact)
+- **`--show-code`**: Display generated Python client code for workflow integration
+- **`--help`**: Show usage information and all available options
+
+**Example Output (Compact Format):**
+```
+🔧 TOOL SUMMARY
+========================================
+Git MCP (12 tools)
+  git_status, git_diff_unstaged, git_diff_staged, git_commit, git_add
+
+Browser MCP (7 tools)  
+  search, navigate, get_links, download_file, take_screenshot
+
+Time MCP (2 tools)
+  get_current_time, convert_time
+
+Total: 3 server(s), 21 tool(s)
+```
+
+> **Note**: Requires ToolHive to be installed and MCP servers to be running. Use `thv list` to see available servers and `thv start <server-name>` to start them.
 
 ## Use Caching system
 
@@ -144,10 +189,8 @@ export USE_CACHED_ENGINE="true"
 Then run *Mimosa* as usual.
 
 ```sh
-python3 main.py --goal "<goal>" --load_template <optional existing workflow uuid>
+python3 main.py --goal "<goal>"
 ```
-
-
 
 ## 📈 Telemetry Setup
 

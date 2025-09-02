@@ -64,33 +64,48 @@ class WorkflowOrchestrator:
 
     async def orchestrate_workflow(
         self,
-        goal_prompt: str,
-        workflow_template: str | None = None,
+        goal: str,
+        craft_instructions: str
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
         Args:
-            goal_prompt: The goal description for the workflow
+            goal: The goal for the workflow
+            craft_instructions: Instructions for crafting the workflow, usually output from previous failed attempt
             workflow_template: Optional workflow template code to use
         Returns:
-            tuple[str, str, bool]: (execution_output, workflow_uuid, success_flag)
+            tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
         """
         logger = logging.getLogger(__name__)
 
         workflow_start_time = time.time()
         execution_output = ""
 
-        logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal_prompt[:50]}...")
+        logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
         print(f"\n\033[96m{'🏗️  WORKFLOW GENERATION PHASE':^80}\033[0m")
         print(f"\033[96m{'=' * 80}\033[0m")
 
         # Workflow generation timing
         generation_start = time.time()
-        workflow_code, uuid = await self.workflow_factory.craft_workflow(
-            goal_prompt,
-            template_workflow=workflow_template,
-            save_workflow=True,
-        )
+        try:
+            complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                goal,
+                craft_instructions,
+                save_workflow=True,
+            )
+        except Exception as e:
+            generation_time = time.time() - generation_start
+            # Extract UUID from exception message if available
+            error_msg = str(e)
+            if error_msg.startswith("UUID:") and "|" in error_msg:
+                uuid_part, actual_error = error_msg.split("|", 1)
+                workflow_uuid = uuid_part.replace("UUID:", "")
+                logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
+                return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
+            else:
+                logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
+                return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
+        
         generation_time = time.time() - generation_start
         logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
         print(
@@ -115,7 +130,7 @@ class WorkflowOrchestrator:
             print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
             print(f"\033[96m{'=' * 80}\033[0m")
             exec_start = time.time()
-            execution_output = await self.workflow_sandbox_run(workflow_code)
+            execution_output = await self.workflow_sandbox_run(complete_code)
             exec_time = time.time() - exec_start
             logger.info(f"[WORKFLOW EXECUTION] {uuid} executed in {exec_time:.3f}s")
             print(
@@ -131,7 +146,7 @@ class WorkflowOrchestrator:
             import traceback
 
             traceback.print_exc()
-            return str(e), uuid, False
+            return str(e), uuid, workflow_code, False
         finally:
             print("\nCleaning up sandbox...")
 
@@ -152,7 +167,7 @@ class WorkflowOrchestrator:
             if execution_output
             else "Workflow executed successfully with no output."
         )
-        return output, uuid, True
+        return output, uuid, workflow_code, True
 
     async def __aenter__(self):
         """Async context manager entry."""

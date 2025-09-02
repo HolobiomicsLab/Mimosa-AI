@@ -13,17 +13,21 @@ import sys
 
 import dotenv
 
+# Prevent tokenizers parallelism warnings when forking processes
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.utils.scenario_loader import ScenarioLoader
+from sources.extensibility.human_mode import HumanMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
 
-def setup_logging():
+def setup_logging(debug=False):
     """Configure logging with timing, line numbers, and log rotation."""
     import logging.handlers
     import os
@@ -34,7 +38,7 @@ def setup_logging():
     
     # Configure root logger
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Remove existing handlers to avoid duplication
     for handler in logger.handlers[:]:
@@ -48,7 +52,7 @@ def setup_logging():
     
     # Console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
@@ -149,6 +153,10 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+async def manual_mode(args, config):
+    hm = HumanMode(config)
+    await hm.shellLoop()
+
 async def multigoal_mode(args, config):
     if getattr(args, 'multi_goal', False):
         goals = collect_goals_from_user()
@@ -198,10 +206,10 @@ async def normal_execution_mode(args, config):
         args.task = scenario_file["goal"]
         args.judge = True
     if args.task:
-        await dgm.start_dgm(goal_prompt=args.task,
+        await dgm.start_dgm(goal=args.task,
                             judge=args.judge, 
                             scenario_id=args.scenario,
-                            human_validation=True,
+                            human_validation=False,
                             max_iteration=args.max_dgm_iterations
                            )
     elif args.goal:
@@ -215,7 +223,6 @@ async def normal_execution_mode(args, config):
 
 async def main():
     """Main execution function"""
-    setup_logging()
     config = Config()
     setup_signal_handlers()
     
@@ -230,6 +237,9 @@ async def main():
     )
     parser.add_argument(
         "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
+    )
+    parser.add_argument(
+        "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
     )
     parser.add_argument(
         "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
@@ -250,11 +260,18 @@ async def main():
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
+        "--debug", action="store_true", help="Enable debug logging to console"
+    )
+    parser.add_argument(
         "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
+    
+    # Setup logging with debug flag
+    setup_logging(debug=args.debug)
+    
     apply_config_overrides(args, config)
 
     validate_environment()
@@ -267,6 +284,8 @@ async def main():
             await dataset_execution_mode(args, config)
         elif (args.multi_goal):
             await multigoal_mode(args, config)
+        elif (args.manual):
+            await manual_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
