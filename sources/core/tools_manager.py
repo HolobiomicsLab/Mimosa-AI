@@ -315,7 +315,7 @@ class ToolManager:
                     print(f"⚠️ Attempting full restart for ToolHive server {name}...")
                     if self._attempt_full_mcp_restart(name):
                         print(f"✅ Successfully restarted ToolHive server {name}")
-                        return self.discover_toolhive_servers()  # Retry discovery after restart
+                        return await self.discover_toolhive_servers()  # Retry discovery after restart
                     else:
                         print(f"❌ Failed to restart ToolHive server {name}")
             return mcps
