@@ -280,7 +280,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         workflow_path: str,
         memory_path: str,
         uuid_str: str,
-        goal_prompt: str,
+        goal: str,
     ) -> str:
         """Assemble the complete workflow code.
         Args:
@@ -291,7 +291,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             workflow_path: Path to save the workflow
             memory_path: Path to save the workflow memory
             uuid_str: Unique identifier for the workflow
-            goal_prompt: The goal description for the workflow
+            goal: The goal for the workflow
         Returns:
             str: Complete workflow code ready for execution
         """
@@ -303,7 +303,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
                 if key == "workflow_uuid"
                 else self.config.smolagent_model_id
                 if key == "model_id"
-                else goal_prompt
+                else goal
                 if key == "goal"
                 else []
             )
@@ -321,7 +321,7 @@ MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
-GOAL = {goal_prompt!r}
+GOAL = {goal!r}
 
 # Load tools
 {tools_code}
@@ -373,13 +373,14 @@ if WORKFLOW_PATH:
 
     async def craft_workflow(
         self,
-        goal_prompt: str,
-        template_workflow: str | None = None,
+        goal: str,
+        craft_instructions: str,
         save_workflow: bool = True,
     ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
         Args:
-            craft_instructions: The goal description
+            goal: The goal description
+            craft_instructions: The instructions for crafting the workflow
             template_workflow: pre-existing workflow template UUID
             save_workflow: Whether to save the workflow
         Returns:
@@ -405,16 +406,13 @@ if WORKFLOW_PATH:
         with open(self.smolagent_factory_code_path) as f:
             smolagent_factory_code = f.read()
         # Generate workflow code - let DGM handle retries
-        if template_workflow:
-            workflow_code = template_workflow
-        else:
-            workflow_code = self.create_workflow_code(
-                goal_prompt, existing_tool_prompt, memory_path
-            )
-            # Save workflow code immediately so DGM can access it even if validation fails
+        workflow_code = self.create_workflow_code(
+            craft_instructions, existing_tool_prompt, memory_path
+        )
+        # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(
-                workflow_path, uuid_str, workflow_code, goal_prompt
+                workflow_path, uuid_str, workflow_code, goal
             )
         try :
             # Validate workflow structure before assembly
@@ -426,7 +424,7 @@ if WORKFLOW_PATH:
         # Assemble complete workflow
         complete_code = self.assemble_workflow(
             tools_code, state_code, smolagent_factory_code,
-            workflow_code, workflow_path, memory_path, uuid_str, goal_prompt
+            workflow_code, workflow_path, memory_path, uuid_str, goal
         )
         
         self.logger.info("Workflow generation completed")
@@ -434,10 +432,10 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Workflow path: {workflow_path}")
         self.logger.debug(f"Memory path: {memory_path}")
 
-        return complete_code, uuid_str
+        return complete_code, workflow_code, uuid_str
 
     def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_code: str, goal_prompt: str
+        self, path: str, uuid_str: str, workflow_code: str, goal: str
     ) -> None:
         """Save workflow code and metadata to files."""
         try:
@@ -460,7 +458,7 @@ if WORKFLOW_PATH:
         
         try:
             with open(os.path.join(path, f"goal_{uuid_str}.txt"), "w") as f:
-                f.write(goal_prompt)
+                f.write(goal)
             self.logger.info(
                 f"Saved goal to: {path}/goal_{uuid_str}.txt"
             )

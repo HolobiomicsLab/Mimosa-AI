@@ -37,6 +37,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+import signal
 
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
@@ -152,6 +153,7 @@ class SmolAgentFactory:
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.max_retries = max_retries
+        self.timeout = 180
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
@@ -347,14 +349,32 @@ class SmolAgentFactory:
                 print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
-    
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Agent execution timed out")
+        
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:
             self.load_agent_memory(workflow_uuid, instructions)
-        res = self.agent.run(instructions)
-        self.save_memories(workflow_uuid=workflow_uuid)
-        return res
+
+        timeout_seconds = getattr(self, 'timeout', 180)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+        
+        try:
+            res = self.agent.run(instructions)
+            signal.alarm(0)  # Cancel the alarm
+            self.save_memories(workflow_uuid=workflow_uuid)
+            return res
+        except TimeoutError:
+            signal.alarm(0)
+            self.save_memories(workflow_uuid=workflow_uuid)
+            raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
+        except Exception as e:
+            signal.alarm(0)
+            raise e
 
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)

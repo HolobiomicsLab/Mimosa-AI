@@ -58,9 +58,9 @@ Launch the toolomics MCP server following the instructions at [HolobiomicsLab/to
 #### Step 4: Run Mimosa-AI
 
 ```sh
-python3 main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
+python3 main.py --goal "Your objective here"
 # or
-uv run main.py --goal "Your objective here" --load_template <optional existing workflow uuid>
+uv run main.py --goal "Your objective here"
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
@@ -76,7 +76,6 @@ Mimosa-AI supports various command line arguments to customize execution:
 - `--dataset DATASET_FOLDER`: Evaluate Mimosa on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
 
 ### Evaluation & Performance
-- `--load_template TEMPLATE_UUID`: Optional. Instead of generating workflow, use  a predefined workflow template from workflows folder (only for `--task` mode)
 - `--judge`: Enable judge for workflow evaluation (default: disabled)
 - `--max_concurrent N`: Maximum number of concurrent tasks, only for `--multi_goal` and `--dataset` mode. (default: 16)
 - `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
@@ -103,8 +102,6 @@ Multi-goal, enter a series of goal to run in parrallel.
 ```sh
  uv run main.py --multi_goal --judge
 ```
-
-**`load_template` allow you to use an existing workflow to avoid waiting generating a functional workflow again for an identical task.**
 
 ## 🔧 Tool Discovery
 
@@ -192,10 +189,8 @@ export USE_CACHED_ENGINE="true"
 Then run *Mimosa* as usual.
 
 ```sh
-python3 main.py --goal "<goal>" --load_template <optional existing workflow uuid>
+python3 main.py --goal "<goal>"
 ```
-
-
 
 ## 📈 Telemetry Setup
 

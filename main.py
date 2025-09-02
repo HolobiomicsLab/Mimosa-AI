@@ -206,7 +206,7 @@ async def normal_execution_mode(args, config):
         args.task = scenario_file["goal"]
         args.judge = True
     if args.task:
-        await dgm.start_dgm(goal_prompt=args.task,
+        await dgm.start_dgm(goal=args.task,
                             judge=args.judge, 
                             scenario_id=args.scenario,
                             human_validation=False,
