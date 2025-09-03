@@ -41,7 +41,7 @@ class Config:
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3"
         self.engine_name: str = "inference_client"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v5.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
         self.workflow_llm_provider: str = "openai"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
