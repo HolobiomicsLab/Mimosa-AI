@@ -118,12 +118,12 @@ def master_router(state: WorkflowState) -> str:
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
 
-    if "SUCCESS:" in last_answer:
+    if "SUCCESS" in last_answer:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
         return "next_node"
     
-    elif "INSUFFICIENT_DATA:" in last_answer: # The agent thinks he needs more data to succeed his task
+    elif "INSUFFICIENT_DATA" in last_answer: # The agent thinks he needs more data to succeed his task
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
          return "fallback_path" # Example of backtracking
     
@@ -138,7 +138,7 @@ def master_router(state: WorkflowState) -> str:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
             return "fallback_path"
 
-    elif "FAILURE:" in last_answer: # Catches FAILURE or any other unhandled response
+    elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
     

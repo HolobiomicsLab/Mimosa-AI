@@ -107,21 +107,41 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - Router functions must return keys like `"next_node"`, `"retry_path"`, `"fallback_path"`, or `END`
 - Ensure all returned routing targets are defined in your conditional edges mapping
 - The agent can't see the state by itself
-- Make one router for each node. Do not make a generic router.
 
 ```python
-def route_after_researcher(state: WorkflowState) -> str:
-    last_answer = state["answers"][-1] if state["answers"] else ""
+def master_router(state: WorkflowState) -> str:
+    last_answer = str(state["answers"][-1]) # ensure we get answer as a string
+    current_agent = state["step_name"][-1] # researcher in this example
+    # IMPORTANT: Use first node name as fallback, NEVER use START
+    previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
+
+    if "SUCCESS" in last_answer:
+        print(f"✅ Success from '{current_agent}'. Proceeding.")
+        # Logic to determine the next step after success
+        return "next_node"
     
-    if "SUCCESS:" in last_answer:
-        print("✅ Researcher completed. Proceeding to writing.")
-        return "to_writer"
-    elif "FAILURE:" in last_answer:
-        print("❌ Researcher failed. Cannot proceed.")
-        return "to_end"
-    else:
-        print("⛔ Protocol violation by researcher. Terminating.")
-        return "to_end"
+    elif "INSUFFICIENT_DATA" in last_answer: # The agent thinks he needs more data to succeed his task
+         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
+         return "fallback_path" # Example of backtracking
+    
+    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
+        retry_count = sum(
+            1 for step in state["step_name"][-3:] if step == current_agent
+        )
+        if retry_count <= 1:
+            print(f"🔄 Retry from '{current_agent}'.")
+            return "retry_path"
+        else:
+            print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
+            return "fallback_path"
+
+    elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+        print(f"❌ Failure from '{current_agent}'. Aborting.")
+        return END
+    
+    else :
+        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Terminating.")
+        return END # workflow need to be modified to avoid such failure case
 ```
 
 ### Step 4: Assemble the Graph
@@ -134,14 +154,14 @@ Be sure to name the StateGraph `workflow`.
 # --- WORKFLOW SCRIPT ---
 
 # 1. MANDATORY Workflow Initialization
-workflow = StateGraph(WorkflowState)
+workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
 
-# 2. AGENT INSTRUCTIONS
+# 2. AGENT INSTRUCTIONS (Define all prompts here)
 instruct_researcher = """
 You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
 
-## TASK
-Conduct thorough web searches to collect accurate information from reliable sources. Cross-reference multiple sources and provide structured findings with proper attribution.
+## INSTRUCTION
+You must find comprehensive information on <research goal>...
 
 ## RECEIVED INFORMATION
 You will receive a research topic or question from the user that needs investigation.
@@ -160,8 +180,8 @@ You will receive a research topic or question from the user that needs investiga
 instruct_coder = """
 You are a Python coding specialist responsible for writing, executing, and debugging code based on research data.
 
-## TASK
-Create and execute Python code to process information, generate outputs, or solve computational problems. Write clean, well-documented code that handles edge cases.
+## INSTRUCTION
+You must implement a code for <user goal>...
 
 ## RECEIVED INFORMATION
 You will receive research findings or data from previous agents that you need to process or analyze through code.
@@ -181,70 +201,40 @@ You will receive research findings or data from previous agents that you need to
     final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
 """
 
-# 3. AGENT CREATION
+# 3. AGENT CREATION (Instantiate all agents here)
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])  # Uses base Python execution
 
-# 4. NODE DEFINITION
+# 4. NODE DEFINITION  (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
 workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
 
-# 5. AGENT-SPECIFIC ROUTING FUNCTIONS
-def route_after_researcher(state: WorkflowState) -> str:
-    last_answer = state["answers"][-1] if state["answers"] else ""
-    
-    if "SUCCESS:" in last_answer:
-        print("✅ Research completed. Proceeding to coding.")
-        return "to_coder"
-    elif "RETRY:" in last_answer:
-        print("🔄 Research needs retry. Attempting again.")
-        return "retry_researcher"
-    elif "IMPOSSIBLE:" in last_answer:
-        print("❌ Research deemed impossible. Terminating workflow.")
-        return "end_workflow"
-    else:
-        print("⛔ Protocol violation by researcher. Terminating.")
-        return "end_workflow"
+# 5. ROUTING FUNCTIONS (Define routing logic here)
+def master_router(state: WorkflowState) -> str:
+    # ... (implementation from above) ...
 
-def route_after_coder(state: WorkflowState) -> str:
-    last_answer = state["answers"][-1] if state["answers"] else ""
-    
-    if "SUCCESS:" in last_answer:
-        print("✅ Coding task completed successfully!")
-        return "end_workflow"
-    elif "CODING_FAILURE:" in last_answer:
-        print("🔄 Coding failed. Retrying with fixes.")
-        return "retry_coder"
-    elif "MISSING_DATA:" in last_answer:
-        print("📊 Need more data. Routing back to researcher.")
-        return "back_to_researcher"
-    elif "IMPOSSIBLE:" in last_answer:
-        print("❌ Coding task impossible. Terminating.")
-        return "end_workflow"
-    else:
-        print("⛔ Protocol violation by coder. Terminating.")
-        return "end_workflow"
-
-# 6. EDGE DEFINITION
+# 6. EDGE DEFINITION (Wire the graph together here)
 workflow.add_edge(START, "researcher")
 
 workflow.add_conditional_edges(
     "researcher",
-    route_after_researcher,
+    master_router,
     {
-        "to_coder": "coder",
-        "retry_researcher": "researcher",
-        "end_workflow": END
+        "next_node": "coder",
+        "retry_path": "researcher",
+        "fallback_path": "researcher",
+        END: END
     }
 )
 
 workflow.add_conditional_edges(
     "coder",
-    route_after_coder,
+    master_router,
     {
-        "retry_coder": "coder",
-        "back_to_researcher": "researcher",
-        "end_workflow": END
+        "next_node": "<next agent or END>,
+        "retry_path": "coder",
+        "fallback_path": "researcher",
+        END: END
     }
 )
 
@@ -257,6 +247,7 @@ workflow.add_conditional_edges(
 - [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user 
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Task Decomposition**: Is each agent responsible for one, and only one, atomic task?
+- [ ] **Agent prompt information**: Does every agent prompt contain sufficient informations ?
 - [ ] **Complete Routing**: Does your routing function handle all completion keywords from all agents?
 - [ ] **Guaranteed Exit**: Does the workflow have a clear start and a guaranteed path to `END`?
 - [ ] **Clarity**: Is the code clean, well-commented, and easy to understand?
