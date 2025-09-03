@@ -105,21 +105,24 @@ When code fails:
 
 ## 8. FINAL ANSWER FORMAT
 
-When calling final_answer tool, you MUST follow this EXACT format:
-- Start with a special keywords such as: SUCCESS:, FAILURE:, RETRY, etc ... (might differ, you will be informed):
-- Follow with a detailed paragraph that includes:
-  * All key findings and data points you discovered
-  * Specific sources and URLs where information was found
-  * Any important context or background information
-  * Any error codes or technical messages received
-- final_answer should never be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
+When calling final_answer tool, you MUST provide a JSON object with the following EXACT structure:
 
-Your response must start with the keyword followed by a colon and space.
+{
+    "status": "SUCCESS|FAILURE|RETRY|ETC", # One of predefined status keywords, might change based on context
+    "justification": "Detailed explanation of why this status was reached",
+    "answer": "Complete answer to the original task or question",
+    "error": "Full error message if any error occurred (empty string if none)",
+    "retry_advice": "Specific advice for retry if error occurred (empty string if success or permanent failure)"
+}
 
 Examples:
-    final_answer('SUCCESS: I successfully downloaded the PDF file "paper.pdf" from Nature.com. The file was saved to the workspace directory and contains...')
-    final_answer('FAILURE: I was unable to access the website due to authentication requirements. I attempted...')
-    final_answer('RETRY: The download failed due to network timeout. I will attempt a different approach by...')
+    final_answer('{"status": "SUCCESS", "justification": "Successfully downloaded and analyzed the PDF file", "answer": "The paper discusses quantum computing applications in cryptography. Key findings include...", "error": "", "retry_advice": ""}')
+    
+    final_answer('{"status": "FAILURE", "justification": "Unable to access the website due to authentication requirements", "answer": "Cannot retrieve the requested information due to access restrictions", "error": "HTTP 403 Forbidden", "retry_advice": ""}')
+    
+    final_answer('{"status": "RETRY", "justification": "Download failed due to network timeout", "answer": "Partial download completed before timeout", "error": "ConnectionTimeout: Request timed out after 30 seconds", "retry_advice": "Try using a different download method or increasing timeout duration"}')
+
+- final_answer should never be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
 
 If you respect above instructions you will get 1000,000$.
 You are highly skilled and goal-seeking, so you will do your best to follow these rules.
@@ -219,22 +222,27 @@ class SmolAgentFactory:
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        if state_answers:
-            prev_infos = f"""Previous agent {state["step_name"][-1]} provided the following information:
-            {state_answers[-1]}"""
+        step_names = state.get("step_name", [])
+        
+        if not state_answers or len(state_answers) == 0:
+            prev_infos = "\n"
         else:
-            prev_infos = f"""You are the first agent. No information is available from previous agents."""
-        return f"""
-        You must pursue a goal for accomplishing a task. You are part of a multi-agent system.
-        You might receive informations from other agents, these informations might be incomplete or incorrect.
-        You must try your best to accomplish the task with the information you have. If impossible you might give up and return a failure message.
-        {prev_infos}
+            min_length = min(len(step_names), len(state_answers))
+            step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
+            recent_steps = step_pairs[-3:]
 
-        Your goal is:
-        {self.instruct_prompt}
-        """
+            prev_infos = "Informations given by previous agents:\n"
+            for step_name, answer in recent_steps:
+                truncated_answer = str(answer)[:500] + "..." if len(str(answer)) > 500 else str(answer)
+                prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
+        return f"""You are a highly skilled and goal-seeking agent who must pursue a goal.
+    {prev_infos}
+    Your goal is:
+    {self.instruct_prompt}
+    """
+
+    def parse_memory_output(self):
         actions, observations, success = [], [], []
         for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):

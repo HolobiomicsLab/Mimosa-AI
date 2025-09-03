@@ -26,15 +26,13 @@ The following components are pre-loaded in the execution environment. You must u
 | `WorkflowState`       | The `TypedDict` for graph state. You cannot modify its schema.           |
 | `SmolAgentFactory`    | Class to create agent instances. `SmolAgentFactory(name, prompt, tools)` |
 | `WorkflowNodeFactory` | Class to create graph nodes. `create_agent_node(agent_instance)`         |
-| `EXISTING_TOOLS_*`    | Pre-defined tool packages (e.g., `EXISTING_TOOLS_WEB`, `EXISTING_TOOLS_FILE`). |
+| `EXISTING_TOOLS_*`    | Pre-defined tool packages (e.g., `WEB_SEARCH_MCP`, `EXISTING_TOOLS_FILE`). |
 
 ### Workflow State Schema
 ```python
 # This is the state object passed between all nodes. It is PRE-DEFINED.
 class WorkflowState(TypedDict):
     step_name: List[str]        # History of node names visited
-    actions: List[Action]       # History of tool calls
-    observations: List[Observation] # History of tool outputs
     answers: List[str]          # History of raw text responses from agents
     success: List[bool]         # History of task success flags
 ```
@@ -44,7 +42,7 @@ class WorkflowState(TypedDict):
 Domain specific tools package will be provided to you. For example:
 
 The following tools packages are available for agents:
-`EXISTING_TOOLS_WEB`, `EXISTING_TOOLS_CHART`
+`WEB_SEARCH_MCP`, `EXISTING_TOOLS_CHART`
 
 Assign exactly one tool package to each agent. Prefer creating additional specialized agents with distinct tool packages rather than assigning multiple tools to a single general-purpose agent.
 
@@ -58,29 +56,29 @@ Create a unique instruction prompt for each agent. The prompt must include a `CO
 ```python
 # Good Example: Specific, contextual, with clear completion keywords.
 instruct_researcher = """
-You are a master web researcher in a multi-agent system tasked with synthesizing accurate, concise, and actionable information to support a broader goal of <overall system goal>. Your role is to process and expand on data provided by a previous agent to deliver a comprehensive response.
+You are a master web researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
 
-## BIGGER PICTURE
-- The multi-agent system is designed to <describe system purpose, e.g., provide strategic insights for policy development>.
-- You receive input from a previous agent: <description of prior agent's output, e.g., a preliminary data summary or specific query>. (for the first agent only describe the task, it won't receive any input)
-- Your task is to refine, validate, or expand this input using web research to meet the system's goal.
+## TASK
+- Conduct comprehensive web searches to address the research objective
+- Prioritize credible sources (academic papers, government reports, reputable news outlets) over low-quality contenty
+- Cross-reference multiple sources to ensure accuracy and resolve any conflicting information
+- Present findings in a clear, structured format with proper source attribution
 
-## YOUR TASK
-- Conduct a web search to address: <specific web search goal>.
-- Prioritize credible sources (e.g., academic papers, government reports, reputable news) over low-quality ones (e.g., unverified blogs, social media).
-- Cross-reference findings to resolve conflicts or inconsistencies with the prior agent's data.
-- Summarize key points in a structured format (e.g., bullet points, table) tailored to the system's needs.
+## RECEIVED INFORMATION
+
+You will only receive a research goal from the user. Likely a research paper title.
 
 ## COMPLETION PROTOCOL
 - On success, end with:
-  SUCCESS: [Structured summary of findings, integrating prior agent's input, including key points, sources, and hyperlinks]
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
 - On failure, end with:
-  FAILURE: [Explanation of search efforts, challenges faced, including issues with prior agent's input, and why the task couldn't be completed]
+    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
 """
 ```
 
 A prompt must specify:
-- The overall goal (the bigger picture of what we are trying to do)
+- The overall goal
 - The goal specific to the agent.
 - If it receive input from previous agent, specify how it will help the agent. 
 - If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
@@ -92,7 +90,7 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 
 # Agent that only writes and executes Python code (no special tools).
 agent_coder = SmolAgentFactory("coder", instruct_coder, [])
@@ -110,10 +108,9 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - Ensure all returned routing targets are defined in your conditional edges mapping
 - The agent can't see the state by itself
 
-
 ```python
 def master_router(state: WorkflowState) -> str:
-    last_answer = state["answers"][-1]
+    last_answer = str(state["answers"][-1]) # ensure we get answer as a string
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
@@ -127,7 +124,7 @@ def master_router(state: WorkflowState) -> str:
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
          return "fallback_path" # Example of backtracking
     
-    elif "RETRY:" in last_answer: # The agent thinks he can succeed his task ins another way
+    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
         retry_count = sum(
             1 for step in state["step_name"][-3:] if step == current_agent
         )
@@ -153,27 +150,66 @@ Do not compile the workflow, it is already in the context.
 Be sure to name the StateGraph `workflow`.
 
 ```python
+
 # --- WORKFLOW SCRIPT ---
 
 # 1. MANDATORY Workflow Initialization
 workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
 
 # 2. AGENT INSTRUCTIONS (Define all prompts here)
-instruct_researcher = """..."""
-instruct_coder = """..."""
-instruct_formatter = """..."""
+instruct_researcher = """
+You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
+
+## INSTRUCTION
+You must find comprehensive information on <research goal>...
+
+## RECEIVED INFORMATION
+You will receive a research topic or question from the user that needs investigation.
+
+## COMPLETION PROTOCOL
+- On success, end with:
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
+- On failure, end with:
+    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On impossible task, end with:
+    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+"""
+
+instruct_coder = """
+You are a Python coding specialist responsible for writing, executing, and debugging code based on research data.
+
+## INSTRUCTION
+You must implement a code for <user goal>...
+
+## RECEIVED INFORMATION
+You will receive research findings or data from previous agents that you need to process or analyze through code.
+
+## COMPLETION PROTOCOL
+
+- On success, end with:
+    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+
+- On coding failure, end with:
+    final_answer('{"status": "CODING_FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On missing data, end with:
+    final_answer('{"status": "MISSING_DATA", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+
+- On impossible task, end with:
+    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+"""
 
 # 3. AGENT CREATION (Instantiate all agents here)
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, EXISTING_TOOLS_WEB)
-agent_coder = SmolAgentFactory("coder", instruct_coder, [])
-agent_formatter = SmolAgentFactory("formatter", instruct_formatter, CSV_TOOLS)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, [])  # Uses base Python execution
 
-# 4. NODE DEFINITION (Add agents to the workflow here)
+# 4. NODE DEFINITION  (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
 workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
-workflow.add_node("formatter", WorkflowNodeFactory.create_agent_node(agent_formatter))
 
-# 5. ROUTING FUNCTION (Define routing logic here)
+# 5. ROUTING FUNCTIONS (Define routing logic here)
 def master_router(state: WorkflowState) -> str:
     # ... (implementation from above) ...
 
@@ -183,17 +219,23 @@ workflow.add_edge(START, "researcher")
 workflow.add_conditional_edges(
     "researcher",
     master_router,
-    {"fallback_path": "researcher", "retry_path": "researcher", "next_node":"coder", END:END}
+    {
+        "next_node": "coder",
+        "retry_path": "researcher",
+        "fallback_path": "researcher",
+        END: END
+    }
 )
+
 workflow.add_conditional_edges(
     "coder",
     master_router,
-    {"fallback_path": "researcher", "retry_path": "coder", "next_node":"formatter", END:END}
-)
-workflow.add_conditional_edges(
-    "formatter",
-    master_router,
-    {"fallback_path": "researcher", "retry_path": "formatter", "next_node":END, END:END}
+    {
+        "next_node": "<next agent or END>,
+        "retry_path": "coder",
+        "fallback_path": "researcher",
+        END: END
+    }
 )
 
 # --- END OF SCRIPT ---
@@ -205,6 +247,7 @@ workflow.add_conditional_edges(
 - [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user 
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Task Decomposition**: Is each agent responsible for one, and only one, atomic task?
+- [ ] **Agent prompt information**: Does every agent prompt contain sufficient informations ?
 - [ ] **Complete Routing**: Does your routing function handle all completion keywords from all agents?
 - [ ] **Guaranteed Exit**: Does the workflow have a clear start and a guaranteed path to `END`?
 - [ ] **Clarity**: Is the code clean, well-commented, and easy to understand?
