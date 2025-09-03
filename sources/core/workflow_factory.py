@@ -158,7 +158,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             'state_graph': r"workflow = StateGraph\(WorkflowState\)",
             'start_edge': r"workflow\.add_edge\(START,\s*[\"'](\w+)[\"']\)",
             'nodes': r"workflow\.add_node\([\"'](\w+)[\"'],.*?\)",
-            'routers': r"def\s+(\w*router\w*)\s*\(",
             'conditional_edges': r"workflow\.add_conditional_edges\(",
             'edge_mappings': r'workflow\.add_conditional_edges\(\s*["\'](\w+)["\'],\s*(\w+),\s*\{([^}]+)\}',
             'router_returns': r'return\s+["\']([^"\']+)["\']',
@@ -188,74 +187,14 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             raise ValueError("No workflow nodes found")
         self.logger.debug(f"📋 Workflow nodes discovered: {', '.join(sorted(nodes))}")
         
-        routers = set(re.findall(patterns['routers'], workflow_code))
-        if not routers:
-            raise ValueError("No router functions found")
-        self.logger.debug(f"🔀 Router functions found: {', '.join(sorted(routers))}")
-        
         # Validate START edge target exists
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
         self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
         
-        # Validate routing consistency
-        self._validate_routing_consistency(workflow_code, patterns, nodes, routers)
-        
         self.logger.info("✅ Workflow structure validation passed")
     
-    def _validate_routing_consistency(self, workflow_code: str, patterns: dict, nodes: set, routers: set) -> None:
-        """Validate routing logic consistency."""
-        conditional_edges = re.findall(patterns['edge_mappings'], workflow_code)
-        all_mapping_keys = set()
-        used_routers = set()
-        
-        self.logger.debug(f"🔗 Analyzing {len(conditional_edges)} conditional edges:")
-        
-        for i, (source_node, _router_func, mapping_content) in enumerate(conditional_edges, 1):
-            if source_node not in nodes:
-                raise ValueError(f"Conditional edge source '{source_node}' doesn't exist")
-            
-            used_routers.add(_router_func)
-            
-            # Parse and display mapping in human-readable format
-            mapping_pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', mapping_content)
-            readable_mappings = []
-            
-            for key, target in mapping_pairs:
-                all_mapping_keys.add(key)
-                target_clean = target.strip().strip('"\'')
-                
-                if target_clean == "START":
-                    raise ValueError("Router mapping contains START - use node names or END")
-                if target_clean not in nodes and target_clean != "END":
-                    raise ValueError(f"Router target '{target_clean}' doesn't exist")
-                
-                readable_mappings.append(f"'{key}' → {target_clean}")
-            
-            self.logger.debug(f"   {i}. {source_node} --({_router_func})--> {{ {', '.join(readable_mappings)} }}")
-        
-        self.logger.debug(f"🗝️  Available routing keys: {', '.join(sorted(all_mapping_keys))}")
-        self.logger.debug(f"⚙️  Routers in use: {', '.join(sorted(used_routers))}")
-        
-        # Validate router functions exist
-        missing_routers = used_routers - routers
-        if missing_routers:
-            raise ValueError(f"Missing router functions: {sorted(missing_routers)}")
-        
-        # Check router return values don't use START
-        router_returns = re.findall(patterns['router_returns'], workflow_code)
-        unique_returns = sorted(set(router_returns))
-        self.logger.debug(f"🔄 Router return values used: {', '.join(unique_returns)}")
-        
-        for return_val in router_returns:
-            if return_val == "START":
-                raise ValueError("Router returns 'START' - use mapping keys or END")
-            if return_val != "END" and return_val not in all_mapping_keys:
-                raise ValueError(f"Router returns invalid key '{return_val}'")
-    
-
-
     def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
         Args:
@@ -343,11 +282,13 @@ initial_state = {initial_state}
 
 try:
     if WORKFLOW_PATH:
-        print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
         try:
             png = app.get_graph().draw_mermaid_png()
+            print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
+                print("workflow run: writing PNG file...")
                 f.write(png)
+                print("PNG saved at ", os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"))
         except Exception as e:
             RuntimeError(f"Could not save workflow graph:" + str(e))
 except Exception as e:

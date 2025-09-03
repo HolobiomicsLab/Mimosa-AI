@@ -100,7 +100,7 @@ class GodelMachine:
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
-        print(f"\n\033[96m{'📝 WORKFLOW AGENTS ANSWERS (Previous run)':^60}\033[0m")
+        print(f"\n\033[96m{'📝 WORKFLOW AGENTS ANSWERS':^60}\033[0m")
         print(f"\033[96m{'─' * 60}\033[0m")
         print(f"\033[96m{flow_answers}\033[0m")
         print(f"\033[96m{'─' * 60}\033[0m\n")
