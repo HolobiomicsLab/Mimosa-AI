@@ -282,11 +282,13 @@ initial_state = {initial_state}
 
 try:
     if WORKFLOW_PATH:
-        print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
         try:
             png = app.get_graph().draw_mermaid_png()
+            print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
+                print("workflow run: writing PNG file...")
                 f.write(png)
+                print("PNG saved at ", os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"))
         except Exception as e:
             RuntimeError(f"Could not save workflow graph:" + str(e))
 except Exception as e:
