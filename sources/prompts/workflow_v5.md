@@ -70,10 +70,10 @@ You will only receive a research goal from the user. Likely a research paper tit
 
 ## COMPLETION PROTOCOL
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On failure, end with:
-    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 """
 ```
 
@@ -109,22 +109,26 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - The agent can't see the state by itself
 
 ```python
+class Answer(BaseModel):
+    status: str
+    message: str
+
 def master_router(state: WorkflowState) -> str:
-    last_answer = str(state["answers"][-1]) # ensure we get answer as a string
+    last_answer = Answer.model_validate_json(state["answers"][-1])
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
 
-    if "SUCCESS" in last_answer:
+    if "SUCCESS" in last_answer.status:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
         return "next_node"
     
-    elif "INSUFFICIENT_DATA" in last_answer: # The agent thinks he needs more data to succeed his task
+    elif "INSUFFICIENT_DATA" in last_answer.status: # The agent thinks he needs more data to succeed his task
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
          return "fallback_path" # Example of backtracking
     
-    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
+    elif "RETRY" in last_answer.status: # The agent thinks he can succeed his task ins another way
         retry_count = sum(
             1 for step in state["step_name"][-3:] if step == current_agent
         )
@@ -135,7 +139,7 @@ def master_router(state: WorkflowState) -> str:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
             return "fallback_path"
 
-    elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+    elif "FAILURE" in last_answer.status: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
     
@@ -168,13 +172,13 @@ You will receive a research topic or question from the user that needs investiga
 
 ## COMPLETION PROTOCOL
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On failure, end with:
-    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 
 - On impossible task, end with:
-    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "RETRY", "message": "..."}')
 """
 
 instruct_coder = """
@@ -189,16 +193,16 @@ You will receive research findings or data from previous agents that you need to
 ## COMPLETION PROTOCOL
 
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On coding failure, end with:
-    final_answer('{"status": "CODING_FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "RETRY", "message": "..."}')
 
 - On missing data, end with:
-    final_answer('{"status": "MISSING_DATA", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "INSUFFICIENT_DATA", "message": "..."}')
 
 - On impossible task, end with:
-    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 """
 
 # 3. AGENT CREATION (Instantiate all agents here)
