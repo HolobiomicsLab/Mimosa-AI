@@ -255,6 +255,7 @@ import re
 import json
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
+from pydantic import BaseModel
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
