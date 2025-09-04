@@ -161,7 +161,7 @@ class SmolAgentFactory:
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.max_retries = max_retries
-        self.timeout = 300
+        self.timeout = 3600
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)

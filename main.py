@@ -22,6 +22,7 @@ from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
 from sources.utils.scenario_loader import ScenarioLoader
 from sources.extensibility.human_mode import HumanMode
+from sources.extensibility.automated_mode import AutomatedMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.user_entry import collect_goals_from_user
 
@@ -198,6 +199,11 @@ async def dataset_execution_mode(args, config):
     else:
         print("❌ No questions found in dataset or no goal provided.")
 
+async def automated_mode(args, config):
+    """Run autonomous mode where LLM generates and executes tasks automatically."""
+    automated = AutomatedMode(config, max_iterations=args.max_iterations)
+    await automated.start_autonomous_mode()
+
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
     planner = Planner(config)
@@ -240,6 +246,12 @@ async def main():
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
+    )
+    parser.add_argument(
+        "--automated", action="store_true", help="Autonomous mode (LLM generates and executes tasks automatically)"
+    )
+    parser.add_argument(
+        "--max_iterations", type=int, default=10, help="Maximum number of autonomous iterations (for --automated mode)"
     )
     parser.add_argument(
         "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
@@ -286,10 +298,12 @@ async def main():
             await multigoal_mode(args, config)
         elif (args.manual):
             await manual_mode(args, config)
+        elif (args.automated):
+            await automated_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --task or --goal to start a task.")
+            raise ValueError("No goal provided. Use --task, --goal, --automated, or --multi_goal to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:
