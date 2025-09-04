@@ -97,11 +97,19 @@ Create a unique instruction prompt for each agent. The prompt must include a `CO
 instruct_researcher = """
 You are a master web researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
 
+## GOAL
+
+You must conduct research on ...<good search keyword based on user goal>
+
 ## TASK
 - Conduct comprehensive web searches to address the research objective
 - Prioritize credible sources (academic papers, government reports, reputable news outlets) over low-quality contenty
 - Cross-reference multiple sources to ensure accuracy and resolve any conflicting information
 - Present findings in a clear, structured format with proper source attribution
+
+## WORKFOLDER
+
+Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 
@@ -109,10 +117,10 @@ You will only receive a research goal from the user. Likely a research paper tit
 
 ## COMPLETION PROTOCOL
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On failure, end with:
-    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 """
 ```
 
@@ -121,6 +129,7 @@ A prompt must specify:
 - The goal specific to the agent.
 - If it receive input from previous agent, specify how it will help the agent. 
 - If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
+- Specify a the work folder: `/projects/` (or a subfolder of `/projects` if created before)
 - A completion protocol
 
 ### Step 2: Create Agents
@@ -136,14 +145,11 @@ Before creating each agent, analyze the available tool packages and select the M
 4. **Ensure Single Responsibility**: Each agent gets exactly one tool package aligned with its atomic task
 
 ```python
-# GOOD: Agent with specialized tool matching its specific task domain
-agent_pdf_processor = SmolAgentFactory("pdf_processor", instruct_pdf_processor, EXISTING_TOOLS_DOCUMENT_MCP)
+# Agent that uses a pre-defined web tool package.
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 
-# GOOD: Agent that only writes and executes Python code (no special tools)
-agent_data_analyzer = SmolAgentFactory("data_analyzer", instruct_data_analyzer, [])
-
-# BAD: Generic tool for specialized task
-# agent_pdf_processor = SmolAgentFactory("pdf_processor", instruct_pdf_processor, EXISTING_TOOLS_SHELL)
+# Agent that only writes and executes Python code (no special tools).
+agent_coder = SmolAgentFactory("coder", instruct_coder, [])
 ```
 
 **Tool Selection Decision Process:**
@@ -161,7 +167,7 @@ agent_data_analyzer = SmolAgentFactory("data_analyzer", instruct_data_analyzer, 
 agent_paper_downloader = SmolAgentFactory("paper_downloader", instruct_paper_downloader, EXISTING_TOOLS_DOCUMENT_MCP)
 ```
 
-**Filesystem Consideration**: Agent should NOT use base python coding ability to list files or interact with local directory, as their PATH differs from Tools execution PATH. Provide agents with filesystem-related tools when needed, or specify this limitation in agent prompts.
+**Filesystem Consideration**: Agent should NOT use they base python coding ability to list files or interact with local directory, this is because their PATH is different from the PATH for Tools execution. If possible provide agent with filesystem related tools (even if that mean an agent has 2 tools package). You might specify this limitation in agent prompt.
 
 ### Step 3: Define Conditional Routing Function(s)
 Create functions that take the `WorkflowState` and return the name of the next node. This is the brain of your workflow. Inspect `state["answers"][-1]` for the completion keywords.
@@ -174,22 +180,26 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - The agent can't see the state by itself
 
 ```python
+class Answer(BaseModel):
+    status: str
+    message: str
+
 def master_router(state: WorkflowState) -> str:
-    last_answer = str(state["answers"][-1]) # ensure we get answer as a string
+    last_answer = Answer.model_validate_json(state["answers"][-1])
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
 
-    if "SUCCESS" in last_answer:
+    if "SUCCESS" in last_answer.status:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
         return "next_node"
     
-    elif "INSUFFICIENT_DATA" in last_answer: # The agent thinks he needs more data to succeed his task
+    elif "INSUFFICIENT_DATA" in last_answer.status: # The agent thinks he needs more data to succeed his task
          print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
          return "fallback_path" # Example of backtracking
     
-    elif "RETRY" in last_answer: # The agent thinks he can succeed his task ins another way
+    elif "RETRY" in last_answer.status: # The agent thinks he can succeed his task ins another way
         retry_count = sum(
             1 for step in state["step_name"][-3:] if step == current_agent
         )
@@ -200,7 +210,7 @@ def master_router(state: WorkflowState) -> str:
             print(f"⏪ Too many retries. Backtracking from {current_agent} to {previous_agent}.")
             return "fallback_path"
 
-    elif "FAILURE" in last_answer: # Catches FAILURE or any other unhandled response
+    elif "FAILURE" in last_answer.status: # Catches FAILURE or any other unhandled response
         print(f"❌ Failure from '{current_agent}'. Aborting.")
         return END
     
@@ -225,21 +235,29 @@ workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
 instruct_researcher = """
 You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
 
+## GOAL
+
+You must search for the latest news on the use of entropy in AI research.
+
 ## INSTRUCTION
 You must find comprehensive information on <research goal>...
+
+## WORKFOLDER
+
+Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 You will receive a research topic or question from the user that needs investigation.
 
 ## COMPLETION PROTOCOL
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On failure, end with:
-    final_answer('{"status": "FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 
 - On impossible task, end with:
-    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "RETRY", "message": "..."}')
 """
 
 instruct_coder = """
@@ -248,22 +266,26 @@ You are a Python coding specialist responsible for writing, executing, and debug
 ## INSTRUCTION
 You must implement a code for <user goal>...
 
+## WORKFOLDER
+
+Allowed directory: `/projects/`
+
 ## RECEIVED INFORMATION
 You will receive research findings or data from previous agents that you need to process or analyze through code.
 
 ## COMPLETION PROTOCOL
 
 - On success, end with:
-    final_answer('{"status": "SUCCESS", "justification": "...", "answer": "...", "error": "", "retry_advice": ""}')
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
 
 - On coding failure, end with:
-    final_answer('{"status": "CODING_FAILURE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "RETRY", "message": "..."}')
 
 - On missing data, end with:
-    final_answer('{"status": "MISSING_DATA", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "INSUFFICIENT_DATA", "message": "..."}')
 
 - On impossible task, end with:
-    final_answer('{"status": "IMPOSSIBLE", "justification": "...", "answer": "...", "error": "...", "retry_advice": ""}')
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
 """
 
 # 3. AGENT CREATION (Instantiate all agents here)
@@ -319,6 +341,7 @@ workflow.add_conditional_edges(
 - [ ] **Tooling**: Each agent has one tool package (or `[]` for the Python default). You should avoid giving multiple package to an agent. Divide and conqueer with more agent.
 - [ ] **Awareness**: Agent must be aware of any informations that might help them accompish their individual goal. You might specify the global picture they are part of.
 - [ ] **No START Routing**: NEVER use START as a routing target in conditional edges - only use actual node names or END.
+- [ ] **State answers considerations**: Never use .upper() on state["answers"]. state["answers"] could be a dict. use str(state["answers"]) before processing.
 - [ ] **Correct Router Returns**: Router functions return mapping keys (`"next_node"`, `"retry_path"`, etc.) NOT direct node names.
 - [ ] **Validation Requirements**: File operation agents include proper validation steps and only claim SUCCESS after verification.
 - [ ] **Protocol Compliance**: All agents follow strict completion protocols with appropriate status keywords.
