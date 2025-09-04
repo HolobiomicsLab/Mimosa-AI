@@ -58,11 +58,19 @@ Create a unique instruction prompt for each agent. The prompt must include a `CO
 instruct_researcher = """
 You are a master web researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
 
+## GOAL
+
+You must conduct research on ...<good search keyword based on user goal>
+
 ## TASK
 - Conduct comprehensive web searches to address the research objective
 - Prioritize credible sources (academic papers, government reports, reputable news outlets) over low-quality contenty
 - Cross-reference multiple sources to ensure accuracy and resolve any conflicting information
 - Present findings in a clear, structured format with proper source attribution
+
+## WORKFOLDER
+
+Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 
@@ -82,6 +90,7 @@ A prompt must specify:
 - The goal specific to the agent.
 - If it receive input from previous agent, specify how it will help the agent. 
 - If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
+- Specify a the work folder: `/projects/` (or a subfolder of `/projects` if created before)
 - A completion protocol
 
 ### Step 2: Create Agents
@@ -164,8 +173,16 @@ workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
 instruct_researcher = """
 You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
 
+## GOAL
+
+You must search for the latest news on the use of entropy in AI research.
+
 ## INSTRUCTION
 You must find comprehensive information on <research goal>...
+
+## WORKFOLDER
+
+Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 You will receive a research topic or question from the user that needs investigation.
@@ -186,6 +203,10 @@ You are a Python coding specialist responsible for writing, executing, and debug
 
 ## INSTRUCTION
 You must implement a code for <user goal>...
+
+## WORKFOLDER
+
+Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 You will receive research findings or data from previous agents that you need to process or analyze through code.
@@ -258,6 +279,7 @@ workflow.add_conditional_edges(
 - [ ] **Tooling**: Each agent has one tool package (or `[]` for the Python default). You should avoid giving multiple package to an agent. Divide and conqueer with more agent.
 - [ ] **Awareness**: Agent must be aware of any informations that might help them accompish their individual goal. You might specify the global picture they are part of.
 - [ ] **No START Routing**: NEVER use START as a routing target in conditional edges - only use actual node names or END.
+- [ ] **State answers considerations**: Never use .upper() on state["answers"]. state["answers"] could be a dict. use str(state["answers"]) before processing.
 - [ ] **Correct Router Returns**: Router functions return mapping keys (`"next_node"`, `"retry_path"`, etc.) NOT direct node names.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.

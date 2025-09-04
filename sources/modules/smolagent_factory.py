@@ -39,9 +39,10 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
+import subprocess
 BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
+DANGEROUS_MODULES = {subprocess}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -59,6 +60,10 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
 ADDED_SYSTEM_PROMPT = """
 # CRITICAL CODE GENERATION CONSTRAINTS:
+
+-## 0. CODING CONSTRAINTS
+-- You should never use python import or base function to interact with the internet or filesystem
+-- Always use the tools provided to you to perform such actions
 
 ## 1. NO ASSUMPTIONS OR PLACEHOLDERS
 - Never assume data structure, content, or format - always inspect first
@@ -156,7 +161,7 @@ class SmolAgentFactory:
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.max_retries = max_retries
-        self.timeout = 180
+        self.timeout = 300
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
