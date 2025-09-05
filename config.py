@@ -56,17 +56,17 @@ class Config:
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         # SmolAgent model configuration
-        self.smolagent_model_id: str = "gpt-5-mini"
+        self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3"
         self.engine_name: str = "inference_client"
         
         # DGM/Workflow generation model configuration
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
         self.workflow_llm_provider: str = "openai"
-        self.workflow_llm_model: str = "gpt-5-mini"  # Model for workflow generation
+        self.workflow_llm_model: str = "gpt-5-nano"  # Model for workflow generation
         
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
-        self.reasoning_effort: str = "medium"
+        self.reasoning_effort: str = "high"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
