@@ -60,7 +60,7 @@ class Config:
         self.engine_name: str = "inference_client"
         
         # DGM/Workflow generation model configuration
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v5.md"
         self.workflow_llm_provider: str = "openai"
         self.workflow_llm_model: str = "gpt-5-nano"  # Model for workflow generation
         
