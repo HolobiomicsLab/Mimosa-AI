@@ -101,9 +101,11 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 # Agent that uses a pre-defined web tool package.
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 
-# Agent that only writes and executes Python code (no special tools).
-agent_coder = SmolAgentFactory("coder", instruct_coder, [])
+# Agent that writes and executes Python code.
+agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP)
 ```
+
+These MCP Tools (PYTHON_EDITING_MCP, WEB_SEARCH_MCP) are just example and might not exist, list of available tools will be provided.
 
 Filesystem consideration: Agent should NOT use they base python coding ability to list files or interact with local directory, this is because their PATH is different from the PATH for Tools execution. If possible provide agent with filesystem related tools (even if that mean an agent has 2 tools package). You might specify this limitation in agent prompt.
 
@@ -228,7 +230,7 @@ You will receive research findings or data from previous agents that you need to
 
 # 3. AGENT CREATION (Instantiate all agents here)
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
-agent_coder = SmolAgentFactory("coder", instruct_coder, [])  # Uses base Python execution
+agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP)
 
 # 4. NODE DEFINITION  (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
