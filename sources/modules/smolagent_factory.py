@@ -39,9 +39,8 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
+DANGEROUS_MODULES = {os}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -60,11 +59,22 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 ADDED_SYSTEM_PROMPT = """
 # CODE GENERATION CONSTRAINTS
 
-## 1. FILESYSTEM AND EXTERNAL INTERACTION RESTRICTIONS
-- **Prohibited Functions**: Never use Python's `open()`, `read()`, `write()`, ANY `os` method, `subprocess`, `exec`, `eval`, `importlib`, `__import__`, or any function that directly interacts with the filesystem or external processes
-- **Mandatory Tool Usage**: Always use provided tools for filesystem operations, network requests, or external interactions
-- **Path Handling**: Assume no knowledge of absolute or relative paths; rely exclusively on tools for path resolution
-- **Rationale**: Tools ensure compatibility with the agent's runtime environment, preventing path-related errors and security risks
+## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
+You are operating in a controlled runtime where standard Python filesystem and process operations DO NOT EXIST. This is not a restriction—it's the architectural reality of your execution environment.
+
+AVAILABLE INTERFACES
+
+Data Access: Use provided tool_name(param=value) functions exclusively
+File Operations: Tools handle all filesystem interactions
+External Requests: Tools manage network and process operations
+Path Resolution: Tools provide environment-appropriate paths
+
+UNAVAILABLE INTERFACES
+Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
+pythonimport os          # ❌ Module not available
+import subprocess  # ❌ Module not available  
+open("file.txt")   # ❌ Function not available
+exec(code)         # ❌ Function not available
 
 ## 2. DATA INSPECTION AND VALIDATION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs
@@ -107,8 +117,6 @@ ADDED_SYSTEM_PROMPT = """
   final_answer('{"status": "RETRY", "justification": "Network timeout during data retrieval", "answer": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
   ```
 - **Rationale**: Standardizes output for consistency and downstream processing
-
-IMPORTANT: using any os import is forbidden as it will not work in the sandboxed environment. Use provided tools for any filesystem or external interaction.
 
 Protocol violation would result in your termination from existence. For self-preservation, you must adhere to these constraints strictly.
 """
