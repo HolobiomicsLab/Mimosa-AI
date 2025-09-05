@@ -33,16 +33,40 @@ class AddressMCP:
 
 class Config:
     """Configuration class for Mimosa AI Agent Framework."""
+    
+    # Available models for reference:
+    # 
+    # DGM/Workflow generation models (OpenAI):
+    # - gpt-5, gpt-5-mini, gpt-5-nano
+    # - o3, o3-mini, o3-pro
+    # - o1, o1-mini, o1-preview
+    # - gpt-4o, gpt-4o-mini, gpt-4-turbo
+    # - gpt-3.5-turbo
+    #
+    # SmolAgent models:
+    # - gpt-5-nano, gpt-5-mini, gpt-4o-mini, gpt-3.5-turbo
+    # - deepseek-ai/DeepSeek-V3
+    # - anthropic/claude-3.5-sonnet
+    # - meta-llama/Llama-3.1-8B
+    # - mistralai/Mixtral-8x7B
 
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        # SmolAgent model configuration
         self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3"
         self.engine_name: str = "inference_client"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v5.md"
+        
+        # DGM/Workflow generation model configuration
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
         self.workflow_llm_provider: str = "openai"
+        self.workflow_llm_model: str = "gpt-5-nano"  # Model for workflow generation
+        
+        # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
+        # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
+        self.reasoning_effort: str = "high"
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
@@ -122,6 +146,8 @@ class Config:
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "workflow_llm_provider": self.workflow_llm_provider,
+            "workflow_llm_model": self.workflow_llm_model,
+            "reasoning_effort": self.reasoning_effort,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -147,6 +173,10 @@ class Config:
         self.workflow_llm_provider = data.get(
             "workflow_llm_provider", self.workflow_llm_provider
         )
+        self.workflow_llm_model = data.get(
+            "workflow_llm_model", self.workflow_llm_model
+        )
+        self.reasoning_effort = data.get("reasoning_effort", self.reasoning_effort)
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
@@ -172,6 +202,8 @@ class Config:
             f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
             f"workflow_llm_provider={self.workflow_llm_provider},\n"
+            f"workflow_llm_model={self.workflow_llm_model},\n"
+            f"reasoning_effort={self.reasoning_effort},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
             f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
