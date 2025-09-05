@@ -95,7 +95,7 @@ A prompt must specify:
 
 ### Step 2: Create Agents
 
-Instantiate each agent using `SmolAgentFactory`, assigning a name, the instruction prompt, and a single tool package. For agents that only need to write and execute Python code, pass an empty list `[]` for the tools.
+Instantiate each agent using `SmolAgentFactory`, assigning a name, the instruction prompt, and a single tool package. 
 
 ```python
 # Agent that uses a pre-defined web tool package.
@@ -105,9 +105,9 @@ agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARC
 agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP)
 ```
 
-These MCP Tools (PYTHON_EDITING_MCP, WEB_SEARCH_MCP) are just example and might not exist, list of available tools will be provided.
+Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
 
-Filesystem consideration: Agent should NOT use they base python coding ability to list files or interact with local directory, this is because their PATH is different from the PATH for Tools execution. If possible provide agent with filesystem related tools (even if that mean an agent has 2 tools package). You might specify this limitation in agent prompt.
+These MCP Tools (PYTHON_EDITING_MCP, WEB_SEARCH_MCP) are just example and might not exist, list of available tools will be provided.
 
 ### Step 3: Define Conditional Routing Function(s)
 Create functions that take the `WorkflowState` and return the name of the next node. This is the brain of your workflow. Inspect `state["answers"][-1]` for the completion keywords.
@@ -159,6 +159,8 @@ def master_router(state: WorkflowState) -> str:
         return END # workflow need to be modified to avoid such failure case
 ```
 
+Note that you might use one router per node to create custom logic if needed, but we advice using a master_router when possible.
+
 ### Step 4: Assemble the Graph
 Put everything together into a `StateGraph`.
 Do not compile the workflow, it is already in the context.
@@ -182,10 +184,6 @@ You must search for the latest news on the use of entropy in AI research.
 ## INSTRUCTION
 You must find comprehensive information on <research goal>...
 
-## WORKFOLDER
-
-Allowed directory: `/projects/`
-
 ## RECEIVED INFORMATION
 You will receive a research topic or question from the user that needs investigation.
 
@@ -205,10 +203,6 @@ You are a Python coding specialist responsible for writing, executing, and debug
 
 ## INSTRUCTION
 You must implement a code for <user goal>...
-
-## WORKFOLDER
-
-Allowed directory: `/projects/`
 
 ## RECEIVED INFORMATION
 You will receive research findings or data from previous agents that you need to process or analyze through code.
@@ -264,7 +258,6 @@ workflow.add_conditional_edges(
         END: END
     }
 )
-
 # --- END OF SCRIPT ---
 ```
 
@@ -283,5 +276,7 @@ workflow.add_conditional_edges(
 - [ ] **No START Routing**: NEVER use START as a routing target in conditional edges - only use actual node names or END.
 - [ ] **State answers considerations**: Never use .upper() on state["answers"]. state["answers"] could be a dict. use str(state["answers"]) before processing.
 - [ ] **Correct Router Returns**: Router functions return mapping keys (`"next_node"`, `"retry_path"`, etc.) NOT direct node names.
+
+Workflow composed could be made of various conditional flow, allowing to create loop, conditional branch or complex custom conditional logic depending on user goal.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
