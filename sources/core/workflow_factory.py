@@ -10,7 +10,7 @@ import uuid
 
 from sources.modules import state_schema
 
-from .llm_provider import LLMProvider
+from .llm_provider import LLMProvider, LLMConfig
 from .tools_manager import ToolManager
 
 
@@ -64,7 +64,12 @@ Do NOT assume any tools exist beyond what is explicitly listed above.
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
-        return LLMProvider("workflow_creator", path, system_prompt)(prompt)
+        # Create LLM config with model and reasoning effort from main config
+        llm_config = LLMConfig(
+            model=self.config.workflow_llm_model,
+            reasoning_effort=self.config.reasoning_effort
+        )
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -86,7 +91,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             if in_code_block:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
-
 
     async def load_tools_code(self) -> tuple[str, str]:
         """Discover all MCP servers and format their client code.
@@ -114,8 +118,11 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
         return "\n".join(
-            line for line in lines 
-            if not (line.strip().startswith("import ") or line.strip().startswith("from "))
+            line
+            for line in lines
+            if not (
+                line.strip().startswith("import ") or line.strip().startswith("from ")
+            )
         )
 
     def create_workflow_code(
@@ -137,63 +144,71 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         workflow_code = self.remove_imports(workflow_code)
         if not workflow_code.strip():
             raise ValueError("LLM did not return valid workflow code")
-        
+
         # Validate syntax before returning
         try:
-            compile(workflow_code, '<workflow>', 'exec')
+            compile(workflow_code, "<workflow>", "exec")
         except SyntaxError as e:
             self.logger.error(f"Generated workflow has syntax error: {e}")
             raise ValueError(f"LLM generated invalid Python syntax: {e}") from e
-        
+
         self.logger.info("LLM generated workflow code successfully")
         return workflow_code
 
     def validate_workflow_structure(self, workflow_code: str) -> None:
         """Validate LangGraph workflow structure before execution."""
         self.logger.info("Validating workflow structure...")
-        
+
         # Pre-compile regex patterns for efficiency
         patterns = {
-            'state_graph': r"workflow = StateGraph\(WorkflowState\)",
-            'start_edge': r"workflow\.add_edge\(START,\s*[\"'](\w+)[\"']\)",
-            'nodes': r"workflow\.add_node\([\"'](\w+)[\"'],.*?\)",
-            'conditional_edges': r"workflow\.add_conditional_edges\(",
-            'edge_mappings': r'workflow\.add_conditional_edges\(\s*["\'](\w+)["\'],\s*(\w+),\s*\{([^}]+)\}',
-            'router_returns': r'return\s+["\']([^"\']+)["\']',
-            'agent_factory': r"SmolAgentFactory\(",
-            'node_factory': r"WorkflowNodeFactory\.create_agent_node\("
+            "state_graph": r"workflow = StateGraph\(WorkflowState\)",
+            "start_edge": r"workflow\.add_edge\(START,\s*[\"'](\w+)[\"']\)",
+            "nodes": r"workflow\.add_node\([\"'](\w+)[\"'],.*?\)",
+            "conditional_edges": r"workflow\.add_conditional_edges\(",
+            "edge_mappings": r'workflow\.add_conditional_edges\(\s*["\'](\w+)["\'],\s*(\w+),\s*\{([^}]+)\}',
+            "router_returns": r'return\s+["\']([^"\']+)["\']',
+            "agent_factory": r"SmolAgentFactory\(",
+            "node_factory": r"WorkflowNodeFactory\.create_agent_node\(",
         }
-        
+
         # Basic structure validation
         required_checks = [
-            (patterns['state_graph'], "Missing 'workflow = StateGraph(WorkflowState)' initialization"),
-            (patterns['conditional_edges'], "No conditional edges found - workflows require conditional routing"),
-            (patterns['agent_factory'], "No SmolAgentFactory usage found"),
-            (patterns['node_factory'], "No WorkflowNodeFactory usage found")
+            (
+                patterns["state_graph"],
+                "Missing 'workflow = StateGraph(WorkflowState)' initialization",
+            ),
+            (
+                patterns["conditional_edges"],
+                "No conditional edges found - workflows require conditional routing",
+            ),
+            (patterns["agent_factory"], "No SmolAgentFactory usage found"),
+            (patterns["node_factory"], "No WorkflowNodeFactory usage found"),
         ]
-        
+
         for pattern, error_msg in required_checks:
             if not re.search(pattern, workflow_code):
                 raise ValueError(error_msg)
-        
+
         # Extract and validate core components
-        start_match = re.search(patterns['start_edge'], workflow_code)
+        start_match = re.search(patterns["start_edge"], workflow_code)
         if not start_match:
-            raise ValueError("Graph must have entry point: workflow.add_edge(START, 'node_name')")
-        
-        nodes = set(re.findall(patterns['nodes'], workflow_code))
+            raise ValueError(
+                "Graph must have entry point: workflow.add_edge(START, 'node_name')"
+            )
+
+        nodes = set(re.findall(patterns["nodes"], workflow_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
         self.logger.debug(f"📋 Workflow nodes discovered: {', '.join(sorted(nodes))}")
-        
+
         # Validate START edge target exists
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
         self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
-        
+
         self.logger.info("✅ Workflow structure validation passed")
-    
+
     def create_folder_structure(self, uuid_str: str) -> tuple[str]:
         """Create directory structure for new workflow.
         Args:
@@ -234,7 +249,6 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             str: Complete workflow code ready for execution
         """
 
-        
         initial_state = {
             key: (
                 uuid_str
@@ -352,22 +366,26 @@ if WORKFLOW_PATH:
         )
         # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
-            self.save_workflow_files(
-                workflow_path, uuid_str, workflow_code, goal
-            )
-        try :
+            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal)
+        try:
             # Validate workflow structure before assembly
             self.validate_workflow_structure(workflow_code)
         except Exception as e:
             # Include UUID in exception so orchestrator can return it
             raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
-        
+
         # Assemble complete workflow
         complete_code = self.assemble_workflow(
-            tools_code, state_code, smolagent_factory_code,
-            workflow_code, workflow_path, memory_path, uuid_str, goal
+            tools_code,
+            state_code,
+            smolagent_factory_code,
+            workflow_code,
+            workflow_path,
+            memory_path,
+            uuid_str,
+            goal,
         )
-        
+
         self.logger.info("Workflow generation completed")
 
         self.logger.debug(f"Workflow path: {workflow_path}")
@@ -396,12 +414,10 @@ if WORKFLOW_PATH:
             )
         except Exception as e:
             self.logger.error(f"Failed to save system prompt: {str(e)}")
-        
+
         try:
             with open(os.path.join(path, f"goal_{uuid_str}.txt"), "w") as f:
                 f.write(goal)
-            self.logger.info(
-                f"Saved goal to: {path}/goal_{uuid_str}.txt"
-            )
+            self.logger.info(f"Saved goal to: {path}/goal_{uuid_str}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save goal: {str(e)}")

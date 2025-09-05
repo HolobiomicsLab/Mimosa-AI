@@ -6,7 +6,6 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
-import logging
 import os
 import signal
 import sys
@@ -20,10 +19,10 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
-from sources.utils.scenario_loader import ScenarioLoader
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.automated_mode import AutomatedMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
+from sources.utils.scenario_loader import ScenarioLoader
 from sources.utils.user_entry import collect_goals_from_user
 
 dotenv.load_dotenv()
