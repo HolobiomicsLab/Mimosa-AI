@@ -184,7 +184,7 @@ Provide a structured analysis with:
         summary_parts = ["EXECUTION HISTORY SUMMARY:"]
         for i, exec_data in enumerate(self.execution_history[-5:], 1):  # Last 5 executions
             summary_parts.append(f"\n{i}. Task: {exec_data['task'][:256]}...")
-            summary_parts.append(f"   Result: {exec_data['success_level']}")
+            summary_parts.append(f"   Result: {exec_data.get('success_level', 'Unknown')}")
             summary_parts.append(f"   Key insight: {exec_data.get('key_insight', 'N/A')}")
         
         return "\n".join(summary_parts)
@@ -310,8 +310,8 @@ Provide your analysis following the specified output format."""
                     "task": task,
                     "uuid": uuid,
                     "execution_time": execution_time,
-                    "success_level": analysis["success_level"],
-                    "key_insight": analysis["key_insight"]
+                    "success_level": analysis.get("success_level", "Unknown"),
+                    "key_insight": analysis.get("key_insight", "Unknown")
                 }
                 self.execution_history.append(execution_data)
                 
@@ -323,7 +323,7 @@ Provide your analysis following the specified output format."""
                 
                 print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
                 print(f"\033[95m   UUID: {uuid}\033[0m")
-                print(f"\033[95m   Success Level: {analysis['success_level']}\033[0m")
+                print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                 print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
                 
                 # Brief pause between iterations
