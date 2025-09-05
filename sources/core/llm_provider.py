@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -67,6 +68,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.max_retries = 3
+        self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:
         """Check if the current model supports reasoning tokens."""
@@ -105,6 +107,7 @@ class LLMProvider:
                 # Add reasoning effort if supported
                 if self._supports_reasoning_tokens():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
+                    self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
                 
                 response = litellm.completion(**completion_params)
                 break
