@@ -57,8 +57,7 @@ The following tools packages are available for agents:
 
 CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
 1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
-2. Create agents with empty tool lists [] that rely only on Python code execution
-3. Clearly state that the task cannot be completed with available tools
+2. Clearly state that the task cannot be completed with available tools
 
 Do NOT assume any tools exist beyond what is explicitly listed above.
 

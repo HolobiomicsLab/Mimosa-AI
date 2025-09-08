@@ -203,7 +203,7 @@ def main():
     Main function to process a list of UUIDs and analyze errors.
     """
 
-    run_filename = "run_GSMK8_20250728_113102"
+    run_filename = "run_evaluation"
 
     try:
         with open(RESULTS_DIR / f"{run_filename}.json") as f:

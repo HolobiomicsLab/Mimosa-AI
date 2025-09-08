@@ -239,6 +239,7 @@ class HumanMode:
                     lines.append(f"│ {key}:")
                     for line in value.split('\n'):
                         lines.append(f"│   {line}")
+                    print(f"Len of {key}: {len(value)}")
                 else:
                     formatted_value = json.dumps(value) if not isinstance(value, str) else value
                     lines.append(f"│ {key}: {formatted_value}")
