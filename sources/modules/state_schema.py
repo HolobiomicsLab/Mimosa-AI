@@ -4,6 +4,11 @@ The code is not imported directly. It is loaded by the workflow factory and used
 """
 
 from typing import TypedDict, List
+from pydantic import BaseModel
+
+class Answer(BaseModel):
+    status: str
+    message: str
 
 class Action(TypedDict):
     tool: str

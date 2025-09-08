@@ -26,7 +26,7 @@ The following components are pre-loaded in the execution environment. You must u
 | `WorkflowState`       | The `TypedDict` for graph state. You cannot modify its schema.           |
 | `SmolAgentFactory`    | Class to create agent instances. `SmolAgentFactory(name, prompt, tools)` |
 | `WorkflowNodeFactory` | Class to create graph nodes. `create_agent_node(agent_instance)`         |
-| `EXISTING_TOOLS_*`    | Pre-defined tool packages (e.g., `WEB_SEARCH_MCP`, `EXISTING_TOOLS_FILE`). |
+| `*_TOOLS`    | Pre-defined tool packages (e.g., `TOOLOMICS_BROWSER_TOOLS`, `FILESYSTEM_TOOLS`, etc..). |
 
 ### Workflow State Schema
 ```python
@@ -99,15 +99,15 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, TOOLOMICS_BROWSER_TOOLS)
 
 # Agent that writes and executes Python code.
-agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, TOOLOMICS_R_SCRIPT_TOOLS)
 ```
 
 Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
 
-These MCP Tools (PYTHON_EDITING_MCP, WEB_SEARCH_MCP) are just example and might not exist, list of available tools will be provided.
+These MCP Tools (TOOLOMICS_R_SCRIPT_TOOLS, TOOLOMICS_BROWSER_TOOLS) are just example and might not exist, list of available tools will be provided.
 
 ### Step 3: Define Conditional Routing Function(s)
 Create functions that take the `WorkflowState` and return the name of the next node. This is the brain of your workflow. Inspect `state["answers"][-1]` for the completion keywords.
@@ -120,9 +120,10 @@ Create functions that take the `WorkflowState` and return the name of the next n
 - The agent can't see the state by itself
 
 ```python
-class Answer(BaseModel):
-    status: str
-    message: str
+# Already defined, used for json validation
+#class Answer(BaseModel):
+#    status: str
+#    message: str
 
 def master_router(state: WorkflowState) -> str:
     last_answer = Answer.model_validate_json(state["answers"][-1])
@@ -171,7 +172,7 @@ Be sure to name the StateGraph `workflow`.
 # --- WORKFLOW SCRIPT ---
 
 # 1. MANDATORY Workflow Initialization
-workflow = StateGraph(WorkflowState) # ALWAYS use the direct reference
+workflow = StateGraph(WorkflowState) # WorkflowState is not a string, it is a defined variable in the context, you should use WorkflowState as a variable passed as argument to the StateGraph
 
 # 2. AGENT INSTRUCTIONS (Define all prompts here)
 instruct_researcher = """
