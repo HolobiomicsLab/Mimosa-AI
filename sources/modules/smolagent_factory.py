@@ -232,7 +232,7 @@ class SmolAgentFactory:
 
             prev_infos = "Informations given by previous agents:\n"
             for step_name, answer in recent_steps:
-                truncated_answer = str(answer)[:500] + "..." if len(str(answer)) > 500 else str(answer)
+                truncated_answer = str(answer)[:1024] + "..." if len(str(answer)) > 500 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
         return f"""You are a highly skilled and goal-seeking agent who must pursue a goal.

@@ -60,9 +60,9 @@ class Config:
         self.engine_name: str = "inference_client"
         
         # DGM/Workflow generation model configuration
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v5.md"
         self.workflow_llm_provider: str = "openai"
-        self.workflow_llm_model: str = "gpt-5-nano"  # Model for workflow generation
+        self.workflow_llm_model: str = "o3"  # Model for workflow generation
         
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
