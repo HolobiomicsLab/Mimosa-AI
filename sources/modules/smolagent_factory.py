@@ -96,7 +96,24 @@ exec(code)         # ❌ Function not available
 - **No Assumptions**: Do not assume tool output format or content; validate every time
 - **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
-## 5. FINAL ANSWER FORMAT
+## 5. Patience and Iteration
+
+You must always stop writing code after the first print statement that inspects the output of a tool call. Wait for the execution result, then analyze the printed output before writing any further code.
+
+# Analyze train_model.r
+script_content = read_file(path="/projects/train_model.r")
+print("First 500 characters of script:")
+print(script_content[:500])
+# SPECIAL STOP TRIGGER: PRINT STATEMENT DETECTED - STOPING FURTHER CODE GENERATION - ALL FUTHER CODE WILL BE COMMENTED OUT
+# Next we could wait for the output, analyze it, and write summary points like so:
+#summary_points = [
+#    "1. Currently loads data from ml.csv",
+#    "2. Performs some basic data preprocessing",
+#]
+
+rationale: This approach ensures you do not hallucinate or make assumptions about the data or code you are processing. It forces you to validate and understand the context before proceeding, leading to more accurate and relevant code generation. 
+
+## 6. FINAL ANSWER FORMAT
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
   ```json
   {

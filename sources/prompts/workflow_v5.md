@@ -131,7 +131,7 @@ def master_router(state: WorkflowState) -> str:
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
 
-    if "SUCCESS" in last_answer.status:
+    if "SUCCESS" in last_answer.status: # ONLY way to check routing "<keyword>" in last_answer.status
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         # Logic to determine the next step after success
         return "next_node"
@@ -156,7 +156,7 @@ def master_router(state: WorkflowState) -> str:
         return END
     
     else :
-        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Terminating.")
+        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FAILURE. Terminating.") # MANDATORY: display when protocol is violated
         return END # workflow need to be modified to avoid such failure case
 ```
 
