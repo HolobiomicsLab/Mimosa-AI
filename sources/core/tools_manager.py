@@ -363,7 +363,7 @@ class ToolManager:
         for addr in self.config.discovery_addresses:
             try:
                 mcps_server = await self.discover_mcp_at_address(addr.ip, addr.port_min, addr.port_max)
-                if mcps:
+                if mcps_server:
                     mcps.extend(mcps_server)
             except Exception as e:
                 print(f"❌ Failed to discover MCP servers on {addr}: {e}")
