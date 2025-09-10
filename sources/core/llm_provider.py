@@ -10,9 +10,9 @@ import litellm
 class LLMConfig:
     """Configuration for Large Language Model interactions."""
 
-    model: str = "o3-2025-04-16"
+    model: str = "o3-2025-04-16" #"gpt-5-2025-08-07" # "o3-2025-04-16"
     provider: str = "openai"
-    temperature: float = 1.0
+    temperature: float = 1
     key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
 
     def __post_init__(self):
