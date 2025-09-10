@@ -26,7 +26,10 @@ class WorkflowEvaluator:
         # Initialize scenario loader and LLMProvider for scenario-based evaluation
         self.scenario_loader = ScenarioLoader()
         self.judge_model = "gpt-4o-mini"  # Default model, using gpt-4o-mini
-        self.llm_config = LLMConfig().from_dict({"model": self.judge_model})
+        self.llm_config = LLMConfig().from_dict({
+            "model": self.judge_model,
+            "reasoning_effort": config.reasoning_effort
+        })
         self.logger = logging.getLogger(__name__)
     
     def _load_workflow_data(self, workflow_id: str) -> dict[dict, str]:
