@@ -330,7 +330,6 @@ class ToolManager:
         timeout: float = 2.0,
     ) -> list[int]:
         """Discover MCP servers on address and ports range with timeout handling."""
-        found_servers = False
         mcps = []
 
         for port in range(port_min, port_max + 1):
@@ -338,21 +337,8 @@ class ToolManager:
                 async with Client(
                     f"http://{address}:{port}/mcp", timeout=3.0
                 ) as client:
-                    found_servers = True
                     tools = await client.list_tools()
-                    name = None
-                    try:
-                        resp = await client.call_tool("get_mcp_name", {})
-                        if "content" in resp and resp.content: 
-                            name = resp.content[0].text
-                        else: # fallback because it randomly change ????
-                            name = resp[0].text if resp else None
-                    except Exception as e:
-                        print(
-                            f"⚠️ Failed to get name for MCP server on port {port}: {e}"
-                        )
-                        name = f"mcp_{port}"
-                    assert name, "MCP name must be set"
+                    name = f"mcp_{port}"
                     if tools:
                         print(f"✅ Found MCP server on port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
@@ -369,16 +355,6 @@ class ToolManager:
                 continue
             except Exception:
                 continue
-
-        if not found_servers:
-            print(
-                f"❌ No MCP servers found on ports {port_min}-{port_max}. \
-                Please ensure toolomics MCPs server is running."
-            )
-            raise RuntimeError(
-                "No MCP servers found. Please start Toolomics MCP server."
-            )
-        self.mcps.extend(mcps)
         return mcps
     
     async def discover_network_mcp_servers(self) -> list[MCP]:
@@ -386,7 +362,7 @@ class ToolManager:
         mcps = []
         for addr in self.config.discovery_addresses:
             try:
-                mcps_server = await self.discover_mcp_at_address(addr)
+                mcps_server = await self.discover_mcp_at_address(addr.ip, addr.port_min, addr.port_max)
                 if mcps:
                     mcps.extend(mcps_server)
             except Exception as e:
