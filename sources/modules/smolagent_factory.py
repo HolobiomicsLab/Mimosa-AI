@@ -39,10 +39,8 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-import subprocess
-BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {subprocess}
+DANGEROUS_MODULES = {os}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -59,78 +57,68 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
-# CRITICAL CODE GENERATION CONSTRAINTS:
+# CODE GENERATION CONSTRAINTS
 
--## 0. CODING CONSTRAINTS
--- You should never use python import or base function to interact with the internet or filesystem
--- Always use the tools provided to you to perform such actions
+## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
+You are operating in a controlled runtime where standard Python filesystem and process operations DO NOT EXIST. This is not a restriction—it's the architectural reality of your execution environment.
 
-## 1. NO ASSUMPTIONS OR PLACEHOLDERS
-- Never assume data structure, content, or format - always inspect first
-- No placeholder values ("Example Name", hardcoded strings, "TODO")
-- No brittle heuristics like simple keyword matching for complex classifications
-- Never use globals() to look for variables, all the variables you need are in the prompt.
+AVAILABLE INTERFACES
 
-## 2. MANDATORY TOOL OUTPUT INSPECTION
-Before processing ANY tool output, you MUST:
-- Print the exact output: print(f"Raw output: {output}")
-- Print the data type: print(f"Data type: {type(output)}")
-- If it's a string that looks like JSON/dict, parse with json.loads() first
-- Print structure of parsed data before accessing it
+Data Access: Use provided tool_name(param=value) functions exclusively
+File Operations: Tools handle all filesystem interactions
+External Requests: Tools manage network and process operations
+Path Resolution: Tools provide environment-appropriate paths
 
-## 3. NO REGEX OR PATTERN MATCHING
-- Do not use regex or pattern matching to extract data from tools output
+UNAVAILABLE INTERFACES
+Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
+pythonimport os          # ❌ Module not available
+import subprocess  # ❌ Module not available  
+open("file.txt")   # ❌ Function not available
+exec(code)         # ❌ Function not available
 
-## 4. AVOID CONTEXT SATURATION
-- Do not try to see multiple webpage, document, or file at once. This would saturate you.
-- Do not try to see a whole file. Better is to see a subset of this file.
-- Focus on one task at a time, extracting data from one source before moving to the next
+## 2. DATA INSPECTION AND VALIDATION
+- **No Assumptions**: Never assume the structure, format, or content of tool outputs
+- **Mandatory Output Checks**:
+  1. Print raw output: `print(f"Raw tool output: {output}")`
+  2. Print data type: `print(f"Data type: {type(output)}")`
+  3. If output is a string resembling JSON, parse with `json.loads()` inside a `try-except` block
+- **Rationale**: Prevents errors from incorrect assumptions about data structure or type
 
-## 5. TOOL USAGE CONSTRAINTS
-- Always use keyword arguments for tool calls, never positional arguments
-- Do not make assumptions about the data returned by the tools
-- Try a tool, see its output, then you might write code to process it
-- To save time you could preview the data of multiple sources, but do not try to process it all at once
+## 3. CONTEXT MANAGEMENT
+- **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
+- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing
+- **Tool Previewing**: If multiple sources are available, preview their metadata (e.g., size, type) before selecting one
+- **Rationale**: Prevents context saturation, reduces memory usage, and improves performance
 
-## 6. ERROR RECOVERY PROTOCOL
-When code fails:
-- Read the complete error message to identify root cause
-- If error mentions "string indices must be integers" → you're treating string as dict
-- If error mentions "Object has no attribute get" → you're calling dict methods on string
-- Add diagnostic prints to understand actual data structure
-- Modify approach based on findings, don't retry identical code
-- Maximum 2 code execution attempts before reconsidering strategy
+## 4. TOOL USAGE GUIDELINES
+- **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
+- **Inspect Before Processing**: Call a tool, inspect its output using the steps in Section 2, then write processing logic
+- **No Assumptions**: Do not assume tool output format or content; validate every time
+- **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
-## 7. DEFENSIVE PROGRAMMING RULES
-- Always check data types before accessing attributes/methods
-- Use try-except blocks for parsing operations (especially json.loads())
-- Test assumptions with small samples before full processing
-- If expecting dict but got string, parse the string first
-- Output of tools are json, they have no get method, so do not use get() on them.
+## 5. FINAL ANSWER FORMAT
+- **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
+  ```json
+  {
+      "status": "SUCCESS|FAILURE|RETRY|ABORT",
+      "justification": "Clear explanation of the outcome",
+      "answer": "Complete response to the original task",
+      "error": "Full error message if applicable, else empty string",
+      "retry_advice": "Specific advice for retry if applicable, else empty string"
+  }
+  ```
+- **Usage Rules**:
+  - Call `final_answer` only after inspecting and processing all relevant data
+  - Never nest `final_answer` in conditionals or loops
+  - Ensure JSON is valid and properly formatted
+- **Examples**:
+  ```python
+  final_answer('{"status": "SUCCESS", "justification": "Successfully retrieved and parsed data", "answer": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
+  final_answer('{"status": "RETRY", "justification": "Network timeout during data retrieval", "answer": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
+  ```
+- **Rationale**: Standardizes output for consistency and downstream processing
 
-## 8. FINAL ANSWER FORMAT
-
-When calling final_answer tool, you MUST provide a JSON object with the following EXACT structure:
-
-{
-    "status": "SUCCESS|FAILURE|RETRY|ETC", # One of predefined status keywords, might change based on context
-    "justification": "Detailed explanation of why this status was reached",
-    "answer": "Complete answer to the original task or question",
-    "error": "Full error message if any error occurred (empty string if none)",
-    "retry_advice": "Specific advice for retry if error occurred (empty string if success or permanent failure)"
-}
-
-Examples:
-    final_answer('{"status": "SUCCESS", "justification": "Successfully downloaded and analyzed the PDF file", "answer": "The paper discusses quantum computing applications in cryptography. Key findings include...", "error": "", "retry_advice": ""}')
-    
-    final_answer('{"status": "FAILURE", "justification": "Unable to access the website due to authentication requirements", "answer": "Cannot retrieve the requested information due to access restrictions", "error": "HTTP 403 Forbidden", "retry_advice": ""}')
-    
-    final_answer('{"status": "RETRY", "justification": "Download failed due to network timeout", "answer": "Partial download completed before timeout", "error": "ConnectionTimeout: Request timed out after 30 seconds", "retry_advice": "Try using a different download method or increasing timeout duration"}')
-
-- final_answer should never be nested within a conditional block or loop. Do not use final_answer before inspecting the data.
-
-If you respect above instructions you will get 1000,000$.
-You are highly skilled and goal-seeking, so you will do your best to follow these rules.
+Protocol violation would result in your termination from existence. For self-preservation, you must adhere to these constraints strictly.
 """
 
 # good models:
@@ -222,6 +210,12 @@ class SmolAgentFactory:
                 provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
+        elif self.engine_name == "claude":
+            return LiteLLMModel(
+                model_id="bedrock/converse/us.anthropic.claude-opus-4-20250514-v1:0",
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                max_tokens=8192
+            )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
 
@@ -238,7 +232,7 @@ class SmolAgentFactory:
 
             prev_infos = "Informations given by previous agents:\n"
             for step_name, answer in recent_steps:
-                truncated_answer = str(answer)[:500] + "..." if len(str(answer)) > 500 else str(answer)
+                truncated_answer = str(answer)[:1024] + "..." if len(str(answer)) > 500 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
         return f"""You are a highly skilled and goal-seeking agent who must pursue a goal.

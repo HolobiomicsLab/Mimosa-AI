@@ -19,6 +19,7 @@ from sources.utils.shared_visualization import (
     ParallelPlotManager,
     SharedVisualizationData,
 )
+from sources.core.workflow_info import WorkflowInfo
 from sources.utils.visualization import VisualizationUtils
 
 # Configure logging
@@ -97,11 +98,22 @@ class ParallelTesting:
                 )
             )
 
+            # Load workflow info for cost and rewards
+            wf = WorkflowInfo(uuid, "workflows" / uuid)
+            state_result = wf.load_state_result()
+            reward_eval = state_result.get("evaluation", {})
+            reward_generic_info = reward_eval.get("generic", {})
+            reward_scenario_info = reward_eval.get("scenario", {})
+            reward_generic = reward_generic_info.get("overall_score", 0.0)
+            reward_scenario = reward_scenario_info.get("score", 0.0)
+            reward = reward_generic + reward_scenario
+
             # Update result with success
             result.update({
                 "status": "completed",
                 "final_uuid": uuid,
-                "execution_time": time.time() - result["start_time"]
+                "execution_time": time.time() - result["start_time"],
+                "total_rewards": reward
             })
 
             logger.info(f"✅ Process {process_id} completed in {result['execution_time']:.2f}s")

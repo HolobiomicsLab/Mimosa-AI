@@ -73,6 +73,7 @@ GUIDELINES:
 3. Focus on areas like: literature review, data analysis, software installation, paper reproduction
 4. Consider the execution history to avoid repetition and build upon previous successes/failures
 5. Tasks should be specific, actionable, and measurable
+6. Always assume empty workfolder at start of each task, no pre-existing files or data, you must specify any data download or code installation required in the task description
 
 TASK CATEGORIES TO EXPLORE:
 - Literature search and analysis
@@ -116,6 +117,8 @@ Please prioritize tasks that use one of these papers or github repositories:
 - "A Better Autoencoder for Image: Convolutional Autoencoder" by Yifei Zhang
 - "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift" by Sergey Ioffe, Christian Szegedy
 - MOGONET integrates multi-omics data using graph convolutional networks allowing patient classification
+
+Always provide the full paper name or github link in your task description if you are using one of the above papers or github repositories as reference.
 """
 
     def _get_result_analyzer_system_prompt(self) -> str:
@@ -184,7 +187,7 @@ Provide a structured analysis with:
         summary_parts = ["EXECUTION HISTORY SUMMARY:"]
         for i, exec_data in enumerate(self.execution_history[-5:], 1):  # Last 5 executions
             summary_parts.append(f"\n{i}. Task: {exec_data['task'][:256]}...")
-            summary_parts.append(f"   Result: {exec_data['success_level']}")
+            summary_parts.append(f"   Result: {exec_data.get('success_level', 'Unknown')}")
             summary_parts.append(f"   Key insight: {exec_data.get('key_insight', 'N/A')}")
         
         return "\n".join(summary_parts)
@@ -222,6 +225,7 @@ Based on the execution history above, generate a new task that:
 2. Explores new capabilities or challenges existing ones
 3. Is appropriate for the current difficulty level
 4. Focuses on scientific research automation
+5. Assume the data is not available locally, you must specify any data download or code installation required unless previous execution summary confirms data or files is already downloaded
 
 Task:"""
 
@@ -293,7 +297,7 @@ Provide your analysis following the specified output format."""
                     goal=task,
                     judge=True,  # Enable evaluation
                     human_validation=False,
-                    max_iteration=3  # Allow some self-improvement
+                    max_iteration=1  # Allow some self-improvement
                 )
                 
                 # Load and analyze results
@@ -310,8 +314,8 @@ Provide your analysis following the specified output format."""
                     "task": task,
                     "uuid": uuid,
                     "execution_time": execution_time,
-                    "success_level": analysis["success_level"],
-                    "key_insight": analysis["key_insight"]
+                    "success_level": analysis.get("success_level", "Unknown"),
+                    "key_insight": analysis.get("full_analysis", "Unknown")
                 }
                 self.execution_history.append(execution_data)
                 
@@ -323,7 +327,7 @@ Provide your analysis following the specified output format."""
                 
                 print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
                 print(f"\033[95m   UUID: {uuid}\033[0m")
-                print(f"\033[95m   Success Level: {analysis['success_level']}\033[0m")
+                print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                 print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
                 
                 # Brief pause between iterations

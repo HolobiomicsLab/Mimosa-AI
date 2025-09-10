@@ -124,7 +124,7 @@ class GodelMachine:
         if flow_code is not None:
             improv_prompt = "\n".join([
                 "# WORKFLOW ATTEMPT ANALYSIS:",
-                "Your previous attempt at generating a workflow did not succeed.",
+                "Your previous attempt at generating a workflow did not succeed or was incomplete.",
                 "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
                 "## Previous workflow code:",
@@ -140,7 +140,7 @@ class GodelMachine:
                 "\n",
                 "## FAILURE ANALYSIS:",
                 "1. Analyze the previous workflow code and its execution results.",
-                "2. Identify the root failure causes.",
+                "2. Evaluate task completion. Did the workflow really achieve the goal?",
                 "3. Think of specific improvements to the workflow code to address these failures.",
                 "\n",
                 "## IMPROVEMENT SUGGESTIONS:",
@@ -155,7 +155,7 @@ class GodelMachine:
                 "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
                 "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
                 "\n",
-                "Generate an IMPROVED workflow that addresses identified failure modes.",
+                "Generate an IMPROVED workflow that addresses identified failure modes or with added steps for reaching the goal.",
                 "The new workflow must be different from the previous attempt.\n"
             ])
 
@@ -324,7 +324,7 @@ class GodelMachine:
         )
 
         # Check termination conditions
-        if iteration_count >= max_depth:
+        if iteration_count >= max_depth-1:
             self._save_final_plots(assertion_plot_data, assertion_history, uuid)
             return uuid
 
