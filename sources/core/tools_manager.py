@@ -7,9 +7,9 @@ import json
 import subprocess
 from typing import Any
 from urllib.parse import urlparse, urlunparse
+from fastmcp import Client
 
-# FastMCP only used for server name discovery as fallback
-
+from config import Config
 
 def normalize_mcp_endpoint(
     raw_url: str, transport: str
@@ -118,6 +118,7 @@ class ToolManager:
     def __init__(self, config=None, mcps: list[MCP] | None = None):
         self.mcps = mcps if mcps is not None else []
         self.use_toolhive = self._check_toolhive_available()
+        self.config = config if config is not None else Config()
 
     def _check_toolhive_available(self) -> bool:
         """Check if ToolHive is available on the system."""
@@ -196,14 +197,13 @@ class ToolManager:
                 print(f"❌ Failed to get tools from {server_url}: {result.stderr}")
                 return []
 
-            # Parse JSON output
             try:
                 data = json.loads(result.stdout)
                 tools = []
                 for tool_data in data.get("tools", []):
                     name = tool_data.get("name", "")
                     description = tool_data.get("description", "")
-                    if name:  # Only add tools with valid names
+                    if name:
                         tools.append(Tool(name, description))
                 return tools
             except json.JSONDecodeError as e:
@@ -220,7 +220,6 @@ class ToolManager:
     async def discover_toolhive_servers(self) -> list[MCP]:
         """Discover all MCP servers running via ToolHive."""
         try:
-            # Get list of running servers from ToolHive
             result = subprocess.run(
                 ["thv", "list", "--format", "json"],
                 capture_output=True,
@@ -232,7 +231,6 @@ class ToolManager:
                 print(f"❌ Failed to get ToolHive server list: {result.stderr}")
                 return []
 
-            # Parse JSON output
             servers_data = json.loads(result.stdout)
             mcps = []
 
@@ -263,10 +261,7 @@ class ToolManager:
                     continue
 
                 # For ToolHive servers, auto-detect transport from URL path
-                # The url from ToolHive may contain fragments, normalize it for consistent client usage
-                raw_url = (
-                    url  # Use the full URL from ToolHive (includes fragment if present)
-                )
+                raw_url = (url)
 
                 # Auto-detect transport type from URL path
                 parsed_url = urllib.parse.urlparse(raw_url)
@@ -284,9 +279,7 @@ class ToolManager:
                     raw_url, detected_transport
                 )
 
-                # Get tools with descriptions using thv command
                 tools = self._get_tools_with_descriptions(raw_url)
-
                 if tools:
                     # Use readable name based on toolhive server name - no need for MCP client
                     server_name = name.replace("-", " ").title() + " MCP"
@@ -298,24 +291,23 @@ class ToolManager:
                     if extras.get("container_hint"):
                         print(f"🏷️ Container: {extras['container_hint']}")
 
-                    # For ToolHive servers, store normalized URLs for consistent client usage
                     mcps.append(
                         MCP(
                             name=server_name,
-                            tools=tools,  # Now storing Tool objects with descriptions
+                            tools=tools,
                             address=address,
                             port=port,
                             toolhive_name=name,
-                            transport=normalized_transport,  # Normalized transport
-                            discovery_url=normalized_url,  # Normalized URL for discovery
-                            client_url=normalized_url,  # Normalized URL for client connections
+                            transport=normalized_transport,
+                            discovery_url=normalized_url,
+                            client_url=normalized_url,
                         )
                     )
                 else:
                     print(f"⚠️ Attempting full restart for ToolHive server {name}...")
                     if self._attempt_full_mcp_restart(name):
                         print(f"✅ Successfully restarted ToolHive server {name}")
-                        return await self.discover_toolhive_servers()  # Retry discovery after restart
+                        return await self.discover_toolhive_servers()
                     else:
                         print(f"❌ Failed to restart ToolHive server {name}")
             return mcps
@@ -330,7 +322,77 @@ class ToolManager:
             print(f"❌ Error discovering ToolHive servers: {e}")
             return []
 
-    # Removed discover_mcp_at_address - ToolHive handles all discovery
+    async def discover_mcp_at_address(
+        self,
+        address: str,
+        port_min: int = 5000,
+        port_max: int = 5250,
+        timeout: float = 2.0,
+    ) -> list[int]:
+        """Discover MCP servers on address and ports range with timeout handling."""
+        found_servers = False
+        mcps = []
+
+        for port in range(port_min, port_max + 1):
+            try:
+                async with Client(
+                    f"http://{address}:{port}/mcp", timeout=3.0
+                ) as client:
+                    found_servers = True
+                    tools = await client.list_tools()
+                    name = None
+                    try:
+                        resp = await client.call_tool("get_mcp_name", {})
+                        if "content" in resp and resp.content: 
+                            name = resp.content[0].text
+                        else: # fallback because it randomly change ????
+                            name = resp[0].text if resp else None
+                    except Exception as e:
+                        print(
+                            f"⚠️ Failed to get name for MCP server on port {port}: {e}"
+                        )
+                        name = f"mcp_{port}"
+                    assert name, "MCP name must be set"
+                    if tools:
+                        print(f"✅ Found MCP server on port {port} with name {name}")
+                        print(f"📋 Available tools: {[tool.name for tool in tools]}")
+                        mcps.append(
+                            MCP(
+                                name=name,
+                                tools=[tool.name for tool in tools],
+                                address=address,
+                                port=port,
+                            )
+                        )
+            except asyncio.TimeoutError:
+                print(f"❌ MCP server on port {port} timed out after {timeout}s")
+                continue
+            except Exception:
+                continue
+
+        if not found_servers:
+            print(
+                f"❌ No MCP servers found on ports {port_min}-{port_max}. \
+                Please ensure toolomics MCPs server is running."
+            )
+            raise RuntimeError(
+                "No MCP servers found. Please start Toolomics MCP server."
+            )
+        self.mcps.extend(mcps)
+        return mcps
+    
+    async def discover_network_mcp_servers(self) -> list[MCP]:
+        """Discover MCP servers on localhost network."""
+        mcps = []
+        for addr in self.config.discovery_addresses:
+            try:
+                mcps_server = await self.discover_mcp_at_address(addr)
+                if mcps:
+                    mcps.extend(mcps_server)
+            except Exception as e:
+                print(f"❌ Failed to discover MCP servers on {addr}: {e}")
+                continue
+        return mcps
 
     async def discover_mcp_servers(self) -> list[MCP]:
         """Discover MCP servers using ToolHive only."""
@@ -339,13 +401,18 @@ class ToolManager:
                 "ToolHive is required. Please install ToolHive: curl -sSL https://get.toolhive.dev | sh"
             )
 
-        print("🔍 Discovering MCP servers via ToolHive...")
         try:
-            mcps = await self.discover_toolhive_servers()
-            if mcps:
-                print(f"✅ Found {len(mcps)} MCP server(s) via ToolHive.")
-                self.mcps.extend(mcps)
-                return mcps
+            print("🔍 Discovering MCP servers via ToolHive...")
+            mcps_thv = await self.discover_toolhive_servers()
+            print("🔍 Discovering MCP servers on network...")
+            mcps_net = await self.discover_network_mcp_servers()
+
+            if mcps_net or mcps_thv:
+                print(f"✅ Found {len(mcps_thv)} MCP server(s) via ToolHive.")
+                self.mcps.extend(mcps_thv)
+                print(f"✅ Found {len(mcps_net)} MCP server(s) via network scan.")
+                self.mcps.extend(mcps_net)
+                return self.mcps
             else:
                 print("⚠️ No running MCP servers found via ToolHive.")
                 return []
