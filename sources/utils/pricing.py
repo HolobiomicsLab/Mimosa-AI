@@ -25,6 +25,51 @@ class PricingCalculator:
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
+    
+    def _find_model_by_substring(self, target_model: str) -> str | None:
+        """
+        Find model using substring matching
+        
+        For anthropic/claude-opus-4-20250514:
+        1. Check if any available model is a substring of the target
+        2. Return the longest match (most specific)
+        
+        Examples:
+        - anthropic/claude-opus-4-20250514 contains anthropic/claude-opus-4 ✅
+        - openai/gpt-5-2025-08-07 contains openai/gpt-5 ✅
+        """
+        if '/' not in target_model:
+            return None
+        
+        # Find all available models that are substrings of target
+        matches = []
+        for available_model in self.model_pricing:
+            if available_model in target_model:
+                matches.append(available_model)
+        
+        if not matches:
+            return None
+        
+        # Return the longest match (most specific)
+        # e.g., prefer "anthropic/claude-opus-4" over "anthropic/claude"
+        return max(matches, key=len)
+    
+    def _get_model_pricing_with_fallback(self, model_name: str) -> dict:
+        """Get model pricing with intelligent fallback."""
+        
+        # 1. Try exact match
+        if model_name in self.model_pricing:
+            return self.model_pricing[model_name]
+        
+        # 2. Try substring matching
+        pattern_match = self._find_model_by_substring(model_name)
+        if pattern_match:
+            print(f"📊 Using pricing for {pattern_match} (pattern matched from {model_name})")
+            return self.model_pricing[pattern_match]
+        
+        # 3. Default fallback
+        print(f"⚠️  No match found for {model_name}, using default pricing")
+        return self.model_pricing.get("default", {"input": 0.70, "output": 2.50})
 
     def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
@@ -113,10 +158,7 @@ class PricingCalculator:
         print("\n💰 Cost Breakdown:")
         print("=" * 60)
         for call in llm_calls:
-            pricing = self.model_pricing.get(
-                call.model,
-                self.model_pricing.get("default", {"input": 0.70, "output": 2.50}),
-            )
+            pricing = self._get_model_pricing_with_fallback(call.model)
             cost = (
                 call.input_tokens * pricing["input"]
                 + call.output_tokens * pricing["output"]
