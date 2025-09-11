@@ -13,6 +13,7 @@ from typing import Any
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.utils.scenario_loader import ScenarioLoader
 
+
 class WorkflowEvaluator:
     """Combined workflow evaluator with both judge and scenario-based evaluation capabilities."""
 
@@ -24,10 +25,12 @@ class WorkflowEvaluator:
 
         # Initialize scenario loader and LLMProvider for scenario-based evaluation
         self.scenario_loader = ScenarioLoader()
-        self.judge_model = "gpt-4o-mini"  # Default model, using gpt-4o-mini
+        self.judge_model = "openai/gpt-4o-mini"  # Default model in OpenRouter format
+        # Extract provider and model from OpenRouter format
+        provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
         self.llm_config = LLMConfig().from_dict({
-            "provider": "openai",
-            "model": self.judge_model,
+            "model": model,
+            "provider": provider,
             "reasoning_effort": config.reasoning_effort
         })
         self.logger = logging.getLogger(__name__)
