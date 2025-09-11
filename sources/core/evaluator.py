@@ -13,7 +13,6 @@ from typing import Any
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.utils.scenario_loader import ScenarioLoader
 
-
 class WorkflowEvaluator:
     """Combined workflow evaluator with both judge and scenario-based evaluation capabilities."""
 
@@ -27,6 +26,7 @@ class WorkflowEvaluator:
         self.scenario_loader = ScenarioLoader()
         self.judge_model = "gpt-4o-mini"  # Default model, using gpt-4o-mini
         self.llm_config = LLMConfig().from_dict({
+            "provider": "openai",
             "model": self.judge_model,
             "reasoning_effort": config.reasoning_effort
         })

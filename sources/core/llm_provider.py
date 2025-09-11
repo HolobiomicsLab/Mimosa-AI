@@ -11,17 +11,34 @@ import litellm
 class LLMConfig:
     """Configuration for Large Language Model interactions."""
 
-    model: str = "o3-2025-04-16"
-    provider: str = "openai"
+    model: str = "claude-opus-4-20250514"
+    provider: str = "anthropic"
     temperature: float = 1.0
-    key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     reasoning_effort: str = "medium"
+
+    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium"):
+        self.model = model
+        self.provider = provider.lower()
+        self.temperature = temperature
+        self.key = key
+        self.reasoning_effort = reasoning_effort
+        self.__post_init__()
 
     def __post_init__(self):
         """Validate configuration after initialization."""
+        # Set appropriate API key based on provider
+        if self.provider == "anthropic" and not self.key:
+            print("using anthropic key")
+            self.key = os.getenv("ANTHROPIC_API_KEY", "")
+        elif self.provider == "openai" and not self.key:
+            print("using openai key")
+            self.key = os.getenv("OPENAI_API_KEY", "")
+            
         if not self.key:
+            env_var = "ANTHROPIC_API_KEY" if self.provider == "anthropic" else "OPENAI_API_KEY"
             raise ValueError(
-                "API key not provided and OPENAI_API_KEY environment variable not set"
+                f"API key not provided and {env_var} environment variable not set"
             )
         self.temperature = float(self.temperature)  # Ensure numeric type
         
@@ -40,7 +57,7 @@ class LLMConfig:
             model=config.get("model", "o3-2025-04-16"),
             provider=config.get("provider", "openai"),
             temperature=config.get("temperature", 1.0),
-            key=config.get("key", os.getenv("OPENAI_API_KEY", "")),
+            key=config.get("key", ""),
             reasoning_effort=config.get("reasoning_effort", "medium"),
         )
 
@@ -50,6 +67,7 @@ class LLMProvider:
     Attributes:
         deepseek_client (OpenAI): Client for Deepseek API
         openai_client (OpenAI): Client for OpenAI API
+        anthropic_client: Client for Anthropic API
     """
 
     def __init__(
@@ -76,6 +94,10 @@ class LLMProvider:
         reasoning_models = ["o1", "o3", "gpt-5"]
         return any(reasoning_model in model_name for reasoning_model in reasoning_models)
 
+    def _is_claude_model(self) -> bool:
+        """Check if the current model is a Claude model."""
+        return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
+
     def save_call(self, call: dict) -> None:
         """
         Save the API call details to a JSON file.
@@ -88,7 +110,7 @@ class LLMProvider:
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
-    def __call__(self, prompt: str, timeout: int = 120):
+    def __call__(self, prompt: str, timeout: int = 180):
         message = []
         if self.sys_msg is not None:
             message.append({"content": self.sys_msg, "role": "system"})
@@ -103,9 +125,9 @@ class LLMProvider:
                     "temperature": self.config.temperature,
                     "timeout": timeout,
                 }
-                
-                # Add reasoning effort if supported
-                if self._supports_reasoning_tokens():
+                completion_params["api_key"] = self.config.key
+                # Add reasoning effort if supported (not for Claude models)
+                if self._supports_reasoning_tokens() and not self._is_claude_model():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
                 
@@ -127,9 +149,28 @@ class LLMProvider:
             "response": res,
             "message": message,
             "temperature": self.config.temperature,
-            "reasoning_effort": self.config.reasoning_effort,
+            "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
         }
         if self.memory_path and self.agent_name:
             self.save_call(json_res)
 
         return res
+
+if __name__ == "__main__":
+    # Example usage
+    llm_config = LLMConfig(
+        model="claude-opus-4-20250514",
+        provider="anthropic",
+        temperature=0.7,
+        key=os.getenv("ANTHROPIC_API_KEY", ""),
+        reasoning_effort="high"
+    )
+    llm_provider = LLMProvider(
+        agent_name="test_agent",
+        memory_path=None,
+        system_msg="You are a helpful assistant.",
+        config=llm_config
+    )
+    prompt = "Explain the theory of relativity in simple terms."
+    response = llm_provider(prompt)
+    print("LLM Response:", response)
