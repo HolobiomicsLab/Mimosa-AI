@@ -66,6 +66,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         """
         # Create LLM config with model and reasoning effort from main config
         llm_config = LLMConfig(
+            provider=self.config.workflow_llm_provider,
             model=self.config.workflow_llm_model,
             reasoning_effort=self.config.reasoning_effort
         )
