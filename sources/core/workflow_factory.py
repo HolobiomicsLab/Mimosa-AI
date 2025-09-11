@@ -10,7 +10,7 @@ import uuid
 
 from sources.modules import state_schema
 
-from .llm_provider import LLMProvider, LLMConfig
+from .llm_provider import LLMConfig, LLMProvider
 from .tools_manager import ToolManager
 
 
@@ -65,9 +65,17 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
         # Create LLM config with model and reasoning effort from main config
+        # Extract provider and model from OpenRouter format (provider/model)
+        if "/" in self.config.workflow_llm_model:
+            provider, model = self.config.workflow_llm_model.split("/", 1)
+        else:
+            # Fallback for backward compatibility
+            provider = "openai"
+            model = self.config.workflow_llm_model
+        
         llm_config = LLMConfig(
-            provider=self.config.workflow_llm_provider,
-            model=self.config.workflow_llm_model,
+            model=model,
+            provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)

@@ -210,13 +210,27 @@ class OpenRouterPricingClient:
     def get_fallback_pricing(self) -> dict[str, dict[str, float]]:
         """Get fallback pricing for common models."""
         return {
-            # OpenAI models
-            "o4-mini-2025-04-16": {"input": 1.10, "output": 4.40},
-            "o3-mini-2025-01-31": {"input": 1.10, "output": 4.40},
-            "o3-2025-04-16": {"input": 2, "output": 8},
+            # OpenAI models (OpenRouter format)
+            "openai/gpt-5": {"input": 2.00, "output": 8.00},
+            "openai/gpt-5-mini": {"input": 1.10, "output": 4.40},
+            "openai/gpt-5-nano": {"input": 0.30, "output": 1.20},
+            "openai/o3": {"input": 2.00, "output": 8.00},
+            "openai/o3-mini": {"input": 1.10, "output": 4.40},
+            "openai/o1": {"input": 15.00, "output": 60.00},
+            "openai/o1-mini": {"input": 3.00, "output": 12.00},
+            "openai/gpt-4o": {"input": 2.50, "output": 10.00},
+            "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
+            "openai/gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
+            # Anthropic models
+            "anthropic/claude-3.5-sonnet": {"input": 3.00, "output": 15.00},
+            "anthropic/claude-3-haiku": {"input": 0.25, "output": 1.25},
             # Deepseek models
             "deepseek/deepseek-reasoner": {"input": 0.55, "output": 2.19},
             "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},
+            # Meta models
+            "meta-llama/llama-3.1-8b-instruct": {"input": 0.07, "output": 0.07},
+            # Mistral models
+            "mistralai/mixtral-8x7b-instruct": {"input": 0.24, "output": 0.24},
             # Default pricing for unknown models
             "default": {"input": 0.70, "output": 2.50},
         }  # Per 1M tokens

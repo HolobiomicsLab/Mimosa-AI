@@ -37,9 +37,13 @@ class AutomatedMode:
         self.run_notes_dir.mkdir(exist_ok=True)
         
         # Initialize LLM for task generation and analysis
+        # Extract provider and model from OpenRouter format
+        model_name = "openai/gpt-4o"  # Use OpenRouter format: provider/model
+        provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
+        
         self.llm_config = LLMConfig(
-            model="gpt-4o",  # Use a capable model for task generation
-            provider="openai",
+            model=model,
+            provider=provider,
             temperature=0.8  # Some creativity for task generation
         )
         
