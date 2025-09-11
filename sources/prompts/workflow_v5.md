@@ -88,8 +88,8 @@ You will only receive a research goal from the user. Likely a research paper tit
 A prompt must specify:
 - The overall goal
 - The goal specific to the agent.
-- If it receive input from previous agent, specify how it will help the agent. 
-- If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
+- The first agent must get all the initial data to succeed his task. You need to gather the important data from the goal and pass it to the first agent prompt. 
+- If it is not the first agent, it will receive input from previous agent. Specifiy how it will help the agent.
 - Specify a the work folder: `/projects/` (or a subfolder of `/projects` if created before)
 - A completion protocol
 
@@ -99,7 +99,7 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, TOOLOMICS_BROWSER_TOOLS)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
 
 # Agent that writes and executes Python code.
 agent_coder = SmolAgentFactory("coder", instruct_coder, TOOLOMICS_R_SCRIPT_TOOLS)
@@ -126,7 +126,7 @@ Create functions that take the `WorkflowState` and return the name of the next n
 #    message: str
 
 def master_router(state: WorkflowState) -> str:
-    last_answer = Answer.model_validate_json(state["answers"][-1])
+    last_answer = Answer.model_validate(state["answers"][-1])
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"
@@ -237,6 +237,8 @@ def master_router(state: WorkflowState) -> str:
 
 # 6. EDGE DEFINITION (Wire the graph together here)
 workflow.add_edge(START, "researcher")
+workflow.add_edge("researcher", "coder")
+workflow.add_edge("coder", END)
 
 workflow.add_conditional_edges(
     "researcher",
@@ -275,7 +277,7 @@ workflow.add_conditional_edges(
 - [ ] **Tooling**: Each agent has one tool package (or `[]` for the Python default). You should avoid giving multiple package to an agent. Divide and conqueer with more agent.
 - [ ] **Awareness**: Agent must be aware of any informations that might help them accompish their individual goal. You might specify the global picture they are part of.
 - [ ] **No START Routing**: NEVER use START as a routing target in conditional edges - only use actual node names or END.
-- [ ] **State answers considerations**: Never use .upper() on state["answers"]. state["answers"] could be a dict. use str(state["answers"]) before processing.
+- [ ] **State answers considerations**: Never use .upper() on state["answers"].
 - [ ] **Correct Router Returns**: Router functions return mapping keys (`"next_node"`, `"retry_path"`, etc.) NOT direct node names.
 
 Workflow composed could be made of various conditional flow, allowing to create loop, conditional branch or complex custom conditional logic depending on user goal.
