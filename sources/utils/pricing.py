@@ -118,41 +118,46 @@ class PricingCalculator:
             print(f"❌ Workflow directory not found: {workflow_path}")
             return 0.0
 
+        model_id = None
         try:
             with open(workflow_path / "state_result.json") as f:
                 state_results = json.load(f)
                 model_id = state_results.get("model_id", None)
         except FileNotFoundError:
-            print(f"❌ State result file not found for UUID {uuid} in {workflow_path}.")
-            return 0.0
+            print(f"⚠️  State result file not found for UUID {uuid} - workflow may have failed during execution.")
+            print("📊 Will calculate costs for workflow generation and judge calls only.")
 
-        try:
-            for file in os.listdir(memory_path):
-                if file.startswith("task_") and file.endswith(".json"):
-                    with open(memory_path / file) as f:
-                        steps = json.load(f)
-                        token_usage = {
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "total_tokens": 0,
-                        }
-                        for step in steps:
-                            step_usage = step.get("token_usage", None)
-                            if token_usage:
-                                token_usage = {
-                                    key: token_usage[key] + step_usage[key]
-                                    for key in step_usage
-                                }
-                        llm_calls.append(
-                            TokenUsage(
-                                file.replace("task_", "").replace(".json", ""),
-                                model_id,
-                                *token_usage.values(),
+        # Only process SmolAgent costs if workflow execution succeeded and we have model_id
+        if model_id:
+            try:
+                for file in os.listdir(memory_path):
+                    if file.startswith("task_") and file.endswith(".json"):
+                        with open(memory_path / file) as f:
+                            steps = json.load(f)
+                            token_usage = {
+                                "input_tokens": 0,
+                                "output_tokens": 0,
+                                "total_tokens": 0,
+                            }
+                            for step in steps:
+                                step_usage = step.get("token_usage", None)
+                                if token_usage:
+                                    token_usage = {
+                                        key: token_usage[key] + step_usage[key]
+                                        for key in step_usage
+                                    }
+                            llm_calls.append(
+                                TokenUsage(
+                                    file.replace("task_", "").replace(".json", ""),
+                                    model_id,
+                                    *token_usage.values(),
+                                )
                             )
-                        )
-        except Exception as e:
-            print(f"❌ Error reading workflow steps: {str(e)}")
-            return 0.0
+            except Exception as e:
+                print(f"❌ Error reading workflow steps: {str(e)}")
+                # Don't return 0.0 here - we can still calculate workflow generation costs
+        else:
+            print("📊 Skipping SmolAgent cost calculation (workflow execution failed)")
 
         total_cost = 0.0
         print("\n💰 Cost Breakdown:")
