@@ -70,7 +70,7 @@ You must conduct research on ...<good search keyword based on user goal>
 
 ## WORKFOLDER
 
-Allowed directory: `/projects/`
+Allowed directory: `./workspace`
 
 ## RECEIVED INFORMATION
 
@@ -90,7 +90,7 @@ A prompt must specify:
 - The goal specific to the agent.
 - If it receive input from previous agent, specify how it will help the agent. 
 - If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
-- Specify a the work folder: `/projects/` (or a subfolder of `/projects` if created before)
+- Specify a the work folder: `./*`
 - A completion protocol
 
 ### Step 2: Create Agents

@@ -10,7 +10,7 @@ import uuid
 
 from sources.modules import state_schema
 
-from .llm_provider import LLMProvider, LLMConfig
+from .llm_provider import LLMConfig, LLMProvider
 from .tools_manager import ToolManager
 
 
@@ -64,17 +64,20 @@ Do NOT assume any tools exist beyond what is explicitly listed above.
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
-        try:
-            llm_config = LLMConfig(
-                provider=self.config.workflow_llm_provider,
-                model=self.config.workflow_llm_model,
-                reasoning_effort=self.config.reasoning_effort
-            )
-            text = LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
-        except Exception as e:
-            self.logger.error(f"llm_make_workflow: LLM call failed: {str(e)}")
-            raise RuntimeError(f"LLM call failed: {str(e)}") from e
-        return text
+        # Extract provider and model from OpenRouter format (provider/model)
+        if "/" in self.config.workflow_llm_model:
+            provider, model = self.config.workflow_llm_model.split("/", 1)
+        else:
+            # Fallback for backward compatibility
+            provider = "openai"
+            model = self.config.workflow_llm_model
+        
+        llm_config = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -121,6 +124,7 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             client_prompt = tool_manager.get_client_prompt(mcp)
             tools_code += client_code + "\n"
             existing_tool_prompt += client_prompt + "\n"
+        print(f"🔧 Discovered {len(mcps)} MCP servers capabilities. Workflow generation can start.")
         return tools_code, existing_tool_prompt
 
     def remove_imports(self, code: str) -> str:

@@ -353,7 +353,7 @@ class ToolManager:
                         mcps.append(
                             MCP(
                                 name=name,
-                                tools=[tool.name for tool in tools],
+                                tools=[tool for tool in tools],
                                 address=address,
                                 port=port,
                             )
@@ -422,18 +422,16 @@ class ToolManager:
         tool_descriptions = []
         for tool in mcp.tools:
             try:
-                if not hasattr(tool, 'name'):
-                    raise AttributeError(f"Tool object missing 'name' attribute: {tool}")
                 name = getattr(tool, 'name', None)
                 if not name:
                     raise AttributeError(f"Tool name is empty or None: {tool}")
                 if hasattr(tool, 'description') and getattr(tool, 'description', None):
                     description = tool.description
-                    tool_descriptions.append(f"  - {name}: {description}")
+                    tool_descriptions.append(f"\n\n  - {name}: {description}")
                 else:
-                    tool_descriptions.append(f"  - {name}")
-            except AttributeError as _:
-                continue
+                    tool_descriptions.append(f"\n\n  - {name}: No description available.")
+            except AttributeError as e:
+                raise e
 
         tool_list_str = "\n".join(tool_descriptions)
         name = self._get_client_variable_name(mcp)

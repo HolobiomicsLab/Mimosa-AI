@@ -105,7 +105,6 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--schema_code_path", type=str, help="Override state schema file path")
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
     parser.add_argument("--prompt_workflow_creator", type=str, help="Override system prompt file path")
-    parser.add_argument("--workflow_llm_provider", type=str, help="Override LLM provider for workflows")
     parser.add_argument("--runner_default_python_version", type=str, help="Override default Python version for runners")
     parser.add_argument("--runner_default_timeout", type=int, help="Override default timeout for runners (seconds)")
     parser.add_argument("--runner_default_max_memory_mb", type=int, help="Override default max memory for runners (MB)")
@@ -124,8 +123,6 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.smolagent_factory_code_path = args.smolagent_factory_code_path
     if args.prompt_workflow_creator:
         config.prompt_workflow_creator = args.prompt_workflow_creator
-    if args.workflow_llm_provider:
-        config.workflow_llm_provider = args.workflow_llm_provider
     if args.runner_default_python_version:
         config.runner_default_python_version = args.runner_default_python_version
     if args.runner_default_timeout:
