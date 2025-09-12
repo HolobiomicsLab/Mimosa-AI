@@ -15,8 +15,8 @@ from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
 
 from .orchestrator import WorkflowOrchestrator
-from .workflow_selection import WorkflowSelector
 from .workflow_info import WorkflowInfo
+from .workflow_selection import WorkflowSelector
 
 
 class GodelMachine:
@@ -379,11 +379,13 @@ class GodelMachine:
         if executed:
             if judge:
                 eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
-            
-            cost_start = time.time()
-            total_cost = self.pricing.calculate_cost(uuid)
-            cost_time = time.time() - cost_start
-            logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
+        
+        # Calculate cost regardless of execution success
+        # This includes workflow generation LLM costs even when execution fails
+        cost_start = time.time()
+        total_cost = self.pricing.calculate_cost(uuid)
+        cost_time = time.time() - cost_start
+        logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
 
         return eval_type, total_cost
 
@@ -480,7 +482,7 @@ class GodelMachine:
 
         print(f"\n\033[94m{'-' * 60}\033[0m")
         print(f"\033[94mTotal rewards: {flow_rewards:.1f}\033[0m")
-        print(f"\033[94mTotal cost: {total_cost:.3f} USD\033[0m")
+        print(f"\033[94mTotal cost: {total_cost:.6f} USD\033[0m")
         print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
         print(f"\033[94m{'-' * 60}\033[0m\n")
 
@@ -490,7 +492,7 @@ class GodelMachine:
             f"UUID: {uuid}\n"
             f"Reward : {flow_rewards:.2f}\n"
             f"Answers: {self.get_flow_answers(flow_state)}\n"
-            f"Cost: {total_cost:.3f} USD.\n"
+            f"Cost: {total_cost:.6f} USD.\n"
             f"Rewards history: {rewards_history}",
             title=f"Workflow {uuid} completed.",
         )
