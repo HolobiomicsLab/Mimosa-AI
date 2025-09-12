@@ -37,9 +37,13 @@ class AutomatedMode:
         self.run_notes_dir.mkdir(exist_ok=True)
         
         # Initialize LLM for task generation and analysis
+        # Extract provider and model from OpenRouter format
+        model_name = "openai/gpt-4o"  # Use OpenRouter format: provider/model
+        provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
+        
         self.llm_config = LLMConfig(
-            model="gpt-4o",  # Use a capable model for task generation
-            provider="openai",
+            model=model,
+            provider=provider,
             temperature=0.8  # Some creativity for task generation
         )
         
@@ -86,11 +90,11 @@ TASK CATEGORIES TO EXPLORE:
 GOOD EXAMPLE:
 
 - https://github.com/tanjeffreyz/deep-residual-learning is a github for a deep learning project, you must install it and review the code, suggest improvement to the algorithm and keep editing the code until you get a test error below 9%
-- Search the paper Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results, read and install all the required software of code required to reproduce the experiments
 - find the github for the research paper titled MOGONET integrates multi-omics data using graph convolutional networks allowing patient classification and biomarker identification, download the source code, set it up by installing any requirements, then proceed to identify the main code entry point and run a full training run
 - find information about the CNRS holobiomics lab and try to run and install their most stared project
 - download the data needed to redo the analysis of this scientific paper https://www.nature.com/articles/s41467-021-23774-w. Use the source code provided to find the data (github link).
 - Reproduce key results from XOmiVAE (https://academic.oup.com/bib/article/22/6/bbab315/6353242): open the paper in the browser, download the PDF, extract hyperparameters, retrieve and run the official code, prepare an omics dataset, train/evaluate the model, compute gene- and latent-dimension attributions (Deep SHAP), explain VAE-derived clusters (Welch’s t-test on latent dimensions), and produce a reproducibility report mapping our outputs to the paper’s claims.
+- Search for the paper "Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results," identify all required software and tools needed for the reproduction of the experiments described in the paper, download and install them in the work environment, and document the setup process in detail for future reference.
 
 You could also challenging scientific questions to answer, as long as the questions require more than simple web searches and require complex reasoning and scientific workflows to answer.
 - Calculate the theoretical maximum efficiency of a perovskite solar cell using the Shockley-Queisser limit, then compare with experimental results from recent literature

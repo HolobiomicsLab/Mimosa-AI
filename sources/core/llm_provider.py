@@ -150,6 +150,7 @@ class LLMProvider:
             "message": message,
             "temperature": self.config.temperature,
             "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
+            "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
         }
         if self.memory_path and self.agent_name:
             self.save_call(json_res)
