@@ -64,13 +64,17 @@ Do NOT assume any tools exist beyond what is explicitly listed above.
 Your task is to create a LangGraph-SmolAgent workflow for the task:
 {craft_instructions}
         """
-        # Create LLM config with model and reasoning effort from main config
-        llm_config = LLMConfig(
-            provider=self.config.workflow_llm_provider,
-            model=self.config.workflow_llm_model,
-            reasoning_effort=self.config.reasoning_effort
-        )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        try:
+            llm_config = LLMConfig(
+                provider=self.config.workflow_llm_provider,
+                model=self.config.workflow_llm_model,
+                reasoning_effort=self.config.reasoning_effort
+            )
+            text = LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        except Exception as e:
+            self.logger.error(f"llm_make_workflow: LLM call failed: {str(e)}")
+            raise RuntimeError(f"LLM call failed: {str(e)}") from e
+        return text
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -102,7 +106,11 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         tools_code = ""
         existing_tool_prompt = ""
         tool_manager = ToolManager(self.config)
-        mcps = await tool_manager.discover_mcp_servers()
+        try:
+            mcps = await tool_manager.discover_mcp_servers()
+        except Exception as e:
+            self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
+            raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
         if not mcps:
             raise ValueError(
                 "\nNo MCP servers found."
@@ -136,21 +144,25 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         Returns:
             str: Validated workflow code
         """
-        self.logger.info("Generating workflow code with LLM")
+        self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
-        llm_output = self.llm_make_workflow(
-            system_prompt, craft_instructions, existing_tool_prompt, path
-        )
-        workflow_code = self.extract_python_code(llm_output)
-        workflow_code = self.remove_imports(workflow_code)
-        if not workflow_code.strip():
-            raise ValueError("LLM did not return valid workflow code")
+        try:
+            llm_output = self.llm_make_workflow(
+                system_prompt, craft_instructions, existing_tool_prompt, path
+            )
+            workflow_code = self.extract_python_code(llm_output)
+            workflow_code = self.remove_imports(workflow_code)
+            if not workflow_code.strip():
+                raise ValueError("LLM did not return valid workflow code")
+        except Exception as e:
+            self.logger.error(f"create_workflow_code: LLM workflow generation/extraction failed: {str(e)}")
+            raise ValueError(f"LLM workflow generation/extraction failed: {str(e)}") from e
 
         # Validate syntax before returning
         try:
             compile(workflow_code, "<workflow>", "exec")
         except SyntaxError as e:
-            self.logger.error(f"Generated workflow has syntax error: {e}")
+            self.logger.error(f"create_workflow_code: Generated workflow has syntax error: {e}")
             raise ValueError(f"LLM generated invalid Python syntax: {e}") from e
 
         self.logger.info("LLM generated workflow code successfully")
@@ -346,21 +358,33 @@ if WORKFLOW_PATH:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"{timestamp}_{short_uuid}"
-        tools_code, existing_tool_prompt = await self.load_tools_code()
+        try:
+            tools_code, existing_tool_prompt = await self.load_tools_code()
+        except Exception as e:
+            self.logger.error(f"craft_workflow: Failed to load tools code: {str(e)}")
+            raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
 
-        workflow_path, memory_path = (
-            self.create_folder_structure(uuid_str)
-            if save_workflow
-            else (
-                os.path.join(self.workflow_dir, uuid_str),
-                os.path.join(self.memory_dir, uuid_str),
+        try:
+            workflow_path, memory_path = (
+                self.create_folder_structure(uuid_str)
+                if save_workflow
+                else (
+                    os.path.join(self.workflow_dir, uuid_str),
+                    os.path.join(self.memory_dir, uuid_str),
+                )
             )
-        )
+        except Exception as e:
+            self.logger.error(f"craft_workflow: Failed to create workflow directories: {str(e)}")
+            raise RuntimeError(f"Failed to create workflow directories: {str(e)}") from e
 
-        with open(self.schema_code_path) as f:
-            state_code = f.read()
-        with open(self.smolagent_factory_code_path) as f:
-            smolagent_factory_code = f.read()
+        try:
+            with open(self.schema_code_path) as f:
+                state_code = f.read()
+            with open(self.smolagent_factory_code_path) as f:
+                smolagent_factory_code = f.read()
+        except Exception as e:
+            self.logger.error(f"craft_workflow: Failed to load required code files: {str(e)}")
+            raise RuntimeError(f"Failed to load required code files: {str(e)}") from e
         # Generate workflow code - let DGM handle retries
         workflow_code = self.create_workflow_code(
             craft_instructions, existing_tool_prompt, memory_path
@@ -369,10 +393,9 @@ if WORKFLOW_PATH:
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal)
         try:
-            # Validate workflow structure before assembly
             self.validate_workflow_structure(workflow_code)
         except Exception as e:
-            # Include UUID in exception so orchestrator can return it
+            self.logger.error(f"craft_workflow: Workflow structure validation failed: {str(e)}")
             raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
 
         # Assemble complete workflow
