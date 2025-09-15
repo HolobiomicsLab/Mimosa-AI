@@ -41,43 +41,6 @@ class WorkflowFactory:
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}") from e
 
-    def llm_make_workflow(
-        self,
-        system_prompt: str,
-        craft_instructions: str,
-        existing_tool_prompt: str,
-        path: str,
-    ) -> str:
-        """Generate a workflow using the LLM."""
-        prompt = f"""
-You are an expert in generating LangGraph workflows using SmolAgent nodes.
-
-The following tools packages are available for agents:
-{existing_tool_prompt}
-
-CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
-2. Clearly state that the task cannot be completed with available tools
-
-Do NOT assume any tools exist beyond what is explicitly listed above.
-
-Your task is to create a LangGraph-SmolAgent workflow for the task:
-{craft_instructions}
-        """
-        # Extract provider and model from OpenRouter format (provider/model)
-        if "/" in self.config.workflow_llm_model:
-            provider, model = self.config.workflow_llm_model.split("/", 1)
-        else:
-            # Fallback for backward compatibility
-            provider = "openai"
-            model = self.config.workflow_llm_model
-        
-        llm_config = LLMConfig(
-            model=model,
-            provider=provider,
-            reasoning_effort=self.config.reasoning_effort
-        )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -138,6 +101,93 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
             )
         )
 
+    def llm_make_prompts(
+        self,
+        system_prompt: str,
+        craft_instructions: str,
+        existing_tool_prompt: str,
+        path: str,
+    ) -> str:
+        """Generate prompts code using the LLM."""
+        prompt = f"""
+You must generate Python code that defines prompt templates for the LangGraph-SmolAgent workflow.
+
+# AVAILABLE TOOLS:
+
+The following tools packages are available for agents:
+{existing_tool_prompt}
+
+# INSTRUCTIONS/GOAL:
+{craft_instructions}
+
+You must first comment about the overall strategy to accomplish the task using the available tools.
+Decide what agent you need and which tools package they should each use.
+Then, generate Python code that defines prompt templates for each agent.
+Do not generate the whole workflow, just the prompts as Python code.
+Previous workflow failed due to python error ? You don't need to change prompts, just shorten them.
+        """
+        if "/" in self.config.workflow_llm_model:
+            provider, model = self.config.workflow_llm_model.split("/", 1)
+        else:
+            provider = "openai"
+            model = self.config.workflow_llm_model
+        
+        llm_config = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+
+    def llm_make_workflow(
+        self,
+        system_prompt: str,
+        craft_instructions: str,
+        existing_tool_prompt: str,
+        path: str,
+        prompts_code: str,
+    ) -> str:
+        """Generate a workflow using the LLM."""
+        prompt = f"""
+You are an expert in generating LangGraph workflows using SmolAgent nodes.
+
+# AVAILABLE TOOLS:
+
+The following tools packages are available for agents:
+{existing_tool_prompt}
+
+CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
+2. Clearly state that the task cannot be completed with available tools
+Do NOT assume any tools exist beyond what is explicitly listed above.
+
+# EXISTING PROMPTS:
+
+The prompts have already been generated for you as Python code:
+
+{prompts_code} 
+
+Given that prompts are already defined, your task is to generate a workflow that uses these prompts.
+You should not modify or rewrite the prompts.
+
+# INSTRUCTIONS/GOAL:
+{craft_instructions}
+        """
+        # Extract provider and model from OpenRouter format (provider/model)
+        if "/" in self.config.workflow_llm_model:
+            provider, model = self.config.workflow_llm_model.split("/", 1)
+        else:
+            # Fallback for backward compatibility
+            provider = "openai"
+            model = self.config.workflow_llm_model
+        
+        llm_config = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str
     ) -> str:
@@ -151,10 +201,20 @@ Your task is to create a LangGraph-SmolAgent workflow for the task:
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
         try:
-            llm_output = self.llm_make_workflow(
+            print("📝 Step 1/2: Generating prompts code...")
+            llm_output = self.llm_make_prompts(
                 system_prompt, craft_instructions, existing_tool_prompt, path
             )
+            print("🔧 Step 2/2: Generating workflow code...")
+            prompts_code = self.extract_python_code(llm_output)
+            commentary = llm_output.replace(prompts_code, "").strip().split('```python')[0]
+            print("💬 LLM commentary on workflow:")
+            print(commentary)
+            llm_output = self.llm_make_workflow(
+                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code
+            )
             workflow_code = self.extract_python_code(llm_output)
+            workflow_code = prompts_code + "\n\n" + workflow_code
             workflow_code = self.remove_imports(workflow_code)
             if not workflow_code.strip():
                 raise ValueError("LLM did not return valid workflow code")

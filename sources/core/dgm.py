@@ -123,8 +123,10 @@ class GodelMachine:
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
-                "# WORKFLOW ATTEMPT ANALYSIS:",
+                "## WORKFLOW ATTEMPT ANALYSIS:",
                 "Your previous attempt at generating a workflow did not succeed or was incomplete.",
+                "Your goal was: ",
+                goal,
                 "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
                 "## Previous workflow code:",
@@ -155,8 +157,8 @@ class GodelMachine:
                 "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
                 "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
                 "\n",
-                "Generate an IMPROVED workflow that addresses identified failure modes or with added steps for reaching the goal.",
-                "The new workflow must be different from the previous attempt.\n"
+                "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
+                "The new version must be different from the previous attempt.\n"
             ])
 
         return "".join(
