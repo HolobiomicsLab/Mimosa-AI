@@ -35,7 +35,7 @@ class ExecutionResult:
 @dataclass
 class RuntimeConfig:
     python_version: str = "3.10"
-    timeout: int = 3600
+    timeout: int = 1800
     max_memory_mb: int = 1024
     max_cpu_percent: int = 100
     temp_dir: Path | None = None

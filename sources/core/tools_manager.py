@@ -201,8 +201,16 @@ class ToolManager:
                 data = json.loads(result.stdout)
                 tools = []
                 for tool_data in data.get("tools", []):
-                    name = tool_data.get("name", "")
-                    description = tool_data.get("description", "")
+                    try:
+                        name = tool_data.get("name", "")
+                    except Exception as e:
+                        print(f"❌ Cannot get name from {server_url}: {e}")
+                        continue
+                    try:
+                        description = tool_data.get("description", "")
+                    except Exception as e:
+                        print(f"❌ Cannot get description from {server_url}: {e}")
+                        continue
                     if name:
                         tools.append(Tool(name, description))
                 return tools
@@ -345,7 +353,7 @@ class ToolManager:
                         mcps.append(
                             MCP(
                                 name=name,
-                                tools=[tool.name for tool in tools],
+                                tools=[tool for tool in tools],
                                 address=address,
                                 port=port,
                             )
@@ -413,10 +421,17 @@ class ToolManager:
         # Create detailed tool descriptions
         tool_descriptions = []
         for tool in mcp.tools:
-            if tool.description:
-                tool_descriptions.append(f"  - {tool.name}: {tool.description}")
-            else:
-                tool_descriptions.append(f"  - {tool.name}")
+            try:
+                name = getattr(tool, 'name', None)
+                if not name:
+                    raise AttributeError(f"Tool name is empty or None: {tool}")
+                if hasattr(tool, 'description') and getattr(tool, 'description', None):
+                    description = tool.description.split('\n')[0]
+                    tool_descriptions.append(f"\n\n  - {name}: {description}")
+                else:
+                    tool_descriptions.append(f"\n\n  - {name}: No description available.")
+            except AttributeError as e:
+                raise e
 
         tool_list_str = "\n".join(tool_descriptions)
         name = self._get_client_variable_name(mcp)

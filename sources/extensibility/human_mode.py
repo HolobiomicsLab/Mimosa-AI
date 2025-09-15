@@ -76,7 +76,10 @@ class HumanMode:
         print("🔧 Available Tools:")
         print()
         for i, tool in attribution_map.items():
-            description = ''.join(tool.description.split('\n')[:1])
+            if not tool.description:
+                description = "No description available."
+            else:
+                description = ''.join(tool.description.split('\n')[:1])
             # Truncate long descriptions
             if len(description) > 70:
                 description = description[:67] + "..."
