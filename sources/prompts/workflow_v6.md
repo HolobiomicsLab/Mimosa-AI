@@ -68,10 +68,6 @@ You must conduct research on ...<good search keyword based on user goal>
 - Cross-reference multiple sources to ensure accuracy and resolve any conflicting information
 - Present findings in a clear, structured format with proper source attribution
 
-## WORKFOLDER
-
-Allowed directory: `/projects/`
-
 ## RECEIVED INFORMATION
 
 You will only receive a research goal from the user. Likely a research paper title.
@@ -90,7 +86,6 @@ A prompt must specify:
 - The goal specific to the agent.
 - If it receive input from previous agent, specify how it will help the agent. 
 - If the agent is the first agent, the task must include all the data specified in the goal needed to do the task.
-- Specify a the work folder: `/projects/` (or a subfolder of `/projects` if created before)
 - A completion protocol
 
 ### Step 2: Create Agents
