@@ -426,7 +426,7 @@ class ToolManager:
                 if not name:
                     raise AttributeError(f"Tool name is empty or None: {tool}")
                 if hasattr(tool, 'description') and getattr(tool, 'description', None):
-                    description = tool.description
+                    description = tool.description.split('\n')[0]
                     tool_descriptions.append(f"\n\n  - {name}: {description}")
                 else:
                     tool_descriptions.append(f"\n\n  - {name}: No description available.")
