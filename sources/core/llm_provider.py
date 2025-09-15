@@ -29,10 +29,8 @@ class LLMConfig:
         """Validate configuration after initialization."""
         # Set appropriate API key based on provider
         if self.provider == "anthropic" and not self.key:
-            print("using anthropic key")
             self.key = os.getenv("ANTHROPIC_API_KEY", "")
         elif self.provider == "openai" and not self.key:
-            print("using openai key")
             self.key = os.getenv("OPENAI_API_KEY", "")
             
         if not self.key:
