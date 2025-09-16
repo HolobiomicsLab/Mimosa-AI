@@ -61,6 +61,7 @@ class Config:
         
         # DGM/Workflow generation model configuration 
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
+        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-20250514"  
         
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"

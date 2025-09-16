@@ -297,12 +297,14 @@ Provide your analysis following the specified output format."""
                 
                 # Execute task via DGM
                 print("\033[95m🚀 Executing task via DGM...\033[0m")
-                uuid = await self.dgm.start_dgm(
+                dgm_runs = await self.dgm.start_dgm(
                     goal=task,
                     judge=True,  # Enable evaluation
                     human_validation=False,
                     max_iteration=1  # Allow some self-improvement
                 )
+                final_dgm_info = dgm_runs[-1]
+                uuid = final_dgm_info.current_uuid
                 
                 # Load and analyze results
                 print("\033[95m📊 Analyzing results...\033[0m")
