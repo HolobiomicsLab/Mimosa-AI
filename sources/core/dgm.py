@@ -324,8 +324,12 @@ class GodelMachine:
             flow_rewards, total_cost, runs[-1].goal, uuid, flow_state, rewards_history
         )
 
+        if runs[-1].answers:
+            all_success =  all(["success" in x.lower() for x in runs[-1].answers])
+        else:
+            all_success = False
         # Check termination conditions
-        if runs[-1].iteration_count >= runs[-1].max_depth-1 or all(["success" in x.lower() for x in runs[-1].answers.lower()]):
+        if runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success:
             self._save_final_plots(assertion_plot_data, assertion_history, uuid)
             return runs
 
