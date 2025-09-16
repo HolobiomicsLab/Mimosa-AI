@@ -3,6 +3,8 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
+import glob
 
 import litellm
 
@@ -108,7 +110,59 @@ class LLMProvider:
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
+    def _find_cache_match(self, prompt: str) -> Optional[str]:
+        """
+        Search for a cached response matching the given prompt.
+        
+        Args:
+            prompt: The user prompt to search for in cache
+            
+        Returns:
+            Cached response if found, None otherwise
+        """
+        if not self.agent_name:
+            return None
+            
+        # Get the base memory directory (parent of current memory_path)
+        base_memory_dir = os.path.dirname(self.memory_path) if self.memory_path else "sources/memory"
+        
+        # Search for UUID folders in the memory directory
+        uuid_pattern = os.path.join(base_memory_dir, "*")
+        uuid_folders = [d for d in glob.glob(uuid_pattern) if os.path.isdir(d)]
+        
+        for uuid_folder in uuid_folders:
+            # Look for a file matching the agent name
+            agent_file = os.path.join(uuid_folder, f"{self.agent_name}.json")
+            
+            if os.path.exists(agent_file):
+                try:
+                    with open(agent_file, 'r') as f:
+                        cached_data = json.load(f)
+                    
+                    # Check if the cached data has the expected structure
+                    if 'message' in cached_data and isinstance(cached_data['message'], list):
+                        # Look for matching user prompt in the message array
+                        for msg in cached_data['message']:
+                            if (msg.get('role') == 'user' and 
+                                msg.get('content') == prompt):
+                                # Found a match, return the cached response
+                                self.logger.info(f"Cache hit for agent '{self.agent_name}' with prompt: {prompt[:50]}...")
+                                return cached_data.get('response', '')
+                                
+                except (json.JSONDecodeError, IOError) as e:
+                    self.logger.warning(f"Error reading cache file {agent_file}: {e}")
+                    continue
+        
+        self.logger.info(f"Cache miss for agent '{self.agent_name}' with prompt: {prompt[:50]}...")
+        return None
+
     def __call__(self, prompt: str, timeout: int = 180):
+        # Check cache first
+        cached_response = self._find_cache_match(prompt)
+        if cached_response:
+            self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
+            return cached_response
+
         message = []
         if self.sys_msg is not None:
             message.append({"content": self.sys_msg, "role": "system"})

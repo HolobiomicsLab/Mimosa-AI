@@ -117,8 +117,7 @@ rationale: This approach ensures you do not hallucinate or make assumptions abou
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
   ```json
   {
-      "status": "SUCCESS|FAILURE|RETRY|ABORT",
-      "justification": "Clear explanation of the outcome",
+      "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
       "answer": "Complete response to the original task",
       "error": "Full error message if applicable, else empty string",
       "retry_advice": "Specific advice for retry if applicable, else empty string"
@@ -128,10 +127,11 @@ rationale: This approach ensures you do not hallucinate or make assumptions abou
   - Call `final_answer` only after inspecting and processing all relevant data
   - Never nest `final_answer` in conditionals or loops
   - Ensure JSON is valid and properly formatted
+  - final_answer should ALWAYS return a json as a string.
 - **Examples**:
   ```python
-  final_answer('{"status": "SUCCESS", "justification": "Successfully retrieved and parsed data", "answer": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
-  final_answer('{"status": "RETRY", "justification": "Network timeout during data retrieval", "answer": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
+  final_answer('{"status": "SUCCESS", "message": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
+  final_answer('{"status": "RETRY", "message": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
   ```
 - **Rationale**: Standardizes output for consistency and downstream processing
 
@@ -164,7 +164,7 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.timeout = 900
+        self.timeout = 3600
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
@@ -267,9 +267,6 @@ class SmolAgentFactory:
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                else:
-                    step_obs = feedback
-                
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
@@ -375,6 +372,40 @@ class SmolAgentFactory:
             raise ValueError(f"Failed to load memory: {str(e)}")
 
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        import threading
+        workflow_uuid = state.get("workflow_uuid", None)
+        if workflow_uuid is not None:
+            self.load_agent_memory(workflow_uuid, instructions)
+
+        timeout_seconds = getattr(self, 'timeout', 180)
+        result = {'response': None, 'exception': None, 'completed': False}
+
+        def _run_agent():
+            try:
+                result['response'] = self.agent.run(instructions)
+                result['completed'] = True
+            except Exception as e:
+                result['exception'] = e
+                result['completed'] = True
+
+        agent_thread = threading.Thread(target=_run_agent, daemon=True)
+        agent_thread.start()
+        agent_thread.join(timeout=timeout_seconds)
+
+        try:
+            if not result['completed']:
+                self.save_memories(workflow_uuid=workflow_uuid)
+                raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
+            if result['exception']:
+                raise result['exception']
+            self.save_memories(workflow_uuid=workflow_uuid)
+            return result['response']
+        except Exception as e:
+            self.save_memories(workflow_uuid=workflow_uuid)
+            raise e
+
+    """
+    def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         
         def timeout_handler(signum, frame):
             raise TimeoutError("Agent execution timed out")
@@ -399,6 +430,7 @@ class SmolAgentFactory:
         except Exception as e:
             signal.alarm(0)
             raise e
+    """
 
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)
@@ -421,7 +453,7 @@ class SmolAgentFactory:
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        success_bool = "success" in str(answer).lower()
+        success_bool = "success" in str(answer).lower() if answer else False
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],
