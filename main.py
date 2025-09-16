@@ -24,69 +24,9 @@ from sources.extensibility.automated_mode import AutomatedMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.scenario_loader import ScenarioLoader
 from sources.utils.user_entry import collect_goals_from_user
+from sources.utils.logging import setup_logging
 
 dotenv.load_dotenv()
-
-def setup_logging(debug=False):
-    """Configure logging with timing, line numbers, and log rotation."""
-    import logging.handlers
-    import os
-    
-    # Create logs directory
-    logs_dir = "sources/logs"
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    # Configure root logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG if debug else logging.INFO)
-    
-    # Remove existing handlers to avoid duplication
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
-    # Rotating file handler for general logs
-    file_handler = logging.handlers.RotatingFileHandler(
-        os.path.join(logs_dir, 'mimosa.log'),
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    
-    # Separate handler for workflow execution logs
-    workflow_handler = logging.handlers.RotatingFileHandler(
-        os.path.join(logs_dir, 'workflows.log'),
-        maxBytes=50*1024*1024,  # 50MB
-        backupCount=10
-    )
-    workflow_handler.setLevel(logging.INFO)
-    workflow_handler.setFormatter(formatter)
-    
-    # Add workflow handler to specific loggers
-    workflow_loggers = [
-        'sources.core.dgm',
-        'sources.core.orchestrator', 
-        'sources.core.workflow_factory',
-        'sources.core.workflow_runner',
-        'sources.core.evaluator'
-    ]
-    
-    for logger_name in workflow_loggers:
-        workflow_logger = logging.getLogger(logger_name)
-        workflow_logger.addHandler(workflow_handler)
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -216,9 +156,8 @@ async def normal_execution_mode(args, config):
                            )
     elif args.goal:
         await planner.start_planner(goal=args.goal, 
-                                    template_uuid=args.load_template, 
                                     judge=args.judge,
-                                    max_iteration=args.max_dgm_iterations
+                                    max_dgm_iteration=args.max_dgm_iterations
                                    )
     else:
         raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")

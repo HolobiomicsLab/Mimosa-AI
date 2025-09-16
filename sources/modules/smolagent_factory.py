@@ -111,7 +111,7 @@ print(script_content[:500])
 #    "2. Performs some basic data preprocessing",
 #]
 
-rationale: This approach ensures you do not hallucinate or make assumptions about the data or code you are processing. It forces you to validate and understand the context before proceeding, leading to more accurate and relevant code generation. 
+rationale: This approach ensures you do not hallucinate or make assumptions about the data or code you are processing.
 
 ## 6. FINAL ANSWER FORMAT
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
@@ -148,8 +148,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 max_steps=12,
-                 max_retries=3
+                 max_steps=24,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -165,7 +164,6 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.max_retries = max_retries
         self.timeout = 900
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
@@ -269,6 +267,8 @@ class SmolAgentFactory:
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
+                else:
+                    step_obs = feedback
                 
                 actions.append(step_action)
                 observations.append(step_obs)
@@ -412,7 +412,7 @@ class SmolAgentFactory:
             logger.info(f"[AGENT] {self.name} failed after {execution_time:.3f}s")
             raise e
             
-        actions, observations, success = self.parse_memory_output()
+        actions, observations, _ = self.parse_memory_output()
         execution_time = time.time() - start_time
         logger.info(f"[AGENT] {self.name} completed in {execution_time:.3f}s")
         action: Action = {
@@ -421,7 +421,7 @@ class SmolAgentFactory:
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        success_bool = any(success) if success else True # no success means no actions were taken
+        success_bool = "success" in str(answer).lower()
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],
