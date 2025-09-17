@@ -123,23 +123,17 @@ class LLMProvider:
         if not self.agent_name:
             return None
             
-        # Get the base memory directory (parent of current memory_path)
         base_memory_dir = os.path.dirname(self.memory_path) if self.memory_path else "sources/memory"
-        
-        # Search for UUID folders in the memory directory
         uuid_pattern = os.path.join(base_memory_dir, "*")
         uuid_folders = [d for d in glob.glob(uuid_pattern) if os.path.isdir(d)]
         
         for uuid_folder in uuid_folders:
-            # Look for a file matching the agent name
             agent_file = os.path.join(uuid_folder, f"{self.agent_name}.json")
-            
             if os.path.exists(agent_file):
                 try:
                     with open(agent_file, 'r') as f:
                         cached_data = json.load(f)
                     
-                    # Check if the cached data has the expected structure
                     if 'message' in cached_data and isinstance(cached_data['message'], list):
                         # Look for matching user prompt in the message array
                         for msg in cached_data['message']:
@@ -157,7 +151,6 @@ class LLMProvider:
         return None
 
     def __call__(self, prompt: str, timeout: int = 180):
-        # Check cache first
         cached_response = self._find_cache_match(prompt)
         if cached_response:
             self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
