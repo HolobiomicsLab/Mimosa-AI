@@ -340,7 +340,7 @@ class Planner:
     async def start_planner(
         self,
         goal: str,
-        judge: bool = False,
+        judge: bool = True,
         max_dgm_iteration: int = 2,
         max_task_retry: int = 2
     ) -> List[Task]:

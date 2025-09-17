@@ -125,8 +125,8 @@ def master_router(state: WorkflowState) -> str:
     try:
         last_answer = Answer.validate(raw_answer)
     except Exception as e:
-        print(f"⛔ Failed to validate answer format: {type(e).__name__}: {e}")
-        return END
+        print(f"❌ Failed to validate answer format of\n: {raw_answer}\n")
+        last_answer = Answer.from_raw(raw_answer)
 
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
