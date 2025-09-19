@@ -3,6 +3,8 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
+import glob
 
 import litellm
 
@@ -32,9 +34,19 @@ class LLMConfig:
             self.key = os.getenv("ANTHROPIC_API_KEY", "")
         elif self.provider == "openai" and not self.key:
             self.key = os.getenv("OPENAI_API_KEY", "")
+        elif self.provider == "deepseek" and not self.key:
+            self.key = os.getenv("DEEPSEEK_API_KEY", "")
             
         if not self.key:
-            env_var = "ANTHROPIC_API_KEY" if self.provider == "anthropic" else "OPENAI_API_KEY"
+            if self.provider == "anthropic":
+                env_var = "ANTHROPIC_API_KEY"
+            elif self.provider == "openai":
+                env_var = "OPENAI_API_KEY"
+            elif self.provider == "deepseek":
+                env_var = "DEEPSEEK_API_KEY"
+            else:
+                env_var = f"{self.provider.upper()}_API_KEY"
+            
             raise ValueError(
                 f"API key not provided and {env_var} environment variable not set"
             )
@@ -61,11 +73,14 @@ class LLMConfig:
 
 
 class LLMProvider:
-    """Handles interactions with various LLM APIs.
-    Attributes:
-        deepseek_client (OpenAI): Client for Deepseek API
-        openai_client (OpenAI): Client for OpenAI API
-        anthropic_client: Client for Anthropic API
+    """Handles interactions with various LLM APIs including OpenAI, Anthropic, and DeepSeek.
+    
+    Supported providers:
+    - anthropic: Claude models (claude-3-5-sonnet, claude-3-opus, etc.)
+    - openai: GPT models (gpt-4, gpt-3.5-turbo, o1, o3, etc.)
+    - deepseek: DeepSeek models (deepseek-chat, deepseek-coder, etc.)
+    
+    Uses litellm for unified API access across providers.
     """
 
     def __init__(
@@ -108,7 +123,52 @@ class LLMProvider:
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
+    def _find_cache_match(self, prompt: str) -> Optional[str]:
+        """
+        Search for a cached response matching the given prompt.
+        
+        Args:
+            prompt: The user prompt to search for in cache
+            
+        Returns:
+            Cached response if found, None otherwise
+        """
+        if not self.agent_name:
+            return None
+            
+        base_memory_dir = os.path.dirname(self.memory_path) if self.memory_path else "sources/memory"
+        uuid_pattern = os.path.join(base_memory_dir, "*")
+        uuid_folders = [d for d in glob.glob(uuid_pattern) if os.path.isdir(d)]
+        
+        for uuid_folder in uuid_folders:
+            agent_file = os.path.join(uuid_folder, f"{self.agent_name}.json")
+            if os.path.exists(agent_file):
+                try:
+                    with open(agent_file, 'r') as f:
+                        cached_data = json.load(f)
+                    
+                    if 'message' in cached_data and isinstance(cached_data['message'], list):
+                        # Look for matching user prompt in the message array
+                        for msg in cached_data['message']:
+                            if (msg.get('role') == 'user' and 
+                                msg.get('content') == prompt):
+                                # Found a match, return the cached response
+                                self.logger.info(f"Cache hit for agent '{self.agent_name}' with prompt: {prompt[:50]}...")
+                                return cached_data.get('response', '')
+                                
+                except (json.JSONDecodeError, IOError) as e:
+                    self.logger.warning(f"Error reading cache file {agent_file}: {e}")
+                    continue
+        
+        self.logger.info(f"Cache miss for agent '{self.agent_name}' with prompt: {prompt[:50]}...")
+        return None
+
     def __call__(self, prompt: str, timeout: int = 180):
+        cached_response = self._find_cache_match(prompt)
+        if cached_response:
+            self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
+            return cached_response
+
         message = []
         if self.sys_msg is not None:
             message.append({"content": self.sys_msg, "role": "system"})
@@ -156,20 +216,27 @@ class LLMProvider:
         return res
 
 if __name__ == "__main__":
-    # Example usage
-    llm_config = LLMConfig(
-        model="claude-opus-4-20250514",
-        provider="anthropic",
+    # DeepSeek example
+    deepseek_config = LLMConfig(
+        model="deepseek-chat",
+        provider="deepseek",
         temperature=0.7,
-        key=os.getenv("ANTHROPIC_API_KEY", ""),
-        reasoning_effort="high"
+        key=os.getenv("DEEPSEEK_API_KEY", ""),
+        reasoning_effort="medium"
     )
+    
+    # Use DeepSeek provider
     llm_provider = LLMProvider(
         agent_name="test_agent",
         memory_path=None,
         system_msg="You are a helpful assistant.",
-        config=llm_config
+        config=deepseek_config
     )
+    
     prompt = "Explain the theory of relativity in simple terms."
-    response = llm_provider(prompt)
-    print("LLM Response:", response)
+    try:
+        response = llm_provider(prompt)
+        print("DeepSeek Response:", response)
+    except Exception as e:
+        print(f"Error with DeepSeek: {e}")
+        print("Make sure DEEPSEEK_API_KEY environment variable is set")

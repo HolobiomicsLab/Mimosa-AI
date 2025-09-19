@@ -121,7 +121,13 @@ Create functions that take the `WorkflowState` and return the name of the next n
 #    message: str
 
 def master_router(state: WorkflowState) -> str:
-    last_answer = Answer.model_validate_json(state["answers"][-1])
+    raw_answer = state["answers"][-1]
+    try:
+        last_answer = Answer.validate(raw_answer)
+    except Exception as e:
+        print(f"❌ Failed to validate answer format of\n: {raw_answer}\n")
+        last_answer = Answer.from_raw(raw_answer)
+
     current_agent = state["step_name"][-1] # researcher in this example
     # IMPORTANT: Use first node name as fallback, NEVER use START
     previous_agent = state["step_name"][-2] if len(state["step_name"]) >= 2 else "researcher"

@@ -17,6 +17,7 @@ from sources.utils.visualization import VisualizationUtils
 from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
+from .schema import GodelRun
 
 
 class GodelMachine:
@@ -212,7 +213,7 @@ class GodelMachine:
         scenario_id: str = None,
         human_validation: bool = False,
         max_iteration: int = 5,
-    ):
+    ) -> list[GodelRun]:
         """
         Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
         Args:
@@ -258,54 +259,52 @@ class GodelMachine:
                         scenario_id, total_assertions
                     )
 
-        return await self.recursive_self_improvement(
-            goal,
-            craft_instructions,
+        run0 = GodelRun(
+            goal=goal,
+            prompt=craft_instructions,
+            template_uuid=template_uuid,
+            workflow_template=wf,
             max_depth=max_iteration,
             judge=judge,
-            answer=answer,
+            answers=answer,
             scenario_id=scenario_id,
-            need_human_validation=human_validation,
+            need_human_validation=human_validation
+        )
+
+        return await self.recursive_self_improvement(
+            [run0],
+            plot_data=plot_data,
             rewards_history=rewards_history,
             assertion_history=assertion_history,
-            plot_data=plot_data,
             assertion_plot_data=assertion_plot_data,
         )
 
     async def recursive_self_improvement(
         self,
-        goal,
-        prompt: str,
-        iteration_count: int = 0,
-        max_depth: int = 5,
-        judge: bool = False,
-        need_human_validation: bool = False,
+        runs: list[GodelRun],
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
         plot_data: tuple = None,
-        assertion_plot_data: tuple = None,
-        answer: str = None,
-        scenario_id: str = None,
+        assertion_plot_data: tuple = None
     ):
         """Run a self-improvement loop for the workflow."""
-        if iteration_count > 0 and need_human_validation:
-            if not self._get_human_validation():
+        if runs[-1].iteration_count > 0 and runs[-1].need_human_validation and not self._get_human_validation():
                 return ""
 
-        self._log_iteration_start(goal, iteration_count, max_depth)
+        self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
         
         iteration_start_time = time.time()
         uuid = None
 
         # Execute workflow
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
-            goal=goal,
-            craft_instructions=prompt,
+            goal=runs[-1].goal,
+            craft_instructions=runs[-1].prompt,
         )
 
         # Evaluate and calculate costs
         eval_type, total_cost = await self._evaluate_and_calculate_cost(
-            executed, judge, uuid, answer, scenario_id, assertion_history
+            executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
         )
 
         # Update tracking data
@@ -316,35 +315,52 @@ class GodelMachine:
         # Update visualizations
         self._update_visualizations(
             rewards_history, assertion_history, plot_data, 
-            assertion_plot_data, goal, scenario_id, uuid
+            assertion_plot_data, runs[-1].goal, runs[-1].scenario_id, uuid
         )
 
         # Log and notify completion
         self._log_iteration_completion(
-            iteration_count, max_depth, iteration_start_time, 
-            flow_rewards, total_cost, goal, uuid, flow_state, rewards_history
+            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time, 
+            flow_rewards, total_cost, runs[-1].goal, uuid, flow_state, rewards_history
         )
 
+        if runs[-1].answers:
+            all_success =  all(["success" in x.lower() for x in runs[-1].answers])
+        else:
+            all_success = False
         # Check termination conditions
-        if iteration_count >= max_depth-1:
+        if runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success:
             self._save_final_plots(assertion_plot_data, assertion_history, uuid)
-            return uuid
+            return runs
 
         # Continue recursion
-        prompt = self.improvement_prompt(
-            goal, flow_state, workflow_code, run_stdout, iteration_count
+        runs[-1].prompt = self.improvement_prompt(
+            runs[-1].goal, flow_state, workflow_code, run_stdout, runs[-1].iteration_count
         )
-        
+
+        runs.append(GodelRun(
+            goal=runs[-1].goal,
+            prompt=runs[-1].prompt,
+            template_uuid=None,
+            workflow_template=runs[-1].workflow_template if flow_state else None,
+            iteration_count=runs[-1].iteration_count + 1,
+            max_depth=runs[-1].max_depth,
+            judge=runs[-1].judge,
+            need_human_validation=runs[-1].need_human_validation,
+            answers=runs[-1].answers,
+            scenario_id=runs[-1].scenario_id
+        ))
+
         await self.recursive_self_improvement(
-            goal, prompt, iteration_count=iteration_count + 1, max_depth=max_depth,
-            judge=judge, need_human_validation=need_human_validation,
-            rewards_history=rewards_history, assertion_history=assertion_history,
-            plot_data=plot_data, assertion_plot_data=assertion_plot_data,
-            answer=answer, scenario_id=scenario_id,
+            runs,
+            plot_data=plot_data,
+            rewards_history=rewards_history,
+            assertion_history=assertion_history,
+            assertion_plot_data=assertion_plot_data,
         )
         
         self._save_final_plots(assertion_plot_data, assertion_history, uuid)
-        return uuid
+        return runs
 
     def _get_human_validation(self) -> bool:
         """Get human validation for continuing the workflow."""
@@ -378,9 +394,8 @@ class GodelMachine:
         eval_type = None
         total_cost = 0.0
 
-        if executed:
-            if judge:
-                eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
+        if executed and judge:
+            eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
         
         # Calculate cost regardless of execution success
         # This includes workflow generation LLM costs even when execution fails
