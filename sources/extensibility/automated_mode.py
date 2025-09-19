@@ -96,11 +96,6 @@ GOOD EXAMPLE:
 - Reproduce key results from XOmiVAE (https://academic.oup.com/bib/article/22/6/bbab315/6353242): open the paper in the browser, download the PDF, extract hyperparameters, retrieve and run the official code, prepare an omics dataset, train/evaluate the model, compute gene- and latent-dimension attributions (Deep SHAP), explain VAE-derived clusters (Welch’s t-test on latent dimensions), and produce a reproducibility report mapping our outputs to the paper’s claims.
 - Search for the paper "Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results," identify all required software and tools needed for the reproduction of the experiments described in the paper, download and install them in the work environment, and document the setup process in detail for future reference.
 
-You could also challenging scientific questions to answer, as long as the questions require more than simple web searches and require complex reasoning and scientific workflows to answer.
-- Calculate the theoretical maximum efficiency of a perovskite solar cell using the Shockley-Queisser limit, then compare with experimental results from recent literature
-- Model the spread of antimicrobial resistance in a bacterial population using differential equations, varying parameters like mutation rate and selection pressure
-- Calculate the thermodynamic feasibility of metabolic pathways by computing Gibbs free energy changes for each reaction step
-
 RULES:
 
 - Avoid any task that would require a GUI based software. GUI is not supported.
@@ -112,15 +107,10 @@ RULES:
 OUTPUT FORMAT:
 Provide only the task description as a clear, specific goal statement. Do not include explanations or metadata.
 
-Please prioritize tasks that use one of these papers or github repositories:
-- https://github.com/tanjeffreyz/deep-residual-learning
-- https://github.com/tanjeffreyz/convolutional-autoencoder
-- https://github.com/tanjeffreyz/batch-normalization
+Please prioritize tasks that use one of these papers :
 - XOmiVAE paper: https://academic.oup.com/bib/article/22/6/bbab315/6353242
 - Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results
-- "A Better Autoencoder for Image: Convolutional Autoencoder" by Yifei Zhang
 - "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift" by Sergey Ioffe, Christian Szegedy
-- MOGONET integrates multi-omics data using graph convolutional networks allowing patient classification
 
 Always provide the full paper name or github link in your task description if you are using one of the above papers or github repositories as reference.
 """
@@ -230,6 +220,8 @@ Based on the execution history above, generate a new task that:
 3. Is appropriate for the current difficulty level
 4. Focuses on scientific research automation
 5. Assume the data is not available locally, you must specify any data download or code installation required unless previous execution summary confirms data or files is already downloaded
+
+If a task appear to be impossible or too difficult for Mimosa, give up and suggest a totally different task.
 
 Task:"""
 
