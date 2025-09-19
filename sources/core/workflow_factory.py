@@ -124,11 +124,14 @@ You must first comment about the overall strategy to accomplish the task using t
 Decide what agent you need and which tools package they should each use.
 Then, generate Python code that defines prompt templates for each agent.
 Do not generate the whole workflow, just the prompts as Python code.
-Previous workflow failed due to python error ? You don't need to change prompts, just shorten them.
+Generate the prompt within python blocks ```python<code with prompt>```
+Previous workflow failed due to python error ? You don't need to change prompts.
         """
+        # Extract provider and model from OpenRouter format (provider/model)
         if "/" in self.config.workflow_llm_model:
             provider, model = self.config.workflow_llm_model.split("/", 1)
         else:
+            # Fallback for backward compatibility
             provider = "openai"
             model = self.config.workflow_llm_model
         
@@ -172,6 +175,8 @@ You should not modify or rewrite the prompts.
 
 # INSTRUCTIONS/GOAL:
 {craft_instructions}
+
+You must write a commentary befoer the prompt explaining the workflow.
         """
         # Extract provider and model from OpenRouter format (provider/model)
         if "/" in self.config.workflow_llm_model:
@@ -205,15 +210,17 @@ You should not modify or rewrite the prompts.
             llm_output = self.llm_make_prompts(
                 system_prompt, craft_instructions, existing_tool_prompt, path
             )
-            print("🔧 Step 2/2: Generating workflow code...")
             prompts_code = self.extract_python_code(llm_output)
-            commentary = llm_output.replace(prompts_code, "").strip().split('```python')[0]
-            print("💬 LLM commentary on workflow:")
-            print(commentary)
+
+            print("🔧 Step 2/2: Generating workflow code...")
             llm_output = self.llm_make_workflow(
                 system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code
             )
             workflow_code = self.extract_python_code(llm_output)
+            commentary = llm_output.replace(workflow_code, "").split("```python")[0]
+            print("💬 LLM commentary on workflow:")
+            print(commentary)
+
             workflow_code = prompts_code + "\n\n" + workflow_code
             workflow_code = self.remove_imports(workflow_code)
             if not workflow_code.strip():
@@ -226,7 +233,7 @@ You should not modify or rewrite the prompts.
         try:
             compile(workflow_code, "<workflow>", "exec")
         except SyntaxError as e:
-            self.logger.error(f"create_workflow_code: Generated workflow has syntax error: {e}")
+            self.logger.error(f"\n🚨 Invalid workflow code 🚨\n{'='*40}\n\033[91m{workflow_code}\033[0m\n{'='*40}\n{e}")
             raise ValueError(f"LLM generated invalid Python syntax: {e}") from e
 
         self.logger.info("LLM generated workflow code successfully")

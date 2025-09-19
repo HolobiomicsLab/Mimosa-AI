@@ -111,9 +111,16 @@ print(script_content[:500])
 #    "2. Performs some basic data preprocessing",
 #]
 
-rationale: This approach ensures you do not hallucinate or make assumptions about the data or code you are processing.
+**Rationale:** This approach ensures you do not hallucinate or make assumptions about the data or code you are processing.
 
-## 6. FINAL ANSWER FORMAT
+## 6. Adaptability
+
+When files aren't found, explore repository structure using pattern matching and alternative naming conventions
+
+**Rationale:** Repositories rarely match assumptions. Expert problem-solving requires systematic exploration and strategic pivoting when initial approaches fail.
+
+
+## 7. FINAL ANSWER FORMAT
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
   ```json
   {
@@ -216,7 +223,7 @@ class SmolAgentFactory:
             print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=0.2,
+                temperature=0.7,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
@@ -403,34 +410,6 @@ class SmolAgentFactory:
         except Exception as e:
             self.save_memories(workflow_uuid=workflow_uuid)
             raise e
-
-    """
-    def run_cached(self, state: WorkflowState, instructions: str) -> dict:
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Agent execution timed out")
-        
-        workflow_uuid = state.get("workflow_uuid", None)
-        if workflow_uuid is not None:
-            self.load_agent_memory(workflow_uuid, instructions)
-
-        timeout_seconds = getattr(self, 'timeout', 180)
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout_seconds)
-        
-        try:
-            res = self.agent.run(instructions)
-            signal.alarm(0)  # Cancel the alarm
-            self.save_memories(workflow_uuid=workflow_uuid)
-            return res
-        except TimeoutError:
-            signal.alarm(0)
-            self.save_memories(workflow_uuid=workflow_uuid)
-            raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
-        except Exception as e:
-            signal.alarm(0)
-            raise e
-    """
 
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)
