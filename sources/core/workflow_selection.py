@@ -29,7 +29,6 @@ class WorkflowSelector:
             workflow_info = WorkflowInfo(uuid, workflow_folder)
             
             if not workflow_info.is_valid():
-                print(f"Skipping workflow {uuid}: missing required files")
                 continue
                 
             # Check if state_result is empty
@@ -92,7 +91,7 @@ class WorkflowSelector:
         return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
 
     def select_best_workflows(
-        self, goal: str, threshold_similary=0.5, threshod_score=0.0
+        self, goal: str, threshold_similary=0.7, threshod_score=0.0
     ) -> list[WorkflowInfo]:
         """Choose a workflow that matches the goal with a minimum threshold."""
         similar_workflows = self.sort_similar_workflows(goal, threshold_similary)

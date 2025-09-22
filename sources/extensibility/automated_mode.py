@@ -62,7 +62,7 @@ class AutomatedMode:
         )
         
         # Track execution history
-        self.execution_history: List[Dict] = []
+        self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
 
     def _get_task_generator_system_prompt(self) -> str:
