@@ -386,5 +386,3 @@ if __name__ == "__main__":
     print("=" * 50)
     report = bs_detector.generate_report(analysis_results)
     print(report)
-    report_path = f"fraud_report_{uuid}.txt"
-    bs_detector.generate_report(analysis_results, report_path)
