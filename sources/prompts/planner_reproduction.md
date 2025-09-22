@@ -83,7 +83,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "dataset_acquisition", 
-      "task": "Using dataset requirements from paper_analysis.json, download all required datasets. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset. If any datasets are inaccessible, document alternatives or contact information for authors in 'data_blockers.txt'.",
+      "task": "Using dataset requirements from paper_analysis.json, download all required datasets. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset. If any datasets are inaccessible, document alternatives or contact information for authors in 'data_blockers.txt'. Decide a GO/NO-GO (for future operation) depending on whenever fatal errors or access restriction occured.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["paper_analysis.json"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"], 
@@ -91,25 +91,17 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "Based on software requirements in paper_analysis.json, locate and acquire all code/tools. Check for: (1) Author-provided code repositories, (2) Referenced software packages and versions, (3) Custom algorithms requiring implementation. Install confirmed tools in 'tools/' directory, clone available repositories to 'code/', create 'implementation_requirements.txt' listing any code that needs to be written from paper descriptions. Test basic functionality of acquired tools.",
+      "task": "based on software requirements in paper_analysis.json, locate and acquire all code/tools. check for: (1) author-provided code repositories, (2) referenced software packages and versions, (3) custom algorithms requiring implementation. install confirmed tools in 'tools/' directory, clone available repositories to 'code/', create 'implementation_requirements.txt' listing any code that needs to be written from paper descriptions. test basic functionality of acquired tools. Decide a GO/NO-GO (for future operation) depending on whenever fatal errors or access restriction occured.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["paper_analysis.json"], 
       "expected_outputs": ["tools/", "code/", "implementation_requirements.txt"],
       "complexity": "high"
     },
     {
-      "name": "method_implementation",
-      "task": "Implement any missing code components identified in implementation_requirements.txt. Follow paper's methodology exactly, creating modular code in 'src/' directory. For each algorithm: (1) Implement according to paper specifications, (2) Add unit tests for core functions, (3) Document parameter settings from paper. Create 'implementation_log.txt' documenting any ambiguities in paper methodology and decisions made. Validate implementations against any provided examples in paper.",
-      "depends_on": ["code_and_tools_acquisition"],
-      "required_inputs": ["paper_analysis.json", "implementation_requirements.txt", "code/"],
-      "expected_outputs": ["src/", "implementation_log.txt"],
-      "complexity": "high"
-    },
-    {
       "name": "experiment_execution",
-      "task": "Execute the paper's experiments using acquired datasets and implemented methods. Run experiments matching paper's exact conditions and parameters from paper_analysis.json. Save all outputs to 'results/' directory with clear naming matching paper's result structure. Create 'execution_log.txt' documenting runtime, parameter settings, and any deviations from paper methodology. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Run experiments matching paper's exact conditions and parameters from paper_analysis.json. Save all outputs to 'results/' directory with clear naming matching paper's result structure. Create 'execution_log.txt' documenting runtime, parameter settings, and any deviations from paper methodology. If experiments fail, document specific error messages and troubleshooting attempts. Decide a GO/NO-GO (for future operation) depending on whenever execution was feasible.",
       "depends_on": ["dataset_acquisition", "method_implementation"],
-      "required_inputs": ["datasets/", "src/", "paper_analysis.json"],
+      "required_inputs": ["datasets/", "code/", "paper_analysis.json"],
       "expected_outputs": ["results/", "execution_log.txt"],
       "complexity": "high"
     },

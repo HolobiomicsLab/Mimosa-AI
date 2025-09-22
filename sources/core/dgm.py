@@ -348,6 +348,7 @@ class GodelMachine:
             judge=runs[-1].judge,
             need_human_validation=runs[-1].need_human_validation,
             answers=runs[-1].answers,
+            state_result=runs[-1].state_result,
             scenario_id=runs[-1].scenario_id
         ))
 
