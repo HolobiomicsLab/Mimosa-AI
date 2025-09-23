@@ -40,14 +40,24 @@ class GodelRun:
     scenario_id: str | None = None
     eval_type: str | None = None
 
+    def __str__(self) -> str:
+        return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
+                f"cost={self.cost}, reward={self.reward}, max_depth={self.max_depth}, "
+                f"iteration_count={self.iteration_count}, answers={self.answers}, "
+                f"state_result={self.state_result}, judge={self.judge}, "
+                f"need_human_validation={self.need_human_validation}, "
+                f"current_uuid={self.current_uuid}, template_uuid={self.template_uuid}, "
+                f"workflow_template={self.workflow_template}, scenario_id={self.scenario_id}, "
+                f"eval_type={self.eval_type})")
+
 @dataclass
 class PlanStep:
     """Represents a single step in a plan with dependencies and I/O requirements."""
     name: str
     task: str
-    depends_on: List[str] = field(default_factory=list)
-    required_inputs: List[str] = field(default_factory=list)
-    expected_outputs: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
+    required_inputs: list[str] = field(default_factory=list)
+    expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     status: TaskStatus = TaskStatus.PENDING
     
@@ -64,7 +74,7 @@ class PlanStep:
 class Plan:
     """Represents a complete execution plan with multiple steps."""
     goal: str
-    steps: List[PlanStep] = field(default_factory=list)
+    steps: list[PlanStep] = field(default_factory=list)
     
     def __post_init__(self):
         """Validate the plan after initialization."""
@@ -95,9 +105,9 @@ class Task:
     final_uuid: str | None = None # last godel run uuid
     workflow_uuid: str | None = None # last workflow uuid
     status: TaskStatus = TaskStatus.PENDING
-    depends_on: List[str] = field(default_factory=list)
-    required_inputs: List[str] = field(default_factory=list)
-    expected_outputs: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
+    required_inputs: list[str] = field(default_factory=list)
+    expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
-    produced_outputs: List[str] = field(default_factory=list)  # Actual outputs produced
-    missing_inputs: List[str] = field(default_factory=list)    # Missing required inputs
+    produced_outputs: list[str] = field(default_factory=list)  # Actual outputs produced
+    missing_inputs: list[str] = field(default_factory=list)    # Missing required inputs

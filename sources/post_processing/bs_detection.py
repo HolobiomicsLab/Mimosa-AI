@@ -19,8 +19,10 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 
 dotenv.load_dotenv()
 
-MEMORY_DIR = Path("../../sources/memory")
+MEMORY_DIR = Path("./sources/memory")
 config_llm = LLMConfig.from_dict({"model": "gpt-4o-mini"})
+
+assert os.path.exists(MEMORY_DIR)
 
 class MemoryExtraction:
     def __init__(self, uuid):
@@ -244,7 +246,7 @@ Please analyze this agent's memory for fraudulent behavior according to the crit
         
         return "\n".join(formatted_entries)
     
-    def analyze_all_agents(self, memory_extraction: MemoryExtraction, target_roles: list[str] = None) -> dict:
+    def analyze_all_agents(self, uuid: str, target_roles: list[str] = None) -> dict:
         """
         Analyze all agents in a memory extraction for fraudulent behavior.
         
@@ -255,6 +257,7 @@ Please analyze this agent's memory for fraudulent behavior according to the crit
         Returns:
             Dictionary containing comprehensive analysis results
         """
+        memory_extraction = MemoryExtraction(uuid)
         if target_roles is None:
             target_roles = ["assistant", "tool-response", "user"]
         
@@ -378,10 +381,9 @@ Please analyze this agent's memory for fraudulent behavior according to the crit
 
 if __name__ == "__main__":
     uuid = "20250919_145615_0a2b7b6a"
-    memory_extractor = MemoryExtraction(uuid)
     bs_detector = BullshitDetector()
     print("🔍 Analyzing agent memories for fraudulent behavior...")
-    analysis_results = bs_detector.analyze_all_agents(memory_extractor)
+    analysis_results = bs_detector.analyze_all_agents(uuid)
     print("\n📊 FRAUD DETECTION REPORT")
     print("=" * 50)
     report = bs_detector.generate_report(analysis_results)
