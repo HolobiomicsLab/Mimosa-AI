@@ -271,13 +271,14 @@ class GodelMachine:
             need_human_validation=human_validation
         )
 
-        return await self.recursive_self_improvement(
+        tmp = await self.recursive_self_improvement(
             [run0],
             plot_data=plot_data,
             rewards_history=rewards_history,
             assertion_history=assertion_history,
             assertion_plot_data=assertion_plot_data,
         )
+        return tmp
 
     async def recursive_self_improvement(
         self,
@@ -288,9 +289,6 @@ class GodelMachine:
         assertion_plot_data: tuple = None
     ):
         """Run a self-improvement loop for the workflow."""
-        if runs[-1].iteration_count > 0 and runs[-1].need_human_validation and not self._get_human_validation():
-                return ""
-
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
         
         iteration_start_time = time.time()
@@ -301,6 +299,7 @@ class GodelMachine:
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
         )
+        runs[-1].current_uuid = uuid
 
         # Evaluate and calculate costs
         eval_type, total_cost = await self._evaluate_and_calculate_cost(
@@ -341,6 +340,7 @@ class GodelMachine:
         runs.append(GodelRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
+            current_uuid=uuid,
             template_uuid=None,
             workflow_template=runs[-1].workflow_template if flow_state else None,
             iteration_count=runs[-1].iteration_count + 1,
@@ -352,7 +352,7 @@ class GodelMachine:
             scenario_id=runs[-1].scenario_id
         ))
 
-        await self.recursive_self_improvement(
+        runs = await self.recursive_self_improvement(
             runs,
             plot_data=plot_data,
             rewards_history=rewards_history,
@@ -395,7 +395,7 @@ class GodelMachine:
         eval_type = None
         total_cost = 0.0
 
-        if executed and judge:
+        if executed and judge and uuid:
             eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
         
         # Calculate cost regardless of execution success
