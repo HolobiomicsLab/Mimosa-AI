@@ -88,3 +88,13 @@ class WorkflowInfo:
         state_file = self.workflow_folder / "state_result.json"
         code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
         return state_file.exists() and code_file.exists()
+
+    def __str__(self) -> str:
+        """Return a string representation of the WorkflowInfo."""
+        goal_preview = self.goal[:100] + "..." if len(self.goal) > 100 else self.goal
+        return (
+            f"WorkflowInfo(uuid={self.uuid}, "
+            f"goal='{goal_preview}', "
+            f"score={self.overall_score:.2f}, "
+            f"valid={self.is_valid()})"
+        )
