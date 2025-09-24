@@ -231,8 +231,8 @@ class Planner:
             return False
         
         state_result = dgm_run.state_result or {}
-        success_list = state_result.get('success', [False])
-        return success_list[-1] if success_list else False
+        ans_list = state_result.get('answers', [])
+        return "success" in str(ans_list[-1].lower()) if ans_list else False
 
     def _extract_produced_outputs(self, dgm_runs: list[GodelRun]) -> list[str]:
         """
@@ -359,7 +359,7 @@ class Planner:
         exit(1)
     
 
-    async def dgm_runs(self, task, judge, max_dgm_iteration):
+    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True):
         """
         Execute DGM runs for a given task with comprehensive error handling.
         Args:
@@ -384,7 +384,7 @@ class Planner:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
                 task, threshold_similary=0.9, threshod_score=0.9 # TODO change values
-            )
+            ) if cached_wf_allow else []
             
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]
@@ -487,7 +487,7 @@ class Planner:
             
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration)
+                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt==0))
                 
                 last_run = None
                 if dgm_runs and isinstance(dgm_runs, list):
@@ -503,6 +503,7 @@ class Planner:
                 final_answers = []
                 final_uuid = None
                 workflow_uuid = None
+                print("❌ Workflow execution considered as failed." if not dgm_success else "\n")
                 
                 if last_run is not None:
                     final_answers = getattr(last_run, 'answers', []) or []
@@ -633,8 +634,8 @@ class Planner:
                 try:
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration, missing_inputs)
                 except Exception as e:
-                    raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
                     step.status = TaskStatus.FAILED
+                    raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
                 
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED
