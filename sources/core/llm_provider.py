@@ -161,8 +161,12 @@ class LLMProvider:
             return False
 
         for exp_msg, cached_msg in zip(expected, cached):
-            if (exp_msg.get('role') != cached_msg.get('role') or 
-                exp_msg.get('content') != cached_msg.get('content')):
+            r_a = exp_msg.get('role')
+            r_b = cached_msg.get('role')
+            c_a = exp_msg.get('content')
+            c_b = cached_msg.get('content')
+    
+            if (r_a != r_b or c_a != c_b):
                 return False
 
         return True

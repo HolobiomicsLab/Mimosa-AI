@@ -136,6 +136,7 @@ Then, generate Python code that defines prompt templates for each agent.
 Do not generate the whole workflow, just the prompts as Python code.
 Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
+Keep the prompt short and efficient.
         """
         
         provider, model = self.extract_model_pattern(self.config.prompts_llm_model)
@@ -180,7 +181,7 @@ You should not modify or rewrite the prompts.
 # INSTRUCTIONS/GOAL:
 {craft_instructions}
 
-You must write a commentary befoer the prompt explaining the workflow.
+You must write a commentary before the prompt explaining the workflow.
         """
         
         provider, model = self.extract_model_pattern(self.config.workflow_llm_model)

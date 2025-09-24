@@ -101,11 +101,13 @@ class GodelMachine:
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
-        print(f"\n\033[96m{'📝 WORKFLOW AGENTS ANSWERS':^60}\033[0m")
+        return flow_answers
+    
+    def show_answers(self, flow_answers):
+        print(f"\n\033[96m{'> WORKFLOW AGENTS ANSWERS':^60}\033[0m")
         print(f"\033[96m{'─' * 60}\033[0m")
         print(f"\033[96m{flow_answers}\033[0m")
         print(f"\033[96m{'─' * 60}\033[0m\n")
-        return flow_answers
 
     def improvement_prompt(
         self,
@@ -119,8 +121,10 @@ class GodelMachine:
 
         if flow_state is not None:
             flow_answers = self.get_flow_answers(flow_state)
+            self.show_answers(flow_answers)
         else:
             flow_answers = run_stdout.strip()
+
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
@@ -271,14 +275,13 @@ class GodelMachine:
             need_human_validation=human_validation
         )
 
-        tmp = await self.recursive_self_improvement(
+        return await self.recursive_self_improvement(
             [run0],
             plot_data=plot_data,
             rewards_history=rewards_history,
             assertion_history=assertion_history,
             assertion_plot_data=assertion_plot_data,
         )
-        return tmp
 
     async def recursive_self_improvement(
         self,
@@ -310,6 +313,9 @@ class GodelMachine:
         flow_state = self.load_flow_state_result(uuid)
         flow_rewards = self.get_total_rewards(flow_state, eval_type)
         rewards_history.append(flow_rewards)
+
+        flow_answers = self.get_flow_answers(flow_state)
+        self.show_answers(flow_answers)
 
         # Update visualizations
         self._update_visualizations(
@@ -506,12 +512,10 @@ class GodelMachine:
 
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n"
-            f"Goal: {goal}\n"
-            f"UUID: {uuid}\n"
-            f"Reward : {flow_rewards:.2f}\n"
-            f"Answers: {self.get_flow_answers(flow_state)}\n"
+            f"Goal: {goal[:128]}...\n"
             f"Cost: {total_cost:.6f} USD.\n"
-            f"Rewards history: {rewards_history}",
+            f"Rewards history: {rewards_history}"
+            f"Answers: {self.get_flow_answers(flow_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
 

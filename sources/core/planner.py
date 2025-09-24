@@ -219,20 +219,6 @@ class Planner:
                 print(f"   Expected Outputs: {', '.join(step.expected_outputs)}")
         print("\n" + "=" * 80)
 
-    def _get_dgm_success(self, dgm_run: GodelRun | None) -> bool:
-        """
-        Check if a DGM run was successful.
-        Args:
-            dgm_run: The DGM run to check
-        Returns:
-            bool: True if the run was successful
-        """
-        if dgm_run is None:
-            return False
-        
-        state_result = dgm_run.state_result or {}
-        ans_list = state_result.get('answers', [])
-        return "success" in str(ans_list[-1].lower()) if ans_list else False
 
     def _extract_produced_outputs(self, dgm_runs: list[GodelRun]) -> list[str]:
         """
@@ -383,7 +369,7 @@ class Planner:
         try:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.9, threshod_score=0.9 # TODO change values
+                task, threshold_similary=0.6, threshod_score=0.8 # TODO change values
             ) if cached_wf_allow else []
             
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -451,6 +437,11 @@ class Planner:
             print(f"❌ Error in dgm_runs: {str(e)}")
             raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
+    def _get_dgm_success(self, ans_list: list[str]) -> bool:
+        if ans_list == []:
+            return False
+        return "success" in str(ans_list[-1].lower())
+
     async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_dgm_iteration, missing_inputs):
         """
         Execute multiple attempts for a step with comprehensive error handling.
@@ -487,29 +478,24 @@ class Planner:
             
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt==0))
+                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
                 
-                last_run = None
-                if dgm_runs and isinstance(dgm_runs, list):
-                    for run in reversed(dgm_runs):
-                        if run is not None:
-                            last_run = run
-                            break
+                last_run = dgm_runs[-1]
                 
-                dgm_success = self._get_dgm_success(last_run)
                 produced_outputs = self._extract_produced_outputs(dgm_runs)
                 
                 # Safely extract data from last run
                 final_answers = []
                 final_uuid = None
                 workflow_uuid = None
-                print("❌ Workflow execution considered as failed." if not dgm_success else "\n")
                 
                 if last_run is not None:
                     final_answers = getattr(last_run, 'answers', []) or []
                     final_uuid = getattr(last_run, 'current_uuid', None)
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
                 
+                dgm_success = self._get_dgm_success(final_answers)
+                print("❌ Workflow execution considered as failed." if not dgm_success else "\n")
                 task = Task(
                     name=step_name,
                     description=step_task,
@@ -549,6 +535,7 @@ class Planner:
                         print("🔄 Retrying...")
                     
             except Exception as e:
+                raise e
                 error_msg = f"Error executing task '{step_name}': {str(e)}, Retry task ? (already tried {attempt} time)"
                 self.request_user_exit(error_msg)
                 if attempt < max_attempts:
