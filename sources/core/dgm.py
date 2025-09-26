@@ -97,7 +97,7 @@ class GodelMachine:
             return ""
 
         flow_answers = (
-            "\n".join(f"agent {n}: {x}" for (n, x) in zip(flow_state["step_name"], flow_state["answers"], strict=True))
+            "\n".join(f"agent {n}: {x[:256]}..." for (n, x) in zip(flow_state["step_name"], flow_state["answers"], strict=True))
             if isinstance(flow_state["answers"], list)
             else flow_state["answers"]
         )
@@ -379,15 +379,17 @@ class GodelMachine:
 
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
         """Log the start of an iteration."""
+        import re
         logger = logging.getLogger(__name__)
         
         print(f"\n\033[94m{'=' * 60}\033[0m")
         print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
               f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
+        goal_formatted = re.sub(r'\{[^}]*\}', '{<...(parsed out for readability)...>}', goal)
         print(f"\033[94m{'=' * 60}\033[0m")
         print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
-        print(f"\033[94m  {goal}\033[0m")
+        print(f"\033[94m  {goal_formatted}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m\n")
 
         logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
