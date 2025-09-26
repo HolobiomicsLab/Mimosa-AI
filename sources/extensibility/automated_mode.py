@@ -169,7 +169,7 @@ Provide a structured analysis with:
     
     def _get_random_paper_title(self) -> str:
         """Get a random paper title from the papers.csv file."""
-        papers_csv_path = Path("sources/extensibility/data/paper_bench.csv")
+        papers_csv_path = Path("datasets/our_benchmark.csv")
         
         try:
             with open(papers_csv_path, encoding='utf-8') as csvfile:
