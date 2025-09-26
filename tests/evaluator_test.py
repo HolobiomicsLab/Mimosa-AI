@@ -73,12 +73,12 @@ def main():
 
     dgm = GodelMachine(config)
 
-    flow_state = dgm.load_flow_state_result(args.workflow_id)
-    flow_rewards = dgm.get_total_rewards(flow_state, eval_type)
+    wf_state = dgm.load_wf_state_result(args.workflow_id)
+    wf_rewards = dgm.get_total_rewards(wf_state, eval_type)
 
     print(f"Evaluation type: {eval_type}")
-    print(f"Flow state: {json.dumps(flow_state, indent=2)}")
-    print(f"Total rewards: {flow_rewards}")
+    print(f"Flow state: {json.dumps(wf_state, indent=2)}")
+    print(f"Total rewards: {wf_rewards}")
 
 
 if __name__ == "__main__":

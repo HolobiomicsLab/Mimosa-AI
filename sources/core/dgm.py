@@ -42,7 +42,7 @@ class GodelMachine:
         self.process_id = process_id
         self.pricing = PricingCalculator(config)
 
-    def load_flow_state_result(self, uuid: str) -> any:
+    def load_wf_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
 
         Args:
@@ -80,26 +80,26 @@ class GodelMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, flow_state: any, eval_type: str) -> float:
+    def get_total_rewards(self, wf_state: any, eval_type: str) -> float:
         """Calculate the total rewards from the workflow state."""
-        if not flow_state or not eval_type:
+        if not wf_state or not eval_type:
             return 0.0
         if eval_type == "generic":
-            return flow_state["evaluation"]["generic"]["overall_score"]
+            return wf_state["evaluation"]["generic"]["overall_score"]
         elif eval_type == "scenario":
-            return flow_state["evaluation"]["scenario"]["score"]
+            return wf_state["evaluation"]["scenario"]["score"]
         else:
             return 0.0
 
-    def get_flow_answers(self, flow_state: any) -> str:
+    def get_flow_answers(self, wf_state: any) -> str:
         """Extract the answers from the workflow state."""
-        if not flow_state or "answers" not in flow_state:
+        if not wf_state or "answers" not in wf_state:
             return ""
 
         flow_answers = (
-            "\n".join(f"agent {n}: {x[:256]}..." for (n, x) in zip(flow_state["step_name"], flow_state["answers"], strict=True))
-            if isinstance(flow_state["answers"], list)
-            else flow_state["answers"]
+            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
+            if isinstance(wf_state["answers"], list)
+            else wf_state["answers"]
         )
         return flow_answers
     
@@ -112,15 +112,15 @@ class GodelMachine:
     def improvement_prompt(
         self,
         goal: str,
-        flow_state: any,
+        wf_state: any,
         flow_code: str,
         run_stdout: str,
         iteration_count: int,
     ) -> str:
         flow_answers = ""
 
-        if flow_state is not None:
-            flow_answers = self.get_flow_answers(flow_state)
+        if wf_state is not None:
+            flow_answers = self.get_flow_answers(wf_state)
             self.show_answers(flow_answers)
         else:
             flow_answers = run_stdout.strip()
@@ -213,9 +213,9 @@ class GodelMachine:
         goal: str,
         template_uuid: str | None = None,
         judge: bool = False,
-        answer: str = None,
         scenario_id: str = None,
         human_validation: bool = False,
+        answer_eval: str = None,
         max_iteration: int = 5,
     ) -> list[GodelRun]:
         """
@@ -270,7 +270,6 @@ class GodelMachine:
             workflow_template=wf,
             max_depth=max_iteration,
             judge=judge,
-            answers=answer,
             scenario_id=scenario_id,
             need_human_validation=human_validation
         )
@@ -302,7 +301,13 @@ class GodelMachine:
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
         )
+        wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+
         runs[-1].current_uuid = uuid
+        runs[-1].answers = wf_info.answers
+        runs[-1].state_result = wf_info.state_result
+        flow_answers = self.get_flow_answers(wf_info.state_result)
+        self.show_answers(flow_answers)
 
         # Evaluate and calculate costs
         eval_type, total_cost = await self._evaluate_and_calculate_cost(
@@ -310,23 +315,16 @@ class GodelMachine:
         )
 
         # Update tracking data
-        flow_state = self.load_flow_state_result(uuid)
-        flow_rewards = self.get_total_rewards(flow_state, eval_type)
-        rewards_history.append(flow_rewards)
-
-        flow_answers = self.get_flow_answers(flow_state)
-        self.show_answers(flow_answers)
-
+        rewards_history.append(wf_info.overall_score)
         # Update visualizations
         self._update_visualizations(
             rewards_history, assertion_history, plot_data, 
             assertion_plot_data, runs[-1].goal, runs[-1].scenario_id, uuid
         )
-
         # Log and notify completion
         self._log_iteration_completion(
             runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time, 
-            flow_rewards, total_cost, runs[-1].goal, uuid, flow_state, rewards_history
+            wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
         if runs[-1].answers:
@@ -340,21 +338,22 @@ class GodelMachine:
 
         # Continue recursion
         runs[-1].prompt = self.improvement_prompt(
-            runs[-1].goal, flow_state, workflow_code, run_stdout, runs[-1].iteration_count
+            runs[-1].goal, wf_info.state_result, workflow_code, run_stdout, runs[-1].iteration_count
         )
 
+        # add godel run class instance to list
         runs.append(GodelRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
             current_uuid=uuid,
             template_uuid=None,
-            workflow_template=runs[-1].workflow_template if flow_state else None,
+            workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
             iteration_count=runs[-1].iteration_count + 1,
             max_depth=runs[-1].max_depth,
             judge=runs[-1].judge,
             need_human_validation=runs[-1].need_human_validation,
-            answers=runs[-1].answers,
-            state_result=runs[-1].state_result,
+            answers=wf_info.answers,
+            state_result=wf_info.state_result,
             scenario_id=runs[-1].scenario_id
         ))
 
@@ -494,8 +493,8 @@ class GodelMachine:
 
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
-        flow_rewards: float, total_cost: float, goal: str, uuid: str, 
-        flow_state: any, rewards_history: list
+        wf_rewards: float, total_cost: float, goal: str, uuid: str, 
+        wf_state: any, rewards_history: list
     ):
         """Log iteration completion and send notification."""
         logger = logging.getLogger(__name__)
@@ -503,11 +502,11 @@ class GodelMachine:
         
         logger.info(
             f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
-            f"Rewards: {flow_rewards:.1f}, Cost: {total_cost:.3f} USD"
+            f"Rewards: {wf_rewards:.1f}, Cost: {total_cost:.3f} USD"
         )
 
         print(f"\n\033[94m{'-' * 60}\033[0m")
-        print(f"\033[94mTotal rewards: {flow_rewards:.1f}\033[0m")
+        print(f"\033[94mTotal rewards: {wf_rewards:.1f}\033[0m")
         print(f"\033[94mTotal cost: {total_cost:.6f} USD\033[0m")
         print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
         print(f"\033[94m{'-' * 60}\033[0m\n")
@@ -517,7 +516,7 @@ class GodelMachine:
             f"Goal: {goal[:128]}...\n"
             f"Cost: {total_cost:.6f} USD.\n"
             f"Rewards history: {rewards_history}"
-            f"Answers: {self.get_flow_answers(flow_state)}\n",
+            f"Answers: {self.get_flow_answers(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
 

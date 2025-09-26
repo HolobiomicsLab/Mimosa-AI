@@ -3,6 +3,7 @@
 *.log
 *.tmp
 *.safetensors
+.asingle_agent_tests
 *.egg-info
 cookies.json
 .env

@@ -96,8 +96,8 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 # Agent that uses a pre-defined web tool package.
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, TOOLOMICS_BROWSER_TOOLS)
 
-# Agent that writes and executes Python code.
-agent_coder = SmolAgentFactory("coder", instruct_coder, TOOLOMICS_R_SCRIPT_TOOLS)
+# Agent that writes and executes R code and has shell.
+agent_coder = SmolAgentFactory("coder", instruct_coder, TOOLOMICS_R_SCRIPT_TOOLS + TOOLOMICS_R_SCRIPT_SHELL)
 ```
 
 Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
@@ -226,7 +226,7 @@ You will receive research findings or data from previous agents that you need to
 
 # 3. AGENT CREATION (Instantiate all agents here)
 agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
-agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP + SHELL_MCP)
 
 # 4. NODE DEFINITION  (Add agents to the workflow here)
 workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
@@ -282,3 +282,4 @@ workflow.add_conditional_edges(
 Workflow composed could be made of various conditional flow, allowing to create loop, conditional branch or complex custom conditional logic depending on user goal.
 
 Generate workflow code that demonstrates EXCEPTIONAL task decomposition (divide and conquer) with BULLETPROOF error handling and multiple fallback strategies.
+Workflow should be of minimum complexity for the tasks, bare minimum of required agents for goal completion.

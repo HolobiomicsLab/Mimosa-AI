@@ -30,8 +30,6 @@ class GodelRun:
     reward: float = 0.0
     max_depth: int = 5
     iteration_count: int = 0
-    answers: list[str] | None = field(default_factory=list)
-    state_result: dict | None = None
     judge: bool = False
     need_human_validation: bool = False
     current_uuid: str | None = None
@@ -39,6 +37,8 @@ class GodelRun:
     workflow_template: str | None = None
     scenario_id: str | None = None
     eval_type: str | None = None
+    answers: list[str] | None = None
+    state_result: dict | None = None
 
     def __str__(self) -> str:
         return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
@@ -47,7 +47,6 @@ class GodelRun:
                 f"state_result={self.state_result}, judge={self.judge}, "
                 f"need_human_validation={self.need_human_validation}, "
                 f"current_uuid={self.current_uuid}, template_uuid={self.template_uuid}, "
-                f"workflow_template={self.workflow_template}, scenario_id={self.scenario_id}, "
                 f"eval_type={self.eval_type})")
 
 @dataclass
