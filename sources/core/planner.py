@@ -369,7 +369,7 @@ class Planner:
         try:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.6, threshod_score=0.8 # TODO change values
+                task, threshold_similary=0.9, threshod_score=0.7 # TODO change values
             ) if cached_wf_allow else []
             
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -377,7 +377,7 @@ class Planner:
                 if best_match is None:
                     print("⚠️ Best match is None, proceeding with new DGM run")
                 else:
-                    print(f"Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
+                    print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
                     
                     state_result = getattr(best_match, 'state_result', None) or {}
                     run = GodelRun(
@@ -389,10 +389,10 @@ class Planner:
                         reward=getattr(best_match, 'overall_score', 0.0),
                         workflow_template=getattr(best_match, 'code', None)
                     )
-                    
+
+                                    
                     run_state_result = getattr(run, 'state_result', None) or {}
                     success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
-                    print(f"Run: success={success_list}\n")
                     return [run]
             
             # Generate new workflows via DGM
@@ -437,10 +437,10 @@ class Planner:
             print(f"❌ Error in dgm_runs: {str(e)}")
             raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
-    def _get_dgm_success(self, ans_list: list[str]) -> bool:
-        if ans_list == []:
-            return False
-        return "success" in str(ans_list[-1].lower())
+    def _get_dgm_success(self, run: GodelRun) -> bool:
+        run_state_result = getattr(run, 'state_result', None) or {}
+        success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
+        return success_list[-1]
 
     async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_dgm_iteration, missing_inputs):
         """
@@ -494,8 +494,8 @@ class Planner:
                     final_uuid = getattr(last_run, 'current_uuid', None)
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
                 
-                dgm_success = self._get_dgm_success(final_answers)
-                print("❌ Workflow execution considered as failed." if not dgm_success else "\n")
+                dgm_success = self._get_dgm_success(last_run)
+                print("❌ Workflow execution considered as failed. Retrying task..." if not dgm_success else "\n")
                 task = Task(
                     name=step_name,
                     description=step_task,

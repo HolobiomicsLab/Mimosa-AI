@@ -250,7 +250,7 @@ class SmolAgentFactory:
         else:
             min_length = min(len(step_names), len(state_answers))
             step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
-            recent_steps = step_pairs[-3:]
+            recent_steps = step_pairs[-5:]
 
             prev_infos = "Informations given by previous agents:\n"
             for step_name, answer in recent_steps:

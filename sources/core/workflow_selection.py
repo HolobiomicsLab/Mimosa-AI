@@ -68,17 +68,17 @@ class WorkflowSelector:
             return []
         similar_workflows = sorted(
             self.workflows_info.values(),
-            key=lambda wf: self.cosine_similarity(wf.goal, goal),
+            key=lambda wf: self.cosine_similarity(wf.goal[-512:], goal[-512:]),
             reverse=True,
         )
         if debug:
             for wf in similar_workflows:
-                sim = self.cosine_similarity(wf.goal, goal)
-                print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Similarity: {sim:.4f}")
+                sim = self.cosine_similarity(wf.goal[-512:], goal[-512:])
+                print(f"UUID: {wf.uuid}\nGoal: ...{wf.goal[-512:]}\nTarget: ...{goal[-512:]}\nSimilarity: {sim:.4f}\n---\n")
         return [
             wf
             for wf in similar_workflows
-            if self.cosine_similarity(wf.goal, goal) >= threshold
+            if self.cosine_similarity(wf.goal[-512:], goal[-512:]) >= threshold
         ]
 
     def sort_workflows_by_score(
