@@ -401,7 +401,6 @@ class Planner:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                answers=None,
                 human_validation=False,
                 max_iteration=max_dgm_iteration
             )
