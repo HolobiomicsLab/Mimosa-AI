@@ -1,6 +1,6 @@
 import json
 from .dgm import GodelMachine
-from .llm_provider import LLMProvider
+from .llm_provider import LLMProvider, LLMConfig
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from .workflow_info import WorkflowInfo
@@ -34,6 +34,7 @@ class Planner:
         self.available_outputs: set[str] = set()  # Track all available outputs
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
+        self.config_llm = LLMConfig.from_dict({"model": "gpt-4o"})
 
     def make_plan(self, system_prompt: str, goal_prompt: str) -> Plan:
         """
@@ -53,7 +54,7 @@ class Planner:
         
         try:
             memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-            raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt)(goal_prompt)
+            raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
         except Exception as e:
             raise ValueError(f"❌ Planner: Failed to generate plan from LLM: {str(e)}") from e
         
@@ -379,20 +380,15 @@ class Planner:
                 else:
                     print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
                     
-                    state_result = getattr(best_match, 'state_result', None) or {}
                     run = GodelRun(
-                        goal=getattr(best_match, 'goal', ''),
-                        prompt=getattr(best_match, 'goal', ''),
-                        answers=state_result.get('answers', []) if isinstance(state_result, dict) else [],
-                        state_result=state_result,
-                        current_uuid=getattr(best_match, 'uuid', None),
-                        reward=getattr(best_match, 'overall_score', 0.0),
-                        workflow_template=getattr(best_match, 'code', None)
+                        goal=best_match.goal,
+                        prompt=best_match.goal,
+                        answers=best_match.state_result ,
+                        state_result=best_match.state_result ,
+                        current_uuid=best_match.uuid,
+                        reward=best_match.overall_score,
+                        workflow_template=best_match.code
                     )
-
-                                    
-                    run_state_result = getattr(run, 'state_result', None) or {}
-                    success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
                     return [run]
             
             # Generate new workflows via DGM
@@ -405,7 +401,7 @@ class Planner:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                answer=None,
+                answers=None,
                 human_validation=False,
                 max_iteration=max_dgm_iteration
             )
@@ -413,24 +409,7 @@ class Planner:
             if runs is None:
                 print("⚠️ DGM returned None, returning empty list")
                 return []
-            
-            if not isinstance(runs, list):
-                print(f"⚠️ DGM returned non-list result: {type(runs)}, converting to list")
-                runs = [runs] if runs else []
-            
-            print(f"DGM completed with {len(runs)} runs.")
-            for i, run in enumerate(runs):
-                if run is None:
-                    print(f"   Run {i+1}: None run detected")
-                    continue
-                
-                try:
-                    run_state_result = getattr(run, 'state_result', None) or {}
-                    success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
-                    print(f"   Run {i+1}: success={success_list}\n")
-                except Exception as e:
-                    print(str(e))
-                    success_list = [True]
+
             return runs
             
         except Exception as e:

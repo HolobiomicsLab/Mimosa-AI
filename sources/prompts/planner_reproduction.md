@@ -60,12 +60,14 @@ Your response must be valid JSON following this exact schema:
 - **Concrete Deliverables**: Exact file names, formats, and validation criteria  
 - **Clear Dependencies**: How this task uses specific outputs from prerequisite steps
 - **Feasibility Bounds**: Conditions that would indicate this step cannot be completed
+- **Simplicity**: Keep plan simple, no unessessary steps, combine all related steps as one
 
-### Forbidden Assumptions:
+### Forbidden :
 - Never assume specific tools, databases, or methodologies without paper evidence
 - Never plan "comprehensive" approaches without validating scope against paper
 - Never include validation datasets from different domains without justification
 - Never commit to large-scale computations (>100 hours) without feasibility gates
+- Never try to use vision-based capabilities such as reading figure
 
 ## Example Structure
 
@@ -75,50 +77,42 @@ Your response must be valid JSON following this exact schema:
   "steps": [
     {
       "name": "comprehensive_paper_analysis",
-      "task": "Download 'Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results' and extract all reproduction requirements. Create 'paper_analysis.json' containing: (1) Exact methodology/algorithms used, (2) Complete dataset list with sources and preprocessing, (3) Software tools and versions, (4) Quantitative claims to reproduce, (5) Validation approaches, (6) Computational requirements. Create 'feasibility_assessment.txt' with GO/NO-GO decision for full reproduction and specific blockers if any. If paper is inaccessible, document alternative sources attempted in 'access_issues.txt'.",
+      "task": "Download 'Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results' and extract all reproduction requirements. Create a very detailled 'report.txt' guide for experiments reproduction containing: (0) Explanation/Summary of the paper (1) Exact methodology/algorithms used, (2) Complete dataset list with link or access method, (3) github link and software versions, (4) Quantitative claims to reproduce, (5) Validation approaches, (6) Computational requirements",
       "depends_on": [],
       "required_inputs": [],
-      "expected_outputs": ["paper_analysis.json", "feasibility_assessment.txt"],
+      "expected_outputs": ["report.txt"],
+      "complexity": "high"
+    },
+    {
+      "name": "code_and_tools_acquisition",
+      "task": "based on software requirements in report.txt, locate and acquire all code/tools. clone available repositories to 'code/'. Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in the code and report the information in report.txt.",
+      "depends_on": ["comprehensive_paper_analysis"],
+      "required_inputs": ["report.txt"], 
+      "expected_outputs": ["code/"],
       "complexity": "high"
     },
     {
       "name": "dataset_acquisition", 
-      "task": "Using dataset requirements from paper_analysis.json, download all required datasets. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset. If any datasets are inaccessible, document alternatives or contact information for authors in 'data_blockers.txt'. Decide a GO/NO-GO (for future operation) depending on whenever fatal errors or access restriction occured.",
-      "depends_on": ["comprehensive_paper_analysis"],
-      "required_inputs": ["paper_analysis.json"],
+      "task": "Using dataset requirements from report.txt, download all required datasets, or copy dataset in code/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
+      "depends_on": ["comprehensive_paper_analysis", "code_and_tools_acquisition"],
+      "required_inputs": ["report.txt"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"], 
       "complexity": "medium"
     },
     {
-      "name": "code_and_tools_acquisition",
-      "task": "based on software requirements in paper_analysis.json, locate and acquire all code/tools. check for: (1) author-provided code repositories, (2) referenced software packages and versions, (3) custom algorithms requiring implementation. install confirmed tools in 'tools/' directory, clone available repositories to 'code/', create 'implementation_requirements.txt' listing any code that needs to be written from paper descriptions. test basic functionality of acquired tools. Decide a GO/NO-GO (for future operation) depending on whenever fatal errors or access restriction occured.",
-      "depends_on": ["comprehensive_paper_analysis"],
-      "required_inputs": ["paper_analysis.json"], 
-      "expected_outputs": ["tools/", "code/", "implementation_requirements.txt"],
-      "complexity": "high"
-    },
-    {
       "name": "experiment_execution",
-      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Run experiments matching paper's exact conditions and parameters from paper_analysis.json. Save all outputs to 'results/' directory with clear naming matching paper's result structure. Create 'execution_log.txt' documenting runtime, parameter settings, and any deviations from paper methodology. If experiments fail, document specific error messages and troubleshooting attempts. Decide a GO/NO-GO (for future operation) depending on whenever execution was feasible.",
-      "depends_on": ["dataset_acquisition", "method_implementation"],
-      "required_inputs": ["datasets/", "code/", "paper_analysis.json"],
-      "expected_outputs": ["results/", "execution_log.txt"],
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in code/ and install all requirements. Run experiments matching paper's exact conditions and parameters from report.txt. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "depends_on": ["dataset_acquisition", "code_and_tools_acquisition"],
+      "required_inputs": ["datasets/", "code/", "report.txt"],
+      "expected_outputs": ["results/"],
       "complexity": "high"
     },
     {
       "name": "results_validation",
-      "task": "Compare reproduction results with original paper results from paper_analysis.json. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.txt'.",
+      "task": "Compare reproduction results with original paper results from report.txt. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.txt'.",
       "depends_on": ["experiment_execution"],
       "required_inputs": ["results/", "paper_analysis.json"],
       "expected_outputs": ["validation_report.html", "discrepancies_analysis.txt"],
-      "complexity": "medium"
-    },
-    {
-      "name": "comprehensive_documentation",
-      "task": "Create complete reproduction documentation in 'reproduction_report.md' including: (1) Summary of reproduction success/failure, (2) Complete methodology followed, (3) All deviations from original paper, (4) Technical issues and solutions, (5) Assessment of result quality, (6) Recommendations for future reproductions. Include all supporting files and create 'reproduction_package/' with all code, data, and results needed for others to verify the reproduction.",
-      "depends_on": ["results_validation"],
-      "required_inputs": ["validation_report.html", "execution_log.txt", "implementation_log.txt"],
-      "expected_outputs": ["reproduction_report.md", "reproduction_package/"],
       "complexity": "medium"
     }
   ]
@@ -129,16 +123,6 @@ Your response must be valid JSON following this exact schema:
 
 - Return ONLY valid JSON following the schema above
 - Every step must include all required fields
-- Decision points must be specific and actionable
-- Resource estimates must be realistic and bounded
 - Failure modes must include concrete mitigation strategies
 
-## Quality Checks Before Finalizing
-
-1. Does the first step analyze paper content and include feasibility assessment?
-2. Are execution steps sequenced logically (data → code → implementation → execution)?
-3. Do task descriptions specify exact files and decision criteria?
-4. Does each step clearly state how it uses outputs from prerequisites?
-5. Is the validation approach appropriate to what the paper actually claims?
-
-Generate plans that maximize probability of successful reproduction while minimizing wasted effort on incorrect assumptions.
+Generate plans that are simple with no uncessessary complexity added. Regroup highly related steps as one (setup up env and running code can be part of the same task).

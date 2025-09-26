@@ -182,6 +182,7 @@ You should not modify or rewrite the prompts.
 {craft_instructions}
 
 You must write a commentary before the prompt explaining the workflow.
+The last agent in the workflow must determine whenever the task was a success or failure.
         """
         
         provider, model = self.extract_model_pattern(self.config.workflow_llm_model)

@@ -56,14 +56,14 @@ class Config:
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         # SmolAgent model configuration (Hugging Face model ID format)
-        self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3"
-        self.engine_name: str = "inference_client"
+        self.smolagent_model_id: str = "deepseek/deepseek-coder"
+        self.engine_name: str = "litellm"
         
         # DGM/Workflow generation model configuration 
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-20250514"
+        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
         
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models

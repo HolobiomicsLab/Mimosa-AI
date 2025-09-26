@@ -20,7 +20,7 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 dotenv.load_dotenv()
 
 MEMORY_DIR = Path("./sources/memory")
-config_llm = LLMConfig.from_dict({"model": "gpt-4o-mini"})
+config_llm = LLMConfig.from_dict({"model": "gpt-4o"})
 
 assert os.path.exists(MEMORY_DIR)
 
