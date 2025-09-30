@@ -378,19 +378,23 @@ class GodelMachine:
 
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
         """Log the start of an iteration."""
-        import re
         logger = logging.getLogger(__name__)
         
         print(f"\n\033[94m{'=' * 60}\033[0m")
         print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
               f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
-        goal_formatted = re.sub(r'\{[^}]*\}', '{<...(parsed out for readability)...>}', goal)
         print(f"\033[94m{'=' * 60}\033[0m")
         print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
-        print(f"\033[94m  {goal_formatted}\033[0m")
+        goal_lines = goal.split('\n')
+        for line in goal_lines:
+            if len(line) <= 256:
+                print(f"\033[94m  {line}\033[0m")
+            else:
+                truncated = line[:256]
+                remaining = len(line) - 256
+                print(f"\033[94m  {truncated}...({remaining} remaining characters not displayed)\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m\n")
-
         logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
 
     async def _evaluate_and_calculate_cost(

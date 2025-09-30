@@ -6,17 +6,14 @@ import asyncio
 import csv
 import json
 import logging
-import os
 import random
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from sources.core.dgm import GodelMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.workflow_info import WorkflowInfo
-from sources.post_processing.bs_detection import BullshitDetector
 
 class AutomatedMode:
     """
@@ -35,7 +32,6 @@ class AutomatedMode:
         self.config = config
         self.max_iterations = max_iterations
         self.dgm = GodelMachine(config)
-        self.bs_detector = BullshitDetector()
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
         
@@ -128,7 +124,7 @@ Provide a structured analysis with:
 5. COMPLEXITY_ADJUSTMENT: (Increase/Maintain/Decrease)"""
 
     def _save_run_notes(self, iteration: int, task: str, uuid: str, 
-                       flow_answers: str, analysis: str, fraud: str, execution_time: float) -> None:
+                       flow_answers: str, analysis: str, execution_time: float) -> None:
         """Save detailed notes about the run."""
         timestamp = datetime.now().isoformat()
         notes = {
@@ -139,7 +135,6 @@ Provide a structured analysis with:
             "execution_time_seconds": execution_time,
             "flow_answers": flow_answers,
             "analysis": analysis,
-            "potential_fraud": fraud,
             "workflow_dir": str(Path(self.config.workflow_dir) / uuid)
         }
         
@@ -284,7 +279,6 @@ Provide your analysis following the specified output format."""
                 
                 execution_time = time.time() - iteration_start_time
                 analysis = self._analyze_results(task, flow_answers, execution_time)
-                fraud_detection = self.bs_detector.analyze_all_agents(uuid)
                 
                 # Save execution data
                 execution_data = {
@@ -300,7 +294,7 @@ Provide your analysis following the specified output format."""
                 # Save detailed notes
                 self._save_run_notes(
                     iteration + 1, task, uuid, flow_answers, 
-                    analysis["full_analysis"], fraud_detection, execution_time
+                    analysis["full_analysis"], execution_time
                 )
                 
                 print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
@@ -317,20 +311,7 @@ Provide your analysis following the specified output format."""
                 self.logger.error(f"[AUTOMATED MODE] Error in iteration {iteration + 1}: {str(e)}")
                 print(f"\033[91m❌ Error in iteration {iteration + 1}: {str(e)}\033[0m")
                 raise e
-                
-                # Save error information
-                error_data = {
-                    "iteration": iteration + 1,
-                    "task": task if 'task' in locals() else "Task generation failed",
-                    "error": str(e),
-                    "execution_time": time.time() - iteration_start_time if 'iteration_start_time' in locals() else 0
-                }
-                self.execution_history.append(error_data)
-                
-                # Continue with next iteration
-                continue
         
-        # Final summary
         self._print_final_summary()
 
     def _print_final_summary(self) -> None:
@@ -349,7 +330,7 @@ Provide your analysis following the specified output format."""
         print(f"\033[95mTotal execution time: {total_time:.2f}s\033[0m")
         print(f"\033[95mNotes saved in: {self.run_notes_dir}\033[0m")
         
-        print(f"\n\033[95mTop performing tasks:\033[0m")
+        print("\n\033[95mTop performing tasks:\033[0m")
         high_success = [exec_data for exec_data in self.execution_history 
                        if exec_data.get("success_level") == "High"]
         
