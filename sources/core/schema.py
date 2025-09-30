@@ -3,7 +3,6 @@ Schema for for storing and managing data in the Mimosa AI system.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
 from enum import Enum
 
 class TaskStatus(Enum):

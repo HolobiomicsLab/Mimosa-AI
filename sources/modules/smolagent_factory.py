@@ -67,14 +67,15 @@ AVAILABLE INTERFACES
 Data Access: Use provided tool_name(param=value) functions exclusively
 File Operations: Tools handle all filesystem interactions
 External Requests: Tools manage network and process operations
-Path Resolution: Tools provide environment-appropriate paths
+Path Resolution: Tools provide environment-appropriate paths, only tools have access to workspace files.
 
 UNAVAILABLE INTERFACES
 Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
-pythonimport os          # ❌ Module not available
-import subprocess  # ❌ Module not available  
-open("file.txt")   # ❌ Function not available
-exec(code)         # ❌ Function not available
+pythonimport os          # Module not available
+import subprocess  # Module not available  
+open("file.txt")   # Function not available
+exec(code)         # Function not available
+pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
 
 ## 2. DATA INSPECTION AND VALIDATION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs

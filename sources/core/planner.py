@@ -3,7 +3,6 @@ from .dgm import GodelMachine
 from .llm_provider import LLMProvider, LLMConfig
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
-from .workflow_info import WorkflowInfo
 from sources.utils.notify import PushNotifier
 
 
@@ -232,24 +231,15 @@ class Planner:
         if not dgm_runs or not isinstance(dgm_runs, list):
             return []
         
-        last_run = None
-        for run in reversed(dgm_runs):
-            if run is not None:
-                last_run = run
-                break
-        
+        last_run = dgm_runs[-1]
         if last_run is None:
             return []
         
-        answers = getattr(last_run, 'answers', None)
+        answers = last_run.answers
         if not answers or not isinstance(answers, list):
             return []
         
-        last_answer = ""
-        for answer in reversed(answers):
-            if answer is not None and isinstance(answer, str):
-                last_answer = answer
-                break
+        last_answer = answers[-1] or ""
         
         if not last_answer:
             return []
@@ -383,8 +373,8 @@ class Planner:
                     run = GodelRun(
                         goal=best_match.goal,
                         prompt=best_match.goal,
-                        answers=best_match.state_result ,
-                        state_result=best_match.state_result ,
+                        answers=best_match.answers,
+                        state_result=best_match.state_result,
                         current_uuid=best_match.uuid,
                         reward=best_match.overall_score,
                         workflow_template=best_match.code
@@ -461,6 +451,7 @@ class Planner:
                 last_run = dgm_runs[-1]
                 
                 produced_outputs = self._extract_produced_outputs(dgm_runs)
+                print(produced_outputs)
                 
                 # Safely extract data from last run
                 final_answers = []
@@ -567,6 +558,7 @@ class Planner:
             # Execute plan steps
             attempt_counts = {}
             
+            lst_step = None
             for step_idx, step in enumerate(self.current_plan.steps):
                 if step is None:
                     print(f"⚠️ Step {step_idx + 1} is None, skipping")
@@ -579,12 +571,12 @@ class Planner:
                 print(f"{'='*60}")
                 
                 # Check if step can be executed (dependencies satisfied)
-                can_execute, missing_deps = self._can_execute_step(step)
-                if not can_execute:
-                    step.status = TaskStatus.SKIPPED
-                    error_msg = f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}"
-                    self.request_user_exit(error_msg)
-                    continue
+                if lst_step:
+                    can_execute, missing_deps = self._can_execute_step(lst_step)
+                    if not can_execute:
+                        error_msg = f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}"
+                        self.request_user_exit(error_msg)
+                        continue
                 
                 # Check required inputs
                 inputs_available, missing_inputs = self._verify_required_inputs(step)
@@ -601,6 +593,7 @@ class Planner:
                 except Exception as e:
                     step.status = TaskStatus.FAILED
                     raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
+                lst_step = step
                 
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED

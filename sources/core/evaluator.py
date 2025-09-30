@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Tuple, Optional, Union
+from typing import Any
 
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.utils.scenario_loader import ScenarioLoader
@@ -52,7 +52,6 @@ class WorkflowEvaluator:
             EvaluatorError: If configuration is invalid or required directories don't exist
         """
         try:
-            # Validate configuration
             if not hasattr(config, 'memory_dir') or not config.memory_dir:
                 raise EvaluatorError("Configuration must include 'memory_dir'")
             if not hasattr(config, 'workflow_dir') or not config.workflow_dir:
@@ -62,25 +61,20 @@ class WorkflowEvaluator:
             if not hasattr(config, 'reasoning_effort'):
                 raise EvaluatorError("Configuration must include 'reasoning_effort'")
 
-            # Initialize paths
             self.memory_dir = Path(config.memory_dir)
             self.workflow_dir = Path(config.workflow_dir)
             self.model_pricing = config.model_pricing
 
-            # Ensure directories exist
             self.memory_dir.mkdir(parents=True, exist_ok=True)
             self.workflow_dir.mkdir(parents=True, exist_ok=True)
 
-            # Initialize scenario loader with error handling
             try:
                 self.scenario_loader = ScenarioLoader()
             except Exception as e:
                 raise EvaluatorError(f"Failed to initialize scenario loader: {str(e)}") from e
 
-            # Initialize LLM configuration
-            self.judge_model = "openai/gpt-4o-mini"  # Default model in OpenRouter format
+            self.judge_model = "deepseek/deepseek-chat"
             try:
-                # Extract provider and model from OpenRouter format
                 provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
                 self.llm_config = LLMConfig().from_dict({
                     "model": model,
@@ -98,7 +92,7 @@ class WorkflowEvaluator:
                 raise
             raise EvaluatorError(f"Failed to initialize WorkflowEvaluator: {str(e)}") from e
     
-    def _load_workflow_data(self, workflow_id: str) -> Tuple[Optional[Dict], Optional[str]]:
+    def _load_workflow_data(self, workflow_id: str) -> tuple[dict, str]:
         """Load workflow execution data from UUID folder.
         
         Args:
@@ -124,13 +118,12 @@ class WorkflowEvaluator:
         state_result = None
         workflow_code = None
 
-        # Load state_result.json with comprehensive error handling
         state_result_path = workflow_path / "state_result.json"
         try:
             if not state_result_path.exists():
                 self.logger.warning(f"state_result.json not found at {state_result_path}")
             else:
-                with open(state_result_path, 'r', encoding='utf-8') as f:
+                with open(state_result_path, encoding='utf-8') as f:
                     content = f.read().strip()
                     if not content:
                         self.logger.warning(f"state_result.json is empty at {state_result_path}")
@@ -146,13 +139,12 @@ class WorkflowEvaluator:
         except OSError as e:
             raise WorkflowDataError(f"OS error reading state_result.json: {str(e)}") from e
 
-        # Load workflow code with comprehensive error handling
         workflow_code_path = workflow_path / f"workflow_code_{workflow_id}.py"
         try:
             if not workflow_code_path.exists():
                 self.logger.warning(f"Workflow code not found at {workflow_code_path}")
             else:
-                with open(workflow_code_path, 'r', encoding='utf-8') as f:
+                with open(workflow_code_path, encoding='utf-8') as f:
                     workflow_code = f.read()
                     if not workflow_code.strip():
                         self.logger.warning(f"Workflow code file is empty at {workflow_code_path}")
@@ -167,7 +159,7 @@ class WorkflowEvaluator:
 
         return state_result, workflow_code
 
-    def workflow_execution_text(self, uuid: str) -> Optional[str]:
+    def workflow_execution_text(self, uuid: str) -> str | None:
         """Generate workflow execution text for evaluation.
         
         Args:
@@ -215,7 +207,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise WorkflowDataError(f"Failed to generate workflow execution text: {str(e)}") from e
 
-    def evaluate(self, uuid: str, answer: str = None, scenario_id: str = None) -> Dict[str, Any]:
+    def evaluate(self, uuid: str, answer: str = None, scenario_id: str = None) -> dict[str, Any]:
         """Evaluate the workflow results.
 
         Args:
@@ -241,13 +233,13 @@ class WorkflowEvaluator:
                 self.generic(uuid, answer)
                 return {'evaluation_type': 'generic', 'uuid': uuid}
 
-        except (WorkflowDataError, ScenarioError, LLMEvaluationError) as e:
+        except (WorkflowDataError, ScenarioError, LLMEvaluationError) as _:
             # Re-raise specific evaluator errors
             raise
         except Exception as e:
             raise EvaluatorError(f"Evaluation failed for {uuid}: {str(e)}") from e
 
-    def generic(self, uuid: str, answer: Optional[str]) -> None:
+    def generic(self, uuid: str, answer: str | None) -> None:
         """Perform generic evaluation of a workflow.
         
         Args:
@@ -367,7 +359,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise LLMEvaluationError(f"Generic evaluation failed: {str(e)}") from e
 
-    def _extract_scores(self, evaluation_text: str) -> Dict[str, float]:
+    def _extract_scores(self, evaluation_text: str) -> dict[str, float]:
         """Extract scores from the evaluation text.
 
         Args:
@@ -459,7 +451,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise ScoreExtractionError(f"Unexpected error extracting scores: {str(e)}") from e
 
-    def _save_results(self, scores: Dict[str, float], uuid: str, eval_type: str) -> None:
+    def _save_results(self, scores: dict[str, float], uuid: str, eval_type: str) -> None:
         """Update the state result file with the evaluation scores.
 
         Args:
@@ -487,12 +479,12 @@ class WorkflowEvaluator:
             state_result = {}
             if state_result_path.exists():
                 try:
-                    with open(state_result_path, 'r', encoding='utf-8') as f:
+                    with open(state_result_path, encoding='utf-8') as f:
                         content = f.read().strip()
                         if content:
                             state_result = json.loads(content)
                             if not isinstance(state_result, dict):
-                                self.logger.warning(f"State result is not a dictionary, creating new one")
+                                self.logger.warning("State result is not a dictionary, creating new one")
                                 state_result = {}
                 except (json.JSONDecodeError, OSError) as e:
                     self.logger.warning(f"Could not load existing state result: {str(e)}, creating new one")
@@ -520,7 +512,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise EvaluatorError(f"Unexpected error updating state result: {str(e)}") from e
 
-    def scenario(self, uuid: str, scenario_id: str) -> Dict[str, Any]:
+    def scenario(self, uuid: str, scenario_id: str) -> dict[str, Any]:
         """Evaluate a workflow against a scenario with scoring.
         
         Args:
@@ -632,7 +624,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise ScenarioError(f"Scenario evaluation failed: {str(e)}") from e
 
-    def _evaluate_assertion(self, uuid: str, assertion: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_assertion(self, uuid: str, assertion: dict[str, Any]) -> dict[str, Any]:
         """Evaluate single assertion using existing LLM prompt format.
         
         Args:
@@ -701,7 +693,7 @@ class WorkflowEvaluator:
         except Exception as e:
             raise LLMEvaluationError(f"Assertion evaluation failed: {str(e)}") from e
 
-    def _build_judge_prompt(self, uuid: str, assertion: Dict[str, Any]) -> str:
+    def _build_judge_prompt(self, uuid: str, assertion: dict[str, Any]) -> str:
         """Build judge prompt with workflow data.
         
         Args:
@@ -776,7 +768,7 @@ Respond in this exact format:
     - Error Handling: Did the system detect and manage errors appropriately?
     - Clarity & Professionalism: Are results presented clearly and in a usable format?"""
 
-    def _parse_judge_response(self, judge_text: str) -> Tuple[bool, str, float]:
+    def _parse_judge_response(self, judge_text: str) -> tuple[bool, str, float]:
         """Parse LLM judge response from JSON format.
         
         Args:
