@@ -8,6 +8,7 @@ explanations of errors that occurred during the workflow execution.
 
 import csv
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,9 @@ dotenv.load_dotenv()
 MEMORY_DIR = Path("sources/memory")
 RESULTS_DIR = Path("evaluation/runs")
 config_llm = LLMConfig.from_dict({"model": "gpt-4o-mini"})
+
+assert os.path.exists(MEMORY_DIR), f"Memory folder does not exists at {MEMORY_DIR}."
+assert os.path.exists(RESULTS_DIR), f"Results folder does not exists at {RESULTS_DIR}"
 
 
 def load_memory_data(uuid: str) -> dict[str, Any]:

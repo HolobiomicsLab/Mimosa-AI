@@ -37,8 +37,8 @@ class HumanMode:
     def validate_choice(self, choice: str, attribution_map: dict) -> bool:
         try:
             _ = int(choice)
-        except ValueError as e:
-            self._print_error(f"Invalid input: Please enter a number")
+        except ValueError as _:
+            self._print_error("Invalid input: Please enter a number")
             return False
         if int(choice) not in list(range(0, len(attribution_map))):
             self._print_error("Choice not in range. Please select a valid option.")
@@ -168,7 +168,7 @@ class HumanMode:
                 print(f"     ✓ Using default: {default}")
                 return default
             elif not required:
-                print(f"     ⏭️  Skipped")
+                print("     ⏭️  Skipped")
                 return None
             else:
                 self._print_error(f"{param_name} is required")

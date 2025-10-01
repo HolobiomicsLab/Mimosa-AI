@@ -29,7 +29,6 @@ class WorkflowSelector:
             workflow_info = WorkflowInfo(uuid, workflow_folder)
             
             if not workflow_info.is_valid():
-                print(f"Skipping workflow {uuid}: missing required files")
                 continue
                 
             # Check if state_result is empty
@@ -69,17 +68,17 @@ class WorkflowSelector:
             return []
         similar_workflows = sorted(
             self.workflows_info.values(),
-            key=lambda wf: self.cosine_similarity(wf.goal, goal),
+            key=lambda wf: self.cosine_similarity(wf.goal[-512:], goal[-512:]),
             reverse=True,
         )
         if debug:
             for wf in similar_workflows:
-                sim = self.cosine_similarity(wf.goal, goal)
-                print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Similarity: {sim:.4f}")
+                sim = self.cosine_similarity(wf.goal[-512:], goal[-512:])
+                print(f"UUID: {wf.uuid}\nGoal: ...{wf.goal[-512:]}\nTarget: ...{goal[-512:]}\nSimilarity: {sim:.4f}\n---\n")
         return [
             wf
             for wf in similar_workflows
-            if self.cosine_similarity(wf.goal, goal) >= threshold
+            if self.cosine_similarity(wf.goal[-512:], goal[-512:]) >= threshold
         ]
 
     def sort_workflows_by_score(
@@ -92,7 +91,7 @@ class WorkflowSelector:
         return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
 
     def select_best_workflows(
-        self, goal: str, threshold_similary=0.5, threshod_score=0.0
+        self, goal: str, threshold_similary=0.7, threshod_score=0.0
     ) -> list[WorkflowInfo]:
         """Choose a workflow that matches the goal with a minimum threshold."""
         similar_workflows = self.sort_similar_workflows(goal, threshold_similary)

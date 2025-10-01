@@ -100,6 +100,16 @@ class WorkflowFactory:
                 line.strip().startswith("import ") or line.strip().startswith("from ")
             )
         )
+    
+    def extract_model_pattern(self, workflow_llm_model: str) -> tuple[str, str]:
+        # Extract provider and model from OpenRouter format (provider/model)
+        if "/" in workflow_llm_model:
+            provider, model = workflow_llm_model.split("/", 1)
+        else:
+            # Fallback for backward compatibility
+            provider = "openai"
+            model = self.config.workflow_llm_model
+        return provider, model
 
     def llm_make_prompts(
         self,
@@ -126,15 +136,10 @@ Then, generate Python code that defines prompt templates for each agent.
 Do not generate the whole workflow, just the prompts as Python code.
 Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
+Keep the prompt short and efficient.
         """
-        # Extract provider and model from OpenRouter format (provider/model)
-        if "/" in self.config.workflow_llm_model:
-            provider, model = self.config.workflow_llm_model.split("/", 1)
-        else:
-            # Fallback for backward compatibility
-            provider = "openai"
-            model = self.config.workflow_llm_model
         
+        provider, model = self.extract_model_pattern(self.config.prompts_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,
@@ -176,16 +181,11 @@ You should not modify or rewrite the prompts.
 # INSTRUCTIONS/GOAL:
 {craft_instructions}
 
-You must write a commentary befoer the prompt explaining the workflow.
+You must write a commentary before the prompt explaining the workflow.
+The last agent in the workflow must determine whenever the task was a success or failure.
         """
-        # Extract provider and model from OpenRouter format (provider/model)
-        if "/" in self.config.workflow_llm_model:
-            provider, model = self.config.workflow_llm_model.split("/", 1)
-        else:
-            # Fallback for backward compatibility
-            provider = "openai"
-            model = self.config.workflow_llm_model
         
+        provider, model = self.extract_model_pattern(self.config.workflow_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,

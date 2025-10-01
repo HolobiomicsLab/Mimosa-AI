@@ -1,12 +1,12 @@
-
+import os
 import json
 from pathlib import Path
 from statistics import mean
 
 class WorkflowInfo:
-    def __init__(self, uuid, workflow_folder: Path):
+    def __init__(self, uuid, workflow_folder: Path | str):
         self.uuid = uuid
-        self.workflow_folder = workflow_folder
+        self.workflow_folder = workflow_folder if isinstance(workflow_folder, Path) else Path(workflow_folder)
         self._goal = None
         self._state_result = None
         self._code = None
@@ -24,6 +24,16 @@ class WorkflowInfo:
         if self._state_result is None:
             self._state_result = self.load_state_result()
         return self._state_result
+
+    @property
+    def answers(self) -> dict:
+        state_result = self.load_state_result()
+        return state_result.get('answers', [])
+
+    @property
+    def success(self) -> dict:
+        state_result = self.load_state_result()
+        return state_result.get('success', [])
 
     @property
     def code(self) -> str:
@@ -88,3 +98,20 @@ class WorkflowInfo:
         state_file = self.workflow_folder / "state_result.json"
         code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
         return state_file.exists() and code_file.exists()
+
+    def __str__(self) -> str:
+        """Return a string representation of the WorkflowInfo."""
+        goal_preview = self.goal[:100] + "..." if len(self.goal) > 100 else self.goal
+        return (
+            f"WorkflowInfo(uuid={self.uuid}, "
+            f"goal='{goal_preview}', "
+            f"score={self.overall_score:.2f}, "
+            f"valid={self.is_valid()})"
+        )
+
+if __name__ == "__main__":
+    # test
+    wf = WorkflowInfo("20250926_165556_9e2402c5", "./20250926_165556_9e2402c5")
+    print(wf.goal)
+    print(wf.state_result)
+    print(wf.answers)
