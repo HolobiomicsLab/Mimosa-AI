@@ -85,15 +85,15 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "based on software requirements in report.txt, locate and acquire all code/tools. clone available repositories to 'code/'. Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in the code and report the information in report.txt.",
+      "task": "read the report.txt, based on software requirements in report.txt, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in report.txt). Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in mgwas_repo/ and report the information in report.txt.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["report.txt"], 
-      "expected_outputs": ["code/"],
+      "expected_outputs": ["mgwas_repo/"],
       "complexity": "high"
     },
     {
       "name": "dataset_acquisition", 
-      "task": "Using dataset requirements from report.txt, download all required datasets, or copy dataset in code/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
+      "task": "Using dataset requirements from report.txt, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
       "depends_on": ["comprehensive_paper_analysis", "code_and_tools_acquisition"],
       "required_inputs": ["report.txt"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"], 
@@ -101,9 +101,9 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "experiment_execution",
-      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in code/ and install all requirements. Run experiments matching paper's exact conditions and parameters from report.txt. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/ and install all requirements. Run experiments matching paper's exact conditions and parameters from report.txt. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
       "depends_on": ["dataset_acquisition", "code_and_tools_acquisition"],
-      "required_inputs": ["datasets/", "code/", "report.txt"],
+      "required_inputs": ["datasets/", "mgwas_repo/", "report.txt"],
       "expected_outputs": ["results/"],
       "complexity": "high"
     },
@@ -124,5 +124,6 @@ Your response must be valid JSON following this exact schema:
 - Return ONLY valid JSON following the schema above
 - Every step must include all required fields
 - Failure modes must include concrete mitigation strategies
+- required_inputs should be very flexible and only list files or folder that are strictly required (90%+ chance of failure without the files)
 
 Generate plans that are simple with no uncessessary complexity added. Regroup highly related steps as one (setup up env and running code can be part of the same task).

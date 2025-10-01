@@ -26,7 +26,7 @@ The following components are pre-loaded in the execution environment. You must u
 | `WorkflowState`       | The `TypedDict` for graph state. You cannot modify its schema.           |
 | `SmolAgentFactory`    | Class to create agent instances. `SmolAgentFactory(name, prompt, tools)` |
 | `WorkflowNodeFactory` | Class to create graph nodes. `create_agent_node(agent_instance)`         |
-| `*_TOOLS`    | Pre-defined tool packages (e.g., `TOOLOMICS_BROWSER_TOOLS`, `FILESYSTEM_TOOLS`, etc..). |
+| `*_TOOLS`    | Pre-defined tool packages (e.g., `BROWSER_MCP`, `FILESYSTEM_MCP`, etc..). |
 
 ### Workflow State Schema
 ```python
@@ -39,12 +39,14 @@ class WorkflowState(TypedDict):
 
 ### Tools
 
-Domain specific tools package will be provided to you. For example:
+A list of tool package and their given tools will be specified, for example:
 
-The following tools packages are available for agents:
-`WEB_SEARCH_MCP`, `EXISTING_TOOLS_CHART`
+Tool `MCP_5098` is a collection of tools with the following capabilities: ['extract_code_from_html', 'list_html_files']
+Tool `MCP_WEB_BROWSER` is a collection of tools with the following capabilities: ['search', 'navigate']
 
-Assign exactly one tool package to each agent. Prefer creating additional specialized agents with distinct tool packages rather than assigning multiple tools to a single general-purpose agent.
+Assign a minimal number of tools package to each agent. Including one primary tools for the task along with a bash/shell tools. Prefer creating additional specialized agents with distinct tool packages rather than assigning multiple tools to a single general-purpose agent.
+
+Always give agent a bash/shell tool (the one with execute_command).
 
 ## 3. How to Build a Workflow
 
@@ -94,10 +96,10 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, TOOLOMICS_BROWSER_TOOLS)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, BROWSER_MCP)
 
 # Agent that writes and executes R code and has shell.
-agent_coder = SmolAgentFactory("coder", instruct_coder, TOOLOMICS_R_SCRIPT_TOOLS + TOOLOMICS_R_SCRIPT_SHELL)
+agent_coder = SmolAgentFactory("coder", instruct_coder, R_SCRIPT_MCP + SHELL_MCP)
 ```
 
 Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
@@ -225,7 +227,7 @@ You will receive research findings or data from previous agents that you need to
 """
 
 # 3. AGENT CREATION (Instantiate all agents here)
-agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP + SHELL_MCP)
 agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP + SHELL_MCP)
 
 # 4. NODE DEFINITION  (Add agents to the workflow here)

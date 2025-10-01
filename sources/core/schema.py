@@ -38,6 +38,7 @@ class GodelRun:
     eval_type: str | None = None
     answers: list[str] | None = None
     state_result: dict | None = None
+    plot: str | None = ""
 
     def __str__(self) -> str:
         return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
