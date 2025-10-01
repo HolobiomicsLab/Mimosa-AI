@@ -56,13 +56,14 @@ class Config:
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         # SmolAgent model configuration (Hugging Face model ID format)
-        self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3"
-        self.engine_name: str = "inference_client"
+        self.smolagent_model_id: str = "deepseek/deepseek-coder"
+        self.engine_name: str = "litellm"
         
         # DGM/Workflow generation model configuration 
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-20250514"  
+        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
+        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
         
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
@@ -146,6 +147,7 @@ class Config:
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "workflow_llm_model": self.workflow_llm_model,
+            "prompts_llm_model": self.prompts_llm_model,
             "reasoning_effort": self.reasoning_effort,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
@@ -171,6 +173,9 @@ class Config:
         )
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
+        )
+        self.prompts_llm_model = data.get(
+            "prompts_llm_model", self.prompts_llm_model
         )
         self.reasoning_effort = data.get("reasoning_effort", self.reasoning_effort)
         self.runner_default_python_version = data.get(
@@ -199,6 +204,7 @@ class Config:
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
             f"workflow_llm_provider={self.workflow_llm_provider},\n"
             f"workflow_llm_model={self.workflow_llm_model},\n"
+            f"prompts_llm_model={self.workflow_llm_model},\n"
             f"reasoning_effort={self.reasoning_effort},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"

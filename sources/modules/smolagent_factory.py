@@ -67,14 +67,15 @@ AVAILABLE INTERFACES
 Data Access: Use provided tool_name(param=value) functions exclusively
 File Operations: Tools handle all filesystem interactions
 External Requests: Tools manage network and process operations
-Path Resolution: Tools provide environment-appropriate paths
+Path Resolution: Tools provide environment-appropriate paths, only tools have access to workspace files.
 
 UNAVAILABLE INTERFACES
 Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
-pythonimport os          # ❌ Module not available
-import subprocess  # ❌ Module not available  
-open("file.txt")   # ❌ Function not available
-exec(code)         # ❌ Function not available
+pythonimport os          # Module not available
+import subprocess  # Module not available  
+open("file.txt")   # Function not available
+exec(code)         # Function not available
+pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
 
 ## 2. DATA INSPECTION AND VALIDATION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs
@@ -250,11 +251,11 @@ class SmolAgentFactory:
         else:
             min_length = min(len(step_names), len(state_answers))
             step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
-            recent_steps = step_pairs[-3:]
+            recent_steps = step_pairs[-5:]
 
             prev_infos = "Informations given by previous agents:\n"
             for step_name, answer in recent_steps:
-                truncated_answer = str(answer)[:1024] + "..." if len(str(answer)) > 500 else str(answer)
+                truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
         return f"""You are a highly skilled and goal-seeking agent who must pursue a goal.
