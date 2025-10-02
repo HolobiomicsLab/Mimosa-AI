@@ -185,30 +185,22 @@ class WorkflowOrchestrator:
 
     def __del__(self):
         """Cleanup resources on deletion - sync fallback."""
-        # Note: This is a fallback - proper cleanup should use async context manager
         try:
-            # Check if we're during Python shutdown
             import sys
 
             if sys.meta_path is None:
                 return
 
-            # Import at module level to avoid shutdown issues
             import asyncio
             from contextlib import suppress
 
-            # Only attempt cleanup if workflow_runner still exists
             if hasattr(self, "workflow_runner") and self.workflow_runner is not None:
-                # Try to get current event loop and schedule cleanup
                 with suppress(RuntimeError, AttributeError):
                     try:
                         loop = asyncio.get_running_loop()
                         if not loop.is_closed():
                             loop.create_task(self.workflow_runner.cleanup())
                     except RuntimeError:
-                        # No running loop, try to run cleanup synchronously if possible
-                        # This is a last resort and may not work for all cleanup operations
                         pass
         except Exception:
-            # Silently ignore cleanup errors during shutdown
             pass
