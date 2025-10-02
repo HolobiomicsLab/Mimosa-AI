@@ -60,22 +60,17 @@ ADDED_SYSTEM_PROMPT = """
 # CODE GENERATION CONSTRAINTS
 
 ## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
-You are operating in a controlled runtime where standard Python filesystem and process operations DO NOT EXIST. This is not a restriction—it's the architectural reality of your execution environment.
-
-AVAILABLE INTERFACES
-
-Data Access: Use provided tool_name(param=value) functions exclusively
-File Operations: Tools handle all filesystem interactions
-External Requests: Tools manage network and process operations
-Path Resolution: Tools provide environment-appropriate paths, only tools have access to workspace files.
+You are operating in a controlled runtime where standard Python filesystem is restricted. 
 
 UNAVAILABLE INTERFACES
 Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
-pythonimport os          # Module not available
+import os          # Module not available
 import subprocess  # Module not available  
 open("file.txt")   # Function not available
 exec(code)         # Function not available
 pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
+
+- **Rationale**: Encourage tools usage instead of using python build-in.
 
 ## 2. DATA INSPECTION AND VALIDATION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs
@@ -112,14 +107,33 @@ print(script_content[:500])
 #    "2. Performs some basic data preprocessing",
 #]
 
-**Rationale:** This approach ensures you do not hallucinate or make assumptions about the data or code you are processing.
+## 6. PATH BEHAVIOR
 
-## 6. Adaptability
+Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
 
-When files aren't found, explore repository structure using pattern matching and alternative naming conventions
+### Forbidden operation
 
-**Rationale:** Repositories rarely match assumptions. Expert problem-solving requires systematic exploration and strategic pivoting when initial approaches fail.
+# These will NOT access the workspace files:
+os.listdir(".")                    # Wrong context
+os.path.exists("/projects/file.txt")  # Wrong context
+pathlib.Path("data").glob("*.csv")    # Wrong context
+with open("file.txt") as f: ...       # File not found (even if tools see it)
 
+### Required pattern
+
+# ✅ CORRECT: Use bash tool for directory operations
+files = execute_command(command="ls -la /projects")
+file_exists = execute_command(command="test -f /projects/data.csv && echo 'exists' || echo 'missing'")
+
+# ✅ CORRECT: Use file tools for content access
+content = read_file(path="/projects/config.json")
+write_file(path="/projects/output.txt", content=data)
+
+# ❌ WRONG: Direct Python filesystem access
+import os
+files = os.listdir("/projects")  # Will list YOUR context, not the workspace
+
+ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
 
 ## 7. FINAL ANSWER FORMAT
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
@@ -187,7 +201,9 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
-                additional_authorized_imports=["*"]
+                additional_authorized_imports=["*"],
+                max_print_outputs_length=32000
+
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
         except Exception as e:
@@ -262,6 +278,16 @@ class SmolAgentFactory:
     {prev_infos}
     Your goal is:
     {self.instruct_prompt}
+    Critical: Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
+    # ✅ CORRECT: Use bash tool for directory operations
+    files = execute_command(command="ls -la /projects")
+    file_exists = execute_command(command="test -f /projects/data.csv && echo 'exists' || echo 'missing'")
+    # ✅ CORRECT: Use file tools for content access
+    content = read_file(path="/projects/config.json")
+    write_file(path="/projects/output.txt", content=data)
+    # ❌ WRONG: Direct Python filesystem access
+    import os # forbidden
+    files = os.listdir("/projects")  # Will list YOUR context, not the workspace
     """
 
     def parse_memory_output(self):

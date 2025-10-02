@@ -365,7 +365,7 @@ class GodelMachine:
             assertion_plot_data=assertion_plot_data,
         )
         
-        self._save_final_plots(assertion_plot_data, assertion_history, uuid)
+        runs[-1].plot = self._save_final_plots(assertion_plot_data, assertion_history, uuid)
         return runs
 
     def _get_human_validation(self) -> bool:
@@ -524,9 +524,11 @@ class GodelMachine:
             title=f"Workflow {uuid} completed.",
         )
 
-    def _save_final_plots(self, assertion_plot_data: tuple, assertion_history: list, uuid: str):
+    def _save_final_plots(self, assertion_plot_data: tuple, assertion_history: list, uuid: str) -> str:
         """Save final assertion plots."""
         if assertion_plot_data and assertion_history:
             plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
             self.viz_utils.save_plot(assertion_plot_data, plot_filename)
             print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
+            return plot_filename
+        return ""

@@ -1,9 +1,12 @@
 import json
+import os
+from pathlib import Path
 from .dgm import GodelMachine
 from .llm_provider import LLMProvider, LLMConfig
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
+from sources.utils.transfer_toolomics import Transfer
 
 
 class PlanValidationError(Exception):
@@ -27,13 +30,15 @@ class Planner:
             raise ValueError("❌ Planner: Configuration cannot be None")
         
         self.config = config
+        self.workspace_path = config.workspace_dir
         self.dgm = GodelMachine(config)
         self.task_history: list[Task] = []
         self.current_plan: Plan | None = None
         self.available_outputs: set[str] = set()  # Track all available outputs
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.config_llm = LLMConfig.from_dict({"model": "gpt-4o"})
+        self.config_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+        self._workspace_files_before_step: set[str] = set()  # Track files before step execution
 
     def make_plan(self, system_prompt: str, goal_prompt: str) -> Plan:
         """
@@ -220,59 +225,61 @@ class Planner:
         print("\n" + "=" * 80)
 
 
-    def _extract_produced_outputs(self, dgm_runs: list[GodelRun]) -> list[str]:
+    def _get_workspace_files(self) -> set[str]:
         """
-        Extract produced outputs from DGM run answers with comprehensive safety checks.
-        Args:
-            dgm_runs: List of DGM runs
+        Get all files in the workspace directory recursively.
         Returns:
-            List[str]: List of produced output filenames
+            set[str]: Set of relative file paths from workspace root
         """
-        if not dgm_runs or not isinstance(dgm_runs, list):
-            return []
-        
-        last_run = dgm_runs[-1]
-        if last_run is None:
-            return []
-        
-        answers = last_run.answers
-        if not answers or not isinstance(answers, list):
-            return []
-        
-        last_answer = answers[-1] or ""
-        
-        if not last_answer:
-            return []
-        
-        produced_outputs = []
+        files = set()
         try:
-            import re
-            # Pattern for files with extensions
-            file_patterns = [
-                r'\b[\w\-_]+\.[a-zA-Z0-9]{1,5}\b',  # filename.ext
-                r'\b[\w\-_]+/[\w\-_\.]+\b',         # directory/filename
-                r'\.\/[\w\-_\/\.]+\b',              # ./path/filename
-            ]
-            for pattern in file_patterns:
-                try:
-                    matches = re.findall(pattern, last_answer)
-                    if matches:
-                        produced_outputs.extend(matches)
-                except Exception as e:
-                    print(f"⚠️ Error in regex pattern {pattern}: {str(e)}")
-                    continue
+            workspace_path = Path(self.workspace_path)
+            if not workspace_path.exists():
+                print(f"⚠️ Workspace path does not exist: {self.workspace_path}")
+                return files
+            
+            for root, dirs, filenames in os.walk(workspace_path):
+                # Skip hidden directories and common ignore patterns
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.git']]
+                
+                for filename in filenames:
+                    if not filename.startswith('.'):  # Skip hidden files
+                        file_path = Path(root) / filename
+                        try:
+                            # Get relative path from workspace root
+                            relative_path = file_path.relative_to(workspace_path)
+                            files.add(str(relative_path))
+                        except ValueError:
+                            # File is outside workspace, skip
+                            continue
         except Exception as e:
-            print(f"⚠️ Error importing re module or processing patterns: {str(e)}")
-            return []
+            print(f"⚠️ Error scanning workspace files: {str(e)}")
         
-        seen = set()
-        unique_outputs = []
-        for output in produced_outputs:
-            if output and isinstance(output, str) and output not in seen:
-                seen.add(output)
-                unique_outputs.append(output)
+        return files
+
+    def _capture_workspace_snapshot(self) -> None:
+        """
+        Capture a snapshot of current workspace files before step execution.
+        """
+        self._workspace_files_before_step = self._get_workspace_files()
+        print(f"📸 Captured workspace snapshot: {len(self._workspace_files_before_step)} files")
+
+    def _track_produced_outputs(self) -> list[str]:
+        """
+        Track new files produced during step execution by comparing with previous snapshot.
+        Returns:
+            list[str]: List of newly created file paths (relative to workspace)
+        """
+        current_files = self._get_workspace_files()
+        new_files = current_files - self._workspace_files_before_step
         
-        return unique_outputs
+        produced_outputs = sorted(list(new_files))
+        if produced_outputs:
+            print(f"📄 Detected {len(produced_outputs)} new files: {produced_outputs}")
+        else:
+            print("ℹ️ No new files detected in workspace")
+        
+        return produced_outputs
 
     def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
@@ -445,13 +452,16 @@ class Planner:
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             
             try:
+                # Capture workspace state before execution
+                self._capture_workspace_snapshot()
+                
                 enhanced_task = self._build_knowledge_aware_task(step_task)
                 dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
                 
                 last_run = dgm_runs[-1]
                 
-                produced_outputs = self._extract_produced_outputs(dgm_runs)
-                print(produced_outputs)
+                # Track new files produced during execution
+                produced_outputs = self._track_produced_outputs()
                 
                 # Safely extract data from last run
                 final_answers = []
@@ -575,7 +585,9 @@ class Planner:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
                         error_msg = f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}"
-                        self.request_user_exit(error_msg)
+                        print(error_msg)
+                        print("proceeding anyways...(request exit commented out)")
+                        #self.request_user_exit(error_msg)
                         continue
                 
                 # Check required inputs
@@ -600,6 +612,8 @@ class Planner:
                     raise Exception(f"❌ Giving up on task '{step_name}' after {max_attempts} attempts")
             
             print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks.")
+            trs = Transfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
+            trs.transfer_workspace_files_to_capsule(goal)
             return self.task_history
             
         except Exception as e:
