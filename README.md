@@ -1,79 +1,17 @@
 
 # Mimosa-AI 🔬🤖
 
-**An automated AI scientist framework for reproducing scientific findings & making discoveries.**
+**An open framework for autonomous AI-driven science**
 
-## Core Architecture
+Mimosa is an automated AI scientist framework designed to reproduce scientific findings and enable autonomous research.
+Its mission is to provide a modular and open alternative to big tech initiatives, empowering academic researchers with next-generation AI tools for scientific discovery.
 
-Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+**Objectives**
 
-### Design Philosophy
+- **Reproduce scientific research** with reliability and transparency
 
-The system operates on an "agent-within-agent" pattern:
-- Goals decompose into learnable tasks
-- Each task triggers the synthesis of a specialized multi-agent workflow
-- Successful workflow patterns are retained and refined over time
-- The system continuously optimizes its own architecture through execution feedback
+- **Enable autonomous research** by generating new hypotheses and insights
 
-## Task vs Goal philosophy
-
-**Goal**: A high-level scientific objective requiring multiple distinct capabilities
-- Example: "Develop a machine learning model to predict protein-ligand binding affinity" or "Try to reproduce the research paper X and compare the experimental results".
-
-**Task**: A granular, repeatable operation frequently encountered across different goals
-- Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
-
-## System Architecture
-
-### Layer 0: Strategic Planning
-- Decomposes goals into executable task sequences
-- Maintains adaptive execution roadmap
-- Adjusts plans based on Layer 2 workflow performance
-
-### Layer 1: Meta-Orchestration
-- **Dynamic Workflow Synthesis**: Advanced LLMs (e.g., claude-3.7) generate task-specific multi-agent architectures
-- **Architecture Search**: Designs custom agent topologies rather than applying generic pipelines
-- **Pattern Recognition**: Identifies structural similarities across tasks to better workflow generation over time
-
-### Layer 2: Workflow Execution (LangGraph)
-- Implements workflows as directed graphs with heterogeneous nodes:
-  - **SmolAgent Nodes**: Autonomous code-generating agents for complex reasoning
-  - **Deterministic Nodes**: Validation, transformation, and control logic
-- **Graph Flexibility**: Supports arbitrary agent topologies (sequential, conditional, cyclical)
-- **State Management**: Maintains workflow context across distributed execution
-
-### Layer 3: Agent Runtime (SmolAgent)
-- Code-generating agents operating in action-observation loops
-- **Tool-as-Code Paradigm**: Agents generate Python to interact with tools
-- **Iterative Refinement**: Continues execution until success criteria met or failure threshold reached
-
-### Layer 4: Tool Ecosystem (MCP)
-- Extensible tool primitives built on Model Context Protocol
-- **Distributed Execution**: Tools run on HPC clusters, lab instruments, cloud infrastructure
-- **Protocol Standardization**: MCP enables seamless client-server tool interaction
-- **Horizontal Scalability**: Add new tools without modifying core system
-
-## (Experimental) Self-Improvement on task
-
-The system implements a **Darwinian workflow evolution** inspired by Gödel machine principles:
-
-1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
-   - "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
-
-2. **Task Recognition** (Layer 1): For each task, the system:
-   - Searches its workflow library for similar historical tasks
-   - If found: Uses best-performing workflow as **template**, adapting for current context
-   - If novel: Synthesizes new workflow from scratch orchestrator
-
-3. **Evolutionary Optimization**: Over time, the system:
-   - Maintains multiple workflow variants per task type
-   - Selects high-performing workflows based on success metrics (speed, accuracy, cost)
-   - Mutates/recombines successful patterns to explore architecture space
-
-4. **Self-Improvement Mechanism**:
-   - The system can propose modifications to its own workflow generation logic
-   - Performance improvements are validated before integration (Gödel machine principle)
-   - Meta-learning: Learns how to generate better workflows from execution history
 ---
 
 
@@ -175,6 +113,78 @@ Evaluation of workflow generation: evaluation on GSMK8.
 ```
 
 > **Note**: Requires Toolomics to be installed and MCP servers to be running.
+
+## 🧠 Core Architecture
+
+Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+
+### Design Philosophy
+
+The system operates on an "agent-within-agent" pattern:
+- Goals decompose into learnable tasks
+- Each task triggers the synthesis of a specialized multi-agent workflow
+- Successful workflow patterns are retained and refined over time
+- The system continuously optimizes its own architecture through execution feedback
+
+## Task vs Goal philosophy
+
+**Goal**: A high-level scientific objective requiring multiple distinct capabilities
+- Example: "Develop a machine learning model to predict protein-ligand binding affinity" or "Try to reproduce the research paper X and compare the experimental results".
+
+**Task**: A granular, repeatable operation frequently encountered across different goals
+- Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
+
+## System Architecture
+
+### Layer 0: Strategic Planning
+- Decomposes goals into executable task sequences
+- Maintains adaptive execution roadmap
+- Adjusts plans based on Layer 2 workflow performance
+
+### Layer 1: Meta-Orchestration
+- **Dynamic Workflow Synthesis**: Advanced LLMs (e.g., claude-3.7) generate task-specific multi-agent architectures
+- **Architecture Search**: Designs custom agent topologies rather than applying generic pipelines
+- **Pattern Recognition**: Identifies structural similarities across tasks to better workflow generation over time
+
+### Layer 2: Workflow Execution (LangGraph)
+- Implements workflows as directed graphs with heterogeneous nodes:
+  - **SmolAgent Nodes**: Autonomous code-generating agents for complex reasoning
+  - **Deterministic Nodes**: Validation, transformation, and control logic
+- **Graph Flexibility**: Supports arbitrary agent topologies (sequential, conditional, cyclical)
+- **State Management**: Maintains workflow context across distributed execution
+
+### Layer 3: Agent Runtime (SmolAgent)
+- Code-generating agents operating in action-observation loops
+- **Tool-as-Code Paradigm**: Agents generate Python to interact with tools
+- **Iterative Refinement**: Continues execution until success criteria met or failure threshold reached
+
+### Layer 4: Tool Ecosystem (MCP)
+- Extensible tool primitives built on Model Context Protocol
+- **Distributed Execution**: Tools run on HPC clusters, lab instruments, cloud infrastructure
+- **Protocol Standardization**: MCP enables seamless client-server tool interaction
+- **Horizontal Scalability**: Add new tools without modifying core system
+
+## (Experimental) Self-Improvement on task
+
+The system implements a **Darwinian workflow evolution** inspired by Gödel machine principles:
+
+1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
+   - "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
+
+2. **Task Recognition** (Layer 1): For each task, the system:
+   - Searches its workflow library for similar historical tasks
+   - If found: Uses best-performing workflow as **template**, adapting for current context
+   - If novel: Synthesizes new workflow from scratch orchestrator
+
+3. **Evolutionary Optimization**: Over time, the system:
+   - Maintains multiple workflow variants per task type
+   - Selects high-performing workflows based on success metrics (speed, accuracy, cost)
+   - Mutates/recombines successful patterns to explore architecture space
+
+4. **Self-Improvement Mechanism**:
+   - The system can propose modifications to its own workflow generation logic
+   - Performance improvements are validated before integration (Gödel machine principle)
+   - Meta-learning: Learns how to generate better workflows from execution history
 
 ## 📈 Telemetry Setup
 

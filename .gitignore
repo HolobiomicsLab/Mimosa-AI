@@ -10,6 +10,8 @@ cookies.json
 .env.*
 */.env
 workflows/*
+runs_capsule/*
+runs_notes/*
 parallel_testing_results/
 cached_server/cache/*
 sources/cache/*
