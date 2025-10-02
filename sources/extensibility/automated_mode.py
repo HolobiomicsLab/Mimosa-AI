@@ -103,8 +103,9 @@ Provide a structured analysis with:
         }
         
         notes_file = self.run_notes_dir / f"run_{iteration:03d}.json"
-        with open(notes_file, 'w') as f:
-            json.dump(notes, f, indent=2)
+        notes_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(notes_file, 'w', encoding='utf-8') as f:
+            json.dump(notes, f, indent=2, ensure_ascii=False)
         
         self.logger.info(f"[AUTOMATED MODE] Run notes saved to {notes_file}")
 
