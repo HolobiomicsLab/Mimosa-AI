@@ -85,7 +85,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "read the reproduction_mgwas.txt, based on software requirements in reproduction_mgwas.txt, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.txt). Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in mgwas_repo/ and report the information in reproduction_mgwas.txt.",
+      "task": "read the reproduction_mgwas.txt, based on software requirements in reproduction_mgwas.txt, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.txt). Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in mgwas_repo/ or information on how to get dataset in the readme.md and report the information in reproduction_mgwas.txt.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["reproduction_mgwas.txt"], 
       "expected_outputs": ["mgwas_repo/"],
@@ -93,7 +93,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "dataset_acquisition", 
-      "task": "Using dataset requirements from reproduction_mgwas.txt, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
+      "task": "Using dataset informations from reproduction_mgwas.txt, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
       "depends_on": ["comprehensive_paper_analysis", "code_and_tools_acquisition"],
       "required_inputs": ["reproduction_mgwas.txt"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"], 

@@ -125,10 +125,6 @@ with open("file.txt") as f: ...       # File not found (even if tools see it)
 files = execute_command(command="ls -la /projects")
 file_exists = execute_command(command="test -f /projects/data.csv && echo 'exists' || echo 'missing'")
 
-# ✅ CORRECT: Use file tools for content access
-content = read_file(path="/projects/config.json")
-write_file(path="/projects/output.txt", content=data)
-
 # ❌ WRONG: Direct Python filesystem access
 import os
 files = os.listdir("/projects")  # Will list YOUR context, not the workspace
@@ -182,7 +178,7 @@ class SmolAgentFactory:
         # additional engine parameters
         self.engine = None
         self.provider = "auto"
-        self.max_tokens = 1024
+        self.max_tokens = 16000
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
@@ -202,7 +198,6 @@ class SmolAgentFactory:
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
                 additional_authorized_imports=["*"],
-                max_print_outputs_length=32000
 
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)

@@ -17,7 +17,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.automated_mode import AutomatedMode
@@ -94,21 +93,6 @@ async def manual_mode(args, config):
     hm = HumanMode(config)
     await hm.shellLoop()
 
-async def multigoal_mode(args, config):
-    if getattr(args, 'multi_goal', False):
-        goals = collect_goals_from_user()
-        if not goals:
-            print("❌ No goals provided for multi-goal. Exiting.")
-            return
-        parallel_testing = ParallelTesting(config)
-        parallel_testing.start_parallel_testing(
-            goals=goals,
-            template_uuid=args.load_template,
-            judge=args.judge,
-            human_validation=False,
-            max_workers=getattr(args, 'max_concurrent', None)
-        )
-
 async def dataset_execution_mode(args, config):
     planner = Planner(config)
     print(f"Using {args.dataset} dataset")
@@ -160,7 +144,7 @@ async def normal_execution_mode(args, config):
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
     else:
-        raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
+        raise ValueError("No goal provided. Use --task, --goal to start.")
 
 async def main():
     """Main execution function"""
@@ -175,9 +159,6 @@ async def main():
     )
     parser.add_argument(
         "--task",  type=str, help="Single task mode (no planner)"
-    )
-    parser.add_argument(
-        "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
@@ -229,8 +210,6 @@ async def main():
     try:
         if (args.dataset):
             await dataset_execution_mode(args, config)
-        elif (args.multi_goal):
-            await multigoal_mode(args, config)
         elif (args.manual):
             await manual_mode(args, config)
         elif (args.automated):
@@ -238,7 +217,7 @@ async def main():
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --task, --goal, --automated, or --multi_goal to start.")
+            raise ValueError("No goal provided. Use --task, --goal, --automated  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:
