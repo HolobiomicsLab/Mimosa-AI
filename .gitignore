@@ -17,6 +17,7 @@ cached_server/cache/*
 sources/cache/*
 cached_server/config.yaml
 sources/tmp/*
+memory/*
 sources/memory/*
 sources/workflows/
 mimosa-env/*
