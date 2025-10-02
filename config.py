@@ -59,11 +59,11 @@ class Config:
         self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
         # SmolAgent model configuration (Hugging Face model ID format)
-        self.smolagent_model_id: str = "deepseek/deepseek-coder"
-        self.engine_name: str = "litellm"
+        self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3.2-Exp"
+        self.engine_name: str = "inference_client"
         
         # DGM/Workflow generation model configuration 
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v6.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
         self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-latest"

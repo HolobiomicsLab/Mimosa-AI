@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import time
 from pathlib import Path
 from .dgm import GodelMachine
 from .llm_provider import LLMProvider, LLMConfig
@@ -34,48 +36,73 @@ class Planner:
         self.dgm = GodelMachine(config)
         self.task_history: list[Task] = []
         self.current_plan: Plan | None = None
-        self.available_outputs: set[str] = set()  # Track all available outputs
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         self.config_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
 
-    def make_plan(self, system_prompt: str, goal_prompt: str) -> Plan:
+    def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
-        Generate a workflow plan using the LLM.
+        Generate a workflow plan using the LLM with retry logic and multiple parsing strategies.
         Args:
             system_prompt: The system prompt for plan generation
             goal_prompt: The goal description
+            max_retries: Maximum number of retry attempts (default: 3)
         Returns:
             Plan: Validated plan object
         Raises:
-            ValueError: If plan generation or validation fails
+            ValueError: If plan generation or validation fails after all retries
         """
         if not system_prompt or not isinstance(system_prompt, str):
             raise ValueError("❌ Planner: system_prompt must be a non-empty string")
         if not goal_prompt or not isinstance(goal_prompt, str):
             raise ValueError("❌ Planner: goal_prompt must be a non-empty string")
         
-        try:
-            memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-            raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
-        except Exception as e:
-            raise ValueError(f"❌ Planner: Failed to generate plan from LLM: {str(e)}") from e
+        last_error = None
         
-        if not raw_plan or not isinstance(raw_plan, str):
-            raise ValueError("❌ Planner: LLM returned empty or invalid response")
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
+                
+                memory_path = getattr(self.config, 'memory_path', 'sources/memory')
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
+                
+                if not raw_plan or not isinstance(raw_plan, str):
+                    raise ValueError("LLM returned empty or invalid response")
+                
+                print(f"📝 Received plan response ({len(raw_plan)} characters)")
+                plan_dict = self._extract_json_from_code_block(raw_plan)
+                if plan_dict is None:
+                    raise ValueError("Failed to extract valid JSON from LLM response")
+                plan = self._parse_and_validate_plan(plan_dict)
+                print(f"✅ Successfully generated and validated plan with {len(plan.steps)} steps")
+                return plan
+                
+            except (ValueError, PlanValidationError, json.JSONDecodeError) as e:
+                last_error = e
+                error_msg = str(e)
+                print(f"⚠️ Attempt {attempt} failed: {error_msg}")
+                
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt
+                    print(f"⏳ Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    
+                    if attempt > 1:
+                        goal_prompt = self._enhance_prompt_with_error(goal_prompt, error_msg)
+                else:
+                    print(f"❌ All {max_retries} attempts failed")
+            
+            except Exception as e:
+                last_error = e
+                print(f"❌ Unexpected error in attempt {attempt}: {str(e)}")
+                if attempt >= max_retries:
+                    break
+                time.sleep(2 ** attempt)
         
-        extracted_json = self._extract_json_code(raw_plan)
-        if not extracted_json:
-            print(f"Raw plan output:\n{raw_plan}")
-            raise ValueError("❌ Planner: Failed to generate a plan from the LLM.")
-        
-        try:
-            plan_dict = json.loads(extracted_json)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"❌ Planner: Invalid JSON: {str(e)}") from e
-        
-        return self._parse_and_validate_plan(plan_dict)
+        # All retries exhausted
+        error_details = f"Failed after {max_retries} attempts. Last error: {str(last_error)}"
+        raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
     def _parse_and_validate_plan(self, plan_dict: dict) -> Plan:
         """
@@ -123,28 +150,50 @@ class Planner:
         return plan
 
     @staticmethod
-    def _extract_json_code(code: str) -> str:
-        """
-        Extract JSON code blocks from text.
-        Args:
-            code: Text potentially containing JSON code blocks
-        Returns:
-            str: Extracted JSON code
-        """
+    def _extract_json_from_code_block(text: str) -> dict | None:
+        """Extract JSON from markdown code blocks (```json ... ```)"""
         code_blocks = []
         in_code_block = False
         
-        for line in code.splitlines():
-            if line.strip().startswith("```json"):
+        for line in text.splitlines():
+            line_stripped = line.strip()
+            if line_stripped.startswith("```json") or line_stripped.startswith("```JSON"):
                 in_code_block = True
                 continue
-            if line.strip().startswith("```") and in_code_block:
+            if line_stripped.startswith("```") and in_code_block:
                 in_code_block = False
                 continue
             if in_code_block:
                 code_blocks.append(line)
         
-        return "\n".join(code_blocks)
+        if code_blocks:
+            json_str = "\n".join(code_blocks)
+            return json.loads(json_str)
+        return None
+    
+    @staticmethod
+    def _enhance_prompt_with_error(original_prompt: str, error_msg: str) -> str:
+        """
+        Enhance the prompt with error context for retry attempts.
+        Args:
+            original_prompt: Original goal prompt
+            error_msg: Error message from previous attempt
+        Returns:
+            str: Enhanced prompt
+        """
+        enhancement = f"""
+IMPORTANT: Previous attempt failed with error: {error_msg}
+
+Please ensure your response:
+1. Contains ONLY valid JSON (no additional text)
+2. Uses proper JSON syntax with correct quotes and commas
+3. Includes all required fields: "goal" and "steps"
+4. Each step has: "name", "task", "depends_on", "required_inputs", "expected_outputs", "complexity"
+
+Original request:
+{original_prompt}
+"""
+        return enhancement
 
     def _read_prompt(self) -> str:
         """
@@ -190,15 +239,6 @@ class Planner:
         ])
 
     def _check_stop_condition(self, plan: Plan) -> bool:
-        """
-        Check if the plan contains a 'stop' step.
-        
-        Args:
-            plan: The plan to check
-            
-        Returns:
-            bool: True if stop condition is found
-        """
         for step in plan.steps:
             if step.task.lower().strip() == "stop" or step.name.lower().strip() == "stop":
                 return True
@@ -207,7 +247,6 @@ class Planner:
     def _display_plan(self, plan: Plan) -> None:
         """
         Display the plan steps in a readable format.
-        
         Args:
             plan: The plan to display
         """
@@ -239,18 +278,15 @@ class Planner:
                 return files
             
             for root, dirs, filenames in os.walk(workspace_path):
-                # Skip hidden directories and common ignore patterns
                 dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.git']]
                 
                 for filename in filenames:
-                    if not filename.startswith('.'):  # Skip hidden files
+                    if not filename.startswith('.'):
                         file_path = Path(root) / filename
                         try:
-                            # Get relative path from workspace root
                             relative_path = file_path.relative_to(workspace_path)
                             files.add(str(relative_path))
                         except ValueError:
-                            # File is outside workspace, skip
                             continue
         except Exception as e:
             print(f"⚠️ Error scanning workspace files: {str(e)}")
@@ -264,23 +300,6 @@ class Planner:
         self._workspace_files_before_step = self._get_workspace_files()
         print(f"📸 Captured workspace snapshot: {len(self._workspace_files_before_step)} files")
 
-    def _track_produced_outputs(self) -> list[str]:
-        """
-        Track new files produced during step execution by comparing with previous snapshot.
-        Returns:
-            list[str]: List of newly created file paths (relative to workspace)
-        """
-        current_files = self._get_workspace_files()
-        new_files = current_files - self._workspace_files_before_step
-        
-        produced_outputs = sorted(list(new_files))
-        if produced_outputs:
-            print(f"📄 Detected {len(produced_outputs)} new files: {produced_outputs}")
-        else:
-            print("ℹ️ No new files detected in workspace")
-        
-        return produced_outputs
-
     def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
         Verify that all required inputs for a step are available.
@@ -292,9 +311,8 @@ class Planner:
         missing_inputs = []
         
         for required_input in step.required_inputs:
-            if required_input not in self.available_outputs:
+            if required_input not in self._workspace_files_before_step:
                 missing_inputs.append(required_input)
-        
         return len(missing_inputs) == 0, missing_inputs
 
     def _verify_expected_outputs(self, step: PlanStep, produced_outputs: list[str]) -> tuple[bool, list[str]]:
@@ -326,12 +344,9 @@ class Planner:
         missing_deps = []
         
         for dep_name in step.depends_on:
-            # Find the dependency task in history
             dep_task = next((task for task in self.task_history if task.name == dep_name), None)
-            
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
                 missing_deps.append(dep_name)
-        
         return len(missing_deps) == 0, missing_deps
     
     def request_user_exit(self, msg: str) -> None:
@@ -367,7 +382,7 @@ class Planner:
         try:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.9, threshod_score=0.7 # TODO change values
+                task, threshold_similary=0.7, threshod_score=0.0 # TODO change values
             ) if cached_wf_allow else []
             
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -460,9 +475,6 @@ class Planner:
                 
                 last_run = dgm_runs[-1]
                 
-                # Track new files produced during execution
-                produced_outputs = self._track_produced_outputs()
-                
                 # Safely extract data from last run
                 final_answers = []
                 final_uuid = None
@@ -487,25 +499,18 @@ class Planner:
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
                     complexity=getattr(step, 'complexity', 'medium'),
-                    produced_outputs=produced_outputs,
+                    produced_outputs=self._workspace_files_before_step,
                     missing_inputs=missing_inputs or []
                 )
                 
                 self.task_history.append(task)
                 
                 if dgm_success:
-                    outputs_produced, missing_outputs = self._verify_expected_outputs(step, produced_outputs)
+                    outputs_produced, missing_outputs = self._verify_expected_outputs(step, self._workspace_files_before_step)
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
-                        print(f"📄 Produced outputs: {produced_outputs}")
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        print(f"📄 Actual outputs: {produced_outputs}")
-                    
-                    # Safely update available outputs
-                    if produced_outputs and isinstance(produced_outputs, list):
-                        self.available_outputs.update(produced_outputs)
-                    
                     step.status = TaskStatus.COMPLETED
                     break
                 else:
@@ -515,10 +520,6 @@ class Planner:
                     
             except Exception as e:
                 raise e
-                error_msg = f"Error executing task '{step_name}': {str(e)}, Retry task ? (already tried {attempt} time)"
-                self.request_user_exit(error_msg)
-                if attempt < max_attempts:
-                    print("🔄 Retrying...")
         
         return step
 
