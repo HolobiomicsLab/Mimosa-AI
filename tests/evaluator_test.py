@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.core.evaluator import WorkflowEvaluator
+from sources.post_processing.evaluator import WorkflowEvaluator
 
 load_dotenv()
 

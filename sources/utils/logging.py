@@ -53,7 +53,7 @@ def setup_logging(debug=False):
         'sources.core.orchestrator', 
         'sources.core.workflow_factory',
         'sources.core.workflow_runner',
-        'sources.core.evaluator'
+        'sources.post_processing.evaluator'
     ]
     
     for logger_name in workflow_loggers:
