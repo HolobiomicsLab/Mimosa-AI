@@ -100,8 +100,15 @@ class Planner:
                     break
                 time.sleep(2 ** attempt)
         
-        # All retries exhausted
+        # All retries exhausted - send notification
         error_details = f"Failed after {max_retries} attempts. Last error: {str(last_error)}"
+        self.notifier.send_message(
+            f"Plan generation failed after {max_retries} attempts\n"
+            f"Goal: {goal_prompt[:128]}...\n"
+            f"Error: {str(last_error)[:256]}",
+            title="Plan generation failed",
+            priority=1
+        )
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
     def _parse_and_validate_plan(self, plan_dict: dict) -> Plan:
@@ -467,7 +474,6 @@ Original request:
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             
             try:
-                # Capture workspace state before execution
                 self._capture_workspace_snapshot()
                 
                 enhanced_task = self._build_knowledge_aware_task(step_task)
@@ -475,7 +481,6 @@ Original request:
                 
                 last_run = dgm_runs[-1]
                 
-                # Safely extract data from last run
                 final_answers = []
                 final_uuid = None
                 workflow_uuid = None
@@ -486,7 +491,6 @@ Original request:
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
                 
                 dgm_success = self._get_dgm_success(last_run)
-                print("❌ Workflow execution considered as failed. Retrying task..." if not dgm_success else "\n")
                 task = Task(
                     name=step_name,
                     description=step_task,
@@ -509,10 +513,9 @@ Original request:
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step, self._workspace_files_before_step)
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
+                        break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                    step.status = TaskStatus.COMPLETED
-                    break
                 else:
                     print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
                     if attempt < max_attempts:
@@ -521,6 +524,7 @@ Original request:
             except Exception as e:
                 raise e
         
+        step.status = TaskStatus.COMPLETED
         return step
 
     async def start_planner(
@@ -610,9 +614,27 @@ Original request:
                 
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED
+                    # Send notification for task failure
+                    self.notifier.send_message(
+                        f"Task '{step_name}' failed after {max_attempts} attempts\n"
+                        f"Goal: {goal[:128]}...\n"
+                        f"Step: {step_idx + 1}/{len(self.current_plan.steps)}",
+                        title=f"Task '{step_name}' failed",
+                        priority=1
+                    )
                     raise Exception(f"❌ Giving up on task '{step_name}' after {max_attempts} attempts")
             
             print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks.")
+            
+            # Send success notification
+            completed_tasks = sum(1 for t in self.task_history if t.status == TaskStatus.COMPLETED)
+            self.notifier.send_message(
+                f"Planner completed successfully!\n"
+                f"Goal: {goal[:128]}...\n"
+                f"Completed: {completed_tasks}/{len(self.task_history)} tasks",
+                title="Planner execution completed",
+                priority=0
+            )
             trs = Transfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
             trs.transfer_workspace_files_to_capsule(goal)
             return self.task_history

@@ -5,6 +5,7 @@ This class orchestrates the execution of workflows in a sandboxed environment.
 import logging
 import time
 
+from sources.utils.notify import PushNotifier
 from .workflow_factory import WorkflowFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
@@ -25,6 +26,7 @@ class WorkflowOrchestrator:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.workflow_factory = WorkflowFactory(config)
+        self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
 
         self.runner_config = RuntimeConfig(
             python_version=self.config.runner_default_python_version,
@@ -101,9 +103,27 @@ class WorkflowOrchestrator:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
                 logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
+                
+                # Send notification for workflow generation error
+                self.notifier.send_message(
+                    f"Workflow {workflow_uuid} generation failed after {generation_time:.1f}s\n"
+                    f"Goal: {goal[:128]}...\n"
+                    f"Error: {actual_error[:256]}",
+                    title=f"Workflow generation failed",
+                    priority=1
+                )
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
                 logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
+                
+                # Send notification for workflow generation error
+                self.notifier.send_message(
+                    f"Workflow generation failed after {generation_time:.1f}s\n"
+                    f"Goal: {goal[:128]}...\n"
+                    f"Error: {error_msg[:256]}",
+                    title=f"Workflow generation failed",
+                    priority=1
+                )
                 return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
         
         generation_time = time.time() - generation_start
@@ -146,6 +166,15 @@ class WorkflowOrchestrator:
             import traceback
 
             traceback.print_exc()
+            
+            # Send notification for workflow execution failure
+            self.notifier.send_message(
+                f"Workflow {uuid} execution failed after {workflow_time:.1f}s\n"
+                f"Goal: {goal[:128]}...\n"
+                f"Error: {str(e)[:256]}",
+                title=f"Workflow {uuid} execution failed",
+                priority=1
+            )
             return str(e), uuid, workflow_code, False
         finally:
             print("\nCleaning up sandbox...")
