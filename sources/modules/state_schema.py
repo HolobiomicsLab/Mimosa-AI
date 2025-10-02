@@ -102,3 +102,28 @@ class WorkflowState(TypedDict):
     observations: List[Observation]
     answers: List[str]
     success: List[bool]
+
+def master_router(state: WorkflowState) -> str:
+    raw_answer = state["answers"][-1]
+    try:
+        last_answer = Answer.validate(raw_answer)
+    except Exception as e:
+        print(f"❌ Failed to validate answer format of\n: {raw_answer}\n")
+        last_answer = Answer.from_raw(raw_answer)
+
+    current_agent = state["step_name"][-1]
+
+    if "SUCCESS" in last_answer.status:
+        print(f"✅ Success from '{current_agent}'. Proceeding.")
+        return "next_node"
+    elif "FALLBACK" in last_answer.status:
+         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
+         return "fallback_node"
+    elif "RETRY" in last_answer.status:
+        return "retry_node"
+    elif "FAILURE" in last_answer.status:
+        print(f"❌ Failure from '{current_agent}'. Aborting.")
+        return END
+    else :
+        print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FALLBACK/FAILURE. Terminating.")
+        return END

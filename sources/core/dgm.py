@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from sources.core.evaluator import WorkflowEvaluator
+from sources.post_processing.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.shared_visualization import SharedVisualizationData
@@ -334,6 +334,19 @@ class GodelMachine:
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success:
             self._save_final_plots(assertion_plot_data, assertion_history, uuid)
+            
+            # Send success notification when all iterations complete
+            if all_success:
+                self.notifier.send_message(
+                    f"DGM completed successfully!\n"
+                    f"Goal: {runs[-1].goal[:128]}...\n"
+                    f"Final UUID: {uuid}\n"
+                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                    f"All workflows successful!",
+                    title=f"DGM success - {uuid}",
+                    priority=0
+                )
+            
             return runs
 
         # Continue recursion
