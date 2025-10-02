@@ -55,6 +55,9 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        # toolomics workspace
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.runs_capsule_dir = "runs_capsule/"
         # SmolAgent model configuration (Hugging Face model ID format)
         self.smolagent_model_id: str = "deepseek/deepseek-coder"
         self.engine_name: str = "litellm"

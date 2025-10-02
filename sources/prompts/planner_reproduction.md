@@ -77,39 +77,39 @@ Your response must be valid JSON following this exact schema:
   "steps": [
     {
       "name": "comprehensive_paper_analysis",
-      "task": "Download 'Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results' and extract all reproduction requirements. Create a very detailled 'report.txt' guide for experiments reproduction containing: (0) Explanation/Summary of the paper (1) Exact methodology/algorithms used, (2) Complete dataset list with link or access method, (3) github link and software versions, (4) Quantitative claims to reproduce, (5) Validation approaches, (6) Computational requirements",
+      "task": "Download 'Simulating Metabolic Pathways to Enhance Interpretations of MGWAS Results' and extract all reproduction requirements. Create a very detailled 'reproduction_mgwas.txt' guide for experiments reproduction containing: (0) Explanation/Summary of the paper (1) Exact methodology/algorithms used, (2) Complete dataset list with link or access method, (3) github link and software versions, (4) Quantitative claims to reproduce, (5) Validation approaches, (6) Computational requirements",
       "depends_on": [],
       "required_inputs": [],
-      "expected_outputs": ["report.txt"],
+      "expected_outputs": ["reproduction_mgwas.txt"],
       "complexity": "high"
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "based on software requirements in report.txt, locate and acquire all code/tools. clone available repositories to 'code/'. Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in the code and report the information in report.txt.",
+      "task": "read the reproduction_mgwas.txt, based on software requirements in reproduction_mgwas.txt, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.txt). Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in mgwas_repo/ and report the information in reproduction_mgwas.txt.",
       "depends_on": ["comprehensive_paper_analysis"],
-      "required_inputs": ["report.txt"], 
-      "expected_outputs": ["code/"],
+      "required_inputs": ["reproduction_mgwas.txt"], 
+      "expected_outputs": ["mgwas_repo/"],
       "complexity": "high"
     },
     {
       "name": "dataset_acquisition", 
-      "task": "Using dataset requirements from report.txt, download all required datasets, or copy dataset in code/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
+      "task": "Using dataset requirements from reproduction_mgwas.txt, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
       "depends_on": ["comprehensive_paper_analysis", "code_and_tools_acquisition"],
-      "required_inputs": ["report.txt"],
+      "required_inputs": ["reproduction_mgwas.txt"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"], 
       "complexity": "medium"
     },
     {
       "name": "experiment_execution",
-      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in code/ and install all requirements. Run experiments matching paper's exact conditions and parameters from report.txt. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/ and install all requirements. Run experiments matching paper's exact conditions and parameters from reproduction_mgwas.txt. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
       "depends_on": ["dataset_acquisition", "code_and_tools_acquisition"],
-      "required_inputs": ["datasets/", "code/", "report.txt"],
+      "required_inputs": ["datasets/", "mgwas_repo/", "reproduction_mgwas.txt"],
       "expected_outputs": ["results/"],
       "complexity": "high"
     },
     {
       "name": "results_validation",
-      "task": "Compare reproduction results with original paper results from report.txt. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.txt'.",
+      "task": "Compare reproduction results with original paper results from reproduction_mgwas.txt. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.txt'.",
       "depends_on": ["experiment_execution"],
       "required_inputs": ["results/", "paper_analysis.json"],
       "expected_outputs": ["validation_report.html", "discrepancies_analysis.txt"],
@@ -124,5 +124,6 @@ Your response must be valid JSON following this exact schema:
 - Return ONLY valid JSON following the schema above
 - Every step must include all required fields
 - Failure modes must include concrete mitigation strategies
+- required_inputs should be very flexible and only list files or folder that are strictly required (90%+ chance of failure without the files)
 
 Generate plans that are simple with no uncessessary complexity added. Regroup highly related steps as one (setup up env and running code can be part of the same task).
