@@ -71,7 +71,6 @@ class Transfer:
             else:
                 try:
                     shutil.copy2(source_path, target_path)
-                    print(f"Copied: {source_path} -> {target_path}")
                 except Exception as e:
                     print(f"Error copying {source_path}: {e}")
 
