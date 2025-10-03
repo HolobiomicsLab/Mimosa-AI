@@ -78,7 +78,7 @@ class Tool:
     def __init__(self, name: str, description: str = ""):
         self.name = name
         self.description = description
-    
+
     def __repr__(self):
         return f"""{self.name}: {self.description}"""
 
@@ -107,7 +107,7 @@ class MCP:
     def tool_names(self) -> list[str]:
         """Get list of tool names for backwards compatibility."""
         return [tool.name for tool in self.tools]
-    
+
     def __repr__(self):
         return f"""{self.name}: {len(self.tools)} tools available | running on {self.address}:{self.port}"""
 
@@ -138,7 +138,7 @@ class ToolManager:
         """Attempt to stop ToolHive MCP servers if they are not running."""
         try:
             result = subprocess.run(
-                ["thv", 
+                ["thv",
                 "stop", mcp_name],
                 capture_output=True, text=True, timeout=5
             )
@@ -149,12 +149,12 @@ class ToolManager:
             subprocess.CalledProcessError,
         ):
             return False
-    
+
     def _attempt_mcp_restart(self, mcp_name) -> bool:
         """Attempt to start ToolHive MCP servers if they are not running."""
         try:
             result = subprocess.run(
-                ["thv", 
+                ["thv",
                 "restart", mcp_name], # no start command, use restart
                 capture_output=True, text=True, timeout=5
             )
@@ -165,7 +165,7 @@ class ToolManager:
             subprocess.CalledProcessError,
         ):
             return False
-    
+
     def _attempt_full_mcp_restart(self, mcp_name) -> bool:
         """Attempt to fully restart a MCP server.
         It appears mcp restart does not always work if the server is already running or hanging.
@@ -364,7 +364,7 @@ class ToolManager:
             except Exception:
                 continue
         return mcps
-    
+
     async def discover_network_mcp_servers(self) -> list[MCP]:
         """Discover MCP servers on localhost network."""
         mcps = []
@@ -380,14 +380,10 @@ class ToolManager:
 
     async def discover_mcp_servers(self) -> list[MCP]:
         """Discover MCP servers using ToolHive only."""
-        if not self.use_toolhive:
-            raise RuntimeError(
-                "ToolHive is required. Please install ToolHive: curl -sSL https://get.toolhive.dev | sh"
-            )
-
         try:
             print("🔍 Discovering MCP servers via ToolHive...")
-            mcps_thv = await self.discover_toolhive_servers()
+            #mcps_thv = await self.discover_toolhive_servers()
+            mcps_thv = []
             print("🔍 Discovering MCP servers on network...")
             mcps_net = await self.discover_network_mcp_servers()
 
