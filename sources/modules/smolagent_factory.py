@@ -92,22 +92,7 @@ pd.read_csv # File does not exist (only tools can access workfolder, build-in py
 - **No Assumptions**: Do not assume tool output format or content; validate every time
 - **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
-## 5. Patience and Iteration
-
-You must always stop writing code after the first print statement that inspects the output of a tool call. Wait for the execution result, then analyze the printed output before writing any further code.
-
-# Analyze train_model.r
-script_content = read_file(path="/projects/train_model.r")
-print("First 500 characters of script:")
-print(script_content[:500])
-# SPECIAL STOP TRIGGER: PRINT STATEMENT DETECTED - STOPING FURTHER CODE GENERATION - ALL FUTHER CODE WILL BE COMMENTED OUT
-# Next we could wait for the output, analyze it, and write summary points like so:
-#summary_points = [
-#    "1. Currently loads data from ml.csv",
-#    "2. Performs some basic data preprocessing",
-#]
-
-## 6. PATH BEHAVIOR
+## 5. PATH BEHAVIOR
 
 Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
 
@@ -115,19 +100,17 @@ Your Python interpreter and the tools operate in separate filesystem contexts. S
 
 # These will NOT access the workspace files:
 os.listdir(".")                    # Wrong context
-os.path.exists("/projects/file.txt")  # Wrong context
-pathlib.Path("data").glob("*.csv")    # Wrong context
+os.path.exists("./file.txt")  # Wrong context
 with open("file.txt") as f: ...       # File not found (even if tools see it)
 
 ### Required pattern
 
 # ✅ CORRECT: Use bash tool for directory operations
-files = execute_command(command="ls -la /projects")
-file_exists = execute_command(command="test -f /projects/data.csv && echo 'exists' || echo 'missing'")
+files = execute_command(command="ls -la ./")
 
 # ❌ WRONG: Direct Python filesystem access
 import os
-files = os.listdir("/projects")  # Will list YOUR context, not the workspace
+files = os.listdir("./")  # Will list YOUR context, not the workspace
 
 ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
 
@@ -273,16 +256,14 @@ class SmolAgentFactory:
     {prev_infos}
     Your goal is:
     {self.instruct_prompt}
-    Critical: Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
+    Check if the goal has been accomplished before by listing files.
+
+    Critical: Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will fail entirely.
     # ✅ CORRECT: Use bash tool for directory operations
-    files = execute_command(command="ls -la /projects")
-    file_exists = execute_command(command="test -f /projects/data.csv && echo 'exists' || echo 'missing'")
-    # ✅ CORRECT: Use file tools for content access
-    content = read_file(path="/projects/config.json")
-    write_file(path="/projects/output.txt", content=data)
+    files = execute_command(command="ls -la")
     # ❌ WRONG: Direct Python filesystem access
     import os # forbidden
-    files = os.listdir("/projects")  # Will list YOUR context, not the workspace
+    files = os.listdir("./")  # Will list YOUR context, not the workspace
     """
 
     def parse_memory_output(self):

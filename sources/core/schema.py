@@ -109,4 +109,3 @@ class Task:
     expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     produced_outputs: list[str] = field(default_factory=list)  # Actual outputs produced
-    missing_inputs: list[str] = field(default_factory=list)    # Missing required inputs

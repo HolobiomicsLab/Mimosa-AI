@@ -328,7 +328,7 @@ class GodelMachine:
         )
 
         if runs[-1].answers:
-            all_success =  all(["success" in x.lower() for x in runs[-1].answers])
+            all_success =  all(["success" in str(x).lower() for x in runs[-1].answers])
         else:
             all_success = False
         # Check termination conditions
