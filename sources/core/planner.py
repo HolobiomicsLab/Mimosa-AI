@@ -271,13 +271,13 @@ Original request:
         print("\n" + "=" * 80)
 
 
-    def _get_workspace_files(self) -> set[str]:
+    def _get_workspace_files(self) -> list[str]:
         """
         Get all files in the workspace directory recursively.
         Returns:
             set[str]: Set of relative file paths from workspace root
         """
-        files = set()
+        files = []
         try:
             workspace_path = Path(self.workspace_path)
             if not workspace_path.exists():
@@ -292,7 +292,7 @@ Original request:
                         file_path = Path(root) / filename
                         try:
                             relative_path = file_path.relative_to(workspace_path)
-                            files.add(str(relative_path))
+                            files.append(str(relative_path))
                         except ValueError:
                             continue
         except Exception as e:
@@ -306,6 +306,7 @@ Original request:
         """
         self._workspace_files_before_step = self._get_workspace_files()
         print(f"📸 Captured workspace snapshot: {len(self._workspace_files_before_step)} files")
+        return self._workspace_files_before_step
 
     def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
@@ -318,11 +319,11 @@ Original request:
         missing_inputs = []
         
         for required_input in step.required_inputs:
-            if required_input not in self._workspace_files_before_step:
+            if required_input not in self._get_workspace_files():
                 missing_inputs.append(required_input)
         return len(missing_inputs) == 0, missing_inputs
 
-    def _verify_expected_outputs(self, step: PlanStep, produced_outputs: list[str]) -> tuple[bool, list[str]]:
+    def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
         Verify that expected outputs were produced.
         Args:
@@ -333,8 +334,9 @@ Original request:
         """
         missing_outputs = []
         
+        workspace_files = self._capture_workspace_snapshot()
         for expected_output in step.expected_outputs:
-            found = any(expected_output in produced for produced in produced_outputs)
+            found = any(expected_output in produced for produced in workspace_files)
             if not found:
                 missing_outputs.append(expected_output)
         
@@ -389,7 +391,7 @@ Original request:
         try:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.7, threshod_score=0.0 # TODO change values
+                task, threshold_similary=0.8, threshod_score=0.0 # TODO change values
             ) if cached_wf_allow else []
             
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -439,7 +441,7 @@ Original request:
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
         return success_list[-1]
 
-    async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_dgm_iteration, missing_inputs):
+    async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_dgm_iteration):
         """
         Execute multiple attempts for a step with comprehensive error handling.
         Args:
@@ -448,7 +450,6 @@ Original request:
             step: The plan step to execute
             judge: Whether to use judge evaluation
             max_dgm_iteration: Maximum DGM iterations
-            missing_inputs: List of missing inputs for this step
         Returns:
             PlanStep: The updated step with execution status
         """
@@ -474,8 +475,6 @@ Original request:
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             
             try:
-                self._capture_workspace_snapshot()
-                
                 enhanced_task = self._build_knowledge_aware_task(step_task)
                 dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
                 
@@ -503,19 +502,18 @@ Original request:
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
                     complexity=getattr(step, 'complexity', 'medium'),
-                    produced_outputs=self._workspace_files_before_step,
-                    missing_inputs=missing_inputs or []
+                    produced_outputs=self._workspace_files_before_step
                 )
                 
                 self.task_history.append(task)
                 
                 if dgm_success:
-                    outputs_produced, missing_outputs = self._verify_expected_outputs(step, self._workspace_files_before_step)
+                    outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
-                        break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
+                    break
                 else:
                     print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
                     if attempt < max_attempts:
@@ -589,24 +587,15 @@ Original request:
                 if lst_step:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
-                        error_msg = f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}"
-                        print(error_msg)
-                        print("proceeding anyways...(request exit commented out)")
-                        #self.request_user_exit(error_msg)
+                        self.request_user_exit(f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}")
                         continue
-                
-                # Check required inputs
-                inputs_available, missing_inputs = self._verify_required_inputs(step)
-                if not inputs_available and step_idx > 0:
-                    error_msg = f"⚠️ Missing required inputs for step '{step_name}': {missing_inputs}"
-                    self.request_user_exit(error_msg)
                 
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
                 max_attempts = max_task_retry
                 
                 try:
-                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration, missing_inputs)
+                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration)
                 except Exception as e:
                     step.status = TaskStatus.FAILED
                     raise Exception(f"❌ Critical error in step execution: {str(e)}") from e

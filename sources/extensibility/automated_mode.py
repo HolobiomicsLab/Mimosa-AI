@@ -127,37 +127,36 @@ Provide a structured analysis with:
         
         return wf_answers
     
-    def _get_random_paper_title(self) -> str:
+    def _get_random_paper_title(self, start_row=0) -> tuple[str, str, str]:
         """Get a random paper title from the papers.csv file."""
         papers_csv_path = Path("datasets/our_benchmark.csv")
-        
+
         try:
             with open(papers_csv_path, encoding='utf-8') as csvfile:
                 reader = csv.DictReader(csvfile)
                 total_rows = sum(1 for _ in reader)
                 csvfile.seek(0)
                 reader = csv.DictReader(csvfile)
-                random_row = random.randint(0, total_rows - 1)
+                random_row = random.randint(0, total_rows - 1) if start_row == -1 else start_row
                 for i, row in enumerate(reader):
                     if i == random_row:
                         return row['Title'].strip(), row['URLS'].strip(), row['Prompt'].strip()
-                        
+
         except Exception as e:
             self.logger.warning(f"[AUTOMATED MODE] Could not read random paper from CSV: {str(e)}")
             raise e
         raise Exception("Run out of papers or failed to open CSV.")
-    
-    def _generate_next_task(self, iteration: int) -> str:
+
+    def _generate_next_task(self, iteration: int, start_row: int = -1) -> str:
         """Generate the next goal using LLM based on a random paper from the CSV."""
-        # Get a random paper title from the CSV
-        paper_title, url, prompt = self._get_random_paper_title()
+        paper_title, url, prompt = self._get_random_paper_title(start_row)
         if prompt == "":
             prompt = "Reproduce the experiments from the paper and compare the result."
-        
+
         goal = f"""
-Paper title: {paper_title}
-Url to paper: {url}
-Goal to achieve: {prompt}
+    Paper title: {paper_title}
+    Url to paper: {url}
+    Goal to achieve: {prompt}
         """
         return goal.strip()
 
@@ -201,6 +200,9 @@ Provide your analysis following the specified output format."""
         print(f"\033[95mNotes will be saved to: {self.run_notes_dir}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
+        user_input = input("Enter starting row ([Enter] for random): ")
+        start_row = int(user_input)-1 if user_input.strip() else -1
+
         for iteration in range(self.max_iterations):
             try:
                 iteration_start_time = time.time()
@@ -208,7 +210,7 @@ Provide your analysis following the specified output format."""
                 print(f"\033[95mAUTONOMOUS ITERATION {iteration + 1}/{self.max_iterations}\033[0m")
                 print(f"\033[95m{'─' * 60}\033[0m")
                 # Generate next goal
-                goal = self._generate_next_task(iteration)
+                goal = self._generate_next_task(iteration, start_row)
                 print(f"\033[95m📋 Task: {goal}\033[0m")
                 # Execute goal via planner
                 tasks_data = await self.planner.start_planner(goal=goal, 
