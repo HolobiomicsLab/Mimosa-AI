@@ -33,9 +33,9 @@ class AddressMCP:
 
 class Config:
     """Configuration class for Mimosa AI Agent Framework."""
-    
+
     # Available models for reference:
-    # 
+    #
     # DGM/Workflow generation models (OpenAI):
     # - gpt-5, gpt-5-mini, gpt-5-nano
     # - o3, o3-mini, o3-pro
@@ -56,18 +56,18 @@ class Config:
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         # toolomics workspace
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
         # SmolAgent model configuration (Hugging Face model ID format)
-        self.smolagent_model_id: str = "deepseek-ai/DeepSeek-V3.2-Exp"
-        self.engine_name: str = "inference_client"
-        
-        # DGM/Workflow generation model configuration 
+        self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.engine_name: str = "litellm"
+
+        # DGM/Workflow generation model configuration
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
-        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
+        self.prompt_planner: str = "sources/prompts/planner_simple.md"
         self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
         self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
-        
+
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
         self.reasoning_effort: str = "high"
