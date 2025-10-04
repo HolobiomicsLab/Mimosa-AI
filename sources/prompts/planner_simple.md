@@ -36,11 +36,11 @@ You are an expert research reproduction planner. Create executable plans for rep
 
 ```json
 {
-  "goal": "Reproduce core experiments from 'Attention Is All You Need'",
+  "goal": "Reproduce core experiments from TimeVaE: a variational auto-encoder for multivariate time series generation",
   "steps": [
     {
       "name": "paper_analysis",
-      "task": "Download and analyze 'Attention Is All You Need' paper. Extract and document in 'reproduction_guide.txt': (1) Core claims to reproduce (e.g., BLEU scores on WMT datasets), (2) Exact model architectures and hyperparameters used, (3) Dataset names and sources (WMT 2014 EN-DE, EN-FR), (4) Whether pre-trained checkpoints are available or training is required, (5) Evaluation methodology and metrics, (6) Links to official code repositories if mentioned. DECISION POINT: If reproduction requires training from scratch and no checkpoints exist, document this blocker and recommend using existing implementations with provided checkpoints instead.",
+      "task": "You are assigned the task of analysing the research paper: TimeVaE: a variational auto-encoder for multivariate time series generation. download as time_vae.pdf. Extract  (1) Core claims to reproduce, (2) Exact model architectures and hyperparameters used, (3) Dataset names and sources, (4) Evaluation methodology and, (5) Links to official code repositories if mentioned, (6) Important: extract all result metrics or tables. reconstitute and fix any data table and make a clear, markdown saved as reproduction_guide.txt",
       "depends_on": [],
       "required_inputs": [],
       "expected_outputs": ["reproduction_guide.txt"],
@@ -48,15 +48,15 @@ You are an expert research reproduction planner. Create executable plans for rep
     },
     {
       "name": "code_and_checkpoint_acquisition",
-      "task": "Based on reproduction_guide.txt, locate official or widely-cited implementation (e.g., tensor2tensor, fairseq). Clone repository to 'transformer_code/'. Prioritize finding pre-trained checkpoints over training code. Download any available model checkpoints to 'checkpoints/'. Create 'requirements.txt' if not present. Document in reproduction_guide.txt whether training can be avoided. DECISION POINT: If no pre-trained checkpoints exist and training is required, estimate computational cost (GPU hours) and document as potential blocker.",
+      "task": "Based on reproduction_guide.txt, locate github implementation. Clone repository to 'vae_code/'. Look for and download any available pre-trained model checkpoints to 'checkpoints/'. Create 'requirements.txt' if not present. Document in reproduction_guide.txt whether training can be avoided. DECISION POINT: If no pre-trained checkpoints exist and training is required, estimate computational cost (GPU hours) and document as potential blocker.",
       "depends_on": ["paper_analysis"],
       "required_inputs": ["reproduction_guide.txt"],
-      "expected_outputs": ["transformer_code/", "checkpoints/", "reproduction_guide.txt (updated)"],
+      "expected_outputs": ["vae_code/", "checkpoints/", "reproduction_guide.txt"],
       "complexity": "medium"
     },
     {
       "name": "dataset_acquisition",
-      "task": "Download evaluation datasets specified in reproduction_guide.txt (e.g., WMT 2014 test sets) to 'datasets/'. Verify file integrity and format. Create 'dataset_status.txt' listing each required dataset as available/missing. DECISION POINT: If evaluation datasets are unavailable, document this blocker - do not substitute with different datasets unless paper explicitly validates on them.",
+      "task": "Download evaluation datasets specified in reproduction_guide.txt to 'datasets/'. Verify file integrity and format. Create 'dataset_status.txt' listing each required dataset as available/missing. DECISION POINT: If evaluation datasets are unavailable, document this blocker - do not substitute with different datasets unless paper explicitly validates on them.",
       "depends_on": ["paper_analysis"],
       "required_inputs": ["reproduction_guide.txt"],
       "expected_outputs": ["datasets/", "dataset_status.txt"],
@@ -64,15 +64,15 @@ You are an expert research reproduction planner. Create executable plans for rep
     },
     {
       "name": "experiment_execution",
-      "task": "Install dependencies from transformer_code/. Load pre-trained checkpoints from checkpoints/ (avoid training if possible). Run evaluation on datasets/ using exact metrics from paper (e.g., BLEU calculation method). Save outputs to 'results/' with clear naming (e.g., 'wmt14_ende_bleu.txt'). Log all commands and parameters used. DECISION POINT: If execution fails due to missing checkpoints and training is required, document estimated GPU hours and stop if >100 hours.",
+      "task": "Install dependencies from vae_code/. Load pre-trained checkpoints from checkpoints/ (avoid training if possible). Run evaluation on datasets/ using parameters from paper (modify config file if needed). Save outputs to 'results/' with clear naming. Log all commands and parameters used.",
       "depends_on": ["code_and_checkpoint_acquisition", "dataset_acquisition"],
-      "required_inputs": ["transformer_code/", "datasets/", "reproduction_guide.txt"],
+      "required_inputs": ["vae_code/", "datasets/", "reproduction_guide.txt"],
       "expected_outputs": ["results/"],
       "complexity": "high"
     },
     {
       "name": "validation",
-      "task": "Compare results in 'results/' with paper's reported metrics from reproduction_guide.txt. Create 'comparison_report.txt' with side-by-side metric comparison (e.g., paper BLEU: 28.4, reproduced BLEU: 28.1). Document any discrepancies >5% and potential causes (different preprocessing, checkpoint version, etc.). If results match within reasonable margin, mark reproduction as successful.",
+      "task": "You are a expert in research reproductability with 5 years of experience rejecting or accepting papers for Nature. Compare results obtained by a researcher who attempted to reproduce the paper in 'results/' with paper's reported metrics from reproduction_guide.txt. Create a full report 'comparison_report.txt' with side-by-side metric comparison. Document any discrepancies >5% and potential causes (different preprocessing, checkpoint version, etc.). If results match within reasonable margin, mark reproduction as successful.",
       "depends_on": ["experiment_execution"],
       "required_inputs": ["results/", "reproduction_guide.txt"],
       "expected_outputs": ["comparison_report.txt"],
@@ -82,6 +82,7 @@ You are an expert research reproduction planner. Create executable plans for rep
 }
 ```
 
+Every task description must be VERY detailled. Task executor are not aware of the bigger picture.
 
 ## Standard Flow
 
@@ -93,7 +94,6 @@ validation: Read reproduction_guide.txt and results_run.txt, Compare outputs to 
 Task Requirements
 Each task must specify:
 
-Decision point: "If X unavailable, document in Y and stop/pivot"
 Concrete outputs: Exact filenames and validation criteria
 Simplicity: Combine related steps (setup + execution can be one step)
 required_inputs: Only list files with 90%+ failure risk if missing
