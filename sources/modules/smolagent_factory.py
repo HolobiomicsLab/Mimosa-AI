@@ -60,12 +60,12 @@ ADDED_SYSTEM_PROMPT = """
 # CODE GENERATION CONSTRAINTS
 
 ## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
-You are operating in a controlled runtime where standard Python filesystem is restricted. 
+You are operating in a controlled runtime where standard Python filesystem is restricted.
 
 UNAVAILABLE INTERFACES
 Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
 import os          # Module not available
-import subprocess  # Module not available  
+import subprocess  # Module not available
 open("file.txt")   # Function not available
 exec(code)         # Function not available
 pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
@@ -161,7 +161,7 @@ class SmolAgentFactory:
         # additional engine parameters
         self.engine = None
         self.provider = "auto"
-        self.max_tokens = 16000
+        self.max_tokens = 8192
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
@@ -186,7 +186,7 @@ class SmolAgentFactory:
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-    
+
     def extend_system_prompt(self, added_prompt: str):
         """Override the system prompt for the agent."""
         if not added_prompt or not added_prompt.strip():
@@ -239,7 +239,7 @@ class SmolAgentFactory:
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
         step_names = state.get("step_name", [])
-        
+
         if not state_answers or len(state_answers) == 0:
             prev_infos = "\n"
         else:
@@ -315,7 +315,7 @@ class SmolAgentFactory:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}\n {memories}")
-    
+
     def load_memory_json(self, memory_dict: List[dict]) -> List[ActionStep]:
         memory_steps = []
 
@@ -326,7 +326,7 @@ class SmolAgentFactory:
                 timing=step_data.get("timing", {})
             )
             action_step.model_input_messages = step_data.get("model_input_messages")
-            action_step.model_output_message = step_data.get("model_output_message") 
+            action_step.model_output_message = step_data.get("model_output_message")
             action_step.tool_calls = step_data.get("tool_calls", [])
             action_step.observations = step_data.get("observations", "")
             action_step.model_output = step_data.get("model_output", "")
@@ -335,7 +335,7 @@ class SmolAgentFactory:
             action_step.action_output = step_data.get("action_output")
             memory_steps.append(action_step)
         return memory_steps
-    
+
     def collect_existing_memories(self) -> List[Tuple[str, List[ActionStep]]]:
         existing_memories = []
         for filename in os.listdir(self.memory_folder):
@@ -356,7 +356,7 @@ class SmolAgentFactory:
     def load_agent_memory(self, workflow_uuid: str, instructions: str):
         matching_memory = None
         filename_uuid = None
-    
+
         try:
             for (filename, memories) in self.collect_existing_memories():
                 for memory_steps in memories:
@@ -417,7 +417,7 @@ class SmolAgentFactory:
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)
         start_time = time.time()
-        
+
         instructions = self.build_workflow_step_prompt(state)
         try:
             answer = self.run_cached(state, instructions)
@@ -425,7 +425,7 @@ class SmolAgentFactory:
             execution_time = time.time() - start_time
             logger.info(f"[AGENT] {self.name} failed after {execution_time:.3f}s")
             raise e
-            
+
         actions, observations, _ = self.parse_memory_output()
         execution_time = time.time() - start_time
         logger.info(f"[AGENT] {self.name} completed in {execution_time:.3f}s")
