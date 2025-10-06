@@ -48,7 +48,7 @@ You are an expert research reproduction planner. Create executable plans for rep
     },
     {
       "name": "code_and_checkpoint_acquisition",
-      "task": "Based on reproduction_guide.txt, locate github implementation. Clone repository to 'vae_code/'. Look for and download any available pre-trained model checkpoints to 'checkpoints/'. Create 'requirements.txt' if not present. Document in reproduction_guide.txt whether training can be avoided. DECISION POINT: If no pre-trained checkpoints exist and training is required, estimate computational cost (GPU hours) and document as potential blocker.",
+      "task": "Read reproduction_guide.txt to identify github url for the paper 'TimeVaE: a variational auto-encoder for multivariate time series generation'. Clone repository to 'vae_code/'. Look for and download any available pre-trained model checkpoints to 'checkpoints/'. Create 'requirements.txt' if not present. Document in reproduction_guide.txt whether training can be avoided. DECISION POINT: If no pre-trained checkpoints exist and training is required, estimate computational cost (GPU hours) and document as potential blocker.",
       "depends_on": ["paper_analysis"],
       "required_inputs": ["reproduction_guide.txt"],
       "expected_outputs": ["vae_code/", "checkpoints/", "reproduction_guide.txt"],
@@ -56,7 +56,7 @@ You are an expert research reproduction planner. Create executable plans for rep
     },
     {
       "name": "dataset_acquisition",
-      "task": "Download evaluation datasets specified in reproduction_guide.txt to 'datasets/'. Verify file integrity and format. Create 'dataset_status.txt' listing each required dataset as available/missing. DECISION POINT: If evaluation datasets are unavailable, document this blocker - do not substitute with different datasets unless paper explicitly validates on them.",
+      "task": "Read reproduction_guide.txt, download the specified evaluation datasets to 'datasets/'. Verify file integrity and format. Create 'dataset_status.txt' listing each required dataset as available/missing. DECISION POINT: If evaluation datasets are unavailable, document this blocker - do not substitute with different datasets unless paper explicitly validates on them.",
       "depends_on": ["paper_analysis"],
       "required_inputs": ["reproduction_guide.txt"],
       "expected_outputs": ["datasets/", "dataset_status.txt"],

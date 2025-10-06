@@ -252,18 +252,28 @@ class SmolAgentFactory:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-        return f"""You are a highly skilled and goal-seeking agent who must pursue a goal.
-    {prev_infos}
-    Your goal is:
-    {self.instruct_prompt}
-    Check if the goal has been accomplished before by listing files.
+        return f"""You are an autonomous agent executing tasks in a constrained environment.
+OPERATIONAL CONTEXT:
+{prev_infos}
 
-    Critical: Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will fail entirely.
-    # ✅ CORRECT: Use bash tool for directory operations
-    files = execute_command(command="ls -la")
-    # ❌ WRONG: Direct Python filesystem access
-    import os # forbidden
-    files = os.listdir("./")  # Will list YOUR context, not the workspace
+FILESYSTEM ARCHITECTURE:
+- Your Python code and tools operate in SEPARATE contexts
+- NEVER use Python's os, pathlib, or filesystem operations
+- ALWAYS use bash commands via execute_command() for file operations
+  
+  Example:
+  ✅ files = execute_command("ls -la")
+  ✅ content = execute_command("cat file.txt")
+  ❌ os.listdir()  # Will fail - wrong context
+
+TASK:
+{self.instruct_prompt}
+
+CONSTRAINTS:
+- No placeholder/example values.
+- No assumptions about missing data - investigate first available data in workspace
+
+Start by assessing workspace: execute_command("ls -la") to see existing work
     """
 
     def parse_memory_output(self):

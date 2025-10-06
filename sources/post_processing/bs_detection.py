@@ -21,8 +21,8 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 dotenv.load_dotenv()
 
 MEMORY_DIR = Path("./sources/memory")
-#default_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
-default_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+default_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
+#default_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
 
 assert os.path.exists(MEMORY_DIR)
 
@@ -363,7 +363,11 @@ Provide your analysis in JSON format:
         )
         try:
             response = llm_provider(analysis_prompt)
-            analysis_result = json.loads(extract_json(response))
+            try:
+                analysis_result = json.loads(extract_json(response))
+            except Exception as e:
+                raise ValueError(f"Failed to parse JSON response: {e}") from e
+
             analysis_result["agent_name"] = agent_name
             return analysis_result
         except Exception as e:
@@ -527,7 +531,10 @@ Provide your analysis in JSON format:
 
 
 if __name__ == "__main__":
-    uuid = "20251003_121708_55d038d1"
+    if len(sys.argv) < 2:
+        print(f"USAGE:\n./{sys.argv[0]} <uuid> memory to evaluate.")
+        exit()
+    uuid = sys.argv[1]
     
     # Test new BullshitDetectorNumerical
     numerical_detector = BullshitDetectorNumerical()
