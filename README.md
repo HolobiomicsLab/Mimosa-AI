@@ -42,8 +42,8 @@ uv venv .venv
 ```
 
 Configure your `.env` file with the following API keys:
-- `HF_TOKEN`: Your Hugging Face token
-- `ANTHROPIC_API_KEY`: Your OpenAI API key
+- `HF_TOKEN`: Your Hugging Face token **OR** `DEEPSEEK_API_KEY` Your deepseek api key, depending on your provider.
+- `ANTHROPIC_API_KEY`: Your Anthropic API key
 - `LANGFUSE_PUBLIC_KEY` & `LANGFUSE_PRIVATE_KEY`: Optional, for [telemetry monitoring](https://huggingface.co/docs/smolagents/tutorials/inspect_runs)
 
 ### Step 2: Install Dependencies

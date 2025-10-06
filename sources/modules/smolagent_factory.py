@@ -149,7 +149,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 max_steps=24,
+                 max_steps=32,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -165,7 +165,7 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.timeout = 3600
+        self.timeout = 3600*5
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
@@ -391,12 +391,18 @@ class SmolAgentFactory:
         result = {'response': None, 'exception': None, 'completed': False}
 
         def _run_agent():
-            try:
-                result['response'] = self.agent.run(instructions)
-                result['completed'] = True
-            except Exception as e:
-                result['exception'] = e
-                result['completed'] = True
+            error = True
+            while error:
+                try:
+                    result['response'] = self.agent.run(instructions)
+                    result['completed'] = True
+                    error = False
+                except Exception as e:
+                    print(str(e))
+                    print("retrying...")
+                    error = True
+                #result['exception'] = e
+                #result['completed'] = True
 
         agent_thread = threading.Thread(target=_run_agent, daemon=True)
         agent_thread.start()

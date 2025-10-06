@@ -72,7 +72,7 @@ class Config:
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
         self.reasoning_effort: str = "high"
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 1800
+        self.runner_default_timeout: int = 18000
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
