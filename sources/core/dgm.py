@@ -195,7 +195,7 @@ class GodelMachine:
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal,
-                threshold_similary=0.5,
+                threshold_similary=0.8,
                 threshod_score=0.0,
             )
             print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
