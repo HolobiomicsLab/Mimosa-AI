@@ -475,8 +475,8 @@ Original request:
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             
             try:
-                enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
+                #enhanced_task = self._build_knowledge_aware_task(step_task)
+                dgm_runs = await self.dgm_runs(step_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
                 
                 last_run = dgm_runs[-1]
                 

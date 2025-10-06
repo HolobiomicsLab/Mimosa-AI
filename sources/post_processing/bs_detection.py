@@ -527,7 +527,7 @@ Provide your analysis in JSON format:
 
 
 if __name__ == "__main__":
-    uuid = "20250929_122806_3220abe8"
+    uuid = "20251003_121708_55d038d1"
     
     # Test new BullshitDetectorNumerical
     numerical_detector = BullshitDetectorNumerical()

@@ -25,34 +25,22 @@ class PricingCalculator:
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
-    
+
     def _find_model_by_substring(self, target_model: str) -> str | None:
-        """
-        Find model using substring matching
-        
-        For anthropic/claude-opus-4-20250514:
-        1. Check if any available model is a substring of the target
-        2. Return the longest match (most specific)
-        
-        Examples:
-        - anthropic/claude-opus-4-20250514 contains anthropic/claude-opus-4 ✅
-        - openai/gpt-5-2025-08-07 contains openai/gpt-5 ✅
-        """
         if '/' not in target_model:
             return None
-        
-        # Find all available models that are substrings of target
+
         matches = []
         for available_model in self.model_pricing:
             if available_model in target_model:
-                matches.append(available_model)
-        
-        if not matches:
-            return None
-        
-        # Return the longest match (most specific)
-        # e.g., prefer "anthropic/claude-opus-4" over "anthropic/claude"
-        return max(matches, key=len)
+                idx = target_model.find(available_model)
+                end_idx = idx + len(available_model)
+                valid_start = idx == 0 or target_model[idx-1] in ['/', '-', ':']
+                valid_end = end_idx == len(target_model) or target_model[end_idx] in ['/', '-', ':']
+                if valid_start and valid_end:
+                    matches.append(available_model)
+
+        return max(matches, key=len) if matches else None
     
     def _get_model_pricing_with_fallback(self, model_name: str) -> dict:
         """Get model pricing with intelligent fallback."""
@@ -69,7 +57,7 @@ class PricingCalculator:
         
         # 3. Default fallback
         print(f"⚠️  No match found for {model_name}, using default pricing")
-        return self.model_pricing.get("default", {"input": 0.70, "output": 2.50})
+        return self.model_pricing.get("default", {"input": 3.00, "output": 15.00})
 
     def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
@@ -279,5 +267,5 @@ class OpenRouterPricingClient:
             # Mistral models
             "mistralai/mixtral-8x7b-instruct": {"input": 0.24, "output": 0.24},
             # Default pricing for unknown models
-            "default": {"input": 0.70, "output": 2.50},
+            "default": {"input": 3.00, "output": 15.00},
         }  # Per 1M tokens

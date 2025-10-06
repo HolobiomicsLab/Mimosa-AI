@@ -34,39 +34,23 @@ class AddressMCP:
 class Config:
     """Configuration class for Mimosa AI Agent Framework."""
 
-    # Available models for reference:
-    #
-    # DGM/Workflow generation models (OpenAI):
-    # - gpt-5, gpt-5-mini, gpt-5-nano
-    # - o3, o3-mini, o3-pro
-    # - o1, o1-mini, o1-preview
-    # - gpt-4o, gpt-4o-mini, gpt-4-turbo
-    # - gpt-3.5-turbo
-    #
-    # SmolAgent models:
-    # - gpt-5-nano, gpt-5-mini, gpt-4o-mini, gpt-3.5-turbo
-    # - deepseek-ai/DeepSeek-V3
-    # - anthropic/claude-3.5-sonnet
-    # - meta-llama/Llama-3.1-8B
-    # - mistralai/Mixtral-8x7B
-
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         # toolomics workspace
-        self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
-        # SmolAgent model configuration (Hugging Face model ID format)
+        # SmolAgent model configuratio
         self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
         self.engine_name: str = "litellm"
 
         # DGM/Workflow generation model configuration
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
         self.prompt_planner: str = "sources/prompts/planner_simple.md"
-        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
-        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-latest"
+        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
@@ -134,6 +118,9 @@ class Config:
         )
         assert os.path.exists(self.prompt_workflow_creator), (
             f"System prompt file not found: {self.prompt_workflow_creator}"
+        )
+        assert os.path.exists(self.workspace_dir), (
+            f"Workspace directory not found: {self.workspace_dir}"
         )
 
     def jsonify(
