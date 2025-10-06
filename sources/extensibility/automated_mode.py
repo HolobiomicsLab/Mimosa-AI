@@ -160,12 +160,19 @@ Provide a structured analysis with:
         """
         return goal.strip()
 
-    def _analyze_results(self, goal: str, tasks_data: Task, execution_time: float) -> dict[str, str]:
+    def _format_task_results(self, tasks_data: Task) -> str:
+        """Format task results for analysis."""
+        return '\n\n'.join(
+            f"Task {task.name}:\n"
+            f"  UUID: {task.dgm_runs[-1].current_uuid}\n"
+            f"  Description: {task.description}\n"
+            f"  Agent Chain: {' -> '.join(task.final_answers)}"
+            for task in tasks_data
+        )
+
+    def _analyze_results(self, goal: str, tasks_data: list[Task], execution_time: float) -> dict[str, str]:
         """Analyze execution results using LLM."""
-        results_str = ""
-        for task in tasks_data:
-            results_str += f"Task {task.name}: {task.description}\n"
-            results_str += '\n'.join(task.final_answers)
+        results_str = self._format_task_results(tasks_data)
         prompt = f"""Analyze the following Mimosa-AI execution:
 TASK: {goal}
 EXECUTION TIME: {execution_time:.2f} seconds
