@@ -6,83 +6,26 @@ Mimosa - A AI Agent Framework for advancing scientific research
 
 import argparse
 import asyncio
-import logging
 import os
 import signal
 import sys
 
 import dotenv
 
+# Prevent tokenizers parallelism warnings when forking processes
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from config import Config
 from sources.core.dgm import GodelMachine
-from sources.core.parallel_testing import ParallelTesting
 from sources.core.planner import Planner
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.extensibility.human_mode import HumanMode
+from sources.extensibility.automated_mode import AutomatedMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
+from sources.utils.scenario_loader import ScenarioLoader
 from sources.utils.user_entry import collect_goals_from_user
+from sources.utils.logging import setup_logging
 
 dotenv.load_dotenv()
-
-def setup_logging():
-    """Configure logging with timing, line numbers, and log rotation."""
-    import logging.handlers
-    import os
-    
-    # Create logs directory
-    logs_dir = "sources/logs"
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    # Configure root logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # Remove existing handlers to avoid duplication
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
-    # Rotating file handler for general logs
-    file_handler = logging.handlers.RotatingFileHandler(
-        os.path.join(logs_dir, 'mimosa.log'),
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    
-    # Separate handler for workflow execution logs
-    workflow_handler = logging.handlers.RotatingFileHandler(
-        os.path.join(logs_dir, 'workflows.log'),
-        maxBytes=50*1024*1024,  # 50MB
-        backupCount=10
-    )
-    workflow_handler.setLevel(logging.INFO)
-    workflow_handler.setFormatter(formatter)
-    
-    # Add workflow handler to specific loggers
-    workflow_loggers = [
-        'sources.core.dgm',
-        'sources.core.orchestrator', 
-        'sources.core.workflow_factory',
-        'sources.core.workflow_runner',
-        'sources.core.evaluator'
-    ]
-    
-    for logger_name in workflow_loggers:
-        workflow_logger = logging.getLogger(logger_name)
-        workflow_logger.addHandler(workflow_handler)
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -101,7 +44,6 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--schema_code_path", type=str, help="Override state schema file path")
     parser.add_argument("--smolagent_factory_code_path", type=str, help="Override SmolAgent factory file path")
     parser.add_argument("--prompt_workflow_creator", type=str, help="Override system prompt file path")
-    parser.add_argument("--workflow_llm_provider", type=str, help="Override LLM provider for workflows")
     parser.add_argument("--runner_default_python_version", type=str, help="Override default Python version for runners")
     parser.add_argument("--runner_default_timeout", type=int, help="Override default timeout for runners (seconds)")
     parser.add_argument("--runner_default_max_memory_mb", type=int, help="Override default max memory for runners (MB)")
@@ -120,8 +62,6 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.smolagent_factory_code_path = args.smolagent_factory_code_path
     if args.prompt_workflow_creator:
         config.prompt_workflow_creator = args.prompt_workflow_creator
-    if args.workflow_llm_provider:
-        config.workflow_llm_provider = args.workflow_llm_provider
     if args.runner_default_python_version:
         config.runner_default_python_version = args.runner_default_python_version
     if args.runner_default_timeout:
@@ -149,20 +89,9 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-async def multigoal_mode(args, config):
-    if getattr(args, 'multi_goal', False):
-        goals = collect_goals_from_user()
-        if not goals:
-            print("❌ No goals provided for multi-goal. Exiting.")
-            return
-        parallel_testing = ParallelTesting(config)
-        parallel_testing.start_parallel_testing(
-            goals=goals,
-            template_uuid=args.load_template,
-            judge=args.judge,
-            human_validation=False,
-            max_workers=getattr(args, 'max_concurrent', None)
-        )
+async def manual_mode(args, config):
+    hm = HumanMode(config)
+    await hm.shellLoop()
 
 async def dataset_execution_mode(args, config):
     planner = Planner(config)
@@ -190,6 +119,11 @@ async def dataset_execution_mode(args, config):
     else:
         print("❌ No questions found in dataset or no goal provided.")
 
+async def automated_mode(args, config):
+    """Run autonomous mode where LLM generates and executes tasks automatically."""
+    automated = AutomatedMode(config, max_iterations=args.max_iterations)
+    await automated.start_autonomous_mode()
+
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
     planner = Planner(config)
@@ -198,24 +132,22 @@ async def normal_execution_mode(args, config):
         args.task = scenario_file["goal"]
         args.judge = True
     if args.task:
-        await dgm.start_dgm(goal_prompt=args.task,
+        await dgm.start_dgm(goal=args.task,
                             judge=args.judge, 
                             scenario_id=args.scenario,
-                            human_validation=True,
+                            human_validation=False,
                             max_iteration=args.max_dgm_iterations
                            )
     elif args.goal:
         await planner.start_planner(goal=args.goal, 
-                                    template_uuid=args.load_template, 
                                     judge=args.judge,
-                                    max_iteration=args.max_dgm_iterations
+                                    max_dgm_iteration=args.max_dgm_iterations
                                    )
     else:
-        raise ValueError("No goal provided. Use --task, --goal, or --multi_goal to start.")
+        raise ValueError("No goal provided. Use --task, --goal to start.")
 
 async def main():
     """Main execution function"""
-    setup_logging()
     config = Config()
     setup_signal_handlers()
     
@@ -229,7 +161,13 @@ async def main():
         "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--multi_goal", action="store_true", help="Multiple goals mode (collects goals from user)"
+        "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
+    )
+    parser.add_argument(
+        "--automated", action="store_true", help="Autonomous mode (LLM generates and executes tasks automatically)"
+    )
+    parser.add_argument(
+        "--max_iterations", type=int, default=10, help="Maximum number of autonomous iterations (for --automated mode)"
     )
     parser.add_argument(
         "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
@@ -250,11 +188,18 @@ async def main():
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
+        "--debug", action="store_true", help="Enable debug logging to console"
+    )
+    parser.add_argument(
         "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
     )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
+    
+    # Setup logging with debug flag
+    setup_logging(debug=args.debug)
+    
     apply_config_overrides(args, config)
 
     validate_environment()
@@ -265,12 +210,14 @@ async def main():
     try:
         if (args.dataset):
             await dataset_execution_mode(args, config)
-        elif (args.multi_goal):
-            await multigoal_mode(args, config)
+        elif (args.manual):
+            await manual_mode(args, config)
+        elif (args.automated):
+            await automated_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --task or --goal to start a task.")
+            raise ValueError("No goal provided. Use --task, --goal, --automated  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:

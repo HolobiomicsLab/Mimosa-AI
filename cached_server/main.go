@@ -29,12 +29,14 @@ type Config struct {
 	Providers []Provider `yaml:"providers"`
 }
 
-// Provider represents an OpenAI-compatible API provider
+// Provider represents an API provider (OpenAI-compatible or Claude)
 type Provider struct {
-	Name    string `yaml:"name"`
-	BaseURL string `yaml:"base_url"`
-	APIKey  string `yaml:"api_key"`
-	Weight  int    `yaml:"weight"`
+	Name     string `yaml:"name"`
+	BaseURL  string `yaml:"base_url"`
+	APIKey   string `yaml:"api_key"`
+	Weight   int    `yaml:"weight"`
+	Type     string `yaml:"type"` // "openai" or "claude"
+	Version  string `yaml:"version,omitempty"` // For Claude API version
 }
 
 // Request represents a cached request
@@ -272,34 +274,175 @@ func (rs *RouterServer) selectProvider() Provider {
 	return Provider{}
 }
 
+// convertOpenAIToClaude converts OpenAI format request to Claude format
+func convertOpenAIToClaude(openAIReq map[string]interface{}) (map[string]interface{}, error) {
+	claudeReq := make(map[string]interface{})
+	
+	// Extract model
+	if model, ok := openAIReq["model"]; ok {
+		claudeReq["model"] = model
+	}
+	
+	// Extract max_tokens
+	if maxTokens, ok := openAIReq["max_tokens"]; ok {
+		claudeReq["max_tokens"] = maxTokens
+	} else {
+		claudeReq["max_tokens"] = 1024 // Default for Claude
+	}
+	
+	// Extract temperature
+	if temperature, ok := openAIReq["temperature"]; ok {
+		claudeReq["temperature"] = temperature
+	}
+	
+	// Convert messages format
+	if messages, ok := openAIReq["messages"].([]interface{}); ok {
+		claudeMessages := make([]map[string]interface{}, 0)
+		var systemMessage string
+		
+		for _, msg := range messages {
+			if msgMap, ok := msg.(map[string]interface{}); ok {
+				role, _ := msgMap["role"].(string)
+				content, _ := msgMap["content"].(string)
+				
+				if role == "system" {
+					systemMessage = content
+				} else if role == "user" || role == "assistant" {
+					claudeMessages = append(claudeMessages, map[string]interface{}{
+						"role":    role,
+						"content": content,
+					})
+				}
+			}
+		}
+		
+		claudeReq["messages"] = claudeMessages
+		if systemMessage != "" {
+			claudeReq["system"] = systemMessage
+		}
+	}
+	
+	return claudeReq, nil
+}
+
+// convertClaudeToOpenAI converts Claude format response to OpenAI format
+func convertClaudeToOpenAI(claudeResp map[string]interface{}) map[string]interface{} {
+	openAIResp := make(map[string]interface{})
+	
+	// Generate OpenAI-compatible response structure
+	openAIResp["id"] = fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano())
+	openAIResp["object"] = "chat.completion"
+	openAIResp["created"] = time.Now().Unix()
+	
+	if model, ok := claudeResp["model"]; ok {
+		openAIResp["model"] = model
+	}
+	
+	// Convert content
+	choices := make([]map[string]interface{}, 0)
+	if content, ok := claudeResp["content"].([]interface{}); ok && len(content) > 0 {
+		if firstContent, ok := content[0].(map[string]interface{}); ok {
+			if text, ok := firstContent["text"].(string); ok {
+				choice := map[string]interface{}{
+					"index": 0,
+					"message": map[string]interface{}{
+						"role":    "assistant",
+						"content": text,
+					},
+					"finish_reason": "stop",
+				}
+				choices = append(choices, choice)
+			}
+		}
+	}
+	
+	openAIResp["choices"] = choices
+	
+	// Add usage information if available
+	if usage, ok := claudeResp["usage"]; ok {
+		openAIResp["usage"] = usage
+	} else {
+		// Provide default usage info
+		openAIResp["usage"] = map[string]interface{}{
+			"prompt_tokens":     0,
+			"completion_tokens": 0,
+			"total_tokens":      0,
+		}
+	}
+	
+	return openAIResp
+}
+
 // forwardRequest forwards request to selected provider
 func (rs *RouterServer) forwardRequest(provider Provider, reqBody []byte, originalHeaders map[string]string) (map[string]interface{}, error) {
 	startTime := time.Now()
 	client := &http.Client{Timeout: 60 * time.Second}
 	
-	url := provider.BaseURL + "/v1/chat/completions"
-	log.Printf("[PROVIDER] Forwarding request to %s at %s", provider.Name, url)
+	var requestData map[string]interface{}
+	if err := json.Unmarshal(reqBody, &requestData); err != nil {
+		return nil, fmt.Errorf("failed to parse request body: %v", err)
+	}
 	
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	var url string
+	var finalReqBody []byte
+	var err error
+	
+	// Handle different provider types
+	providerType := provider.Type
+	if providerType == "" {
+		providerType = "openai" // Default to OpenAI for backward compatibility
+	}
+	
+	switch providerType {
+	case "claude":
+		url = provider.BaseURL + "/v1/messages"
+		claudeReq, err := convertOpenAIToClaude(requestData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert request to Claude format: %v", err)
+		}
+		finalReqBody, err = json.Marshal(claudeReq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal Claude request: %v", err)
+		}
+		log.Printf("[PROVIDER] Forwarding Claude request to %s at %s", provider.Name, url)
+	default: // "openai" or any other type defaults to OpenAI format
+		url = provider.BaseURL + "/v1/chat/completions"
+		finalReqBody = reqBody
+		log.Printf("[PROVIDER] Forwarding OpenAI request to %s at %s", provider.Name, url)
+	}
+	
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(finalReqBody))
 	if err != nil {
 		log.Printf("[PROVIDER] ERROR: Failed to create request: %v", err)
 		return nil, err
 	}
 	
-	// Set required headers
+	// Set required headers based on provider type
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
+	
+	switch providerType {
+	case "claude":
+		req.Header.Set("x-api-key", provider.APIKey)
+		if provider.Version != "" {
+			req.Header.Set("anthropic-version", provider.Version)
+		} else {
+			req.Header.Set("anthropic-version", "2023-06-01") // Default Claude API version
+		}
+	default: // OpenAI format
+		req.Header.Set("Authorization", "Bearer "+provider.APIKey)
+	}
 	
 	// Copy safe headers from original request
 	copiedHeaders := 0
 	for key, value := range originalHeaders {
 		lowerKey := strings.ToLower(key)
-		if lowerKey != "authorization" && lowerKey != "host" && 
+		if lowerKey != "authorization" && lowerKey != "x-api-key" && lowerKey != "host" && 
 		   (strings.HasPrefix(lowerKey, "x-") || lowerKey == "user-agent") {
 			req.Header.Set(key, value)
 			copiedHeaders++
 		}
 	}
+	
 	resp, err := client.Do(req)
 	if err != nil {
 		duration := time.Since(startTime)
@@ -331,6 +474,11 @@ func (rs *RouterServer) forwardRequest(provider Provider, reqBody []byte, origin
 	// Check for API errors
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("provider error (status %d): %s", resp.StatusCode, string(body))
+	}
+	
+	// Convert Claude response to OpenAI format if needed
+	if providerType == "claude" {
+		result = convertClaudeToOpenAI(result)
 	}
 	
 	log.Printf("[PROVIDER] ✓ Successfully processed request via %s", provider.Name)
