@@ -39,17 +39,29 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
-        self.smolagent_model_provider: str = "deepseek"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v4.md"
-        self.workflow_llm_provider: str = "openai"
+        # toolomics workspace
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.runs_capsule_dir = "runs_capsule/"
+        # SmolAgent model configuratio
+        self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.engine_name: str = "litellm"
+
+        # DGM/Workflow generation model configuration
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
+        self.prompt_planner: str = "sources/prompts/planner_simple.md"
+        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
+
+        # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
+        # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
+        self.reasoning_effort: str = "high"
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 3600
+        self.runner_default_timeout: int = 18000
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="localhost", port_min=5000, port_max=5250),
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200),
         ]
         self.runner_requirements: list[str] = [
             "python-dotenv",
@@ -107,6 +119,9 @@ class Config:
         assert os.path.exists(self.prompt_workflow_creator), (
             f"System prompt file not found: {self.prompt_workflow_creator}"
         )
+        assert os.path.exists(self.workspace_dir), (
+            f"Workspace directory not found: {self.workspace_dir}"
+        )
 
     def jsonify(
         self,
@@ -121,7 +136,9 @@ class Config:
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "prompt_workflow_creator": self.prompt_workflow_creator,
-            "workflow_llm_provider": self.workflow_llm_provider,
+            "workflow_llm_model": self.workflow_llm_model,
+            "prompts_llm_model": self.prompts_llm_model,
+            "reasoning_effort": self.reasoning_effort,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -144,9 +161,13 @@ class Config:
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
         )
-        self.workflow_llm_provider = data.get(
-            "workflow_llm_provider", self.workflow_llm_provider
+        self.workflow_llm_model = data.get(
+            "workflow_llm_model", self.workflow_llm_model
         )
+        self.prompts_llm_model = data.get(
+            "prompts_llm_model", self.prompts_llm_model
+        )
+        self.reasoning_effort = data.get("reasoning_effort", self.reasoning_effort)
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
@@ -172,6 +193,9 @@ class Config:
             f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
             f"workflow_llm_provider={self.workflow_llm_provider},\n"
+            f"workflow_llm_model={self.workflow_llm_model},\n"
+            f"prompts_llm_model={self.workflow_llm_model},\n"
+            f"reasoning_effort={self.reasoning_effort},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
             f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"

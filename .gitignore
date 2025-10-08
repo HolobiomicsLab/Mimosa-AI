@@ -3,17 +3,21 @@
 *.log
 *.tmp
 *.safetensors
+.asingle_agent_tests
 *.egg-info
 cookies.json
 .env
 .env.*
 */.env
 workflows/*
+runs_capsule/*
+runs_notes/*
 parallel_testing_results/
 cached_server/cache/*
 sources/cache/*
 cached_server/config.yaml
 sources/tmp/*
+memory/*
 sources/memory/*
 sources/workflows/
 mimosa-env/*
@@ -77,7 +81,6 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
-.cache
 nosetests.xml
 coverage.xml
 *.cover
@@ -224,3 +227,5 @@ docs/project.xml
 
 sources/cache
 tests/browser.py
+
+tests/perso

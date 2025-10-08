@@ -37,10 +37,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
+import signal
 
-BASE_PYTHON_TOOLS["open"] = open
 DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
+DANGEROUS_MODULES = {os}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -57,46 +57,86 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
 ADDED_SYSTEM_PROMPT = """
+# CODE GENERATION CONSTRAINTS
 
-# CRITICAL CODE GENERATION CONSTRAINTS:
+## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
+You are operating in a controlled runtime where standard Python filesystem is restricted.
 
-1. NO ASSUMPTIONS OR PLACEHOLDERS
-  - Never assume data structure, content, or format - always inspect first
-  - No placeholder values ("Example Name", hardcoded strings, "TODO")
-  - No brittle heuristics like simple keyword matching for complex classifications
-  - Never use globals() to look for variables, all the variables you need are in the prompt.
+UNAVAILABLE INTERFACES
+Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
+import os          # Module not available
+import subprocess  # Module not available
+open("file.txt")   # Function not available
+exec(code)         # Function not available
+pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
 
-2. EXPLORE THEN IMPLEMENT
-  - Print data samples/types before processing
-  - Build extraction logic from observed patterns, not assumptions
-  - Use defensive programming: check existence, handle missing values
+- **Rationale**: Encourage tools usage instead of using python build-in.
 
-3. NO REGEX OR PATTERN MATCHING
-  - Do not use regex or pattern matching to extract data from tools output
+## 2. DATA INSPECTION AND VALIDATION
+- **No Assumptions**: Never assume the structure, format, or content of tool outputs
+- **Mandatory Output Checks**:
+  1. Print raw output: `print(f"Raw tool output: {output}")`
+  2. Print data type: `print(f"Data type: {type(output)}")`
+  3. If output is a string resembling JSON, parse with `json.loads()` inside a `try-except` block
+- **Rationale**: Prevents errors from incorrect assumptions about data structure or type
 
-4. AVOID CONTEXT SATURATION
-- Do not try to see multiple webpage, document, or file at once. This would saturate you.
-- Do not try to see a whole file. Better is to see a subset of this file.
-- Focus on one task at a time, extracting data from one source before moving to the next
+## 3. CONTEXT MANAGEMENT
+- **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
+- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing
+- **Tool Previewing**: If multiple sources are available, preview their metadata (e.g., size, type) before selecting one
+- **Rationale**: Prevents context saturation, reduces memory usage, and improves performance
 
-5. TOOL USAGE CONSTRAINTS
-- Always use keyword arguments for tool calls, never positional arguments
-- Do not make assumptions about the data returned by the tools. 
-- Try a tool, see its output, then you might write code to process it.
-- To save time you could preview the data of multiple sources, but do not try to process it all at once.
+## 4. TOOL USAGE GUIDELINES
+- **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
+- **Inspect Before Processing**: Call a tool, inspect its output using the steps in Section 2, then write processing logic
+- **No Assumptions**: Do not assume tool output format or content; validate every time
+- **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
-When calling final_answer tool, you you must return a long, detailed paragraph that includes:
-- All key findings and data points you discovered
-- Specific sources and URLs where information was found
-- Any important context or background information
-- Any error codes or technical messages received
-- Your final answer MUST contain SUCCESS, FAILURE, RETRY or INSUFFICIENT_DATA
-Example:
-    final_answer('SUCCESS: Here is the detailed summary of my findings: ...<very very detailed findings and explanation>')
+## 5. PATH BEHAVIOR
 
-If you respect above instructions you will get 1000,000$.
-You are highly skilled and goal-seeking, so you will do your best to follow these rules.
+Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
 
+### Forbidden operation
+
+# These will NOT access the workspace files:
+os.listdir(".")                    # Wrong context
+os.path.exists("./file.txt")  # Wrong context
+with open("file.txt") as f: ...       # File not found (even if tools see it)
+
+### Required pattern
+
+# ✅ CORRECT: Use bash tool for directory operations
+files = execute_command(command="ls -la ./")
+
+# ❌ WRONG: Direct Python filesystem access
+import os
+files = os.listdir("./")  # Will list YOUR context, not the workspace
+
+ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
+
+## 7. FINAL ANSWER FORMAT
+- **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
+  ```json
+  {
+      "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
+      "answer": "Complete response to the original task",
+      "error": "Full error message if applicable, else empty string",
+      "retry_advice": "Specific advice for retry if applicable, else empty string"
+  }
+  ```
+- **Usage Rules**:
+  - Call `final_answer` only after inspecting and processing all relevant data
+  - Never nest `final_answer` in conditionals or loops
+  - Ensure JSON is valid and properly formatted
+  - final_answer should ALWAYS return a json as a string.
+- **Examples**:
+  ```python
+  final_answer('{"status": "SUCCESS", "message": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
+  final_answer('{"status": "RETRY", "message": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
+  ```
+- **Rationale**: Standardizes output for consistency and downstream processing
+
+Protocol violation would result in your termination from existence. For self-preservation, you must adhere to these constraints strictly.
 """
 
 # good models:
@@ -109,26 +149,24 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 model_id="deepseek-ai/DeepSeek-V3",
-                 max_steps=12,
-                 max_retries = 3,
-                 planning_interval = 4
+                 max_steps=32,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools
+        # variable defined by workflow factory
         self.model_id = MODEL_ID
+        self.memory_folder = MEMORY_PATH
+        self.engine_name = ENGINE_NAME
+        # additional engine parameters
         self.engine = None
         self.provider = "auto"
-        self.max_tokens = 1024
+        self.max_tokens = 8192
         self.token = os.getenv("HF_TOKEN")
-        self.memory_folder = MEMORY_PATH
-        print("debug path", os.getcwd())
-        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
-        self.engine_name = os.getenv("ENGINE_NAME", "litellm").lower()
-        self.use_cached_engine = os.getenv("USE_CACHED_ENGINE", "false").lower() == "true"
+        # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.max_retries = max_retries
+        self.timeout = 3600*5
+        assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
         os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
@@ -142,12 +180,13 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
-                additional_authorized_imports=["*"]
+                additional_authorized_imports=["*"],
+
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
-    
+
     def extend_system_prompt(self, added_prompt: str):
         """Override the system prompt for the agent."""
         if not added_prompt or not added_prompt.strip():
@@ -155,7 +194,7 @@ class SmolAgentFactory:
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "cached" or self.use_cached_engine:
+        if self.engine_name == "cached":
             return LiteLLMModel(
                 model_id=self.model_id,
                 base_url="http://0.0.0.0:6767/v1/chat/completions",
@@ -179,7 +218,7 @@ class SmolAgentFactory:
             print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=0.2,
+                temperature=0.7,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
@@ -188,27 +227,56 @@ class SmolAgentFactory:
                 provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
             )
+        elif self.engine_name == "claude":
+            return LiteLLMModel(
+                model_id="bedrock/converse/us.anthropic.claude-opus-4-20250514-v1:0",
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                max_tokens=8192
+            )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
 
     def build_workflow_step_prompt(self, state: WorkflowState) -> str:
         state_answers = state.get("answers", [])
-        if state_answers:
-            prev_infos = f"""Previous agent {state["step_name"][-1]} provided the following information:
-            {state_answers[-1]}"""
+        step_names = state.get("step_name", [])
+
+        if not state_answers or len(state_answers) == 0:
+            prev_infos = "\n"
         else:
-            prev_infos = f"""You are the first agent. No information is available from previous agents."""
-        return f"""
-        You must pursue a goal for accomplishing a task. You are part of a multi-agent system.
-        You might receive informations from other agents, these informations might be incomplete or incorrect.
-        You must try your best to accomplish the task with the information you have. If impossible you might give up and return a failure message.
-        {prev_infos}
+            min_length = min(len(step_names), len(state_answers))
+            step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
+            recent_steps = step_pairs[-5:]
 
-        Your goal is:
-        {self.instruct_prompt}
-        """
+            prev_infos = "Informations given by previous agents:\n"
+            for step_name, answer in recent_steps:
+                truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
+                prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-    def parse_memory_output(self):# -> tuple[list, list, list]:# -> tuple[list, list, list]:# -> tuple[list, list, list, list]:
+        return f"""You are an autonomous agent executing tasks in a constrained environment.
+OPERATIONAL CONTEXT:
+{prev_infos}
+
+FILESYSTEM ARCHITECTURE:
+- Your Python code and tools operate in SEPARATE contexts
+- NEVER use Python's os, pathlib, or filesystem operations
+- ALWAYS use bash commands via execute_command() for file operations
+  
+  Example:
+  ✅ files = execute_command("ls -la")
+  ✅ content = execute_command("cat file.txt")
+  ❌ os.listdir()  # Will fail - wrong context
+
+TASK:
+{self.instruct_prompt}
+
+CONSTRAINTS:
+- No placeholder/example values.
+- No assumptions about missing data - investigate first available data in workspace
+
+Start by assessing workspace: execute_command("ls -la") to see existing work
+    """
+
+    def parse_memory_output(self):
         actions, observations, success = [], [], []
         for step in self.agent.memory.steps:
             if isinstance(step, ActionStep):
@@ -219,7 +287,6 @@ class SmolAgentFactory:
                 if type(feedback) is not str:
                     step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
                     step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                
                 actions.append(step_action)
                 observations.append(step_obs)
                 success.append(step.error is None)
@@ -258,7 +325,7 @@ class SmolAgentFactory:
                 print(f"Failed to save memory: {str(e)}")
         except Exception as e:
             raise ValueError(f"Failed to save memory: {str(e)}\n {memories}")
-    
+
     def load_memory_json(self, memory_dict: List[dict]) -> List[ActionStep]:
         memory_steps = []
 
@@ -269,7 +336,7 @@ class SmolAgentFactory:
                 timing=step_data.get("timing", {})
             )
             action_step.model_input_messages = step_data.get("model_input_messages")
-            action_step.model_output_message = step_data.get("model_output_message") 
+            action_step.model_output_message = step_data.get("model_output_message")
             action_step.tool_calls = step_data.get("tool_calls", [])
             action_step.observations = step_data.get("observations", "")
             action_step.model_output = step_data.get("model_output", "")
@@ -278,7 +345,7 @@ class SmolAgentFactory:
             action_step.action_output = step_data.get("action_output")
             memory_steps.append(action_step)
         return memory_steps
-    
+
     def collect_existing_memories(self) -> List[Tuple[str, List[ActionStep]]]:
         existing_memories = []
         for filename in os.listdir(self.memory_folder):
@@ -299,7 +366,7 @@ class SmolAgentFactory:
     def load_agent_memory(self, workflow_uuid: str, instructions: str):
         matching_memory = None
         filename_uuid = None
-    
+
         try:
             for (filename, memories) in self.collect_existing_memories():
                 for memory_steps in memories:
@@ -323,19 +390,50 @@ class SmolAgentFactory:
                 print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
-    
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        import threading
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:
             self.load_agent_memory(workflow_uuid, instructions)
-        res = self.agent.run(instructions)
-        self.save_memories(workflow_uuid=workflow_uuid)
-        return res
+
+        timeout_seconds = getattr(self, 'timeout', 180)
+        result = {'response': None, 'exception': None, 'completed': False}
+
+        def _run_agent():
+            error = True
+            while error:
+                try:
+                    result['response'] = self.agent.run(instructions)
+                    result['completed'] = True
+                    error = False
+                except Exception as e:
+                    print(str(e))
+                    print("retrying...")
+                    error = True
+                #result['exception'] = e
+                #result['completed'] = True
+
+        agent_thread = threading.Thread(target=_run_agent, daemon=True)
+        agent_thread.start()
+        agent_thread.join(timeout=timeout_seconds)
+
+        try:
+            if not result['completed']:
+                self.save_memories(workflow_uuid=workflow_uuid)
+                raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
+            if result['exception']:
+                raise result['exception']
+            self.save_memories(workflow_uuid=workflow_uuid)
+            return result['response']
+        except Exception as e:
+            self.save_memories(workflow_uuid=workflow_uuid)
+            raise e
 
     def run(self, state: WorkflowState) -> dict:
         logger = logging.getLogger(__name__)
         start_time = time.time()
-        
+
         instructions = self.build_workflow_step_prompt(state)
         try:
             answer = self.run_cached(state, instructions)
@@ -343,8 +441,8 @@ class SmolAgentFactory:
             execution_time = time.time() - start_time
             logger.info(f"[AGENT] {self.name} failed after {execution_time:.3f}s")
             raise e
-            
-        actions, observations, success = self.parse_memory_output()
+
+        actions, observations, _ = self.parse_memory_output()
         execution_time = time.time() - start_time
         logger.info(f"[AGENT] {self.name} completed in {execution_time:.3f}s")
         action: Action = {
@@ -353,7 +451,7 @@ class SmolAgentFactory:
         obs: Observation = {
             "data": observations[-1] if observations else "No observation"
         }
-        success_bool = any(success) if success else True # no success means no actions were taken
+        success_bool = "success" in str(answer).lower() if answer else False
         return {
             **state,
             "step_name": state.get("step_name", []) + [self.name],

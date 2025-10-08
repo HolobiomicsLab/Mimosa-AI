@@ -1,0 +1,36 @@
+{
+  "id": "mzml_feature_detection",
+  "goal": "Perform feature detection on QC_0.mzML file to identify and quantify peaks",
+  "assertions": [
+    {
+      "id": "1",
+      "description": "mzML file was successfully loaded and validated",
+      "evaluation_criteria": "Workflow confirms file exists and is valid mzML format"
+    },
+    {
+      "id": "2",
+      "description": "Feature detection algorithm executed",
+      "evaluation_criteria": "Peak picking/chromatogram analysis performed (e.g., XCMS, OpenMS)"
+    },
+    {
+      "id": "3",
+      "description": "Feature table generated with m/z and retention times",
+      "evaluation_criteria": "Output contains detected features with intensity values"
+    },
+    {
+      "id": "4",
+      "description": "Quality metrics calculated for features",
+      "evaluation_criteria": "Results include peak width, symmetry, or signal-to-noise ratios"
+    },
+    {
+      "id": "5",
+      "description": "Results saved in standard format",
+      "evaluation_criteria": "Feature table exported as CSV/mzTab"
+    }
+  ],
+  "optional": {
+    "required_tools": ["xcms_mcp"],
+    "judge_model": "gpt-4o",
+    "timeout": 600
+  }
+}

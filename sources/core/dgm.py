@@ -6,15 +6,18 @@ import json
 import logging
 import os
 import time
+from pathlib import Path
 
-from sources.core.evaluator import WorkflowEvaluator
+from sources.post_processing.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
 
 from .orchestrator import WorkflowOrchestrator
+from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
+from .schema import GodelRun
 
 
 class GodelMachine:
@@ -39,7 +42,7 @@ class GodelMachine:
         self.process_id = process_id
         self.pricing = PricingCalculator(config)
 
-    def load_flow_state_result(self, uuid: str) -> any:
+    def load_wf_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
 
         Args:
@@ -77,66 +80,103 @@ class GodelMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, flow_state: any, eval_type: str) -> float:
+    def get_total_rewards(self, wf_state: any, eval_type: str) -> float:
         """Calculate the total rewards from the workflow state."""
-        if not flow_state or not eval_type:
+        if not wf_state or not eval_type:
             return 0.0
         if eval_type == "generic":
-            return flow_state["evaluation"]["generic"]["overall_score"]
+            return wf_state["evaluation"]["generic"]["overall_score"]
         elif eval_type == "scenario":
-            return flow_state["evaluation"]["scenario"]["score"]
+            return wf_state["evaluation"]["scenario"]["score"]
         else:
             return 0.0
 
-    def get_flow_answers(self, flow_state: any) -> str:
+    def get_flow_answers(self, wf_state: any) -> str:
         """Extract the answers from the workflow state."""
-        if not flow_state or "answers" not in flow_state:
+        if not wf_state or "answers" not in wf_state:
             return ""
 
-        return (
-            "\n".join(str(x) for x in flow_state["answers"])
-            if isinstance(flow_state["answers"], list)
-            else flow_state["answers"]
+        flow_answers = (
+            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
+            if isinstance(wf_state["answers"], list)
+            else wf_state["answers"]
         )
+        return flow_answers
+    
+    def show_answers(self, flow_answers):
+        print(f"\n\033[96m{'> WORKFLOW AGENTS ANSWERS':^60}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m")
+        print(f"\033[96m{flow_answers}\033[0m")
+        print(f"\033[96m{'─' * 60}\033[0m\n")
 
     def improvement_prompt(
         self,
         goal: str,
-        flow_state: any,
+        wf_state: any,
         flow_code: str,
         run_stdout: str,
         iteration_count: int,
     ) -> str:
         flow_answers = ""
 
-        if flow_state is not None:
-            flow_answers = self.get_flow_answers(flow_state)
+        if wf_state is not None:
+            flow_answers = self.get_flow_answers(wf_state)
+            self.show_answers(flow_answers)
         else:
             flow_answers = run_stdout.strip()
-        improv_prompt = "You must generate a multi-agent workflow for the goal."
+
+        improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
-            improv_prompt = "\n".join(
-                [
-                    "Previously written workflow code:",
-                    flow_code,
-                    "Previous attempt resulted in agents ending with following answers:",
-                    flow_answers,
-                    "You must improve the workflow based on previous execution results.",
-                    "Only change a prompt, add an agent, change a tool, etc.. ",
-                ]
-            )
+            improv_prompt = "\n".join([
+                "## WORKFLOW ATTEMPT ANALYSIS:",
+                "Your previous attempt at generating a workflow did not succeed or was incomplete.",
+                "Your goal was: ",
+                goal,
+                "Reflect on your previous attempt and identify what went wrong.",
+                "\n",
+                "## Previous workflow code:",
+                "<python>",
+                flow_code,
+                "</python>",
+                "\n",
+                "## Previous execution results:",
+                "This is the answer from each agent during the last execution.",
+                "<results>",
+                flow_answers,
+                "</results>",
+                "\n",
+                "## FAILURE ANALYSIS:",
+                "1. Analyze the previous workflow code and its execution results.",
+                "2. Evaluate task completion. Did the workflow really achieve the goal?",
+                "3. Think of specific improvements to the workflow code to address these failures.",
+                "\n",
+                "## IMPROVEMENT SUGGESTIONS:",
+                "\n",
+                "1. If the workflow code execution failed, analyze the error messages and fix the python code.",
+                "2. If an agent failed due to limitation of its tool capabilities, consider an alternative tool that would allow to complete the task (eg: use web search tool if arxiv search doesn't seem to work).",
+                "3. If an agent failed due to lack of information, consider adding an initial research step to gather more information before attempting the main task.",
+                "4. If agent didn't behave as expected, consider changing the prompt or the agent role to better align with the task requirements.",
+                "5. Consider adding fallback agents that can take over if a primary agent fails.",
+                "6. Consider adding error handling and validation steps to ensure robustness.",
+                "7. Consider breaking down complex tasks into smaller, manageable sub-tasks.",
+                "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
+                "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
+                "\n",
+                "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
+                "The new version must be different from the previous attempt.\n"
+            ])
 
         return "".join(
             [
                 f"Attempt {iteration_count + 1} of workflow generation.\n",
                 improv_prompt,
-                "Target goal:",
+                "Target goal:\n",
                 goal,
             ]
         )
 
-    def select_workflow_template(self, goal_prompt, template_uuid: str = None) -> str:
-        """Select and load a workflow template by UUID.
+    def select_workflow_template(self, goal, template_uuid: str = None) -> str:
+        """Select and load a workflow template from the workflow directory or by UUID.
 
         Args:
             template_uuid: Optional UUID of workflow template to load
@@ -150,221 +190,358 @@ class GodelMachine:
         if not workflows:
             print(f"No workflows found in {self.workflow_dir}.")
             return None
+        
+        # default to selecting best workflow if no template UUID provided
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
-                goal=goal_prompt,
+                goal=goal,
+                threshold_similary=0.8,
+                threshod_score=0.0,
             )
-            print(f"Selected {len(candidates)} candidates for goal '{goal_prompt}'")
-            return candidates[0].code if candidates else None
-        workflow_path = f"{self.workflow_dir}/{template_uuid}"
-        if not os.path.exists(workflow_path):
-            raise ValueError(
-                f"❌ Workflow for ID {template_uuid} not found in {self.workflow_dir}."
-            )
-
-        try:
-            with open(
-                f"{workflow_path}/workflow_code_{template_uuid}.py",
-            ) as f:
-                return f.read()
-        except FileNotFoundError as e:
-            raise ValueError(
-                f"❌ Workflow code file not found for ID {template_uuid} in {workflow_path}."
-            ) from e
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow template: {str(e)}") from e
+            print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m")
+            print(f"\033[96mSelected {len(candidates)} candidates for goal:\033[0m")
+            print(f"\033[96m{goal}\033[0m")
+            print(f"\033[96mTop candidate: {candidates[0].uuid if candidates else str(None)}\033[0m")
+            print(f"\033[96m{'─' * 60}\033[0m\n")
+            return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
+        # load specified template UUID
+        return WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
 
     async def start_dgm(
         self,
-        goal_prompt: str,
+        goal: str,
         template_uuid: str | None = None,
         judge: bool = False,
-        answer: str = None,
         scenario_id: str = None,
         human_validation: bool = False,
+        answer_eval: str = None,
         max_iteration: int = 5,
-    ):
+    ) -> list[GodelRun]:
         """
         Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
         Args:
-        - goal_prompt (str): The primary goal or objective to be accomplished.
+        - goal (str): The primary goal or objective to be accomplished.
          template_uuid (str | None, optional): UUID of a workflow template to use.
         - judge (bool, optional): Whether to enable judging mode for evaluation.
         - answer (str, optional): A predefined correct answer for evaluation system.
         - human_validation (bool, optional): Whether human validation is required.
         """
 
-        template = self.select_workflow_template(
-            goal_prompt, template_uuid=template_uuid
-        )
-
-        print(f"\n{'📋 CURRENT GOAL':^60}")
+        print(f"\n{'📋 CURRENT TASK':^60}")
         print(f"{'─' * 60}")
-        print(f"  {goal_prompt}")
+        print(f"  {goal}")
         print(f"{'─' * 60}\n")
 
+        wf = self.select_workflow_template(
+            goal, template_uuid=template_uuid
+        )
+
+        if wf:
+            craft_instructions = self.improvement_prompt(
+                goal, wf.state_result, wf.code, "", 0
+            )
+        else:
+            craft_instructions = goal
+
         rewards_history = []
+        assertion_history = []  # Track [passed, total] per iteration
         plot_data = None
+        assertion_plot_data = None
 
         if self.shared_viz_data and self.process_id is not None:
             plot_data = None
         else:
-            plot_data = self.viz_utils.create_rewards_curve_plot(goal_prompt)
+            plot_data = self.viz_utils.create_rewards_curve_plot(goal)
+            # Create assertion plot only for scenario evaluation
+            if scenario_id and judge:
+                from sources.utils.scenario_loader import ScenarioLoader
+                scenario = ScenarioLoader().load_scenario(scenario_id)
+                if scenario:
+                    total_assertions = len(scenario.get("assertions", []))
+                    assertion_plot_data = self.viz_utils.create_assertion_progress_plot(
+                        scenario_id, total_assertions
+                    )
 
-        return await self.recursive_self_improvement(
-            goal_prompt,
-            goal_prompt,
+        run0 = GodelRun(
+            goal=goal,
+            prompt=craft_instructions,
             template_uuid=template_uuid,
-            workflow_template=template,
+            workflow_template=wf,
             max_depth=max_iteration,
             judge=judge,
-            answer=answer,
             scenario_id=scenario_id,
-            need_human_validation=human_validation,
-            rewards_history=rewards_history,
+            need_human_validation=human_validation
+        )
+
+        return await self.recursive_self_improvement(
+            [run0],
             plot_data=plot_data,
+            rewards_history=rewards_history,
+            assertion_history=assertion_history,
+            assertion_plot_data=assertion_plot_data,
         )
 
     async def recursive_self_improvement(
         self,
-        goal,
-        prompt: str,
-        template_uuid: str | None = None,
-        workflow_template: str | None = None,
-        iteration_count: int = 0,
-        max_depth: int = 5,
-        judge: bool = False,
-        need_human_validation: bool = False,
+        runs: list[GodelRun],
         rewards_history: list[float] = None,
+        assertion_history: list[list[int]] = None,
         plot_data: tuple = None,
-        answer: str = None,
-        scenario_id: str = None,
+        assertion_plot_data: tuple = None
     ):
-        """Run a self-improvement loop for the workflow.
-
-        Args:
-            prompt: The goal prompt for workflow generation
-            goal: The goal to achieve with the workflow
-            template_uuid: Optional UUID of workflow template to use
-            workflow_template: Optional workflow template code to use
-            iteration_count: Current iteration count (for recursion)
-            max_depth: Maximum depth of recursion
-            plot_data: Tuple containing (fig, ax, line) for VisualizationUtils plotting
-        Returns:
-            str: Final execution status message
-        """
-        logger = logging.getLogger(__name__)
+        """Run a self-improvement loop for the workflow."""
+        self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
+        
         iteration_start_time = time.time()
-        total_cost = 0.0
-        uuid = None  # Initialize uuid to avoid undefined reference
+        uuid = None
 
-        if iteration_count > 0 and need_human_validation:
-            human_validation = (
-                input("Continue with next iteration? (yes/no): ").strip().lower()
-            )
-            if human_validation not in ["yes", "y"]:
-                print("Exiting self-improvement loop.\n")
-                return template_uuid
-
-        print(f"\n\033[94m{'=' * 60}\033[0m")
-        print(
-            f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop\033[0m"
+        # Execute workflow
+        run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
+            goal=runs[-1].goal,
+            craft_instructions=runs[-1].prompt,
         )
+        wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+
+        runs[-1].current_uuid = uuid
+        runs[-1].answers = wf_info.answers
+        runs[-1].state_result = wf_info.state_result
+        flow_answers = self.get_flow_answers(wf_info.state_result)
+        self.show_answers(flow_answers)
+
+        # Evaluate and calculate costs
+        eval_type, total_cost = await self._evaluate_and_calculate_cost(
+            executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
+        )
+
+        # Update tracking data
+        rewards_history.append(wf_info.overall_score)
+        # Update visualizations
+        self._update_visualizations(
+            rewards_history, assertion_history, plot_data, 
+            assertion_plot_data, runs[-1].goal, runs[-1].scenario_id, uuid
+        )
+        # Log and notify completion
+        self._log_iteration_completion(
+            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time, 
+            wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+        )
+
+        if runs[-1].answers:
+            all_success =  all(["success" in str(x).lower() for x in runs[-1].answers])
+        else:
+            all_success = False
+        # Check termination conditions
+        if runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success:
+            self._save_final_plots(assertion_plot_data, assertion_history, uuid)
+            
+            # Send success notification when all iterations complete
+            if all_success:
+                self.notifier.send_message(
+                    f"DGM completed successfully!\n"
+                    f"Goal: {runs[-1].goal[:128]}...\n"
+                    f"Final UUID: {uuid}\n"
+                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                    f"All workflows successful!",
+                    title=f"DGM success - {uuid}",
+                    priority=0
+                )
+            
+            return runs
+
+        # Continue recursion
+        runs[-1].prompt = self.improvement_prompt(
+            runs[-1].goal, wf_info.state_result, workflow_code, run_stdout, runs[-1].iteration_count
+        )
+
+        # add godel run class instance to list
+        runs.append(GodelRun(
+            goal=runs[-1].goal,
+            prompt=runs[-1].prompt,
+            current_uuid=uuid,
+            template_uuid=None,
+            workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
+            iteration_count=runs[-1].iteration_count + 1,
+            max_depth=runs[-1].max_depth,
+            judge=runs[-1].judge,
+            need_human_validation=runs[-1].need_human_validation,
+            answers=wf_info.answers,
+            state_result=wf_info.state_result,
+            scenario_id=runs[-1].scenario_id
+        ))
+
+        runs = await self.recursive_self_improvement(
+            runs,
+            plot_data=plot_data,
+            rewards_history=rewards_history,
+            assertion_history=assertion_history,
+            assertion_plot_data=assertion_plot_data,
+        )
+        
+        runs[-1].plot = self._save_final_plots(assertion_plot_data, assertion_history, uuid)
+        return runs
+
+    def _get_human_validation(self) -> bool:
+        """Get human validation for continuing the workflow."""
+        human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
+        if human_validation not in ["yes", "y"]:
+            print("Exiting self-improvement loop.\n")
+            return False
+        return True
+
+    def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
+        """Log the start of an iteration."""
+        logger = logging.getLogger(__name__)
+        
+        print(f"\n\033[94m{'=' * 60}\033[0m")
+        print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
+              f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
         print(f"\033[94m{'=' * 60}\033[0m")
         print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
-        print(f"\033[94m  {goal}\033[0m")
+        goal_lines = goal.split('\n')
+        for line in goal_lines:
+            if len(line) <= 256:
+                print(f"\033[94m  {line}\033[0m")
+            else:
+                truncated = line[:256]
+                remaining = len(line) - 256
+                print(f"\033[94m  {truncated}...({remaining} remaining characters not displayed)\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m\n")
+        logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
 
-        logger.info(
-            f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}..."
-        )
-
-        run_stdout, uuid, executed = await self.orchestrator.orchestrate_workflow(
-            goal_prompt=prompt,
-            workflow_template=workflow_template if iteration_count == 0 else None,
-        )
+    async def _evaluate_and_calculate_cost(
+        self, executed: bool, judge: bool, uuid: str, 
+        answer: str, scenario_id: str, assertion_history: list
+    ) -> tuple[str, float]:
+        """Evaluate workflow and calculate cost."""
+        logger = logging.getLogger(__name__)
         eval_type = None
-        if executed:
-            if judge:
-                print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
-                print(f"\033[94m{'=' * 80}\033[0m")
-                eval_start = time.time()
-                eval_type = self.judge.evaluate(
-                    uuid=uuid, answer=answer, scenario_id=scenario_id
-                )
-                eval_time = time.time() - eval_start
-                logger.info(
-                    f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s"
-                )
-                print(
-                    f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m"
-                )
+        total_cost = 0.0
 
-            cost_start = time.time()
-            total_cost = self.pricing.calculate_cost(uuid)
-            cost_time = time.time() - cost_start
-            logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
+        if executed and judge and uuid:
+            eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
+        
+        # Calculate cost regardless of execution success
+        # This includes workflow generation LLM costs even when execution fails
+        cost_start = time.time()
+        total_cost = self.pricing.calculate_cost(uuid)
+        cost_time = time.time() - cost_start
+        logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
 
-        flow_state = self.load_flow_state_result(uuid)
-        flow_rewards = self.get_total_rewards(flow_state, eval_type)
-        rewards_history.append(flow_rewards)
+        return eval_type, total_cost
 
-        # Update visualization - either shared (parallel mode) or individual plot
+    async def _evaluate_workflow(
+        self, uuid: str, answer: str, scenario_id: str, assertion_history: list
+    ) -> str:
+        """Evaluate the workflow and update assertion history."""
+        logger = logging.getLogger(__name__)
+        
+        print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
+        print(f"\033[94m{'=' * 80}\033[0m")
+        
+        eval_start = time.time()
+        eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
+        eval_type = 'scenario' if scenario_id else 'generic'
+        eval_time = time.time() - eval_start
+        
+        logger.info(f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s")
+        print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
+        
+        # Track assertion progress for scenario evaluation
+        if scenario_id and isinstance(eval_result, dict) and assertion_history is not None:
+            self._update_assertion_history(eval_result, assertion_history)
+
+        return eval_type
+
+    def _update_assertion_history(self, eval_result: dict, assertion_history: list):
+        """Update assertion history with evaluation results."""
+        passed = eval_result.get('passed_assertions', 0)
+        total = eval_result.get('total_assertions', 0)
+        assertion_history.append([passed, total])
+        print(f"\033[94m📊 Assertions Progress: {passed}/{total} "
+              f"({passed/total*100 if total > 0 else 0:.0f}%)\033[0m")
+
+    def _update_visualizations(
+        self, rewards_history: list, assertion_history: list, 
+        plot_data: tuple, assertion_plot_data: tuple, 
+        goal: str, scenario_id: str, uuid: str
+    ):
+        """Update all visualizations with current data."""
+        # Update rewards visualization
         if self.shared_viz_data and self.process_id is not None:
-            iterations = list(range(1, len(rewards_history) + 1))
-            self.shared_viz_data.write_curve_data(
-                process_id=self.process_id,
-                iterations=iterations,
-                rewards=rewards_history,
-                goal=goal,
-                status="running",
-            )
+            self._update_shared_visualization(rewards_history, goal)
         elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
+            
+        # Update assertion plot if available
+        if assertion_plot_data and assertion_history:
+            self._update_assertion_plot(assertion_plot_data, assertion_history, scenario_id, uuid)
 
+    def _update_shared_visualization(self, rewards_history: list, goal: str):
+        """Update shared visualization data for parallel processing."""
+        iterations = list(range(1, len(rewards_history) + 1))
+        self.shared_viz_data.write_curve_data(
+            process_id=self.process_id,
+            iterations=iterations,
+            rewards=rewards_history,
+            goal=goal,
+            status="running",
+        )
+
+    def _update_assertion_plot(
+        self, assertion_plot_data: tuple, assertion_history: list, 
+        scenario_id: str, uuid: str
+    ):
+        """Update assertion progress plot."""
+        from sources.utils.scenario_loader import ScenarioLoader
+        
+        scenario = ScenarioLoader().load_scenario(scenario_id)
+        total_assertions = len(scenario.get("assertions", [])) if scenario else 0
+        
+        self.viz_utils.update_assertion_progress_plot(
+            assertion_plot_data, assertion_history, total_assertions
+        )
+        
+        # Save plot after each update for real-time monitoring
+        plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
+        self.viz_utils.save_plot(assertion_plot_data, plot_filename)
+        print(f"\033[94m📊 Assertion progress plot updated: {plot_filename}\033[0m")
+
+    def _log_iteration_completion(
+        self, iteration_count: int, max_depth: int, iteration_start_time: float,
+        wf_rewards: float, total_cost: float, goal: str, uuid: str, 
+        wf_state: any, rewards_history: list
+    ):
+        """Log iteration completion and send notification."""
+        logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
+        
         logger.info(
-            f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - Rewards: {flow_rewards:.1f}, Cost: {total_cost:.3f} USD"
+            f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
+            f"Rewards: {wf_rewards:.1f}, Cost: {total_cost:.3f} USD"
         )
 
         print(f"\n\033[94m{'-' * 60}\033[0m")
-        print(f"\033[94mTotal rewards: {flow_rewards:.1f}\033[0m")
-        print(f"\033[94mTotal cost: {total_cost:.3f} USD\033[0m")
+        print(f"\033[94mTotal rewards: {wf_rewards:.1f}\033[0m")
+        print(f"\033[94mTotal cost: {total_cost:.6f} USD\033[0m")
         print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
         print(f"\033[94m{'-' * 60}\033[0m\n")
+
         self.notifier.send_message(
-            f"Iteration {iteration_count + 1} completed.\n \
-            Goal: {goal}\n \
-            UUID: {uuid}\n \
-            Reward : {flow_rewards:.2f}\n \
-            Answers: {self.get_flow_answers(flow_state)}\n \
-            Cost: {total_cost:.3f} USD.\n \
-            Rewards history: {rewards_history}",
+            f"Iteration {iteration_count + 1} completed.\n"
+            f"Goal: {goal[:128]}...\n"
+            f"Cost: {total_cost:.6f} USD.\n"
+            f"Rewards history: {rewards_history}"
+            f"Answers: {self.get_flow_answers(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
 
-        if iteration_count >= max_depth:
-            print(f"Maximum iterations reached ({max_depth}).")
-            return uuid
-
-        flow_code = self.select_workflow_template(
-            goal_prompt=goal, template_uuid=template_uuid
-        )
-        prompt = self.improvement_prompt(
-            goal, flow_state, flow_code, run_stdout, iteration_count
-        )
-        await self.recursive_self_improvement(
-            goal,
-            prompt,
-            template_uuid=None,
-            workflow_template=flow_code if flow_state else None,
-            iteration_count=iteration_count + 1,
-            max_depth=max_depth,
-            judge=judge,
-            need_human_validation=need_human_validation,
-            rewards_history=rewards_history,
-            plot_data=plot_data,
-            scenario_id=scenario_id,
-        )
-        return uuid
+    def _save_final_plots(self, assertion_plot_data: tuple, assertion_history: list, uuid: str) -> str:
+        """Save final assertion plots."""
+        if assertion_plot_data and assertion_history:
+            plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
+            self.viz_utils.save_plot(assertion_plot_data, plot_filename)
+            print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
+            return plot_filename
+        return ""
