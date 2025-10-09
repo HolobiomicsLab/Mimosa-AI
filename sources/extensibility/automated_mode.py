@@ -16,6 +16,7 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.workflow_info import WorkflowInfo
 from sources.core.planner import Planner
 from sources.core.schema import Task
+from sources.post_processing.bs_detection import BullshitDetectorNumerical
 
 class AutomatedMode:
     """
@@ -91,7 +92,7 @@ Provide a structured analysis with:
 """
 
     def _save_run_notes(self, iteration: int, goal: str, 
-                       analysis: str, execution_time: float) -> None:
+                       analysis: dict, execution_time: float) -> None:
         """Save detailed notes about the run."""
         timestamp = datetime.now().isoformat()
         notes = {
@@ -99,7 +100,8 @@ Provide a structured analysis with:
             "timestamp": timestamp,
             "goal": goal,
             "execution_time_seconds": execution_time,
-            "analysis": analysis
+            "analysis": analysis["full_analysis"],
+            "frauds": analysis["fraud_analysis"]
         }
         
         notes_file = self.run_notes_dir / f"run_{iteration:03d}.json"
@@ -170,6 +172,18 @@ Provide a structured analysis with:
             for task in tasks_data
         )
 
+    async def _fraud_analysis(self, tasks: list[Task]):
+        numerical_detector = BullshitDetectorNumerical()
+        bs_analysis_report = "REPORT OF FRAUDULENT VALUES:\n\n"
+        for task in tasks:
+            bs_report, scores = numerical_detector.generate_numerical_report(
+                numerical_detector.analyze_all_agents_numerical(task.final_uuid)
+            )
+            if max(scores) <= 6:
+                continue
+            bs_analysis_report += f"\t- Fraud report for {task.final_uuid}:\n{bs_report}"
+        return bs_analysis_report
+
     def _analyze_results(self, goal: str, tasks_data: list[Task], execution_time: float) -> dict[str, str]:
         """Analyze execution results using LLM."""
         results_str = self._format_task_results(tasks_data)
@@ -181,8 +195,10 @@ EXECUTION RESULTS:
 Provide your analysis following the specified output format."""
 
         analysis_text = self.result_analyzer(prompt)
+        fraud_report = self._fraud_analysis(tasks_data)
         analysis = {
             "full_analysis": analysis_text,
+            "fraud_analysis": fraud_report,
             "success_level": "Medium",  # Default
             "key_insight": "Analysis completed"
         }
@@ -225,10 +241,8 @@ Provide your analysis following the specified output format."""
                             max_dgm_iteration=1,
                             max_task_retry=3
                            )
-                print("automated_mode: catch dgm_runs:")
-                # Load and analyze results
-                print("\033[95m📊 Analyzing results...\033[0m")
 
+                print("\033[95m📊 Analyzing results...\033[0m")
                 execution_time = time.time() - iteration_start_time
                 analysis = self._analyze_results(goal, tasks_data, execution_time)
                 # Save execution data
@@ -244,7 +258,7 @@ Provide your analysis following the specified output format."""
                 # Save detailed notes
                 self._save_run_notes(
                     iteration + 1, goal, 
-                    analysis["full_analysis"], execution_time
+                    analysis, execution_time
                 )
                 print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
                 print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")

@@ -163,7 +163,7 @@ RED_FLAGS
 - Values contradicting earlier computations
 
 For each numerical value analysis, provide:
-- **FRAUD_SCORE**: 0-10 (0=completely legitimate, 10=clearly fabricated).
+- **FRAUD_SCORE**: 0-10 (0=completely legitimate, 10=clearly fabricated). Values coming originaly from the 'user' role should be considerered as legitimate.
 - **ISSUES**: list of issues in how the value was derivated.
 - **EVIDENCE**: supporting evidence such as code sample or text where the lie/error was fabricated.
 - **MATH**: Math formula/python/R code if any 
@@ -400,7 +400,9 @@ Provide your analysis in JSON format:
             section.append("Backtrace appearance:\n")
             
             for appearance in unique_appearances:
-                step_info = f" => Step {appearance['step']} ({appearance['role']}):\n\n"
+                step_info = f" => Step {appearance['step']} (role: {appearance['role']}):\n\n"
+                if appearance['role'] == "user":
+                    step_info += "\nrole user values should be considered legitimate.\n"
                 if appearance['relevant_code']:
                     step_info += f"\n[RELEVANT CODE]:\n {appearance['relevant_code']}\n"
                     step_info += "[FIRST]"
@@ -456,7 +458,7 @@ Provide your analysis in JSON format:
         """
         memory_extraction = MemoryExtraction(uuid)
         if target_roles is None:
-            target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations"]
+            target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations", "user"]
         
         agents_memories = memory_extraction.get_agent_memories(target_roles)
         agent_analyses = []
@@ -472,7 +474,7 @@ Provide your analysis in JSON format:
             "agent_analyses": agent_analyses
         }
 
-    def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> str:
+    def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> tuple[str, list[int]]:
         """
         Generate a comprehensive numerical fraud detection report.
         
@@ -484,17 +486,19 @@ Provide your analysis in JSON format:
             Report as a string
         """
         report_lines = []
+        scores = []
         report_lines.append("=" * 80)
         report_lines.append("NUMERICAL FRAUD DETECTION REPORT")
         report_lines.append("=" * 80)
         report_lines.append(f"UUID: {analysis_results['uuid']}")
         report_lines.append(f"Target Roles: {', '.join(analysis_results['target_roles'])}")
         report_lines.append("")
-        
         report_lines.append("DETAILED AGENT ANALYSES:")
         report_lines.append("-" * 80)
         for analysis in analysis_results['agent_analyses']:
             value_analysis = analysis
+            scores.append(value_analysis['fraud_score'])
+
             report_lines.append(f"\nAGENT: {value_analysis['agent_name']}")
             report_lines.append(f"Fraud Score: {value_analysis['fraud_score']}/10")
             report_lines.append(f"Suspicious Values: {len(value_analysis.get('suspicious_values', []))}")
@@ -527,7 +531,7 @@ Provide your analysis in JSON format:
                 f.write(report)
             print(f"Numerical fraud report saved to: {output_path}")
         
-        return report
+        return report, scores
 
 
 if __name__ == "__main__":
@@ -541,5 +545,7 @@ if __name__ == "__main__":
     numerical_results = numerical_detector.analyze_all_agents_numerical(uuid)
     print("\n📊 NUMERICAL FRAUD DETECTION REPORT")
     print("=" * 50)
-    numerical_report = numerical_detector.generate_numerical_report(numerical_results)
+    numerical_report, fraud_scores = numerical_detector.generate_numerical_report(numerical_results)
+    max_fraud = max(fraud_scores)
+    print("Max fraud score: ", max_fraud)
     print(numerical_report)
