@@ -631,7 +631,5 @@ if __name__ == "__main__":
     numerical_results = numerical_detector.analyze_all_agents_numerical(uuid)
     print("\n📊 NUMERICAL FRAUD DETECTION REPORT")
     print("=" * 50)
-    numerical_report, fraud_scores = numerical_detector.generate_short_fraud_report(numerical_results)
-    max_fraud = max(fraud_scores)
-    print("Max fraud score: ", max_fraud)
+    numerical_report = numerical_detector.generate_short_fraud_report(numerical_results)
     print(numerical_report)
