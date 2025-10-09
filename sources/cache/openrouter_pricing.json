@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-08T15:03:42.900460",
+  "timestamp": "2025-10-09T17:09:54.060897",
   "pricing": {
     "google/gemini-2.5-flash-image": {
       "input": 0.3,
@@ -242,8 +242,8 @@
       "output": 0.0
     },
     "z-ai/glm-4.5-air": {
-      "input": 0.0,
-      "output": 0.0
+      "input": 0.14,
+      "output": 0.86
     },
     "qwen/qwen3-235b-a22b-thinking-2507": {
       "input": 0.11,
@@ -789,10 +789,6 @@
       "input": 1.1,
       "output": 4.4
     },
-    "deepseek/deepseek-r1-distill-llama-8b": {
-      "input": 0.04,
-      "output": 0.04
-    },
     "google/gemini-2.0-flash-001": {
       "input": 0.09999999999999999,
       "output": 0.39999999999999997
@@ -926,8 +922,8 @@
       "output": 0.0
     },
     "meta-llama/llama-3.3-70b-instruct": {
-      "input": 0.04,
-      "output": 0.12
+      "input": 0.13,
+      "output": 0.39
     },
     "amazon/nova-lite-v1": {
       "input": 0.06,

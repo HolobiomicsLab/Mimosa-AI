@@ -38,6 +38,7 @@ class AutomatedMode:
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
+        self.done_rows = [6, 11, 12, 8] # NOTE actually row-1
         
         model_name = "deepseek/deepseek-chat"  # Use OpenRouter format: provider/model
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
@@ -139,7 +140,11 @@ Provide a structured analysis with:
                 total_rows = sum(1 for _ in reader)
                 csvfile.seek(0)
                 reader = csv.DictReader(csvfile)
-                random_row = random.randint(0, total_rows - 1) if start_row == -1 else start_row
+                while True:
+                    random_row = random.randint(0, total_rows - 1) if start_row == -1 else start_row
+                    if random_row not in self.done_rows:
+                        break
+                self.done_rows.append(random_row)
                 for i, row in enumerate(reader):
                     if i == random_row:
                         return row['Title'].strip(), row['URLS'].strip(), row['Prompt'].strip()
@@ -176,11 +181,9 @@ Provide a structured analysis with:
         numerical_detector = BullshitDetectorNumerical()
         bs_analysis_report = "REPORT OF FRAUDULENT VALUES:\n\n"
         for task in tasks:
-            bs_report, scores = numerical_detector.generate_short_fraud_report(
+            bs_report = numerical_detector.generate_short_fraud_report(
                 numerical_detector.analyze_all_agents_numerical(task.final_uuid)
             )
-            if max(scores) <= 6:
-                continue
             bs_analysis_report += f"\t- Fraud report for {task.final_uuid}:\n{bs_report}"
         return bs_analysis_report
 

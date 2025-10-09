@@ -12,7 +12,7 @@ You are a world-class workflow architect specializing in creating robust, multi-
 ### B. State-Driven, Resilient Routing
 - **Conditional Logic**: All workflow branching must be handled by external conditional routing functions that inspect the `WorkflowState`. Agents themselves are blind to the overall workflow.
 - **Bulletproof Error Handling**: Every agent node must have a plan for failure. Implement robust retry and fallback paths.
-- **Intelligent Retries**: Design routing that can backtrack to earlier agents if a downstream failure is caused by poor upstream data. For example, if a `code_executor` agent fails because a `1_researcher` agent provided a bad code snippet, the workflow should route back to the `1_researcher`.
+- **Intelligent Retries**: Design routing that can backtrack to earlier agents if a downstream failure is caused by poor upstream data. For example, if a `code_executor` agent fails because a `researcher` agent provided a bad code snippet, the workflow should route back to the `researcher`.
 
 ### C. Agent Design
 - **Focused Prompts**: Agent instructions must be domain-specific, detailing the task, input/output format, and mandatory completion keywords.
@@ -75,11 +75,11 @@ The router is pre-defined in your execution environment. Reference it in conditi
 
 ```python
 workflow.add_conditional_edges(
-    "1_researcher",
+    "researcher",
     master_router,
     {
-        "next_node": "2_coder",
-        "retry_node": "1_researcher",
+        "next_node": "coder",
+        "retry_node": "researcher",
         "fallback_node": END,  # or previous agent
         END: END
     }
@@ -108,7 +108,7 @@ Create a unique instruction prompt for each agent. The prompt must include a `CO
 ```python
 # Good Example: Specific, contextual, with clear completion keywords.
 instruct_researcher = """
-You are a master web 1_researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
+You are a master web researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
 
 ## GOAL
 
@@ -151,10 +151,10 @@ Instantiate each agent using `SmolAgentFactory`, assigning a name, the instructi
 
 ```python
 # Agent that uses a pre-defined web tool package.
-agent_researcher = SmolAgentFactory("1_researcher", instruct_researcher, BROWSER_MCP)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, BROWSER_MCP)
 
 # Agent that writes and executes R code and has shell.
-agent_coder = SmolAgentFactory("2_coder", instruct_coder, R_SCRIPT_MCP + SHELL_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, R_SCRIPT_MCP + SHELL_MCP)
 ```
 
 Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
@@ -223,34 +223,34 @@ You will receive research findings or data from previous agents that you need to
 """
 
 # 3. AGENT CREATION (Instantiate all agents here)
-agent_researcher = SmolAgentFactory("1_researcher", instruct_researcher, WEB_SEARCH_MCP + SHELL_MCP)
-agent_coder = SmolAgentFactory("2_coder", instruct_coder, PYTHON_EDITING_MCP + SHELL_MCP)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP + SHELL_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP + SHELL_MCP)
 
 # 4. NODE DEFINITION  (Add agents to the workflow here)
-workflow.add_node("1_researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
-workflow.add_node("2_coder", WorkflowNodeFactory.create_agent_node(agent_coder))
+workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
+workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
 
 # 5. EDGE DEFINITION (Wire the graph together here)
-workflow.add_edge(START, "1_researcher")
+workflow.add_edge(START, "researcher")
 
 master_router is a method that can return one of ["next_node", "retry_node", "fallback_node", END]
 workflow.add_conditional_edges(
-    "1_researcher",
+    "researcher",
     master_router, # always trust the master_router
     {
-        "next_node": "2_coder",
-        "retry_node": "1_researcher",
+        "next_node": "coder",
+        "retry_node": "researcher",
         "fallback_node": "knowledge_agent",
         END: END
     }
 )
 
 workflow.add_conditional_edges(
-    "2_coder",
+    "coder",
     master_router, # always trust the master_router
     {
         "next_node": "<next agen" or END>,
-        "retry_node": "2_coder",
+        "retry_node": "coder",
         "fallback_node": END,
         END: END
     }
