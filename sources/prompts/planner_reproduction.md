@@ -77,7 +77,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.txt, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create a requirement.txt file with list of requirements if not already present. Also check if any datasets is present in mgwas_repo/ or information on how to get dataset in the readme.md and report the information in reproduction_mgwas.txt.",
+      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.md, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create a requirement.txt file with list of requirements if not already present. Create a virtual environnement and install all dependencies. Check if any datasets is present in mgwas_repo/ or if the readme.md contain information regarding datasets aquisition and document findings in reproduction_mgwas.md.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["reproduction_mgwas.md"],
       "expected_outputs": ["mgwas_repo/"],
@@ -101,7 +101,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "results_validation",
-      "task": "Compare reproduction results with original paper results from reproduction_mgwas.md. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.txt'.",
+      "task": "Compare reproduction results with original paper results from reproduction_mgwas.md. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.md'.",
       "depends_on": ["experiment_execution"],
       "required_inputs": ["results/", "paper_analysis.json"],
       "expected_outputs": ["validation_report.html", "discrepancies_analysis.md"],

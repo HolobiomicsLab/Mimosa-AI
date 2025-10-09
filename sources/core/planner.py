@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 import time
 import threading
 from pathlib import Path
@@ -45,6 +46,7 @@ class Planner:
         self.visualizer: PlannerVisualizer | None = None
         self.visualizer_thread: threading.Thread | None = None
         self.use_visualization: bool = True  # Can be disabled if pygame not available
+        self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
 
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
@@ -278,7 +280,10 @@ Original request:
 
     def _init_visualization(self, plan: Plan) -> None:
         """
-        Initialize the pygame visualization window in a separate thread.
+        Initialize the pygame visualization window.
+        On macOS, pygame must run on the main thread due to Cocoa requirements.
+        On Linux, it can run in a separate thread for better performance.
+        
         Args:
             plan: The execution plan to visualize
         """
@@ -289,16 +294,21 @@ Original request:
             self.visualizer = PlannerVisualizer(plan)
             print("🎨 Visualization window initialized")
 
-            # Start event handling in a separate thread
-            def visualization_loop():
-                import pygame
-                clock = pygame.time.Clock()
-                while self.visualizer and self.visualizer.is_running():
-                    self.visualizer.handle_events()
-                    clock.tick(30)  # 30 FPS
+            # On Linux, use a separate thread for event handling
+            # On macOS, event handling must be done from main thread (will be called periodically)
+            if not self.is_macos:
+                def visualization_loop():
+                    import pygame
+                    clock = pygame.time.Clock()
+                    while self.visualizer and self.visualizer.is_running():
+                        self.visualizer.handle_events()
+                        clock.tick(30)  # 30 FPS
 
-            self.visualizer_thread = threading.Thread(target=visualization_loop, daemon=True)
-            self.visualizer_thread.start()
+                self.visualizer_thread = threading.Thread(target=visualization_loop, daemon=True)
+                self.visualizer_thread.start()
+                print("🎨 Visualization running in separate thread (Linux)")
+            else:
+                print("🎨 Visualization will update from main thread (macOS)")
 
         except Exception as e:
             print(f"⚠️ Could not initialize visualization: {str(e)}")
@@ -309,9 +319,14 @@ Original request:
     def _update_visualization(self) -> None:
         """
         Update the visualization with the current task states.
+        On macOS, also handle events since we can't use a separate thread.
         """
         if self.visualizer and self.use_visualization:
             try:
+                # On macOS, handle events from main thread
+                if self.is_macos:
+                    self.visualizer.handle_events()
+                
                 self.visualizer.update_tasks(self.task_history)
             except Exception as e:
                 print(f"⚠️ Error updating visualization: {str(e)}")
@@ -322,14 +337,14 @@ Original request:
         """
         if self.visualizer:
             try:
-                # Mark visualizer as not running to stop the thread
+                # Mark visualizer as not running to stop the thread (if using thread)
                 self.visualizer.running = False
+                # On macOS, handle any remaining events before closing
+                if self.is_macos:
+                    self.visualizer.handle_events()
                 self.visualizer.close()
-
-                # Give thread a short time to finish, then continue
                 if self.visualizer_thread and self.visualizer_thread.is_alive():
                     self.visualizer_thread.join(timeout=0.5)
-
                 self.visualizer = None
                 self.visualizer_thread = None
                 print("🎨 Visualization window closed")
@@ -391,7 +406,7 @@ Original request:
 
     def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
-        Verify that expected outputs were produced.
+        Verify that expected outputs files were produced.
         Args:
             step: The plan step
             produced_outputs: List of actually produced outputs
@@ -399,10 +414,15 @@ Original request:
             Tuple[bool, List[str]]: (all_produced, missing_outputs)
         """
         missing_outputs = []
-
         workspace_files = self._capture_workspace_snapshot()
+
         for expected_output in step.expected_outputs:
-            found = any(expected_output in produced for produced in workspace_files)
+            exp_terms = set(re.sub(r'[_\-.]', ' ', os.path.splitext(expected_output)[0].lower()).split())
+            found = any(
+                expected_output in actual or
+                len(exp_terms & set(re.sub(r'[_\-.]', ' ', os.path.splitext(actual)[0].lower()).split())) >= len(exp_terms) * 0.7
+                for actual in workspace_files
+            )
             if not found:
                 missing_outputs.append(expected_output)
 
@@ -425,13 +445,16 @@ Original request:
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
+        self.notifier.send_message(
+            f"Mimosa is requesting exit:\n{msg}",
+            title="Mimosa exit request."
+        )
         print(msg)
         choice = input("\nContinue ? (y(yes)/n(no))")
         if choice.lower() == "y" or choice.lower() == "yes":
             return
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
-
 
     async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True):
         """
@@ -577,13 +600,14 @@ Original request:
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
+                        break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                    break
+                        self.request_user_exit("Retry task (will exit otherwise) ?")
+                        continue
                 else:
                     print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
-                    if attempt < max_attempts:
-                        print("🔄 Retrying...")
+                    continue
 
             except Exception as e:
                 raise e
@@ -624,10 +648,8 @@ Original request:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
 
             self._display_plan(self.current_plan)
-
             # Initialize visualization
             self._init_visualization(self.current_plan)
-
             # Check for stop condition
             if self._check_stop_condition(self.current_plan):
                 print("⏹️ Stop condition found in plan. Exiting.")
@@ -645,13 +667,10 @@ Original request:
                 if step is None:
                     print(f"⚠️ Step {step_idx + 1} is None, skipping")
                     continue
-
                 step_name = getattr(step, 'name', f'step_{step_idx}')
-
                 print(f"\n{'='*60}")
                 print(f"📋 Executing Step {step_idx + 1}/{len(self.current_plan.steps)}: {step_name}")
                 print(f"{'='*60}")
-
                 # Check if step can be executed (dependencies satisfied)
                 if lst_step:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
@@ -662,7 +681,6 @@ Original request:
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
                 self._update_visualization()  # Update to show running status
-
                 max_attempts = max_task_retry
 
                 try:
@@ -700,18 +718,8 @@ Original request:
             trs = Transfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
             trs.transfer_workspace_files_to_capsule(goal)
 
-            # Keep visualization open briefly to show final state
             if self.visualizer:
-                print("\n👀 Visualization window open. Press ESC or Q to close, or wait 5 seconds...")
-
-                # Allow user to close early while waiting
-                import pygame
-                start_time = time.time()
-                while time.time() - start_time < 5.0 and self.visualizer.is_running():
-                    time.sleep(0.1)
-
                 self._cleanup_visualization()
-
             return self.task_history
 
         except Exception as e:
