@@ -176,7 +176,7 @@ Provide a structured analysis with:
         numerical_detector = BullshitDetectorNumerical()
         bs_analysis_report = "REPORT OF FRAUDULENT VALUES:\n\n"
         for task in tasks:
-            bs_report, scores = numerical_detector.generate_numerical_report(
+            bs_report, scores = numerical_detector.generate_short_fraud_report(
                 numerical_detector.analyze_all_agents_numerical(task.final_uuid)
             )
             if max(scores) <= 6:
