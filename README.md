@@ -188,8 +188,6 @@ The system implements a **Darwinian workflow evolution** inspired by Gödel mach
 
 ## Phone notification setup
 
-# Phone Notifications Setup
-
 Get real-time updates about Mimosa's status directly on your phone using Pushover.
 
 ## Setup Steps

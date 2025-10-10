@@ -6,12 +6,13 @@ import time
 import threading
 from pathlib import Path
 from .dgm import GodelMachine
-from .llm_provider import LLMProvider, LLMConfig
+from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.transfer_toolomics import Transfer
 from sources.utils.planner_visualization import PlannerVisualizer
+
 
 
 class PlanValidationError(Exception):
@@ -41,7 +42,12 @@ class Planner:
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.config_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+        provider, model = extract_model_pattern(self.config.planner_llm_model)
+        self.config_llm = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None
         self.visualizer_thread: threading.Thread | None = None

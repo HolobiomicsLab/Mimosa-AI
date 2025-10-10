@@ -8,6 +8,16 @@ import glob
 
 import litellm
 
+def extract_model_pattern(llm_model: str) -> tuple[str, str]:
+    # Extract provider and model from OpenRouter format (provider/model)
+    if "/" in llm_model:
+        provider, model = llm_model.split("/", 1)
+    else:
+        # Fallback for backward compatibility
+        provider = "openai"
+        model = llm_model
+    return provider, model
+
 
 @dataclass
 class LLMConfig:
