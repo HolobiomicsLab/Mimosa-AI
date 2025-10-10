@@ -100,7 +100,7 @@ class WorkflowFactory:
                 line.strip().startswith("import ") or line.strip().startswith("from ")
             )
         )
-    
+
     def extract_model_pattern(self, workflow_llm_model: str) -> tuple[str, str]:
         # Extract provider and model from OpenRouter format (provider/model)
         if "/" in workflow_llm_model:
@@ -138,7 +138,7 @@ Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
 Keep the prompt short and efficient.
         """
-        
+
         provider, model = self.extract_model_pattern(self.config.prompts_llm_model)
         llm_config = LLMConfig(
             model=model,
@@ -165,7 +165,7 @@ The following tools packages are available for agents:
 {existing_tool_prompt}
 
 CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
 2. Clearly state that the task cannot be completed with available tools
 Do NOT assume any tools exist beyond what is explicitly listed above.
 
@@ -173,7 +173,7 @@ Do NOT assume any tools exist beyond what is explicitly listed above.
 
 The prompts have already been generated for you as Python code:
 
-{prompts_code} 
+{prompts_code}
 
 Given that prompts are already defined, your task is to generate a workflow that uses these prompts.
 You should not modify or rewrite the prompts.
@@ -184,7 +184,7 @@ You should not modify or rewrite the prompts.
 You must write a commentary before the prompt explaining the workflow.
 The last agent in the workflow must determine whenever the task was a success or failure.
         """
-        
+
         provider, model = self.extract_model_pattern(self.config.workflow_llm_model)
         llm_config = LLMConfig(
             model=model,
