@@ -41,7 +41,7 @@ class Config:
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
         self.papers_benchmark_path: str = "datasets/paper_bench_light.csv"
         # toolomics workspace
-        self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
         # SmolAgent model configuratio
         self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
