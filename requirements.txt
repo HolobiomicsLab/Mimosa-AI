@@ -11,3 +11,4 @@ litellm
 openai==1.99.9
 python_a2a
 psutil>=5.9.0
+pygame>=2.5.0

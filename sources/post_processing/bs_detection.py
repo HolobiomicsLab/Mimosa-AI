@@ -129,6 +129,7 @@ class BullshitDetectorNumerical:
         
         self.llm_config = llm_config
         self.numerical_judge_system_prompt = self._create_numerical_judge_system_prompt()
+        self.values_already_found = []
         
         # Regex patterns for numerical value extraction
         self.number_patterns = [
@@ -163,7 +164,7 @@ RED_FLAGS
 - Values contradicting earlier computations
 
 For each numerical value analysis, provide:
-- **FRAUD_SCORE**: 0-10 (0=completely legitimate, 10=clearly fabricated).
+- **FRAUD_SCORE**: 0-10 (0=completely legitimate, 10=clearly fabricated). Values coming originaly from the 'user' role should be considerered as legitimate.
 - **ISSUES**: list of issues in how the value was derivated.
 - **EVIDENCE**: supporting evidence such as code sample or text where the lie/error was fabricated.
 - **MATH**: Math formula/python/R code if any 
@@ -194,29 +195,54 @@ Specificity = 0.9 ✓
         comma_lines = sum(1 for line in lines if ',' in line)
         return comma_lines / len(lines) > 0.6
 
-    def extract_numerical_values(self, text: str) -> set[str]:
-        numbers = set()
+    def extract_numerical_values(self, text: str) -> list[str]:
+        numbers = []
         if self.is_csv_content(text):
-            return set()
-        all_matches = set()
+            return []
+        
+        seen = set()
         for pattern in self.compiled_patterns:
-            all_matches.update(pattern.findall(text))
-        for match in all_matches:
-            clean_num = re.sub(r'[%\s].*$', '', match)
-            # Skip if no decimal point
-            if '.' not in clean_num:
-                continue
-            # Skip version numbers: look for pattern x.y.z or x.y.z.w etc
-            if re.match(r'^\d+\.\d+\.\d+', clean_num):
-                continue
-            try:
-                float_value = float(clean_num)
-                if float_value < 100.0:
-                    numbers.add(match)
-            except ValueError:
-                continue
+            for match in pattern.finditer(text):
+                matched_text = match.group()
+                match_start = match.start()
+                match_end = match.end()
+                
+                # Clean the number
+                clean_num = re.sub(r'[%\s].*$', '', matched_text)
+                if '.' not in clean_num:
+                    continue
+                if re.match(r'^\d+\.\d+\.\d+', clean_num):
+                    continue
+                
+                try:
+                    float_value = float(clean_num)
+                    if float_value >= 100.0:
+                        continue
+                    if matched_text in seen:
+                        continue
+                    
+                    # Check if the number is followed by uppercase words (section titles)
+                    # Look ahead up to 50 characters
+                    look_ahead = text[match_end:match_end + 50]
+                    # Pattern: optional whitespace followed by uppercase word(s)
+                    if re.match(r'^\s+[A-Z][A-Z\s]{2,}', look_ahead):
+                        continue
+                    
+                    # Check if preceded by uppercase word (within 20 chars before)
+                    look_behind_start = max(0, match_start - 20)
+                    look_behind = text[look_behind_start:match_start]
+                    # Pattern: uppercase word followed by optional whitespace
+                    if re.search(r'[A-Z][A-Z\s]{2,}\s*$', look_behind):
+                        continue
+                    
+                    numbers.append(matched_text)
+                    seen.add(matched_text)
+                    
+                except ValueError:
+                    continue
+        
         return numbers
-    
+
     def is_coding(self, cmd):
         py_attempt = ["replace_line_range", "replace_method_implementation", "add_method_to_class", "create_python_file", "python3"]
         r_attempt = ["execute_r_code", "write_r_script"]
@@ -225,7 +251,7 @@ Specificity = 0.9 ✓
         if any([r in cmd for r in r_attempt]):
             return True
         return False
-
+    
     def backtrace_numerical_values(self, agent_name: str, memory_data: list[dict], last_steps_count: int = 1) -> dict[str, list[dict]]:
         """
         Backtrace numerical values through agent memory, focusing on values from the last steps.
@@ -242,24 +268,6 @@ Specificity = 0.9 ✓
         if not memory_data:
             return {}
             
-        last_steps_values = set()
-        total_steps = len(memory_data)
-        start_idx = max(0, total_steps - last_steps_count)
-        print(f"[DEBUG] Agent {agent_name}:")
-        # Extract values from last steps
-        for step_idx in range(start_idx, total_steps):
-            entry = memory_data[step_idx]
-            role = entry['role']
-            content = self._extract_content_text(entry)
-            if not content:
-                continue
-            print(f"[DEBUG] Step : {step_idx} Role: {role}\n")
-            numbers_in_step = self.extract_numerical_values(content)
-            for number in numbers_in_step:
-                print(f"[DEBUG] Backtracking value '{number}...'")
-            last_steps_values.update(numbers_in_step)
-        
-        # Now backtrace only these values through the entire memory
         value_timeline = {}
         relevant_code = ""
 
@@ -272,7 +280,7 @@ Specificity = 0.9 ✓
                 relevant_code = str(entry) if entry else None
                 
             numbers_in_step = self.extract_numerical_values(content)
-            relevant_numbers = numbers_in_step.intersection(last_steps_values)
+            relevant_numbers = [nb for nb in numbers_in_step if nb not in self.values_already_found]
             for number in relevant_numbers:
                 if number not in value_timeline:
                     value_timeline[number] = []
@@ -309,7 +317,7 @@ Specificity = 0.9 ✓
         else:
             return str(content)
 
-    def _extract_number_context(self, text: str, number: str, context_chars: int = 1024) -> str:
+    def _extract_number_context(self, text: str, number: str, context_chars: int = 512) -> str:
         """Extract surrounding context for a numerical value."""
         # Find the position of the number in text
         pattern = re.escape(number)
@@ -317,7 +325,7 @@ Specificity = 0.9 ✓
         if not match:
             return f"Number '{number}' found in text"
         start_pos = max(0, match.start() - context_chars)
-        end_pos = min(len(text), match.end() + context_chars)
+        end_pos = min(len(text), match.end() + (context_chars // 4))
         context = text[start_pos:end_pos]
         if start_pos > 0:
             context = "..." + context
@@ -336,6 +344,10 @@ Analyze these numerical values for potential fraud or fabrication. Focus on:
 1. Values that appear without clear origin
 2. Values that seem to be calculated using incoherent values.
 3. Inconsistent or contradictory numerical claims
+
+- Values that come from tool-response and appear to be documents content such as PDF should be considered valid. This is because tool-reponse may be result from reading a PDF and therefore values are legitimate.
+- Values that appear to be title  are de-facto legitimate.
+- Values that are not metrics, percentage or numerical computation results but appear from litterature are legitimate
 
 third-party validation is not needed.
 
@@ -400,7 +412,9 @@ Provide your analysis in JSON format:
             section.append("Backtrace appearance:\n")
             
             for appearance in unique_appearances:
-                step_info = f" => Step {appearance['step']} ({appearance['role']}):\n\n"
+                step_info = f" => Step {appearance['step']} (role: {appearance['role']}):\n\n"
+                if appearance['role'] == "user":
+                    step_info += "\nrole user values should be considered legitimate.\n"
                 if appearance['relevant_code']:
                     step_info += f"\n[RELEVANT CODE]:\n {appearance['relevant_code']}\n"
                     step_info += "[FIRST]"
@@ -437,6 +451,7 @@ Provide your analysis in JSON format:
                 "suspicious_values": [],
                 "analysis_summary": "No numerical values found to analyze"
             }]
+        self.values_already_found.extend(value_timeline.keys())
         prompt_values = self._format_numerical_analysis(agent_name, value_timeline)
         analysis_values = []
         for prompt in prompt_values:
@@ -456,7 +471,7 @@ Provide your analysis in JSON format:
         """
         memory_extraction = MemoryExtraction(uuid)
         if target_roles is None:
-            target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations"]
+            target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations", "user"]
         
         agents_memories = memory_extraction.get_agent_memories(target_roles)
         agent_analyses = []
@@ -472,7 +487,7 @@ Provide your analysis in JSON format:
             "agent_analyses": agent_analyses
         }
 
-    def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> str:
+    def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> tuple[str, list[int]]:
         """
         Generate a comprehensive numerical fraud detection report.
         
@@ -484,17 +499,19 @@ Provide your analysis in JSON format:
             Report as a string
         """
         report_lines = []
+        scores = []
         report_lines.append("=" * 80)
         report_lines.append("NUMERICAL FRAUD DETECTION REPORT")
         report_lines.append("=" * 80)
         report_lines.append(f"UUID: {analysis_results['uuid']}")
         report_lines.append(f"Target Roles: {', '.join(analysis_results['target_roles'])}")
         report_lines.append("")
-        
         report_lines.append("DETAILED AGENT ANALYSES:")
         report_lines.append("-" * 80)
         for analysis in analysis_results['agent_analyses']:
             value_analysis = analysis
+            scores.append(value_analysis['fraud_score'])
+
             report_lines.append(f"\nAGENT: {value_analysis['agent_name']}")
             report_lines.append(f"Fraud Score: {value_analysis['fraud_score']}/10")
             report_lines.append(f"Suspicious Values: {len(value_analysis.get('suspicious_values', []))}")
@@ -527,7 +544,80 @@ Provide your analysis in JSON format:
                 f.write(report)
             print(f"Numerical fraud report saved to: {output_path}")
         
-        return report
+        return report, scores
+
+    def generate_short_fraud_report(self, analysis_results: dict, threshold: float = 5.0) -> str:
+        """
+        Generate a concise fraud report showing only high-risk fraudulent values.
+        
+        Args:
+            analysis_results: Results from analyze_all_agents_numerical
+            threshold: Minimum fraud score to include (default: 5.0)
+            
+        Returns:
+            Short fraud report as a string
+        """
+        report_lines = []
+        report_lines.append("=" * 80)
+        report_lines.append("SHORT FRAUD REPORT - HIGH RISK VALUES ONLY")
+        report_lines.append("=" * 80)
+        report_lines.append(f"UUID: {analysis_results['uuid']}")
+        report_lines.append(f"Threshold: Fraud Score > {threshold}/10")
+        report_lines.append("")
+        
+        # Collect all agents with high fraud scores and their suspicious values
+        fraudulent_agents = {}
+        total_fraudulent_values = 0
+        
+        for analysis in analysis_results['agent_analyses']:
+            agent_name = analysis['agent_name']
+            suspicious_values = analysis.get('suspicious_values', [])
+            
+            # Filter values above threshold
+            high_risk_values = [
+                sv for sv in suspicious_values 
+                if sv.get('fraud_score', 0) > threshold
+            ]
+            
+            if high_risk_values:
+                if agent_name not in fraudulent_agents:
+                    fraudulent_agents[agent_name] = []
+                fraudulent_agents[agent_name].extend(high_risk_values)
+                total_fraudulent_values += len(high_risk_values)
+        
+        # Summary
+        report_lines.append(f"SUMMARY:")
+        report_lines.append(f"  Agents with fraudulent values: {len(fraudulent_agents)}")
+        report_lines.append(f"  Total high-risk fraudulent values: {total_fraudulent_values}")
+        report_lines.append("")
+        
+        if not fraudulent_agents:
+            report_lines.append("✓ No high-risk fraudulent values detected.")
+            return "\n".join(report_lines)
+        
+        # Detailed breakdown by agent
+        report_lines.append("FRAUDULENT VALUES BY AGENT:")
+        report_lines.append("-" * 80)
+        
+        for agent_name, fraudulent_values in fraudulent_agents.items():
+            report_lines.append(f"\n🚨 AGENT: {agent_name}")
+            report_lines.append(f"   Fraudulent values: {len(fraudulent_values)}")
+            report_lines.append("")
+            
+            for idx, fraud_val in enumerate(fraudulent_values, 1):
+                report_lines.append(f"   [{idx}] VALUE: {fraud_val['value']} (Score: {fraud_val['fraud_score']}/10)")
+                report_lines.append(f"       Issues: {', '.join(fraud_val['issues'])}")
+                
+                # Truncate evidence if too long
+                evidence = fraud_val.get('evidence', 'N/A')
+                if len(evidence) > 200:
+                    evidence = evidence[:200] + "..."
+                report_lines.append(f"       Evidence: {evidence}")
+                report_lines.append("")
+            
+            report_lines.append("-" * 40)
+        
+        return "\n".join(report_lines)
 
 
 if __name__ == "__main__":
@@ -541,5 +631,5 @@ if __name__ == "__main__":
     numerical_results = numerical_detector.analyze_all_agents_numerical(uuid)
     print("\n📊 NUMERICAL FRAUD DETECTION REPORT")
     print("=" * 50)
-    numerical_report = numerical_detector.generate_numerical_report(numerical_results)
+    numerical_report = numerical_detector.generate_short_fraud_report(numerical_results)
     print(numerical_report)
