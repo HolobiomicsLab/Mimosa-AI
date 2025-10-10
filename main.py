@@ -121,7 +121,7 @@ async def dataset_execution_mode(args, config):
 
 async def automated_mode(args, config):
     """Run autonomous mode where LLM generates and executes tasks automatically."""
-    automated = AutomatedMode(config, max_iterations=args.max_iterations)
+    automated = AutomatedMode(config, csv_runs_limit=args.csv_runs_limit)
     await automated.start_autonomous_mode()
 
 async def normal_execution_mode(args, config):
@@ -167,7 +167,7 @@ async def main():
         "--automated", action="store_true", help="Autonomous mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--max_iterations", type=int, default=2, help="Maximum number of autonomous iterations (for --automated mode)"
+        "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --automated mode)"
     )
     parser.add_argument(
         "--dataset", type=str, help="evalaluation mode for single task mode, specify dataset folder to use such as GSMK8 (csv)"
