@@ -24,16 +24,16 @@ class AutomatedMode:
     and learn from results to generate progressively more challenging goals.
     """
 
-    def __init__(self, config, max_iterations: int = 10):
+    def __init__(self, config, csv_runs_limit: int = 10):
         """
         Initialize AutomatedMode.
 
         Args:
             config: Mimosa configuration object
-            max_iterations: Maximum number of autonomous iterations
+            csv_runs_limit: Maximum number of autonomous iterations
         """
         self.config = config
-        self.max_iterations = max_iterations
+        self.csv_runs_limit = csv_runs_limit
         self.dgm = GodelMachine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
@@ -147,7 +147,7 @@ Provide a structured analysis with:
                 self.done_rows.append(random_row)
                 for i, row in enumerate(reader):
                     if i == random_row:
-                        return row['Title'].strip(), row['URLS'].strip(), row['Prompt'].strip()
+                        return row['Title'].strip(), row['URLS'].strip(), row.get('Prompt', '').strip()
 
         except Exception as e:
             self.logger.warning(f"[AUTOMATED MODE] Could not read random paper from CSV: {str(e)}")
@@ -218,26 +218,25 @@ Provide your analysis following the specified output format."""
         Main autonomous execution loop.
         Generates goals, executes them, analyzes results, and learns.
         """
-        self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {self.max_iterations} iterations")
+        self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {self.csv_runs_limit} CSV entry")
 
-        print(f"\n\033[95m{'🤖 AUTONOMOUS MODE':^80}\033[0m")
+        print(f"\n\033[95m{'🤖 AUTOMATED RUN ON PAPERS DATASETS':^80}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
-        print(f"\033[95mRunning {self.max_iterations} autonomous iterations\033[0m")
         print(f"\033[95mNotes will be saved to: {self.run_notes_dir}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
         user_input = input("Enter starting row ([Enter] for random): ")
         start_row = int(user_input)-1 if user_input.strip() else -1
 
-        for iteration in range(self.max_iterations):
+        for iteration in range(self.csv_runs_limit):
             try:
                 iteration_start_time = time.time()
                 print(f"\n\033[95m{'─' * 60}\033[0m")
-                print(f"\033[95mAUTONOMOUS ITERATION {iteration + 1}/{self.max_iterations}\033[0m")
+                print(f"\033[95mAUTONOMOUS ITERATION {iteration + 1}/{self.csv_runs_limit}\033[0m")
                 print(f"\033[95m{'─' * 60}\033[0m")
                 # Generate next goal
                 goal = self._generate_next_task(iteration, start_row)
-                print(f"\033[95m📋 Task: {goal}\033[0m")
+                print(f"\033[95m📋 GOAL: {goal}\033[0m")
                 # Execute goal via planner
                 tasks_data = await self.planner.start_planner(goal=goal,
                             judge=False,
@@ -267,7 +266,7 @@ Provide your analysis following the specified output format."""
                 print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                 print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
                 # Brief pause between iterations
-                if iteration < self.max_iterations - 1:
+                if iteration < self.csv_runs_limit - 1:
                     print("\033[95m⏸️  Pausing before next iteration...\033[0m")
                     await asyncio.sleep(2)
             except Exception as e:

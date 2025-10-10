@@ -39,7 +39,7 @@ class Config:
         self.memory_dir: str = "sources/memory"
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
-        self.papers_benchmark_path: str = "datasets/our_benchmark.csv"
+        self.papers_benchmark_path: str = "datasets/paper_bench_light.csv"
         # toolomics workspace
         self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
