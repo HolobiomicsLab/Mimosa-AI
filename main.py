@@ -85,7 +85,7 @@ def setup_signal_handlers():
             if not task.done():
                 task.cancel()
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -133,13 +133,13 @@ async def normal_execution_mode(args, config):
         args.judge = True
     if args.task:
         await dgm.start_dgm(goal=args.task,
-                            judge=args.judge, 
+                            judge=args.judge,
                             scenario_id=args.scenario,
                             human_validation=False,
                             max_iteration=args.max_dgm_iterations
                            )
     elif args.goal:
-        await planner.start_planner(goal=args.goal, 
+        await planner.start_planner(goal=args.goal,
                                     judge=args.judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
@@ -150,7 +150,7 @@ async def main():
     """Main execution function"""
     config = Config()
     setup_signal_handlers()
-    
+
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
@@ -164,13 +164,13 @@ async def main():
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
     )
     parser.add_argument(
-        "--automated", action="store_true", help="Autonomous mode (LLM generates and executes tasks automatically)"
+        "--automated", action="store_true", help="Autonomous mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--max_iterations", type=int, default=10, help="Maximum number of autonomous iterations (for --automated mode)"
+        "--max_iterations", type=int, default=2, help="Maximum number of autonomous iterations (for --automated mode)"
     )
     parser.add_argument(
-        "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
+        "--dataset", type=str, help="evalaluation mode for single task mode, specify dataset folder to use such as GSMK8 (csv)"
     )
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load", default=None
@@ -196,10 +196,10 @@ async def main():
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
-    
+
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
-    
+
     apply_config_overrides(args, config)
 
     validate_environment()

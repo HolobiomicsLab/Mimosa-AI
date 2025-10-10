@@ -27,7 +27,7 @@ class AutomatedMode:
     def __init__(self, config, max_iterations: int = 10):
         """
         Initialize AutomatedMode.
-        
+
         Args:
             config: Mimosa configuration object
             max_iterations: Maximum number of autonomous iterations
@@ -38,18 +38,18 @@ class AutomatedMode:
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
-        self.done_rows = [6, 11, 12, 8] # NOTE actually row-1
-        
+        self.done_rows = []
+
         model_name = "deepseek/deepseek-chat"  # Use OpenRouter format: provider/model
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
-        
+
         self.llm_config = LLMConfig(
             model=model,
             provider=provider,
             temperature=0.8  # Some creativity for goal generation
         )
         self.result_analyzer = LLMProvider(
-            agent_name="result_analyzer", 
+            agent_name="result_analyzer",
             memory_path=None,
             system_msg=self._get_result_analyzer_system_prompt(),
             config=self.llm_config
@@ -92,7 +92,7 @@ Provide a structured analysis with:
 3. WEAKNESSES: Areas that need improvement
 """
 
-    def _save_run_notes(self, iteration: int, goal: str, 
+    def _save_run_notes(self, iteration: int, goal: str,
                        analysis: dict, execution_time: float) -> None:
         """Save detailed notes about the run."""
         timestamp = datetime.now().isoformat()
@@ -104,35 +104,35 @@ Provide a structured analysis with:
             "analysis": analysis["full_analysis"],
             "frauds": analysis["fraud_analysis"]
         }
-        
+
         notes_file = self.run_notes_dir / f"run_{iteration:03d}.json"
         notes_file.parent.mkdir(parents=True, exist_ok=True)
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
-        
+
         self.logger.info(f"[AUTOMATED MODE] Run notes saved to {notes_file}")
 
     def _extract_wf_answers(self, workflow_info: WorkflowInfo) -> str:
         """Extract and format flow answers from workflow state result."""
         state_result = workflow_info.load_state_result()
-        
+
         if not state_result or "answers" not in state_result:
             return "No answers found in workflow execution."
-        
+
         # Format answers as specified in the requirements
         if isinstance(state_result["answers"], list) and "step_name" in state_result:
             wf_answers = "\n".join(
-                f"agent {n}: {x}" 
+                f"agent {n}: {x}"
                 for (n, x) in zip(state_result["step_name"], state_result["answers"], strict=True)
             )
         else:
             wf_answers = str(state_result["answers"])
-        
+
         return wf_answers
-    
+
     def _get_random_paper_title(self, start_row=0) -> tuple[str, str, str]:
         """Get a random paper title from the papers.csv file."""
-        papers_csv_path = Path("datasets/our_benchmark.csv")
+        papers_csv_path = Path(self.config.papers_benchmark_path)
 
         try:
             with open(papers_csv_path, encoding='utf-8') as csvfile:
@@ -219,7 +219,7 @@ Provide your analysis following the specified output format."""
         Generates goals, executes them, analyzes results, and learns.
         """
         self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {self.max_iterations} iterations")
-        
+
         print(f"\n\033[95m{'🤖 AUTONOMOUS MODE':^80}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
         print(f"\033[95mRunning {self.max_iterations} autonomous iterations\033[0m")
@@ -239,7 +239,7 @@ Provide your analysis following the specified output format."""
                 goal = self._generate_next_task(iteration, start_row)
                 print(f"\033[95m📋 Task: {goal}\033[0m")
                 # Execute goal via planner
-                tasks_data = await self.planner.start_planner(goal=goal, 
+                tasks_data = await self.planner.start_planner(goal=goal,
                             judge=False,
                             max_dgm_iteration=1,
                             max_task_retry=3
@@ -257,10 +257,10 @@ Provide your analysis following the specified output format."""
                     "key_insight": analysis.get("full_analysis", "Unknown")
                 }
                 self.execution_history.append(execution_data)
-                
+
                 # Save detailed notes
                 self._save_run_notes(
-                    iteration + 1, goal, 
+                    iteration + 1, goal,
                     analysis, execution_time
                 )
                 print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
@@ -274,15 +274,15 @@ Provide your analysis following the specified output format."""
                 self.logger.error(f"[AUTOMATED MODE] Error in iteration {iteration + 1}: {str(e)}")
                 print(f"\033[91m❌ Error in iteration {iteration + 1}: {str(e)}\033[0m")
                 raise e
-        
+
         self._print_final_summary()
 
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
         print(f"\n\033[95m{'🏁 AUTONOMOUS MODE COMPLETED':^80}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
-        
-        successful_runs = [exec_data for exec_data in self.execution_history 
+
+        successful_runs = [exec_data for exec_data in self.execution_history
                           if exec_data.get("success_level") in ["High", "Medium"]]
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
         print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
