@@ -45,7 +45,7 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
-        self.planner_llm_model: str = "openai/o3"
+        self.planner_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
         self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
         self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
         self.smolagent_model_id: str = "deepseek/deepseek-chat"
