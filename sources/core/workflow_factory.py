@@ -10,7 +10,7 @@ import uuid
 
 from sources.modules import state_schema
 
-from .llm_provider import LLMConfig, LLMProvider
+from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
 
 
@@ -101,16 +101,6 @@ class WorkflowFactory:
             )
         )
 
-    def extract_model_pattern(self, workflow_llm_model: str) -> tuple[str, str]:
-        # Extract provider and model from OpenRouter format (provider/model)
-        if "/" in workflow_llm_model:
-            provider, model = workflow_llm_model.split("/", 1)
-        else:
-            # Fallback for backward compatibility
-            provider = "openai"
-            model = self.config.workflow_llm_model
-        return provider, model
-
     def llm_make_prompts(
         self,
         system_prompt: str,
@@ -139,7 +129,7 @@ Previous workflow failed due to python error ? You don't need to change prompts.
 Keep the prompt short and efficient.
         """
 
-        provider, model = self.extract_model_pattern(self.config.prompts_llm_model)
+        provider, model = extract_model_pattern(self.config.prompts_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,
@@ -185,7 +175,7 @@ You must write a commentary before the prompt explaining the workflow.
 The last agent in the workflow must determine whenever the task was a success or failure.
         """
 
-        provider, model = self.extract_model_pattern(self.config.workflow_llm_model)
+        provider, model = extract_model_pattern(self.config.workflow_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,

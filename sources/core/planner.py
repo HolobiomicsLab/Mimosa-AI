@@ -6,12 +6,13 @@ import time
 import threading
 from pathlib import Path
 from .dgm import GodelMachine
-from .llm_provider import LLMProvider, LLMConfig
+from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.transfer_toolomics import Transfer
 from sources.utils.planner_visualization import PlannerVisualizer
+
 
 
 class PlanValidationError(Exception):
@@ -41,7 +42,12 @@ class Planner:
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.config_llm = LLMConfig.from_dict({"model": "o3", "provider": "openai"})
+        provider, model = extract_model_pattern(self.config.planner_llm_model)
+        self.config_llm = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None
         self.visualizer_thread: threading.Thread | None = None
@@ -67,12 +73,13 @@ class Planner:
 
         last_error = None
 
+        prompt = f"You must generate a plan for goal:\n{goal_prompt}\nImportant: Every task description should be very detailled and specific with the full path of all input output files specified."
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(prompt)
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -564,8 +571,8 @@ Original request:
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
 
             try:
-                #enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(step_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
+                enhanced_task = self._build_knowledge_aware_task(step_task)
+                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
 
                 last_run = dgm_runs[-1]
 
