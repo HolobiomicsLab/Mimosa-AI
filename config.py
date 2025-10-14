@@ -44,14 +44,14 @@ class Config:
         self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
         # SmolAgent model configuratio
-        self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm"
 
         # DGM/Workflow generation model configuration
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
         self.prompt_planner: str = "sources/prompts/planner_simple.md"
-        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
-        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.prompts_llm_model: str = "deepseek/deepseek-chat"
+        self.workflow_llm_model: str = "deepseek/deepseek-chat"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         # Controls reasoning depth vs. speed trade-off for O-series and GPT-5 models
