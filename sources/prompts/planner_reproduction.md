@@ -77,7 +77,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.md, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create a requirement.txt file with list of requirements if not already present. Create a virtual environnement and install all dependencies. Check if any datasets is present in mgwas_repo/ or if the readme.md contain information regarding datasets aquisition and document findings in reproduction_mgwas.md.",
+      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.md, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create or fix the requirement.txt file with list of requirements. Check if any datasets is present in mgwas_repo/ or if the readme.md contain information regarding datasets aquisition and document findings in reproduction_mgwas.md.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["reproduction_mgwas.md"],
       "expected_outputs": ["mgwas_repo/"],
@@ -92,8 +92,8 @@ Your response must be valid JSON following this exact schema:
       "complexity": "medium"
     },
     {
-      "name": "experiment_execution",
-      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/ and install all requirements. Run experiments matching paper's exact conditions and parameters from reproduction_mgwas.md. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "name": "experiment_setup_and_execution",
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/, setup a virtual environnement and install all dependencies from requirements.txt. Run experiments matching paper's exact conditions and parameters from reproduction_mgwas.md. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
       "depends_on": ["dataset_acquisition", "code_and_tools_acquisition"],
       "required_inputs": ["datasets/", "mgwas_repo/", "reproduction_mgwas.md"],
       "expected_outputs": ["results/"],
@@ -101,8 +101,8 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "results_validation",
-      "task": "Compare reproduction results with original paper results from reproduction_mgwas.md. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.md'.",
-      "depends_on": ["experiment_execution"],
+      "task": "Compare reproduction results in results/ with original paper results from reproduction_mgwas.md. Create quantitative comparison tables, statistical tests where appropriate, and visual comparisons of key figures. Generate 'validation_report.html' with side-by-side comparisons and assessment of reproduction success. Document any significant discrepancies and potential explanations in 'discrepancies_analysis.md'.",
+      "depends_on": ["experiment_setup_and_execution"],
       "required_inputs": ["results/", "paper_analysis.json"],
       "expected_outputs": ["validation_report.html", "discrepancies_analysis.md"],
       "complexity": "medium"
@@ -118,4 +118,5 @@ Your response must be valid JSON following this exact schema:
 - Failure modes must include concrete mitigation strategies
 - required_inputs should be very flexible and only list files or folder that are strictly required (90%+ chance of failure without the files)
 
+Each 'task' will trigger the creation of a multi-agent workflow specific to the task. Therefore describe task as workflow that want to solve a problem.
 Generate plans that are simple with no uncessessary complexity added. Regroup highly related steps as one (setup up env and running code can be part of the same task).
