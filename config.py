@@ -41,18 +41,18 @@ class Config:
 
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/toolomics"
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
         self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
         self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
         self.engine_name: str = "litellm" # for smolagent
-        
+
         # prompts for planner / workflow generator
-        self.prompt_planner: str = "sources/prompts/planner_simple.md"
+        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v7.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"

@@ -73,12 +73,13 @@ class Planner:
 
         last_error = None
 
+        prompt = f"You must generate a plan for goal:\n{goal_prompt}\nImportant: Every task description should be very detailled and specific with the full path of all input output files specified."
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(prompt)
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -289,7 +290,7 @@ Original request:
         Initialize the pygame visualization window.
         On macOS, pygame must run on the main thread due to Cocoa requirements.
         On Linux, it can run in a separate thread for better performance.
-        
+
         Args:
             plan: The execution plan to visualize
         """
@@ -332,7 +333,7 @@ Original request:
                 # On macOS, handle events from main thread
                 if self.is_macos:
                     self.visualizer.handle_events()
-                
+
                 self.visualizer.update_tasks(self.task_history)
             except Exception as e:
                 print(f"⚠️ Error updating visualization: {str(e)}")

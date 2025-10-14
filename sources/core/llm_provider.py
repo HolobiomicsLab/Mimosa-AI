@@ -23,7 +23,7 @@ def extract_model_pattern(llm_model: str) -> tuple[str, str]:
 class LLMConfig:
     """Configuration for Large Language Model interactions."""
 
-    model: str = "claude-opus-4-20250514"
+    model: str = "claude-3-7-sonnet-20250219"
     provider: str = "anthropic"
     temperature: float = 1.0
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
@@ -46,7 +46,7 @@ class LLMConfig:
             self.key = os.getenv("OPENAI_API_KEY", "")
         elif self.provider == "deepseek" and not self.key:
             self.key = os.getenv("DEEPSEEK_API_KEY", "")
-            
+
         if not self.key:
             if self.provider == "anthropic":
                 env_var = "ANTHROPIC_API_KEY"
@@ -56,12 +56,12 @@ class LLMConfig:
                 env_var = "DEEPSEEK_API_KEY"
             else:
                 env_var = f"{self.provider.upper()}_API_KEY"
-            
+
             raise ValueError(
                 f"API key not provided and {env_var} environment variable not set"
             )
         self.temperature = float(self.temperature)  # Ensure numeric type
-        
+
         # Validate reasoning effort
         valid_efforts = {"minimal", "low", "medium", "high"}
         if self.reasoning_effort not in valid_efforts:
@@ -84,12 +84,12 @@ class LLMConfig:
 
 class LLMProvider:
     """Handles interactions with various LLM APIs including OpenAI, Anthropic, and DeepSeek.
-    
+
     Supported providers:
     - anthropic: Claude models (claude-3-5-sonnet, claude-3-opus, etc.)
     - openai: GPT models (gpt-4, gpt-3.5-turbo, o1, o3, etc.)
     - deepseek: DeepSeek models (deepseek-chat, deepseek-coder, etc.)
-    
+
     Uses litellm for unified API access across providers.
     """
 
@@ -161,7 +161,7 @@ class LLMProvider:
                 except OSError as e:
                     self.logger.warning(f"Error reading cache file {agent_file}: {e}")
                     continue
-                
+
         self.logger.info(f"Cache miss for agent '{self.agent_name}'")
         return None
 
@@ -175,7 +175,7 @@ class LLMProvider:
             r_b = cached_msg.get('role')
             c_a = exp_msg.get('content')
             c_b = cached_msg.get('content')
-    
+
             if (r_a != r_b or c_a != c_b):
                 return False
 
@@ -206,7 +206,7 @@ class LLMProvider:
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
-                
+
                 response = litellm.completion(**completion_params)
                 break
             except TimeoutError:
@@ -242,7 +242,7 @@ if __name__ == "__main__":
         key=os.getenv("DEEPSEEK_API_KEY", ""),
         reasoning_effort="medium"
     )
-    
+
     # Use DeepSeek provider
     llm_provider = LLMProvider(
         agent_name="test_agent",
@@ -250,7 +250,7 @@ if __name__ == "__main__":
         system_msg="You are a helpful assistant.",
         config=deepseek_config
     )
-    
+
     prompt = "Explain the theory of relativity in simple terms."
     try:
         response = llm_provider(prompt)
