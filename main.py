@@ -94,7 +94,7 @@ async def manual_mode(args, config):
     await hm.shellLoop()
 
 async def dataset_execution_mode(args, config):
-    planner = Planner(config)
+    dgm = GodelMachine(config)
     print(f"Using {args.dataset} dataset")
     dataset_questions = read_dataset(args.dataset, args.num_samples)
     if dataset_questions:
@@ -103,7 +103,7 @@ async def dataset_execution_mode(args, config):
         async def run_with_semaphore(question, answer):
             """Run a single question with semaphore to limit concurrency"""
             async with semaphore:
-                return question, answer, await planner.start_planner(
+                return question, answer, await dgm.start_dgm(
                     goal=question,
                     template_uuid=args.load_template,
                     judge=True,
