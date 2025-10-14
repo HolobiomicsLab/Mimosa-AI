@@ -41,7 +41,7 @@ class Planner:
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.config_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+        self.config_llm = LLMConfig.from_dict({"model": "o3", "provider": "openai"})
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None
         self.visualizer_thread: threading.Thread | None = None
@@ -283,7 +283,7 @@ Original request:
         Initialize the pygame visualization window.
         On macOS, pygame must run on the main thread due to Cocoa requirements.
         On Linux, it can run in a separate thread for better performance.
-        
+
         Args:
             plan: The execution plan to visualize
         """
@@ -326,7 +326,7 @@ Original request:
                 # On macOS, handle events from main thread
                 if self.is_macos:
                     self.visualizer.handle_events()
-                
+
                 self.visualizer.update_tasks(self.task_history)
             except Exception as e:
                 print(f"⚠️ Error updating visualization: {str(e)}")
