@@ -186,6 +186,31 @@ The system implements a **Darwinian workflow evolution** inspired by Gödel mach
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
 
+## Phone notification setup
+
+Get real-time updates about Mimosa's status directly on your phone using Pushover.
+
+## Setup Steps
+
+1. **Register for Pushover**
+   - Go to [pushover.net](https://pushover.net/) and create an account
+   - After registration, you'll receive your **User Key**
+
+2. **Create an Application**
+   - In your Pushover dashboard, click "Create an Application/API Token"
+   - Name it (e.g., "Mimosa") and create it
+   - Copy your **API Token/Key**
+
+3. **Configure Environment Variables**
+```bash
+   export PUSHOVER_USER="your_user_key_here"
+   export PUSHOVER_TOKEN="your_api_token_here"
+```
+
+4. **Install Pushover on your phone***
+
+Download pushover from play/app store and login.
+
 ## 📈 Telemetry Setup
 
 Monitor and debug your AI agents with real-time observability dashboards.

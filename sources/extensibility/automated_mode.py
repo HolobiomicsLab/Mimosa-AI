@@ -6,7 +6,6 @@ import asyncio
 import csv
 import json
 import logging
-import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -20,8 +19,7 @@ from sources.post_processing.bs_detection import BullshitDetectorNumerical
 
 class AutomatedMode:
     """
-    Autonomous mode that uses LLM to generate goals, execute them via DGM,
-    and learn from results to generate progressively more challenging goals.
+    Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
     """
 
     def __init__(self, config, csv_runs_limit: int = 10):
@@ -130,33 +128,11 @@ Provide a structured analysis with:
 
         return wf_answers
 
-    def _get_random_paper_title(self, start_row=0) -> tuple[str, str, str]:
-        """Get a random paper title from the papers.csv file."""
-        papers_csv_path = Path(self.config.papers_benchmark_path)
-
-        try:
-            with open(papers_csv_path, encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                total_rows = sum(1 for _ in reader)
-                csvfile.seek(0)
-                reader = csv.DictReader(csvfile)
-                while True:
-                    random_row = random.randint(0, total_rows - 1) if start_row == -1 else start_row
-                    if random_row not in self.done_rows:
-                        break
-                self.done_rows.append(random_row)
-                for i, row in enumerate(reader):
-                    if i == random_row:
-                        return row['Title'].strip(), row['URLS'].strip(), row.get('Prompt', '').strip()
-
-        except Exception as e:
-            self.logger.warning(f"[AUTOMATED MODE] Could not read random paper from CSV: {str(e)}")
-            raise e
-        raise Exception("Run out of papers or failed to open CSV.")
-
-    def _generate_next_task(self, iteration: int, start_row: int = -1) -> str:
-        """Generate the next goal using LLM based on a random paper from the CSV."""
-        paper_title, url, prompt = self._get_random_paper_title(start_row)
+    def _generate_next_task(self, row) -> str:
+        """Generate the next goal using LLM based on paper from the CSV."""
+        paper_title = row.get('Title', '').strip() if row.get('Title') else ''
+        url = row.get('URLS', '').strip() if row.get('URLS') else ''
+        prompt = row.get('Prompt', '').strip() if row.get('Prompt') else ''
         if prompt == "":
             prompt = "Reproduce the experiments from the paper and compare the result."
 
@@ -202,7 +178,7 @@ Provide your analysis following the specified output format."""
         analysis = {
             "full_analysis": analysis_text,
             "fraud_analysis": fraud_report,
-            "success_level": "Medium",  # Default
+            "success_level": "Medium",
             "key_insight": "Analysis completed"
         }
         lines = analysis_text.split('\n')
@@ -218,61 +194,51 @@ Provide your analysis following the specified output format."""
         Main autonomous execution loop.
         Generates goals, executes them, analyzes results, and learns.
         """
-        self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {self.csv_runs_limit} CSV entry")
-
-        print(f"\n\033[95m{'🤖 AUTOMATED RUN ON PAPERS DATASETS':^80}\033[0m")
-        print(f"\033[95m{'=' * 80}\033[0m")
-        print(f"\033[95mNotes will be saved to: {self.run_notes_dir}\033[0m")
-        print(f"\033[95m{'=' * 80}\033[0m\n")
-
-        user_input = input("Enter starting row ([Enter] for random): ")
+        papers_csv_path = Path(self.config.papers_benchmark_path)
+        user_input = input("Enter starting row ([Enter] 0 by default): ")
         start_row = int(user_input)-1 if user_input.strip() else -1
-
-        for iteration in range(self.csv_runs_limit):
-            try:
-                iteration_start_time = time.time()
-                print(f"\n\033[95m{'─' * 60}\033[0m")
-                print(f"\033[95mAUTONOMOUS ITERATION {iteration + 1}/{self.csv_runs_limit}\033[0m")
-                print(f"\033[95m{'─' * 60}\033[0m")
-                # Generate next goal
-                goal = self._generate_next_task(iteration, start_row)
-                print(f"\033[95m📋 GOAL: {goal}\033[0m")
-                # Execute goal via planner
-                tasks_data = await self.planner.start_planner(goal=goal,
-                            judge=False,
-                            max_dgm_iteration=1,
-                            max_task_retry=3
-                           )
-
-                print("\033[95m📊 Analyzing results...\033[0m")
-                execution_time = time.time() - iteration_start_time
-                analysis = self._analyze_results(goal, tasks_data, execution_time)
-                # Save execution data
-                execution_data = {
-                    "iteration": iteration + 1,
-                    "goal": goal,
-                    "execution_time": execution_time,
-                    "success_level": analysis.get("success_level", "Unknown"),
-                    "key_insight": analysis.get("full_analysis", "Unknown")
-                }
-                self.execution_history.append(execution_data)
-
-                # Save detailed notes
-                self._save_run_notes(
-                    iteration + 1, goal,
-                    analysis, execution_time
-                )
-                print(f"\033[95m✅ Iteration {iteration + 1} completed\033[0m")
-                print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
-                print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
-                # Brief pause between iterations
-                if iteration < self.csv_runs_limit - 1:
-                    print("\033[95m⏸️  Pausing before next iteration...\033[0m")
-                    await asyncio.sleep(2)
-            except Exception as e:
-                self.logger.error(f"[AUTOMATED MODE] Error in iteration {iteration + 1}: {str(e)}")
-                print(f"\033[91m❌ Error in iteration {iteration + 1}: {str(e)}\033[0m")
-                raise e
+        with open(papers_csv_path, encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            total_rows = sum(1 for _ in reader)
+            csvfile.seek(0)
+            reader = csv.DictReader(csvfile)
+            self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {total_rows} CSV entry")
+            print(f"\n\033[95m{'🤖 AUTOMATED RUN ON PAPERS DATASETS':^80}\033[0m")
+            print(f"\033[95m{'=' * 80}\033[0m")
+            for i, row in enumerate(reader):
+                if i < start_row:
+                    continue
+                try:
+                    iteration_start_time = time.time()
+                    goal = self._generate_next_task(row)
+                    print(f"\033[95m📋 GOAL: {goal}\033[0m")
+                    tasks_data = await self.planner.start_planner(goal=goal,
+                                judge=False,
+                                max_dgm_iteration=1,
+                                max_task_retry=3
+                               )
+                    print("\033[95m📊 Analyzing results...\033[0m")
+                    execution_time = time.time() - iteration_start_time
+                    analysis = self._analyze_results(goal, tasks_data, execution_time)
+                    execution_data = {
+                        "iteration": i + 1,
+                        "goal": goal,
+                        "execution_time": execution_time,
+                        "success_level": analysis.ge("success_level", "Unknown"),
+                        "key_insight": analysis.get("full_analysis", "Unknown")
+                    }
+                    self.execution_history.append(execution_data)
+                    self._save_run_notes(
+                        i + 1, goal,
+                        analysis, execution_time
+                    )
+                    print(f"\033[95m✅ Iteration {i + 1} completed\033[0m")
+                    print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
+                    print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
+                except Exception as e:
+                    self.logger.error(f"[AUTOMATED MODE] Error in csv row {i + 1}: {str(e)}")
+                    print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
+                    raise e
 
         self._print_final_summary()
 
