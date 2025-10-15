@@ -149,18 +149,6 @@ Keep the prompt short and efficient.
     ) -> str:
         """Generate a workflow using the LLM."""
         prompt = f"""
-You are an expert in generating LangGraph workflows using SmolAgent nodes.
-
-# AVAILABLE TOOLS:
-
-The following tools packages are available for agents:
-{existing_tool_prompt}
-
-CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
-2. Clearly state that the task cannot be completed with available tools
-Do NOT assume any tools exist beyond what is explicitly listed above.
-
 # EXISTING PROMPTS:
 
 The prompts have already been generated for you as Python code:
@@ -172,6 +160,21 @@ You should not modify or rewrite the prompts.
 
 # INSTRUCTIONS/GOAL:
 {craft_instructions}
+
+# AVAILABLE TOOLS:
+
+The following tools packages are available for agents:
+{existing_tool_prompt}
+
+CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
+2. Clearly state that the task cannot be completed with available tools
+
+# ROUTING
+
+1. Use smart routing, fallback could go all the way back to first agent.
+2. Use Multi-agent best practice such as using a judge agent or having agent debates.
+3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
 
 You must write a commentary before the prompt explaining the workflow.
 The last agent in the workflow must determine whenever the task was a success or failure.
