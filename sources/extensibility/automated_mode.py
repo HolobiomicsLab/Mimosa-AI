@@ -224,7 +224,7 @@ Provide your analysis following the specified output format."""
                         "iteration": i + 1,
                         "goal": goal,
                         "execution_time": execution_time,
-                        "success_level": analysis.ge("success_level", "Unknown"),
+                        "success_level": analysis.get("success_level", "Unknown"),
                         "key_insight": analysis.get("full_analysis", "Unknown")
                     }
                     self.execution_history.append(execution_data)

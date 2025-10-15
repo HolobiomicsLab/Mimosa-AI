@@ -260,11 +260,12 @@ FILESYSTEM ARCHITECTURE:
 - Your Python code and tools operate in SEPARATE contexts
 - NEVER use Python's os, pathlib, or filesystem operations
 - ALWAYS use bash commands via execute_command() for file operations
-  
+
   Example:
   ✅ files = execute_command("ls -la")
   ✅ content = execute_command("cat file.txt")
   ❌ os.listdir()  # Will fail - wrong context
+  ❌ subprocess.run(...)  # Will fail - wrong context
 
 TASK:
 {self.instruct_prompt}
