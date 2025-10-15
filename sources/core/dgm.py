@@ -227,11 +227,6 @@ class GodelMachine:
         - human_validation (bool, optional): Whether human validation is required.
         """
 
-        print(f"\n{'📋 CURRENT TASK':^60}")
-        print(f"{'─' * 60}")
-        print(f"  {goal}")
-        print(f"{'─' * 60}\n")
-
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
         )
@@ -396,7 +391,7 @@ class GodelMachine:
         print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
               f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
         print(f"\033[94m{'=' * 60}\033[0m")
-        print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
+        print(f"\n\033[94m{'📋 CURRENT TASK':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
         goal_lines = goal.split('\n')
         for line in goal_lines:
