@@ -610,8 +610,8 @@ Original request:
                         break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        self.request_user_exit("Retry task (will exit otherwise) ?")
-                        continue
+                        #self.request_user_exit("Retry task (will exit otherwise) ?")
+                        break
                 else:
                     print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
                     continue
