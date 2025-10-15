@@ -38,7 +38,6 @@ Your response must be valid JSON following this exact schema:
 **Execution Phase (Multiple Steps as Needed)**
 - `data_acquisition`: Obtain specific datasets mentioned in paper
 - `code_acquisition`: Locate or implement required code/algorithms
-- `environment_setup`: Install and configure specific tools from paper
 - `experiment_execution`: Run the paper's specific experiments
 - `results_validation`: Compare outcomes with paper's original results
 

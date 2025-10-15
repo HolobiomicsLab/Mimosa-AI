@@ -162,6 +162,7 @@ class GodelMachine:
                 "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
                 "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
                 "\n",
+                "Getting invalid syntax (<workflow>, line 284) error with no clear message ? It may be because the code and prompt exceed your token limits, make sacrifice for shorter prompt or a simpler workflow.",
                 "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
                 "The new version must be different from the previous attempt.\n"
             ])
