@@ -135,7 +135,8 @@ Keep the prompt short and efficient.
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        use_cache = not "failure analysis" in prompt.lower()
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=use_cache)
 
     def llm_make_workflow(
         self,
@@ -181,7 +182,8 @@ The last agent in the workflow must determine whenever the task was a success or
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        use_cache = not "failure analysis" in prompt.lower()
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=use_cache)
 
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str
