@@ -37,18 +37,18 @@ class Config:
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
-        self.papers_benchmark_path: str = "datasets/paper_bench_light.csv"
+        self.papers_benchmark_path: str = "datasets/our_benchmark.csv"
 
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/toolomics"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
-        self.prompts_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
-        self.workflow_llm_model: str = "anthropic/claude-3-7-sonnet-20250219"
-        self.smolagent_model_id: str = "anthropic/claude-3-7-sonnet-20250219"
+        self.planner_llm_model: str = "openrouter/moonshotai/kimi-k2-0905"
+        self.prompts_llm_model: str = "openrouter/deepseek/deepseek-v3.2-exp"
+        self.workflow_llm_model: str = "openrouter/deepseek/deepseek-v3.2-exp"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2-exp"
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator

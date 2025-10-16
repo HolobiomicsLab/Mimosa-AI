@@ -57,9 +57,9 @@ class LLMConfig:
             else:
                 env_var = f"{self.provider.upper()}_API_KEY"
 
-            raise ValueError(
-                f"API key not provided and {env_var} environment variable not set"
-            )
+            #raise ValueError(
+            #    f"API key not provided and {env_var} environment variable not set"
+            #)
         self.temperature = float(self.temperature)  # Ensure numeric type
 
         # Validate reasoning effort

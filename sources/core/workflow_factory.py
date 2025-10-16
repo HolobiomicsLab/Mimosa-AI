@@ -165,10 +165,11 @@ The prompts have already been generated for you as Python code:
 
 {prompts_code}
 
-Given that prompts are already defined, your task is to generate a workflow that uses these prompts.
-You should not modify or rewrite the prompts.
+You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not rewrite prompt you wish to keep, they will be automatically part of the context.
 
 # INSTRUCTIONS/GOAL:
+
+Generate a workflow for this goal:
 {craft_instructions}
 
 You must write a commentary before the prompt explaining the workflow.

@@ -57,7 +57,7 @@ def master_router(state: WorkflowState) -> Literal["next_node", "retry_node", "f
 |-------------|----------------|---------|
 | SUCCESS | "next_node" | Task completed, proceed to next agent |
 | RETRY | "retry_node" | Recoverable error, re-execute current agent |
-| FALLBACK | "fallback_node" | Missing/bad input, return to previous agent |
+| FALLBACK | "fallback_node" | Missing/bad input, return to previous or fallback agent |
 | FAILURE | END | Unrecoverable error, terminate workflow |
 | Invalid format | END | Protocol violation, terminate with error |
 
