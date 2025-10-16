@@ -181,8 +181,8 @@ class LLMProvider:
 
         return True
 
-    def __call__(self, prompt: str, timeout: int = 180):
-        cached_response = self._find_cache_match(prompt)
+    def __call__(self, prompt: str, timeout: int = 180, use_cache: bool = True):
+        cached_response = self._find_cache_match(prompt) if use_cache else None
         if cached_response:
             self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
             return cached_response
