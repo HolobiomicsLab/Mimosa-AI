@@ -102,7 +102,7 @@ class GodelMachine:
             else wf_state["answers"]
         )
         return flow_answers
-    
+
     def show_answers(self, flow_answers):
         print(f"\n\033[96m{'> WORKFLOW AGENTS ANSWERS':^60}\033[0m")
         print(f"\033[96m{'─' * 60}\033[0m")
@@ -162,6 +162,7 @@ class GodelMachine:
                 "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
                 "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
                 "\n",
+                "Getting invalid syntax (<workflow>, line 284) error with no clear message ? It may be because the code and prompt exceed your token limits, make sacrifice for shorter prompt or a simpler workflow.",
                 "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
                 "The new version must be different from the previous attempt.\n"
             ])
@@ -190,7 +191,7 @@ class GodelMachine:
         if not workflows:
             print(f"No workflows found in {self.workflow_dir}.")
             return None
-        
+
         # default to selecting best workflow if no template UUID provided
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
@@ -201,7 +202,6 @@ class GodelMachine:
             print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m")
             print(f"\033[96mSelected {len(candidates)} candidates for goal:\033[0m")
-            print(f"\033[96m{goal}\033[0m")
             print(f"\033[96mTop candidate: {candidates[0].uuid if candidates else str(None)}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m\n")
             return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
@@ -227,11 +227,6 @@ class GodelMachine:
         - answer (str, optional): A predefined correct answer for evaluation system.
         - human_validation (bool, optional): Whether human validation is required.
         """
-
-        print(f"\n{'📋 CURRENT TASK':^60}")
-        print(f"{'─' * 60}")
-        print(f"  {goal}")
-        print(f"{'─' * 60}\n")
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
@@ -292,7 +287,7 @@ class GodelMachine:
     ):
         """Run a self-improvement loop for the workflow."""
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
-        
+
         iteration_start_time = time.time()
         uuid = None
 
@@ -318,12 +313,12 @@ class GodelMachine:
         rewards_history.append(wf_info.overall_score)
         # Update visualizations
         self._update_visualizations(
-            rewards_history, assertion_history, plot_data, 
+            rewards_history, assertion_history, plot_data,
             assertion_plot_data, runs[-1].goal, runs[-1].scenario_id, uuid
         )
         # Log and notify completion
         self._log_iteration_completion(
-            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time, 
+            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
             wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
@@ -334,7 +329,7 @@ class GodelMachine:
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success:
             self._save_final_plots(assertion_plot_data, assertion_history, uuid)
-            
+
             # Send success notification when all iterations complete
             if all_success:
                 self.notifier.send_message(
@@ -346,7 +341,7 @@ class GodelMachine:
                     title=f"DGM success - {uuid}",
                     priority=0
                 )
-            
+
             return runs
 
         # Continue recursion
@@ -377,7 +372,7 @@ class GodelMachine:
             assertion_history=assertion_history,
             assertion_plot_data=assertion_plot_data,
         )
-        
+
         runs[-1].plot = self._save_final_plots(assertion_plot_data, assertion_history, uuid)
         return runs
 
@@ -392,12 +387,12 @@ class GodelMachine:
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
         """Log the start of an iteration."""
         logger = logging.getLogger(__name__)
-        
+
         print(f"\n\033[94m{'=' * 60}\033[0m")
         print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
               f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
         print(f"\033[94m{'=' * 60}\033[0m")
-        print(f"\n\033[94m{'📋 CURRENT GOAL':^60}\033[0m")
+        print(f"\n\033[94m{'📋 CURRENT TASK':^60}\033[0m")
         print(f"\033[94m{'─' * 60}\033[0m")
         goal_lines = goal.split('\n')
         for line in goal_lines:
@@ -411,7 +406,7 @@ class GodelMachine:
         logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
 
     async def _evaluate_and_calculate_cost(
-        self, executed: bool, judge: bool, uuid: str, 
+        self, executed: bool, judge: bool, uuid: str,
         answer: str, scenario_id: str, assertion_history: list
     ) -> tuple[str, float]:
         """Evaluate workflow and calculate cost."""
@@ -421,7 +416,7 @@ class GodelMachine:
 
         if executed and judge and uuid:
             eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
-        
+
         # Calculate cost regardless of execution success
         # This includes workflow generation LLM costs even when execution fails
         cost_start = time.time()
@@ -436,18 +431,18 @@ class GodelMachine:
     ) -> str:
         """Evaluate the workflow and update assertion history."""
         logger = logging.getLogger(__name__)
-        
+
         print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
         print(f"\033[94m{'=' * 80}\033[0m")
-        
+
         eval_start = time.time()
         eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
         eval_type = 'scenario' if scenario_id else 'generic'
         eval_time = time.time() - eval_start
-        
+
         logger.info(f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s")
         print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
-        
+
         # Track assertion progress for scenario evaluation
         if scenario_id and isinstance(eval_result, dict) and assertion_history is not None:
             self._update_assertion_history(eval_result, assertion_history)
@@ -463,8 +458,8 @@ class GodelMachine:
               f"({passed/total*100 if total > 0 else 0:.0f}%)\033[0m")
 
     def _update_visualizations(
-        self, rewards_history: list, assertion_history: list, 
-        plot_data: tuple, assertion_plot_data: tuple, 
+        self, rewards_history: list, assertion_history: list,
+        plot_data: tuple, assertion_plot_data: tuple,
         goal: str, scenario_id: str, uuid: str
     ):
         """Update all visualizations with current data."""
@@ -473,7 +468,7 @@ class GodelMachine:
             self._update_shared_visualization(rewards_history, goal)
         elif plot_data:
             self.viz_utils.update_rewards_curve(plot_data, rewards_history)
-            
+
         # Update assertion plot if available
         if assertion_plot_data and assertion_history:
             self._update_assertion_plot(assertion_plot_data, assertion_history, scenario_id, uuid)
@@ -490,19 +485,19 @@ class GodelMachine:
         )
 
     def _update_assertion_plot(
-        self, assertion_plot_data: tuple, assertion_history: list, 
+        self, assertion_plot_data: tuple, assertion_history: list,
         scenario_id: str, uuid: str
     ):
         """Update assertion progress plot."""
         from sources.utils.scenario_loader import ScenarioLoader
-        
+
         scenario = ScenarioLoader().load_scenario(scenario_id)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0
-        
+
         self.viz_utils.update_assertion_progress_plot(
             assertion_plot_data, assertion_history, total_assertions
         )
-        
+
         # Save plot after each update for real-time monitoring
         plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
         self.viz_utils.save_plot(assertion_plot_data, plot_filename)
@@ -510,13 +505,13 @@ class GodelMachine:
 
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
-        wf_rewards: float, total_cost: float, goal: str, uuid: str, 
+        wf_rewards: float, total_cost: float, goal: str, uuid: str,
         wf_state: any, rewards_history: list
     ):
         """Log iteration completion and send notification."""
         logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
-        
+
         logger.info(
             f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
             f"Rewards: {wf_rewards:.1f}, Cost: {total_cost:.3f} USD"

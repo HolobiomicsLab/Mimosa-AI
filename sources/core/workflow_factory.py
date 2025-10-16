@@ -107,6 +107,7 @@ class WorkflowFactory:
         craft_instructions: str,
         existing_tool_prompt: str,
         path: str,
+        allow_cache: bool
     ) -> str:
         """Generate prompts code using the LLM."""
         prompt = f"""
@@ -135,7 +136,7 @@ Keep the prompt short and efficient.
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
     def llm_make_workflow(
         self,
@@ -144,21 +145,10 @@ Keep the prompt short and efficient.
         existing_tool_prompt: str,
         path: str,
         prompts_code: str,
+        allow_cache: bool
     ) -> str:
         """Generate a workflow using the LLM."""
         prompt = f"""
-You are an expert in generating LangGraph workflows using SmolAgent nodes.
-
-# AVAILABLE TOOLS:
-
-The following tools packages are available for agents:
-{existing_tool_prompt}
-
-CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
-2. Clearly state that the task cannot be completed with available tools
-Do NOT assume any tools exist beyond what is explicitly listed above.
-
 # EXISTING PROMPTS:
 
 The prompts have already been generated for you as Python code:
@@ -172,6 +162,21 @@ You may add another if prompt if you need to add another agent, or overwrite a p
 Generate a workflow for this goal:
 {craft_instructions}
 
+# AVAILABLE TOOLS:
+
+The following tools packages are available for agents:
+{existing_tool_prompt}
+
+CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
+1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
+2. Clearly state that the task cannot be completed with available tools
+
+# ROUTING
+
+1. Use smart routing, fallback could go all the way back to first agent.
+2. Use Multi-agent best practice such as using a judge agent or having agent debates.
+3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
+
 You must write a commentary before the prompt explaining the workflow.
 The last agent in the workflow must determine whenever the task was a success or failure.
         """
@@ -182,10 +187,10 @@ The last agent in the workflow must determine whenever the task was a success or
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
     def create_workflow_code(
-        self, craft_instructions: str, existing_tool_prompt: str, path: str
+        self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
     ) -> str:
         """Generate and validate workflow code.
         Args:
@@ -199,13 +204,13 @@ The last agent in the workflow must determine whenever the task was a success or
         try:
             print("📝 Step 1/2: Generating prompts code...")
             llm_output = self.llm_make_prompts(
-                system_prompt, craft_instructions, existing_tool_prompt, path
+                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             prompts_code = self.extract_python_code(llm_output)
 
             print("🔧 Step 2/2: Generating workflow code...")
             llm_output = self.llm_make_workflow(
-                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code
+                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
@@ -448,8 +453,9 @@ if WORKFLOW_PATH:
             self.logger.error(f"craft_workflow: Failed to load required code files: {str(e)}")
             raise RuntimeError(f"Failed to load required code files: {str(e)}") from e
         # Generate workflow code - let DGM handle retries
+        allow_cache = goal == craft_instructions # if goal and craft instructions are the same it mean last workflow didn't fail (dgm level)
         workflow_code = self.create_workflow_code(
-            craft_instructions, existing_tool_prompt, memory_path
+            craft_instructions, existing_tool_prompt, memory_path, allow_cache
         )
         # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):

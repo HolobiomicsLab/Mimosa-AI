@@ -79,7 +79,7 @@ class Planner:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(prompt)
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(prompt, use_cache=not (attempt>1))
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -610,8 +610,8 @@ Original request:
                         break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        self.request_user_exit("Retry task (will exit otherwise) ?")
-                        continue
+                        #self.request_user_exit("Retry task (will exit otherwise) ?")
+                        break
                 else:
                     print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
                     continue
