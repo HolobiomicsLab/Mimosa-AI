@@ -201,7 +201,7 @@ class GodelMachine:
             )
             print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m")
-            print(f"\033[96mSelected {len(candidates)} candidates for goal:\033[0m")
+            print(f"\033[96mSelected {len(candidates)} candidates.\033[0m")
             print(f"\033[96mTop candidate: {candidates[0].uuid if candidates else str(None)}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m\n")
             return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None

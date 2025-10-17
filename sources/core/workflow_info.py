@@ -36,6 +36,12 @@ class WorkflowInfo:
         return state_result.get('success', [])
 
     @property
+    def is_success(self) -> dict:
+        state_result = self.load_state_result()
+        success_list = state_result.get('success', [False]) if isinstance(state_result, dict) else [False]
+        return success_list[-1]
+
+    @property
     def code(self) -> str:
         if self._code is None:
             self._code = self.load_code()
