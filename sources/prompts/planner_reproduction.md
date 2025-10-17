@@ -76,7 +76,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "code_and_tools_acquisition",
-      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.md, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create or fix the requirement.txt file with list of requirements. Check if any datasets is present in mgwas_repo/ or if the readme.md contain information regarding datasets aquisition and document findings in reproduction_mgwas.md.",
+      "task": "read the reproduction_mgwas.md, based on software requirements in reproduction_mgwas.md, locate and acquire all code. clone available repositories to 'mgwas_repo/' (url should be in reproduction_mgwas.md). Create or fix the requirement.txt file with list of requirements. Check if any datasets is present in mgwas_repo/ or if the readme.md contain information regarding datasets aquisition and document findings in reproduction_mgwas.md. Ensure folder stay well organized and remove temporary files.",
       "depends_on": ["comprehensive_paper_analysis"],
       "required_inputs": ["reproduction_mgwas.md"],
       "expected_outputs": ["mgwas_repo/"],
@@ -84,7 +84,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "dataset_acquisition",
-      "task": "Using dataset informations from reproduction_mgwas.md, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset.",
+      "task": "Using dataset informations from reproduction_mgwas.md, download all required datasets, or copy dataset in mgwas_repo/ if any. For each dataset: verify availability, download to 'datasets/' directory, validate file integrity and format, document preprocessing steps needed. Create 'dataset_inventory.csv' with status (available/missing/partial) for each required dataset. Ensure folder stay well organized and remove temporary files.",
       "depends_on": ["comprehensive_paper_analysis", "code_and_tools_acquisition"],
       "required_inputs": ["reproduction_mgwas.md"],
       "expected_outputs": ["datasets/", "dataset_inventory.csv"],
@@ -92,7 +92,7 @@ Your response must be valid JSON following this exact schema:
     },
     {
       "name": "experiment_setup_and_execution",
-      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/, setup a virtual environnement and install all dependencies from requirements.txt. Run experiments matching paper's exact conditions and parameters from reproduction_mgwas.md. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts.",
+      "task": "Execute the paper's experiments using acquired datasets in datasets/ and exact methods described in paper_analysis.json. Do a analysis of the code in mgwas_repo/, setup a virtual environnement and install all dependencies from requirements.txt. Run experiments matching paper's exact conditions and parameters from reproduction_mgwas.md. Save all outputs to 'results/' directory with clear naming matching paper's result structure. If experiments fail, document specific error messages and troubleshooting attempts. Ensure folder stay well organized and remove temporary files.",
       "depends_on": ["dataset_acquisition", "code_and_tools_acquisition"],
       "required_inputs": ["datasets/", "mgwas_repo/", "reproduction_mgwas.md"],
       "expected_outputs": ["results/"],

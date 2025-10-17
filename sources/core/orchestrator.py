@@ -109,7 +109,7 @@ class WorkflowOrchestrator:
                     f"Workflow {workflow_uuid} generation failed after {generation_time:.1f}s\n"
                     f"Goal: {goal[:128]}...\n"
                     f"Error: {actual_error[:256]}",
-                    title=f"Workflow generation failed",
+                    title="Workflow generation failed",
                     priority=1
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
@@ -121,7 +121,7 @@ class WorkflowOrchestrator:
                     f"Workflow generation failed after {generation_time:.1f}s\n"
                     f"Goal: {goal[:128]}...\n"
                     f"Error: {error_msg[:256]}",
-                    title=f"Workflow generation failed",
+                    title="Workflow generation failed",
                     priority=1
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False

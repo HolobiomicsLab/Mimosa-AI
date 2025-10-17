@@ -37,8 +37,7 @@ class Config:
     def __init__(self):
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
-        self.papers_benchmark_path: str = "datasets/our_benchmark.csv"
-
+        self.papers_benchmark_path: str = "datasets/paper_bench_light.csv"
 
         # workspace configuration
         self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
@@ -48,7 +47,7 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
         self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_id: str = "openrouter/qwen/qwen3-coder-plus"
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
@@ -66,12 +65,13 @@ class Config:
 
         # runner settings
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 18000
+        self.runner_default_timeout: int = 3600*24
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200),
+            AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
+            #AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
         self.runner_requirements: list[str] = [
             "python-dotenv",
