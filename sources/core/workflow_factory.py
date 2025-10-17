@@ -177,8 +177,8 @@ CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requi
 2. Use Multi-agent best practice such as using a judge agent or having agent debates.
 3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
 
-You must write a commentary before the workflow code explaining the workflow.
-Always provide agent with a tool to execute bash (execute_command)
+You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
+Always provide all agents with a tool to execute bash (execute_command)
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)

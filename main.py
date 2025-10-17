@@ -107,7 +107,6 @@ async def dataset_execution_mode(args, config):
                     goal=question,
                     template_uuid=args.load_template,
                     judge=True,
-                    answer=answer,
                     max_iteration=1
                 )
         tasks = []
@@ -120,11 +119,20 @@ async def dataset_execution_mode(args, config):
         print("❌ No questions found in dataset or no goal provided.")
 
 async def automated_mode(args, config):
-    """Run autonomous mode where LLM generates and executes tasks automatically."""
     automated = AutomatedMode(config, csv_runs_limit=args.csv_runs_limit)
     await automated.start_autonomous_mode()
 
+async def learning_mode(args, config):
+    from sources.utils.shared_visualization import SharedVisualizationData
+    dgm = GodelMachine(config)
+    await dgm.start_dgm(goal=args.learn,
+                        judge=True,
+                        max_iteration=args.max_dgm_iterations or 5,
+                        learning_mode=True
+                       )
+
 async def normal_execution_mode(args, config):
+    from sources.utils.shared_visualization import SharedVisualizationData
     dgm = GodelMachine(config)
     planner = Planner(config)
     if args.scenario:
@@ -135,12 +143,11 @@ async def normal_execution_mode(args, config):
         await dgm.start_dgm(goal=args.task,
                             judge=args.judge,
                             scenario_id=args.scenario,
-                            human_validation=False,
-                            max_iteration=args.max_dgm_iterations
+                            max_iteration=args.max_dgm_iterations,
                            )
     elif args.goal:
         await planner.start_planner(goal=args.goal,
-                                    judge=args.judge,
+                                    judge=True,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
     else:
@@ -159,6 +166,9 @@ async def main():
     )
     parser.add_argument(
         "--task",  type=str, help="Single task mode (no planner)"
+    )
+    parser.add_argument(
+        "--learn",  type=str, help="Task learning mode"
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
@@ -191,7 +201,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
+        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for learning a task."
     )
 
     add_config_arguments(parser, config)
@@ -216,6 +226,8 @@ async def main():
             await automated_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
+        elif args.learn:
+            await learning_mode(args, config)
         else:
             raise ValueError("No goal provided. Use --task, --goal, --automated  to start.")
     except KeyboardInterrupt:

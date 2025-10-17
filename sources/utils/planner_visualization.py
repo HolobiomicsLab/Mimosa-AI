@@ -49,6 +49,7 @@ class PlannerVisualizer:
 
         self.plan = plan
         self.tasks: List[Task] = []
+        self.total_cost: float = 0.0
         self.width = width
         self.height = height
 
@@ -77,14 +78,17 @@ class PlannerVisualizer:
 
         self.running = True
 
-    def update_tasks(self, tasks: List[Task]):
+    def update_tasks(self, tasks: List[Task], total_cost: float = None):
         """
         Update the task list and refresh the display.
 
         Args:
             tasks: Current list of tasks with their statuses
+            total_cost: Optional total cost to display
         """
         self.tasks = tasks
+        if total_cost is not None:
+            self.total_cost = total_cost
         self.render()
 
     def _get_status_color(self, status: TaskStatus) -> tuple:
@@ -161,6 +165,13 @@ class PlannerVisualizer:
         title_surface = self.font_title.render(title_text, True, self.COLOR_TEXT)
         title_x = (self.width - title_surface.get_width()) // 2
         self.screen.blit(title_surface, (title_x, 20))
+
+        # Draw cost in bottom right corner
+        cost_text = f"Cost: {round(self.total_cost, 2)} $"
+        cost_surface = self.font_task.render(cost_text, True, self.COLOR_TEXT)
+        cost_x = self.width - cost_surface.get_width() - 20
+        cost_y = self.height - 30
+        self.screen.blit(cost_surface, (cost_x, cost_y))
 
         # Draw progress line
         if len(self.plan.steps) > 1:

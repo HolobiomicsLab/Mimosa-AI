@@ -1,4 +1,5 @@
 import json
+import time
 import os
 import re
 import sys
@@ -12,7 +13,6 @@ from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.planner_visualization import PlannerVisualizer
-
 
 
 class PlanValidationError(Exception):
@@ -154,6 +154,7 @@ class Planner:
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
+                    cost=0.0,
                     depends_on=step_dict.get("depends_on", []),
                     required_inputs=step_dict.get("required_inputs", []),
                     expected_outputs=step_dict.get("expected_outputs", []),
@@ -323,10 +324,13 @@ Original request:
             self.use_visualization = False
             self.visualizer = None
 
-    def _update_visualization(self) -> None:
+    def _update_visualization(self, total_cost: float = 0.0) -> None:
         """
         Update the visualization with the current task states.
         On macOS, also handle events since we can't use a separate thread.
+        
+        Args:
+            total_cost: The cumulative cost to display
         """
         if self.visualizer and self.use_visualization:
             try:
@@ -334,7 +338,7 @@ Original request:
                 if self.is_macos:
                     self.visualizer.handle_events()
 
-                self.visualizer.update_tasks(self.task_history)
+                self.visualizer.update_tasks(self.task_history, total_cost=total_cost)
             except Exception as e:
                 print(f"⚠️ Error updating visualization: {str(e)}")
 
@@ -518,7 +522,6 @@ Original request:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                human_validation=False,
                 max_iteration=max_dgm_iteration
             )
 
@@ -565,6 +568,7 @@ Original request:
         step_task = getattr(step, 'task', '')
 
         attempt = attempt_counts.get(step_name, 0)
+        attempt_cost = 0
         while attempt < max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
@@ -574,6 +578,8 @@ Original request:
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
                 dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
+
+                attempt_cost += sum([r.cost for r in dgm_runs])
 
                 last_run = dgm_runs[-1]
 
@@ -605,6 +611,7 @@ Original request:
                 self.task_history.append(task)
 
                 if dgm_success:
+                    time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
@@ -621,6 +628,7 @@ Original request:
                 raise e
 
         step.status = TaskStatus.COMPLETED
+        step.cost = attempt_cost
         return step
 
     async def start_planner(
@@ -671,6 +679,7 @@ Original request:
             attempt_counts = {}
 
             lst_step = None
+            total_cost = 0
             for step_idx, step in enumerate(self.current_plan.steps):
                 if step is None:
                     print(f"⚠️ Step {step_idx + 1} is None, skipping")
@@ -688,15 +697,16 @@ Original request:
 
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
-                self._update_visualization()  # Update to show running status
+                self._update_visualization(total_cost)  # Update to show running status
                 max_attempts = max_task_retry
 
                 try:
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration)
-                    self._update_visualization()  # Update after step completes
+                    total_cost += step.cost
+                    self._update_visualization(total_cost)  # Update after step completes
                 except Exception as e:
                     step.status = TaskStatus.FAILED
-                    self._update_visualization()  # Update to show failed status
+                    self._update_visualization(total_cost)  # Update to show failed status
                     raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
                 lst_step = step
 
@@ -712,7 +722,7 @@ Original request:
                     )
                     raise Exception(f"❌ Giving up on task '{step_name}' after {max_attempts} attempts")
 
-            print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks.")
+            print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks. Cost: {total_cost}")
 
             # Send success notification
             completed_tasks = sum(1 for t in self.task_history if t.status == TaskStatus.COMPLETED)
