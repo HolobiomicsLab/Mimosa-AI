@@ -10,7 +10,7 @@ from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
-from sources.utils.transfer_toolomics import Transfer
+from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.planner_visualization import PlannerVisualizer
 
 
@@ -494,7 +494,7 @@ Original request:
                 best_match = past_wf_lookups[0]
                 if best_match is None:
                     print("⚠️ Best match is None, proceeding with new DGM run")
-                else:
+                elif self._get_dgm_success(best_match):
                     print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
 
                     run = GodelRun(
@@ -529,6 +529,7 @@ Original request:
             return runs
 
         except Exception as e:
+            raise e
             print(f"❌ Error in dgm_runs: {str(e)}")
             raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
@@ -722,7 +723,7 @@ Original request:
                 title="Planner execution completed",
                 priority=0
             )
-            trs = Transfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
+            trs = LocalTransfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
             trs.transfer_workspace_files_to_capsule(goal)
 
             if self.visualizer:

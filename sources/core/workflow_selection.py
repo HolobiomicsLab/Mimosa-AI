@@ -80,7 +80,7 @@ class WorkflowSelector:
             for wf in similar_workflows
             if self.cosine_similarity(wf.goal[-512:], goal[-512:]) >= threshold
         ]
-
+    
     def sort_workflows_by_score(
         self, workflows_info: list[WorkflowInfo], threshold: float
     ) -> list[WorkflowInfo]:
@@ -88,7 +88,7 @@ class WorkflowSelector:
         sorted_workflows = sorted(
             workflows_info, key=lambda wf: wf.overall_score, reverse=True
         )
-        return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
+        return [wf for wf in sorted_workflows if wf.overall_score >= threshold and wf.is_success]
 
     def select_best_workflows(
         self, goal: str, threshold_similary=0.7, threshod_score=0.0

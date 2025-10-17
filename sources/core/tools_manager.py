@@ -348,7 +348,7 @@ class ToolManager:
                     tools = await client.list_tools()
                     name = f"mcp_{port}"
                     if tools:
-                        print(f"✅ Found MCP server on port {port} with name {name}")
+                        print(f"✅ Found MCP server on {address} port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
                         mcps.append(
                             MCP(

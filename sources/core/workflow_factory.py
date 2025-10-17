@@ -127,7 +127,7 @@ Then, generate Python code that defines prompt templates for each agent.
 Do not generate the whole workflow, just the prompts as Python code.
 Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
-Keep the prompt short and efficient.
+Keep the prompt short and efficient. Agents are smart domains expert, not children.
         """
 
         provider, model = extract_model_pattern(self.config.prompts_llm_model)
@@ -177,8 +177,8 @@ CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requi
 2. Use Multi-agent best practice such as using a judge agent or having agent debates.
 3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
 
-You must write a commentary before the prompt explaining the workflow.
-The last agent in the workflow must determine whenever the task was a success or failure.
+You must write a commentary before the workflow code explaining the workflow.
+Always provide agent with a tool to execute bash (execute_command)
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
@@ -207,6 +207,9 @@ The last agent in the workflow must determine whenever the task was a success or
                 system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             prompts_code = self.extract_python_code(llm_output)
+            commentary = llm_output.replace(prompts_code, "").split("```python")[0]
+            print("💬 LLM commentary on prompt:")
+            print(commentary)
 
             print("🔧 Step 2/2: Generating workflow code...")
             llm_output = self.llm_make_workflow(

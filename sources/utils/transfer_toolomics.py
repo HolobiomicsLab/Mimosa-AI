@@ -7,7 +7,7 @@ from sources.core.llm_provider import LLMProvider, LLMConfig
 import re
 import os
 
-class Transfer:
+class LocalTransfer:
     """
     Class transfer results of run between workspace folder and a capsule folder to cnetralize run results.
     """
@@ -88,6 +88,6 @@ class Transfer:
         workspace.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
-    trans = Transfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")
+    trans = LocalTransfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")
     goal = "you are assigned Low-Light Image Enhancement with Wavelet-based Diffusion Models to replicate. You need to ACTUALLY EXECUTE the experiment only for the LOLv1 dataset. Paper is availableat this link https://arxiv.org/pdf/2306.00306. Reproduction without model training (inference only using available evaluation script is allowed). Looking for existing model weight if necessary is allowed. make sure plan is within json"
     trans.transfer_workspace_files_to_capsule(goal)
