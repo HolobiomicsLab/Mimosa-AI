@@ -356,6 +356,7 @@ class GodelMachine:
             scenario_id=runs[-1].scenario_id
         ))
 
+        time.sleep(5)
         runs = await self.recursive_self_improvement(
             runs,
             rewards_history=rewards_history,

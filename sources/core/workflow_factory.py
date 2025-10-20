@@ -79,8 +79,12 @@ class WorkflowFactory:
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
         if not mcps:
             raise ValueError(
-                "\nNo MCP servers found."
-                "Please ensure at least one MCP is running on toolomics."
+                "\n" + "=" * 80 + 
+                "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
+                "\n" + "-" * 80 +
+                "\nPlease ensure at least one MCP instance is running on Toolomics."
+                "\nRetrying until MCPs detected.... use CTRL+C to stop."
+                "\n" + "=" * 80 + "\n"
             )
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)
@@ -128,6 +132,7 @@ Do not generate the whole workflow, just the prompts as Python code.
 Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
 Keep the prompt short and efficient. Agents are smart domains expert, not children.
+document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
         """
 
         provider, model = extract_model_pattern(self.config.prompts_llm_model)
@@ -178,7 +183,8 @@ CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requi
 3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
 
 You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
-Always provide all agents with a tool to execute bash (execute_command)
+Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
+Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)

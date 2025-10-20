@@ -102,7 +102,7 @@ class WorkflowOrchestrator:
             if error_msg.startswith("UUID:") and "|" in error_msg:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
-                logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
+                logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{actual_error}\n")
                 
                 # Send notification for workflow generation error
                 self.notifier.send_message(
@@ -114,7 +114,7 @@ class WorkflowOrchestrator:
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
-                logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
+                logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{error_msg}\n")
                 
                 # Send notification for workflow generation error
                 self.notifier.send_message(
