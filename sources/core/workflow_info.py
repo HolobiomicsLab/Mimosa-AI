@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from pathlib import Path
 from statistics import mean
 
@@ -11,6 +12,7 @@ class WorkflowInfo:
         self._state_result = None
         self._code = None
         self._overall_score = None
+        self._original_task = None
 
     @property
     def goal(self) -> str:
@@ -18,6 +20,49 @@ class WorkflowInfo:
             state_result = self.load_state_result()
             self._goal = state_result.get("goal", "") if state_result else ""
         return self._goal
+    
+    @property
+    def original_task(self) -> str:
+        """Load the original unwrapped task for similarity matching.
+        
+        Returns:
+            str: The original task without knowledge wrapper. Falls back to
+                 extracting from goal if original_task file doesn't exist.
+        """
+        if self._original_task is None:
+            # Try to load from original_task_{uuid}.txt file first
+            task_file = self.workflow_folder / f"original_task_{self.uuid}.txt"
+            if task_file.exists():
+                try:
+                    with open(task_file) as f:
+                        self._original_task = f.read().strip()
+                except Exception as e:
+                    print(f"⚠️ Could not load original_task_{self.uuid}.txt: {e}")
+                    self._original_task = self._extract_original_from_wrapped(self.goal)
+            else:
+                # Fallback: extract from goal if it has the wrapper pattern
+                self._original_task = self._extract_original_from_wrapped(self.goal)
+        return self._original_task
+    
+    def _extract_original_from_wrapped(self, text: str) -> str:
+        """Extract original task from knowledge-wrapped text.
+        
+        Args:
+            text: Potentially wrapped text
+            
+        Returns:
+            str: Extracted task or original text if not wrapped
+        """
+        if not text:
+            return ""
+        
+        # Pattern: "...complete the following task:\n<actual_task>"
+        match = re.search(r'complete the following task:\s*\n(.*)', text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        
+        # If not wrapped, return as-is
+        return text
 
     @property
     def state_result(self) -> dict:

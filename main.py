@@ -138,16 +138,15 @@ async def normal_execution_mode(args, config):
     if args.scenario:
         scenario_file = ScenarioLoader().load_scenario(args.scenario)
         args.task = scenario_file["goal"]
-        args.judge = True
     if args.task:
         await dgm.start_dgm(goal=args.task,
-                            judge=args.judge,
+                            judge=not args.disable_judge,
                             scenario_id=args.scenario,
                             max_iteration=args.max_dgm_iterations,
                            )
     elif args.goal:
         await planner.start_planner(goal=args.goal,
-                                    judge=True,
+                                    judge=not args.disable_judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
     else:
@@ -186,7 +185,7 @@ async def main():
         "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
-        "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+        "--disable_judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
     parser.add_argument(
         "--scenario", type=str, help="Scenario for workflow evaluation"

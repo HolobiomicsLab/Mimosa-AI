@@ -103,6 +103,9 @@ class WorkflowState(TypedDict):
     answers: List[str]
     success: List[bool]
 
+MAX_CONSECUTIVE_FALLBACKS = 3
+MAX_CONSECUTIVE_RETRY = 5
+
 def master_router(state: WorkflowState) -> str:
     raw_answer = state["answers"][-1]
     try:
@@ -117,9 +120,17 @@ def master_router(state: WorkflowState) -> str:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         return "next_node"
     elif "FALLBACK" in last_answer.status:
-         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return "fallback_node"
+        retry_count = state["step_name"][-5:].count(current_agent)
+        if retry_count >= MAX_CONSECUTIVE_FALLBACKS:
+            print(f"❌ Detected fallback infinite loop: {retry_count} out of {MAX_CONSECUTIVE_FALLBACKS}. Aborting.")
+            return END
+        print(f"⏪ Fallback from '{current_agent}' to previous agent..")
+        return "fallback_node"
     elif "RETRY" in last_answer.status:
+        retry_count = state["step_name"][-5:].count(current_agent)
+        if retry_count >= MAX_CONSECUTIVE_RETRY:
+            print(f"❌ Detected retry infinite loop: {retry_count} out of {MAX_CONSECUTIVE_RETRY}. Aborting.")
+            return END
         return "retry_node"
     elif "FAILURE" in last_answer.status:
         print(f"❌ Failure from '{current_agent}'. Aborting.")

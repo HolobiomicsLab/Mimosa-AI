@@ -67,14 +67,15 @@ class WorkflowOrchestrator:
     async def orchestrate_workflow(
         self,
         goal: str,
-        craft_instructions: str
+        craft_instructions: str,
+        original_task: str = None
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
         Args:
-            goal: The goal for the workflow
+            goal: The goal for the workflow (may be knowledge-wrapped)
             craft_instructions: Instructions for crafting the workflow, usually output from previous failed attempt
-            workflow_template: Optional workflow template code to use
+            original_task: Original unwrapped task for similarity matching
         Returns:
             tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
         """
@@ -94,6 +95,7 @@ class WorkflowOrchestrator:
                 goal,
                 craft_instructions,
                 save_workflow=True,
+                original_task=original_task
             )
         except Exception as e:
             generation_time = time.time() - generation_start

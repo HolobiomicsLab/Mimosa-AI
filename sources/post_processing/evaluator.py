@@ -205,7 +205,10 @@ class WorkflowEvaluator:
         except WorkflowDataError:
             raise
         except Exception as e:
-            raise WorkflowDataError(f"Failed to generate workflow execution text: {str(e)}") from e
+            return f"""
+            Worflow generation failed due to error:
+            {str(e)}
+            """
 
     def evaluate(self, uuid: str, answer: str = None, scenario_id: str = None) -> dict[str, Any]:
         """Evaluate the workflow results.

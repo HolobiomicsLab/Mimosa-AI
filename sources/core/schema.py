@@ -38,6 +38,7 @@ class GodelRun:
     answers: list[str] | None = None
     state_result: dict | None = None
     plot: str | None = ""
+    original_task: str | None = None  # Original unwrapped task for similarity matching
 
     def __str__(self) -> str:
         return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
