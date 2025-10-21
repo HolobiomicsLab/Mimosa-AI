@@ -160,7 +160,7 @@ The prompts have already been generated for you as Python code:
 
 {prompts_code}
 
-You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not rewrite prompt you wish to keep, they will be automatically part of the context.
+You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not EVER rewrite prompt you wish to keep, they will be automatically part of the context. You may add a prompt by including it in the workflow code you write but do NOT rewrite existing prompt.
 
 # INSTRUCTIONS/GOAL:
 
@@ -172,19 +172,15 @@ Generate a workflow for this goal:
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)
-2. Clearly state that the task cannot be completed with available tools
+# CONSTRAINT:
 
-# ROUTING
-
-1. Use smart routing, fallback could go all the way back to first agent.
-2. Use Multi-agent best practice such as using a judge agent or having agent debates.
-3. Be creative, you may use the retry route for fully retrying task, you may use the fallback and success to create special conditional routing.
-
-You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
-Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
-Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
+1. Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST clearly state that the task cannot be completed and give up.
+2. Use smart routing, fallback could go all the way back to first agent, not the previous agent.
+3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
+4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
+5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
+6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organise non-critical files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
+7. Agent should always be provided with tool to use shell and take notes, in addition to a primary tool.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
@@ -420,13 +416,15 @@ if WORKFLOW_PATH:
         goal: str,
         craft_instructions: str,
         save_workflow: bool = True,
+        original_task: str = None,
     ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
         Args:
-            goal: The goal description
+            goal: The goal description (may be knowledge-wrapped)
             craft_instructions: The instructions for crafting the workflow
             template_workflow: pre-existing workflow template UUID
             save_workflow: Whether to save the workflow
+            original_task: The original unwrapped task for similarity matching
         Returns:
             str: Complete executable workflow code
         """
@@ -468,7 +466,7 @@ if WORKFLOW_PATH:
         )
         # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
-            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal)
+            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal, original_task)
         try:
             self.validate_workflow_structure(workflow_code)
         except Exception as e:
@@ -495,9 +493,17 @@ if WORKFLOW_PATH:
         return complete_code, workflow_code, uuid_str
 
     def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_code: str, goal: str
+        self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
     ) -> None:
-        """Save workflow code and metadata to files."""
+        """Save workflow code and metadata to files.
+        
+        Args:
+            path: Directory path to save files
+            uuid_str: Unique workflow identifier
+            workflow_code: Generated workflow code
+            goal: The goal description (may be knowledge-wrapped)
+            original_task: The original unwrapped task for similarity matching
+        """
         try:
             with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
                 f.write(workflow_code)
@@ -522,3 +528,12 @@ if WORKFLOW_PATH:
             self.logger.info(f"Saved goal to: {path}/goal_{uuid_str}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save goal: {str(e)}")
+        
+        # Save original task for better similarity matching
+        if original_task:
+            try:
+                with open(os.path.join(path, f"original_task_{uuid_str}.txt"), "w") as f:
+                    f.write(original_task)
+                self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
+            except Exception as e:
+                self.logger.error(f"Failed to save original task: {str(e)}")

@@ -467,13 +467,15 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
-    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True):
+    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True, original_task=None):
         """
         Execute DGM runs for a given task with comprehensive error handling.
         Args:
-            task: Task description string
+            task: Task description string (may be knowledge-wrapped)
             judge: Whether to use judge evaluation
             max_dgm_iteration: Maximum iterations for DGM
+            cached_wf_allow: Whether to allow using cached workflows
+            original_task: Original unwrapped task for similarity matching
         Returns:
             List[GodelRun]: List of DGM runs
         Raises:
@@ -489,9 +491,12 @@ Original request:
         print(f"🎯 Starting DGM runs for task: {task[:50]}...")
 
         try:
+            # Use original_task for lookup to avoid knowledge wrapper interference
+            lookup_task = original_task if original_task else task
+            
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.9, threshod_score=0.0 # TODO change values
+                lookup_task, threshold_similary=0.8, threshod_score=0.7
             ) if cached_wf_allow else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -522,7 +527,8 @@ Original request:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                max_iteration=max_dgm_iteration
+                max_iteration=max_dgm_iteration,
+                original_task=original_task
             )
 
             if runs is None:
@@ -577,7 +583,14 @@ Original request:
 
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(enhanced_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
+                # Pass both enhanced task and original task for proper workflow matching
+                dgm_runs = await self.dgm_runs(
+                    enhanced_task, 
+                    judge, 
+                    max_dgm_iteration, 
+                    cached_wf_allow=(attempt<=1),
+                    original_task=step_task  # Pass original for similarity matching
+                )
 
                 attempt_cost += sum([r.cost for r in dgm_runs])
 

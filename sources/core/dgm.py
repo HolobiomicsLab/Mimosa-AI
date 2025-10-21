@@ -5,6 +5,7 @@ Darwin Godel Machine
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -19,6 +20,46 @@ from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
 from .schema import GodelRun
+
+
+def check_answer_success(answer: str) -> bool:
+    """Check if an answer indicates success using pattern matching.
+    Args:
+        answer: The answer string to check
+    Returns:
+        bool: True if answer indicates success, False otherwise
+    """
+    answer_lower = str(answer).lower()
+    failure_patterns = [
+        r'\bfailed\b', r'\berror\b', r'\failure\b',
+    ]
+    for pattern in failure_patterns:
+        if re.search(pattern, answer_lower):
+            return False
+    return True
+
+def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
+    """
+    Evaluate workflow success using multiple criteria.
+    Args:
+        wf_info: WorkflowInfo object containing state and evaluation results
+        answers: List of answers from workflow agents
+    Returns:
+        bool: True if workflow is considered successful, False otherwise
+    """
+    if wf_info.state_result and 'evaluation' in wf_info.state_result:
+        eval_data = wf_info.state_result['evaluation']
+        
+        if 'scenario' in eval_data and eval_data['scenario']:
+            passed = eval_data['scenario'].get('passed_assertions', 0)
+            total = eval_data['scenario'].get('total_assertions', 1)
+            return (passed / total) >= 0.8
+        if 'generic' in eval_data and eval_data['generic']:
+            score = eval_data['generic'].get('overall_score', 0.0)
+            return score >= 7.0
+    if answers:
+        return check_answer_success(answers[-1])
+    return False
 
 
 class GodelMachine:
@@ -196,8 +237,8 @@ class GodelMachine:
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal,
-                threshold_similary=0.8,
-                threshod_score=0.0,
+                threshold_similary=0.7,
+                threshod_score=0.7,
             )
             print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m")
@@ -212,18 +253,22 @@ class GodelMachine:
         self,
         goal: str,
         template_uuid: str | None = None,
-        judge: bool = False,
+        judge: bool = True,
         scenario_id: str = None,
         max_iteration: int = 5,
-        learning_mode: bool = True
+        learning_mode: bool = True,
+        original_task: str = None
     ) -> list[GodelRun]:
         """
         Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
         Args:
-        - goal (str): The primary goal or objective to be accomplished.
+        - goal (str): The primary goal or objective to be accomplished (may be knowledge-wrapped).
          template_uuid (str | None, optional): UUID of a workflow template to use.
         - judge (bool, optional): Whether to enable judging mode for evaluation.
-        - answer (str, optional): A predefined correct answer for evaluation system.
+        - scenario_id (str, optional): ID of scenario for evaluation.
+        - max_iteration (int): Maximum number of iterations.
+        - learning_mode (bool): Whether in learning mode.
+        - original_task (str, optional): Original unwrapped task for similarity matching.
         """
 
         wf = self.select_workflow_template(
@@ -260,6 +305,7 @@ class GodelMachine:
             max_depth=max_iteration,
             judge=judge,
             scenario_id=scenario_id,
+            original_task=original_task
         )
 
         return await self.recursive_self_improvement(
@@ -286,6 +332,7 @@ class GodelMachine:
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
+            original_task=runs[-1].original_task
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
 
@@ -313,10 +360,9 @@ class GodelMachine:
             wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
-        if runs[-1].answers:
-            all_success =  all(["success" in str(x).lower() for x in runs[-1].answers])
-        else:
-            all_success = False
+        # Evaluate workflow success using hybrid approach
+        all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
+        
         # Check termination conditions
         if (runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success) and not learning_mode:
             self._save_final_plots(assertion_history, rewards_history, uuid)
@@ -404,7 +450,8 @@ class GodelMachine:
         eval_type = None
         total_cost = 0.0
 
-        if executed and judge and uuid:
+        if judge and uuid:
+            answer = answer if executed else "workflow failed to execute."
             eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
 
         # Calculate cost regardless of execution success
