@@ -20,9 +20,7 @@ from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.papers_mode import PaperEvaluationMode
-from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.scenario_loader import ScenarioLoader
-from sources.utils.user_entry import collect_goals_from_user
 from sources.utils.logging import setup_logging
 
 dotenv.load_dotenv()
@@ -93,31 +91,6 @@ async def manual_mode(args, config):
     hm = HumanMode(config)
     await hm.shellLoop()
 
-async def dataset_execution_mode(args, config):
-    dgm = GodelMachine(config)
-    print(f"Using {args.dataset} dataset")
-    dataset_questions = read_dataset(args.dataset, args.num_samples)
-    if dataset_questions:
-        print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
-        semaphore = asyncio.Semaphore(args.max_concurrent)
-        async def run_with_semaphore(question, answer):
-            """Run a single question with semaphore to limit concurrency"""
-            async with semaphore:
-                return question, answer, await dgm.start_dgm(
-                    goal=question,
-                    template_uuid=args.load_template,
-                    judge=True,
-                    max_iteration=1
-                )
-        tasks = []
-        for question, answer in dataset_questions:
-            task = asyncio.create_task(run_with_semaphore(question, answer))
-            tasks.append(task)
-        all_run = await asyncio.gather(*tasks)
-        calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
-    else:
-        print("❌ No questions found in dataset or no goal provided.")
-
 async def papers_mode(args, config):
     papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
     await papers.start_autonomous_mode()
@@ -179,9 +152,6 @@ async def main():
         "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
     )
     parser.add_argument(
-        "--dataset", type=str, help="evalaluation mode for single task mode, specify dataset folder to use such as GSMK8 (csv)"
-    )
-    parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
@@ -189,9 +159,6 @@ async def main():
     )
     parser.add_argument(
         "--scenario", type=str, help="Scenario for workflow evaluation"
-    )
-    parser.add_argument(
-        "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
     )
     parser.add_argument(
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
@@ -217,9 +184,7 @@ async def main():
     config.validate_paths()
 
     try:
-        if (args.dataset):
-            await dataset_execution_mode(args, config)
-        elif (args.manual):
+        if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
             await papers_mode(args, config)
