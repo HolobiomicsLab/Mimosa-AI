@@ -343,9 +343,10 @@ class GodelMachine:
         self.show_answers(flow_answers)
 
         # Evaluate and calculate costs
-        eval_type, total_cost = await self._evaluate_and_calculate_cost(
-            executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
-        )
+        if workflow_code:
+            eval_type, total_cost = await self._evaluate_and_calculate_cost(
+                executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
+            )
 
         # Update tracking data
         rewards_history.append(wf_info.overall_score)

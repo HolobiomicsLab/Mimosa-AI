@@ -286,6 +286,59 @@ Original request:
                 print(f"   Expected Outputs: {', '.join(step.expected_outputs)}")
         print("\n" + "=" * 80)
 
+    def _request_human_plan_validation(self, plan: Plan) -> tuple[bool, str]:
+        """
+        Request human validation of the generated plan.
+        Returns:
+            tuple[bool, str]: (is_approved, feedback)
+                - is_approved: True if human pressed Enter (approve), False otherwise
+                - feedback: User's correction/feedback if plan not approved
+        """
+        print("\n" + "_" * 40)
+        print("👤 HUMAN VALIDATION REQUIRED")
+        print("_" * 40)
+        print("\nPlease review the plan above.")
+        print("\nOptions:")
+        print("   • Press [ENTER] to approve and execute the plan")
+        print("   • Type your corrections/feedback and press [ENTER] to regenerate")
+        print("\n" + "─" * 80)
+        
+        user_input = input("\n👉 Your decision: ").strip()
+        if not user_input:
+            print("\n✅ Plan approved by human. Proceeding with execution...")
+            return True, ""
+        else:
+            print(f"\n📝 Feedback received: {user_input}")
+            print("🔄 Will regenerate plan based on your feedback...")
+            return False, user_input
+
+    def _generate_plan_with_human_validation(self, goal: str, max_attempts: int = 10) -> Plan:
+        """
+        Generate a plan with iterative human validation and feedback loop.
+        Args:
+            goal: The goal description for the planner
+            max_attempts: Maximum number of plan generation attempts (default: 10)
+        Returns:
+            Plan: Human-approved plan object
+        Raises:
+            ValueError: If maximum attempts reached without approval or plan generation fails
+        """
+        system_prompt = self._read_prompt()
+        plan_approved = False
+        human_feedback = ""
+        
+        while not plan_approved:
+            
+            current_goal = goal
+            if human_feedback:
+                current_goal = f"{goal}\n\nHUMAN FEEDBACK ON PREVIOUS PLAN:\n{human_feedback}\n\nPlease address this feedback in the new plan."
+            plan = self.make_plan(system_prompt, current_goal)
+            if plan is None:
+                raise ValueError("❌ Planner: Failed to generate a valid plan")
+            self._display_plan(plan)
+            plan_approved, human_feedback = self._request_human_plan_validation(plan)
+        return plan
+
     def _init_visualization(self, plan: Plan) -> None:
         """
         Initialize the pygame visualization window.
@@ -334,7 +387,7 @@ Original request:
         """
         if self.visualizer and self.use_visualization:
             try:
-                # On macOS, handle events from main thread
+                # On mac handle events from main thread
                 if self.is_macos:
                     self.visualizer.handle_events()
 
@@ -350,7 +403,7 @@ Original request:
             try:
                 # Mark visualizer as not running to stop the thread (if using thread)
                 self.visualizer.running = False
-                # On macOS, handle any remaining events before closing
+                # On mac handle any remaining events before closing
                 if self.is_macos:
                     self.visualizer.handle_events()
                 self.visualizer.close()
@@ -669,15 +722,13 @@ Original request:
         print(f"🚀 Starting planner with goal: {goal}")
 
         try:
-            # Generate and validate plan
-            system_prompt = self._read_prompt()
-            self.current_plan = self.make_plan(system_prompt, goal)
+            # Generate plan with human validation loop
+            self.current_plan = self._generate_plan_with_human_validation(goal)
 
             if self.current_plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
 
-            self._display_plan(self.current_plan)
-            # Initialize visualization
+            # Initialize visualization after plan is approved
             self._init_visualization(self.current_plan)
             # Check for stop condition
             if self._check_stop_condition(self.current_plan):

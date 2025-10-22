@@ -58,7 +58,7 @@ class WorkflowSelector:
         return F.cosine_similarity(embeddings_a, embeddings_b, dim=0).item()
 
     def sort_similar_workflows(
-        self, goal: str, threshold=0.8, debug=True
+        self, goal: str, threshold=0.8, debug=False
     ) -> list[WorkflowInfo]:
         """Find workflows with similar goals using original unwrapped tasks.
         

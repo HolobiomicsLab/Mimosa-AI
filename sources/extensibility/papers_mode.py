@@ -1,5 +1,5 @@
 """
-AutomatedMode - Autonomous goal generation and execution system
+PaperEvaluationMode - Autonomous goal generation and execution system
 """
 
 import asyncio
@@ -17,14 +17,14 @@ from sources.core.planner import Planner
 from sources.core.schema import Task
 from sources.post_processing.bs_detection import BullshitDetectorNumerical
 
-class AutomatedMode:
+class PaperEvaluationMode:
     """
     Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
     """
 
     def __init__(self, config, csv_runs_limit: int = 10):
         """
-        Initialize AutomatedMode.
+        Initialize PaperEvaluationMode.
 
         Args:
             config: Mimosa configuration object
@@ -108,7 +108,7 @@ Provide a structured analysis with:
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
 
-        self.logger.info(f"[AUTOMATED MODE] Run notes saved to {notes_file}")
+        self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
 
     def _extract_wf_answers(self, workflow_info: WorkflowInfo) -> str:
         """Extract and format flow answers from workflow state result."""
@@ -202,8 +202,8 @@ Provide your analysis following the specified output format."""
             total_rows = sum(1 for _ in reader)
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
-            self.logger.info(f"[AUTOMATED MODE] Starting autonomous loop for {total_rows} CSV entry")
-            print(f"\n\033[95m{'🤖 AUTOMATED RUN ON PAPERS DATASETS':^80}\033[0m")
+            self.logger.info(f"[PAPERS DATASET MODE] Starting autonomous loop for {total_rows} CSV entry")
+            print(f"\n\033[95m{'🤖 PAPERS DATASET RUN ON PAPERS DATASETS':^80}\033[0m")
             print(f"\033[95m{'=' * 80}\033[0m")
             for i, row in enumerate(reader):
                 if i < start_row:
@@ -236,7 +236,7 @@ Provide your analysis following the specified output format."""
                     print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                     print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
                 except Exception as e:
-                    self.logger.error(f"[AUTOMATED MODE] Error in csv row {i + 1}: {str(e)}")
+                    self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
                     raise e
 
@@ -262,6 +262,6 @@ Provide your analysis following the specified output format."""
             print("\n\033[95m⚠️ Autonomous mode interrupted by user\033[0m")
             self._print_final_summary()
         except Exception as e:
-            self.logger.error(f"[AUTOMATED MODE] Fatal error: {str(e)}")
+            self.logger.error(f"[PAPERS DATASET MODE] Fatal error: {str(e)}")
             print(f"\033[91m❌ Fatal error in autonomous mode: {str(e)}\033[0m")
             raise
