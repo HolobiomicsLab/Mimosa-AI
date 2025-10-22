@@ -19,7 +19,7 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.automated_mode import AutomatedMode
+from sources.extensibility.papers_mode import PaperEvaluationMode
 from sources.utils.dataset import calculate_good_answer_average, read_dataset
 from sources.utils.scenario_loader import ScenarioLoader
 from sources.utils.user_entry import collect_goals_from_user
@@ -118,9 +118,9 @@ async def dataset_execution_mode(args, config):
     else:
         print("❌ No questions found in dataset or no goal provided.")
 
-async def automated_mode(args, config):
-    automated = AutomatedMode(config, csv_runs_limit=args.csv_runs_limit)
-    await automated.start_autonomous_mode()
+async def papers_mode(args, config):
+    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_autonomous_mode()
 
 async def learning_mode(args, config):
     from sources.utils.shared_visualization import SharedVisualizationData
@@ -173,10 +173,10 @@ async def main():
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
     )
     parser.add_argument(
-        "--automated", action="store_true", help="Autonomous mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
+        "--papers", action="store_true", help="Autonomous mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --automated mode)"
+        "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
     )
     parser.add_argument(
         "--dataset", type=str, help="evalaluation mode for single task mode, specify dataset folder to use such as GSMK8 (csv)"
@@ -221,14 +221,14 @@ async def main():
             await dataset_execution_mode(args, config)
         elif (args.manual):
             await manual_mode(args, config)
-        elif (args.automated):
-            await automated_mode(args, config)
+        elif (args.papers):
+            await papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         elif args.learn:
             await learning_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --task, --goal, --automated  to start.")
+            raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:

@@ -1,6 +1,10 @@
 {
-  "timestamp": "2025-10-21T09:51:35.299029",
+  "timestamp": "2025-10-22T10:00:03.660997",
   "pricing": {
+    "openrouter/andromeda-alpha": {
+      "input": 0.0,
+      "output": 0.0
+    },
     "ibm-granite/granite-4.0-h-micro": {
       "input": 0.017,
       "output": 0.11
@@ -461,11 +465,11 @@
       "input": 0.5,
       "output": 1.5
     },
-    "mistralai/magistral-medium-2506:thinking": {
+    "mistralai/magistral-medium-2506": {
       "input": 2.0,
       "output": 5.0
     },
-    "mistralai/magistral-medium-2506": {
+    "mistralai/magistral-medium-2506:thinking": {
       "input": 2.0,
       "output": 5.0
     },
@@ -873,10 +877,6 @@
       "input": 0.049999999999999996,
       "output": 0.19999999999999998
     },
-    "qwen/qwen2.5-vl-72b-instruct:free": {
-      "input": 0.0,
-      "output": 0.0
-    },
     "qwen/qwen2.5-vl-72b-instruct": {
       "input": 0.08,
       "output": 0.33
@@ -1136,6 +1136,10 @@
     "nousresearch/hermes-3-llama-3.1-70b": {
       "input": 0.3,
       "output": 0.3
+    },
+    "nousresearch/hermes-3-llama-3.1-405b:free": {
+      "input": 0.0,
+      "output": 0.0
     },
     "nousresearch/hermes-3-llama-3.1-405b": {
       "input": 1.0,

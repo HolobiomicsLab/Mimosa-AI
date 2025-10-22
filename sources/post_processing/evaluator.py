@@ -161,17 +161,15 @@ class WorkflowEvaluator:
 
     def workflow_execution_text(self, uuid: str) -> str | None:
         """Generate workflow execution text for evaluation.
-        
         Args:
             uuid: UUID of the workflow
-            
         Returns:
             Formatted workflow execution text or None if data cannot be loaded
-            
         Raises:
             WorkflowDataError: If workflow data is invalid
         """
         try:
+            
             state_result, workflow_code = self._load_workflow_data(uuid)
             
             if not state_result and not workflow_code:
@@ -190,20 +188,14 @@ class WorkflowEvaluator:
 
             # Format the execution text (preserving original prompt format)
             return f"""You are evaluating a scientific workflow execution.
-
-        WORKFLOW GOAL:
-        {goal}
-
-        FULL WORKFLOW STATE RESULT (JSON):
-        {json.dumps(state_result_copy, indent=2)}
-
-        WORKFLOW CODE:
-        ```python
-        {workflow_code or "# No workflow code available"}
-        ```"""
-
-        except WorkflowDataError:
-            raise
+                   WORKFLOW GOAL:
+                   {goal}
+                   FULL WORKFLOW STATE RESULT (JSON):
+                   {json.dumps(state_result_copy, indent=2)}
+                   WORKFLOW CODE:
+                   ```python
+                   {workflow_code or "# No workflow code available"}
+                   ```"""
         except Exception as e:
             return f"""
             Worflow generation failed due to error:

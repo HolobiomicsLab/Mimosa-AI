@@ -85,7 +85,7 @@ Mimosa-AI supports various command line arguments to customize execution:
 - `--goal GOAL`: Specify your research objective, research reproduction or scientific question (planner mode)
 - `--task TASK`: Run & learn how to do a single task (Litterature review, code installation, dataset download)
 - `--manual`: Interact & use Mimosa tools (from Toolomics MCPs) using a CLI interface. Allow to debug MCPs and put yourself in Mimosa shoes.
-- `--automated`: Automated evaluation mode. Will load a CSV dataset from `datasets/` containing a list of paper and prompt for Mimosa (such as reproduce the paper X ...), will automatically run Mimosa in goal mode for every papers in the csv dataset.
+- `--papers`: Automated run on CSV of research papers. Will load a CSV dataset from `datasets/` containing a list of paper and prompt for Mimosa (such as reproduce the paper X ...), will automatically run Mimosa in goal mode for every papers in the csv dataset.
 - `--dataset DATASET_FOLDER`: Evaluate Mimosa workflow generation on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
 - `--scenario`: Specify scenario to evaluate Mimosa on.
 
