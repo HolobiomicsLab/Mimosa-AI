@@ -12,7 +12,7 @@ class LocalTransfer:
     Class transfer results of run between workspace folder and a capsule folder to cnetralize run results.
     """
 
-    def __init__(self, workspace_path, runs_capsule_dir):
+    def __init__(self, workspace_path, runs_capsule_dir = "runs_capsule"):
         self.workspace_path = workspace_path 
         self.runs_capsule_dir = runs_capsule_dir
         self.config_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
@@ -43,12 +43,12 @@ class LocalTransfer:
         except Exception as e:
             raise e
     
-    def create_capsule_folder(self, capsule_name):
+    def create_capsule_folder(self, capsule_name) -> str:
         path = f"{self.runs_capsule_dir}/{capsule_name}"
         os.makedirs(path, exist_ok=True)
         return path
     
-    def copy_files_recursive(self, source: Path, target: Path):
+    def copy_files_recursive(self, source: Path, target: Path) -> None:
         """
         Recursively copy files and directories from source to target.
 
@@ -74,14 +74,21 @@ class LocalTransfer:
                 except Exception as e:
                     print(f"Error copying {source_path}: {e}")
 
-    def transfer_workspace_files_to_capsule(self, goal):
+    def transfer_files_to_workspace(self, path_files_folder: str) -> None:
+        folder_name = path_files_folder.split('/')[-1]
+        path_destination = Path(f"{self.workspace_path}/{folder_name}")
+        path_files = Path(path_files_folder)
+        self.copy_files_recursive(path_files, path_destination)
+
+    def transfer_workspace_files_to_capsule(self, goal) -> str:
         capsule_name = self.create_capsule_name(goal)
         path_capsule = Path(self.create_capsule_folder(capsule_name))
         path_workspace = Path(self.workspace_path)
         self.copy_files_recursive(path_workspace, path_capsule)
         self.clean_workspace()
+        return capsule_name
 
-    def clean_workspace(self):
+    def clean_workspace(self) -> None:
         """Remove all files and directories in the workspace folder."""
         workspace = Path(self.workspace_path)
         shutil.rmtree(workspace, ignore_errors=True)

@@ -797,8 +797,6 @@ Original request:
                 title="Planner execution completed",
                 priority=0
             )
-            trs = LocalTransfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
-            trs.transfer_workspace_files_to_capsule(goal)
 
             if self.visualizer:
                 self._cleanup_visualization()

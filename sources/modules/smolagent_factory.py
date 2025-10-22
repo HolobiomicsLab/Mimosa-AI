@@ -119,9 +119,7 @@ ALWAYS Use execute_command("ls -la <path>") to verify file existence and permiss
   ```json
   {
       "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
-      "answer": "Complete response to the original task",
-      "error": "Full error message if applicable, else empty string",
-      "retry_advice": "Specific advice for retry if applicable, else empty string"
+      "answer": "Complete response to the original task"
   }
   ```
 - **Usage Rules**:
