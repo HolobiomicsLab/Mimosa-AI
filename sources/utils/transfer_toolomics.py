@@ -126,10 +126,6 @@ class LocalTransfer:
         path_destination = Path(f"{self.workspace_path}/{folder_name}")
         path_files = Path(path_files_folder)
         
-        print(f"[DEBUG] Source: {path_files}")
-        print(f"[DEBUG] Destination: {path_destination}")
-        print(f"[DEBUG] Workspace: {self.workspace_path}")
-        
         if not path_files.exists():
             raise FileNotFoundError(f"Source folder does not exist: {path_files}")
         
@@ -138,11 +134,9 @@ class LocalTransfer:
         
         # Count files in source before transfer
         source_file_count = self.count_files_recursive(path_files)
-        print(f"[DEBUG] Source contains {source_file_count} files")
         
         # Perform the transfer
         files_copied = self.copy_files_recursive(path_files, path_destination)
-        print(f"[DEBUG] Copied {files_copied} files")
         
         # Verify files were actually transferred
         if files_copied == 0:
@@ -151,27 +145,13 @@ class LocalTransfer:
                 f"Source contained {source_file_count} files."
             )
         
-        # Check destination folder specifically
-        dest_file_count = self.count_files_recursive(path_destination)
-        print(f"[DEBUG] Destination folder contains {dest_file_count} files")
-        
         # Verify workspace has files after transfer
         workspace_file_count = self.count_files_recursive(Path(self.workspace_path))
-        print(f"[DEBUG] Workspace contains {workspace_file_count} files total")
-        
         if workspace_file_count == 0:
             raise ValueError(
                 f"Workspace is empty after transfer. "
                 f"Expected {files_copied} files but found none."
             )
-        
-        # List actual files for debugging
-        workspace_path = Path(self.workspace_path)
-        if workspace_path.exists():
-            actual_files = list(workspace_path.rglob('*'))
-            print(f"[DEBUG] Actual files in workspace:")
-            for f in actual_files[:10]:  # Show first 10
-                print(f"  - {f.relative_to(workspace_path)}")
         
         return files_copied
 
@@ -186,8 +166,12 @@ class LocalTransfer:
     def clean_workspace(self) -> None:
         """Remove all files and directories in the workspace folder."""
         workspace = Path(self.workspace_path)
-        shutil.rmtree(workspace, ignore_errors=True)
-        workspace.mkdir(parents=True, exist_ok=True)
+        if workspace.exists() and workspace.is_dir():
+            for item in workspace.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+                else:
+                    item.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     trans = LocalTransfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")
