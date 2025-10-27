@@ -186,16 +186,18 @@ Provide your analysis following the specified output format."""
         return analysis
     
     def sab_files_transfer(self, sab_loader, file_transfer, row):
-        try:
-            task_dataset_path = sab_loader.get_dataset_path(row)
-            self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
-            print(f"\033[95m📁 Transferring dataset: {task_dataset_path.name}\033[0m")
-            file_transfer.clean_workspace()
-            file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-            print("\033[95m✓ Dataset transferred to workspace\033[0m")
-        except Exception as e:
-            self.logger.error(f"[PAPERS DATASET MODE] Error transferring dataset: {str(e)}")
-            print(f"\033[91m⚠️ Warning: Could not transfer dataset: {str(e)}\033[0m")
+        """Transfer dataset files to workspace with validation."""
+        file_transfer.clean_workspace()
+        task_dataset_path = sab_loader.get_dataset_path(row)
+        
+        self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
+        print(f"\033[95m📁 Transferring dataset: {task_dataset_path.name}\033[0m")
+        
+        # Transfer files and validate
+        files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
+        
+        print(f"\033[95m✓ Transferred {files_transferred} files to workspace\033[0m")
+        self.logger.info(f"[PAPERS DATASET MODE] Successfully transferred {files_transferred} files")
 
     async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
         """
@@ -228,6 +230,8 @@ Provide your analysis following the specified output format."""
             for i, row in enumerate(reader):
                 if i < start_row:
                     continue
+                if i > self.csv_runs_limit:
+                    break
                 try:
                     iteration_start_time = time.time()
                     goal = self._generate_next_task(row, dataset_type)

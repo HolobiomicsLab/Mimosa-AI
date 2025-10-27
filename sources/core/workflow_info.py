@@ -138,10 +138,13 @@ class WorkflowInfo:
         evaluation = state_result.get("evaluation", {})
         scores = []
         if evaluation:
-            if "generic" in evaluation:
-                scores.append(evaluation["generic"]["overall_score"])
-            elif "scenario" in evaluation:
-                scores.append(evaluation["scenario"]["score"])
+            try:
+                if "generic" in evaluation:
+                        scores.append(evaluation["generic"]["overall_score"])
+                elif "scenario" in evaluation:
+                    scores.append(evaluation["scenario"]["score"])
+            except Exception as _:
+                scores.append(0)
         return mean(scores) if scores else 0.0
 
     def is_valid(self) -> bool:
