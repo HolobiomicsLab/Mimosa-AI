@@ -129,10 +129,10 @@ async def normal_execution_mode(args, config):
                                     judge=not args.disable_judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
+        trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
+        trs.transfer_workspace_files_to_capsule(args.goal or args.task)
     else:
         raise ValueError("No goal provided. Use --task, --goal to start.")
-    trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
-    trs.transfer_workspace_files_to_capsule(args.goal or args.task)
 
 async def main():
     """Main execution function"""
