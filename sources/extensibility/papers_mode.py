@@ -196,7 +196,21 @@ Provide your analysis following the specified output format."""
         # Transfer files and validate
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
         
+        # Double-check files are still there after transfer
+        from pathlib import Path
+        import time
+        time.sleep(0.5)  # Give filesystem a moment to sync
+        
+        workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[95m✓ Transferred {files_transferred} files to workspace\033[0m")
+        print(f"\033[95m📊 Verification: {workspace_files_after} files present in workspace\033[0m")
+        
+        if workspace_files_after == 0:
+            raise ValueError(
+                f"Files disappeared after transfer! "
+                f"Transferred {files_transferred} but workspace now has 0 files."
+            )
+        
         self.logger.info(f"[PAPERS DATASET MODE] Successfully transferred {files_transferred} files")
 
     async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
