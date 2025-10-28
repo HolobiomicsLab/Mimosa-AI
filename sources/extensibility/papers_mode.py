@@ -15,7 +15,7 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.workflow_info import WorkflowInfo
 from sources.core.planner import Planner
 from sources.core.schema import Task, GodelRun
-from sources.post_processing.bs_detection import BullshitDetectorNumerical
+from sources.evaluation.bs_detection import BullshitDetectorNumerical
 from sources.utils.science_agent_bench import ScienceAgentBenchLoader
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.mock_data import MockDataGenerator
@@ -140,6 +140,7 @@ Provide a structured analysis with:
     {dataset_preview}
     EXPECTED OUTPUT:
     Save results to a formatted file named exactly: {output_fname}
+    Keep only one python script in the workspace (The best one that lead to success).
     """
         return task_prompt
 
@@ -189,18 +190,10 @@ Provide your analysis following the specified output format."""
         """Transfer dataset files to workspace with validation."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
-        
         self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
         print(f"\033[95m📁 Transferring dataset: {task_dataset_path.name}\033[0m")
-        
-        # Transfer files and validate
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        
-        # Double-check files are still there after transfer
-        from pathlib import Path
-        import time
         time.sleep(0.5)  # Give filesystem a moment to sync
-        
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[95m✓ Transferred {files_transferred} files to workspace\033[0m")
         print(f"\033[95m📊 Verification: {workspace_files_after} files present in workspace\033[0m")

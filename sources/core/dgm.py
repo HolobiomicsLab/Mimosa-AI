@@ -9,12 +9,12 @@ import re
 import time
 from pathlib import Path
 
-from sources.post_processing.evaluator import WorkflowEvaluator
+from sources.evaluation.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
-from sources.utils.scenario_loader import ScenarioLoader
+from sources.evaluation.scenario_loader import ScenarioLoader
 
 from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
@@ -514,7 +514,7 @@ class GodelMachine:
         scenario_id: str, uuid: str
     ):
         """Update assertion progress plot."""
-        from sources.utils.scenario_loader import ScenarioLoader
+        from sources.evaluation.scenario_loader import ScenarioLoader
 
         scenario = ScenarioLoader().load_scenario(scenario_id)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0
