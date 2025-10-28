@@ -1,0 +1,73 @@
+{
+  "data_loading": [
+    {
+      "name": "Load roads data",
+      "description": "Correctly load the roads geojson file from the path 'benchmark/datasets/deforestation/roads.geojson'.",
+      "points": 5
+    },
+    {
+      "name": "Load deforested area data",
+      "description": "Correctly load the deforested area geojson file from the path 'benchmark/datasets/deforestation/deforestedArea.geojson'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Convert CRS for roads",
+      "description": "Convert the coordinate reference system of roads to EPSG:32723.",
+      "points": 5
+    },
+    {
+      "name": "Convert CRS for deforested area",
+      "description": "Convert the coordinate reference system of deforestedArea to EPSG:32723.",
+      "points": 5
+    },
+    {
+      "name": "Buffer roads",
+      "description": "Correctly create a buffer of 5500 meters around the roads.",
+      "points": 5
+    },
+    {
+      "name": "Dissolve buffers",
+      "description": "Correctly dissolve the buffered roads to form a single geometry.",
+      "points": 5
+    },
+    {
+      "name": "Clip deforested area",
+      "description": "Correctly compute the difference between the deforested area and the dissolved buffer of roads with geopandas.overlay().",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Compute buffer area",
+      "description": "Correctly calculate the total area of the dissolved buffer.",
+      "points": 5
+    },
+    {
+      "name": "Compute deforested area sum",
+      "description": "Correctly calculate the total area of the clipped deforested area within the buffer.",
+      "points": 5
+    },
+    {
+      "name": "Compute deforestation percentage",
+      "description": "Calculate the percentage of deforested area relative to the buffer area correctly.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [
+    {
+      "name": "Dataframe column naming",
+      "description": "Correctly name the result dataframe column as 'percentage_deforestation'.",
+      "points": 5
+    }
+  ],
+  "output_saving": [
+    {
+      "name": "Save output to CSV",
+      "description": "Save the dataframe to 'pred_results/deforestation_rate.csv' without the index.",
+      "points": 5
+    }
+  ],
+  "total_points": 60
+}

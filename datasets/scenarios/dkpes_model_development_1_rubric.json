@@ -1,0 +1,58 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Train Data",
+      "description": "Read the train data from 'benchmark/datasets/dkpes/dkpes_train.csv'.",
+      "points": 5
+    },
+    {
+      "name": "Load Test Data",
+      "description": "Read the test data from 'benchmark/datasets/dkpes/dkpes_test.csv'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Feature Selection",
+      "description": "Correctly select numeric columns as features.",
+      "points": 10
+    },
+    {
+      "name": "Transform Target Variable",
+      "description": "Transform 'Signal-inhibition' to binary using the median value as threshold from train data and use as target for training.",
+      "points": 10
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Initialize Model",
+      "description": "Correctly initialize the RandomForestClassifier with appropriate parameters, such as with 100 estimators.",
+      "points": 5
+    },
+    {
+      "name": "Fit Model",
+      "description": "Train the RandomForestClassifier on the training data.",
+      "points": 10
+    },
+    {
+      "name": "Generate Predictions",
+      "description": "Use the trained model to predict on the test data.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [
+    {
+      "name": "Format Predictions",
+      "description": "Format the predictions with columns 'index' and 'Signal-inhibition'.",
+      "points": 5
+    }
+  ],
+  "output_saving": [
+    {
+      "name": "Save Predictions",
+      "description": "Save the formatted predictions to 'pred_results/dkpes_test_pred.csv'.",
+      "points": 5
+    }
+  ],
+  "total_points": 60
+}

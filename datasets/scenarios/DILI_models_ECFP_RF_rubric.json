@@ -1,0 +1,67 @@
+{
+  "data_loading": [
+    {
+      "name": "Loading Training Data",
+      "description": "Correctly loads the training data from 'benchmark/datasets/dili/train.csv'.",
+      "points": 5
+    },
+    {
+      "name": "Loading Testing Data",
+      "description": "Correctly loads the test data from 'benchmark/datasets/dili/test.csv'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Generate Morgan Fingerprints for Training Data",
+      "description": "Properly generates Morgan fingerprints for the training data from SMILES strings using rdkit.Chem.AllChem.GetMorganFingerprintAsBitVect",
+      "points": 5
+    },
+    {
+      "name": "Label Encoding for Training Data",
+      "description": "Correctly encodes labels for training data based on the 'vDILIConcern' column. Label is 1 when column value is 'vMost-DILI-Concern' or 'vLess-DILI-Concern'. Label is 0 when column value is 'vNo-DILI-Concern' or 'sider_inactive'.",
+      "points": 5
+    },
+    {
+      "name": "Data Configuration",
+      "description": "Properly create the 3 dataset configurations (MCNC, MCLCNC, all) for model training.",
+      "points": 10
+    },
+    {
+      "name": "Generate Morgan Fingerprints for Test Data",
+      "description": "Properly generates Morgan fingerprints for the test data from SMILES strings using the same parameters as in training.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Random Forest Hyperparameter Tuning",
+      "description": "Correctly implements hyperparameter tuning for Random Forest.",
+      "points": 10
+    },
+    {
+      "name": "Model Evaluation Metrics",
+      "description": "Correctly computes and uses evaluation metric for model evaluation and hyperparameter search.",
+      "points": 5
+    },
+    {
+      "name": "Cross Validation",
+      "description": "Correctly implements 5-fold cross validation for each data configuration.",
+      "points": 15
+    },
+    {
+      "name": "Best Model Training and Prediction",
+      "description": "Train the model on all examples for each configuration with the best hyperparameter and save the predictions for each configuration.",
+      "points": 10
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Saving Results as CSV",
+      "description": "Correctly saves the prediction results to 'pred_results/' directory with appropriate filenames based on the configuration.",
+      "points": 5
+    }
+  ],
+  "total_points": 50
+}

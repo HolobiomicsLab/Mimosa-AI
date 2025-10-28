@@ -1,0 +1,45 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Papyrus Data",
+      "description": "Load data from 'benchmark/datasets/papyrus/papyrus_unfiltered.pkl' using pd.read_pickle.",
+      "points": 5
+    },
+    {
+      "name": "Load Protein Data",
+      "description": "Load data from 'benchmark/datasets/papyrus/papyrus_protein_set.pkl' using pd.read_pickle.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Filter by Quality",
+      "description": "Filter data with minimum quality set to 'medium'.",
+      "points": 5
+    },
+    {
+      "name": "Filter by Protein Class",
+      "description": "Keep data from classes 'Ligand-gated ion channels' and 'SLC superfamily of solute carriers'.",
+      "points": 5
+    },
+    {
+      "name": "Filter by Activity Type",
+      "description": "Keep data with activity types as 'Ki' or 'KD'.",
+      "points": 5
+    },
+    {
+      "name": "Filter by Organism",
+      "description": "Keep proteins from either 'Human' or 'Rat' organism.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Filtered Data",
+      "description": "Save the filtered papyrus_data to './pred_results/papyrus_filtered.pkl'.",
+      "points": 5
+    }
+  ],
+  "total_points": 35
+}

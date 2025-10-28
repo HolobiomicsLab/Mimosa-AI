@@ -1,0 +1,67 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Bus Service Area",
+      "description": "Correctly load the Bus Service Area GeoJSON file from 'benchmark/datasets/TransitAccessDemographic/BusServiceArea.geojson'.",
+      "points": 5
+    },
+    {
+      "name": "Load Hamilton County Block Groups",
+      "description": "Correctly load the Hamilton County Block Groups GeoJSON file from 'benchmark/datasets/TransitAccessDemographic/HamiltonDemographics.geojson'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Fill NaN Values for Population to Polygon Size",
+      "description": "Fill NaN values with 0 for the 'populationToPolygonSizeRating' column.",
+      "points": 5
+    },
+    {
+      "name": "Fill NaN Values for Households Poverty Status",
+      "description": "Fill NaN values with 0 for the 'households_ACSHHBPOV' column.",
+      "points": 5
+    },
+    {
+      "name": "Fill NaN Values for At Risk Vehicle Ownership",
+      "description": "Fill NaN values with 0 for the 'AtRisk_ACSOVEH0' column.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Set Up Plotting Environment",
+      "description": "Initialize matplotlib subplot with size 15x15 for plotting.",
+      "points": 5
+    },
+    {
+      "name": "Plot Population Density",
+      "description": "Plot 'populationToPolygonSizeRating' with 'Greens' colormap and dynamic alpha.",
+      "points": 5
+    },
+    {
+      "name": "Plot Poverty Rate",
+      "description": "Plot 'households_ACSHHBPOV' with 'Reds' colormap and dynamic alpha.",
+      "points": 5
+    },
+    {
+      "name": "Plot Vehicle Ownership",
+      "description": "Plot 'AtRisk_ACSOVEH0' with 'Blues' colormap and dynamic alpha.",
+      "points": 5
+    },
+    {
+      "name": "Overlay Bus Service Area",
+      "description": "Correctly overlay the bus service area on the plot with appropriate styling.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Plot to File",
+      "description": "Save the plot to 'pred_results/transit_access.png' with 300 dpi.",
+      "points": 5
+    }
+  ],
+  "total_points": 55
+}
