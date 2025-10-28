@@ -21,6 +21,11 @@ memory/*
 sources/memory/*
 sources/workflows/
 mimosa-env/*
+datasets/**/*.h5ad
+datasets/**/*.pkl
+datasets/**/*.np
+datasets/**/*.mtx
+datasets/**/*.tif"
 
 ### react ###
 .DS_*
