@@ -131,10 +131,8 @@ class ScenarioLoader:
     def _validate_rubric_format(self, scenario: dict[str, Any]) -> bool:
         """
         Validate ScienceAgentBench rubric format.
-        
         Args:
             scenario: Scenario dictionary to validate
-            
         Returns:
             True if valid, False otherwise
         """
@@ -155,13 +153,11 @@ class ScenarioLoader:
             "output_formatting",
             "output_saving"
         }
-        
         # Check that at least one category exists
         category_keys = [k for k in scenario.keys() if k in valid_categories]
         if not category_keys:
             print("No valid rubric categories found")
             return False
-        
         # Validate each category
         total_calculated = 0
         for category_name in category_keys:

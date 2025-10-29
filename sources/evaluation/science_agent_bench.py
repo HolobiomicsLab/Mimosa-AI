@@ -25,9 +25,9 @@ class ScienceAgentBenchLoader:
         self.scoring_rubrics_path = self.base_path / "scoring_rubrics"
         
         # Cache for CSV data
-        self._csv_data: Optional[List[Dict[str, str]]] = None
+        self._csv_data: list[dict[str, str]] = None
     
-    def load_csv_data(self, csv_path: Optional[str] = None) -> List[Dict[str, str]]:
+    def load_csv_data(self, csv_path: str = None) -> list[dict[str, str]]:
         """
         Load the ScienceAgentBench CSV file.
         
@@ -48,13 +48,13 @@ class ScienceAgentBenchLoader:
         if not csv_path.exists():
             raise FileNotFoundError(f"CSV file not found: {csv_path}")
         
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        with open(csv_path, encoding='utf-8') as f:
             reader = csv.DictReader(f)
             self._csv_data = list(reader)
         
         return self._csv_data
     
-    def get_task_by_index(self, index: int, csv_path: Optional[str] = None) -> Dict[str, str]:
+    def get_task_by_index(self, index: int, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by row index (0-based).
         
@@ -70,7 +70,7 @@ class ScienceAgentBenchLoader:
             raise IndexError(f"Task index {index} out of range (0-{len(data)-1})")
         return data[index]
     
-    def get_task_by_id(self, instance_id: int, csv_path: Optional[str] = None) -> Dict[str, str]:
+    def get_task_by_id(self, instance_id: int, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by instance_id (1-102).
         
@@ -87,7 +87,7 @@ class ScienceAgentBenchLoader:
                 return task
         raise ValueError(f"Task with instance_id {instance_id} not found")
     
-    def get_task_by_name(self, task_name: str, csv_path: Optional[str] = None) -> Dict[str, str]:
+    def get_task_by_name(self, task_name: str, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by gold program name or eval script name.
         
@@ -112,7 +112,7 @@ class ScienceAgentBenchLoader:
         
         raise ValueError(f"Task with name '{task_name}' not found")
     
-    def get_dataset_path(self, task_data: Dict[str, str]) -> Path:
+    def get_dataset_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the dataset directory path for a task.
         
@@ -142,7 +142,7 @@ class ScienceAgentBenchLoader:
         
         return dataset_path
     
-    def get_eval_script_path(self, task_data: Dict[str, str]) -> Path:
+    def get_eval_script_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the evaluation script path for a task.
         
@@ -163,7 +163,7 @@ class ScienceAgentBenchLoader:
         
         return eval_path
     
-    def get_gold_program_path(self, task_data: Dict[str, str]) -> Path:
+    def get_gold_program_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the gold program path for a task.
         
@@ -184,7 +184,7 @@ class ScienceAgentBenchLoader:
         
         return gold_path
     
-    def get_output_path(self, task_data: Dict[str, str]) -> str:
+    def get_output_path(self, task_data: dict[str, str]) -> str:
         """
         Get the expected output file path for a task.
         
@@ -196,7 +196,7 @@ class ScienceAgentBenchLoader:
         """
         return task_data.get('output_fname', '')
     
-    def get_task_summary(self, task_data: Dict[str, str]) -> str:
+    def get_task_summary(self, task_data: dict[str, str]) -> str:
         """
         Get a formatted summary of task information.
         
@@ -217,7 +217,7 @@ Gold Program: {task_data.get('gold_program_name')}"""
 
 
 # Convenience functions for quick access
-def get_task_by_index(index: int, base_path: str = "datasets/ScienceAgentBench") -> Dict[str, str]:
+def get_task_by_index(index: int, base_path: str = "datasets/ScienceAgentBench") -> dict[str, str]:
     """Quick access to get task by index."""
     loader = ScienceAgentBenchLoader(base_path)
     return loader.get_task_by_index(index)
@@ -230,7 +230,7 @@ def get_dataset_path_for_index(index: int, base_path: str = "datasets/ScienceAge
     return loader.get_dataset_path(task)
 
 
-def get_task_by_id(instance_id: int, base_path: str = "datasets/ScienceAgentBench") -> Dict[str, str]:
+def get_task_by_id(instance_id: int, base_path: str = "datasets/ScienceAgentBench") -> dict[str, str]:
     """Quick access to get task by instance ID."""
     loader = ScienceAgentBenchLoader(base_path)
     return loader.get_task_by_id(instance_id)

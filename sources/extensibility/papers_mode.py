@@ -2,7 +2,6 @@
 PaperEvaluationMode - Autonomous goal generation and execution system
 """
 
-import asyncio
 import csv
 import json
 import logging
@@ -12,13 +11,11 @@ from pathlib import Path
 
 from sources.core.dgm import GodelMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
-from sources.core.workflow_info import WorkflowInfo
 from sources.core.planner import Planner
 from sources.core.schema import Task, GodelRun
-from sources.evaluation.bs_detection import BullshitDetectorNumerical
-from sources.utils.science_agent_bench import ScienceAgentBenchLoader
+from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
-from sources.utils.mock_data import MockDataGenerator
 
 class PaperEvaluationMode:
     """
@@ -47,7 +44,7 @@ class PaperEvaluationMode:
         self.llm_config = LLMConfig(
             model=model,
             provider=provider,
-            temperature=0.8  # Some creativity for goal generation
+            temperature=0.8
         )
         self.result_analyzer = LLMProvider(
             agent_name="result_analyzer",
@@ -205,6 +202,69 @@ Provide your analysis following the specified output format."""
             )
         
         self.logger.info(f"[PAPERS DATASET MODE] Successfully transferred {files_transferred} files")
+    
+    def _evaluate_with_science_agent_bench(
+        self,
+        capsule_name: str,
+        row: dict,
+        runs: list,
+        sab_loader,
+        execution_data: dict
+    ) -> dict:
+        """
+        Evaluate results using ScienceAgentBench metrics.
+        
+        Args:
+            capsule_name: Name of the capsule directory containing results
+            row: CSV row data with task information
+            runs: List of GodelRun objects from execution
+            sab_loader: ScienceAgentBenchLoader instance
+            execution_data: Dictionary to update with evaluation results
+            
+        Returns:
+            Updated execution_data dictionary with evaluation metrics
+        """
+        try:
+            print("\033[95m📊 Evaluating results with ScienceAgentBench metrics...\033[0m")
+            
+            api_cost = runs[-1].cost if runs and hasattr(runs[-1], 'cost') else 0.0
+            evaluator = CapsuleEvaluator(
+                capsule_path=Path(self.config.runs_capsule_dir) / capsule_name,
+                task_data=row,
+                sab_loader=sab_loader,
+                api_cost=api_cost
+            )
+            
+            eval_results = evaluator.evaluate_all()
+            evaluator.save_results()
+            execution_data.update({
+                'VER': eval_results['VER'][0],
+                'VER_message': eval_results['VER'][1],
+                'SR': eval_results['SR'][0],
+                'SR_message': eval_results['SR'][1],
+                'CBS': eval_results['CBS'],
+                'eval_cost': eval_results['cost']
+            })
+            print(f"\033[95m{eval_results['summary']}\033[0m")
+
+            self.logger.info(
+                f"[SAB EVAL] Task {row.get('instance_id')}: "
+                f"VER={eval_results['VER'][0]}, "
+                f"SR={eval_results['SR'][0]}, "
+                f"CBS={eval_results['CBS']:.3f}"
+            )
+            
+        except Exception as eval_error:
+            self.logger.error(f"[SAB EVAL] Evaluation error: {str(eval_error)}")
+            print(f"\033[91m⚠️ Evaluation failed: {str(eval_error)}\033[0m")
+            execution_data.update({
+                'VER': False,
+                'SR': False,
+                'CBS': 0.0,
+                'eval_error': str(eval_error)
+            })
+        
+        return execution_data
 
     async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
         """
@@ -215,12 +275,11 @@ Provide your analysis following the specified output format."""
         user_input = input("Enter starting row ([Enter] 0 by default): ")
         start_row = int(user_input)-1 if user_input.strip() else -1
         
-        # Initialize ScienceAgentBench loader if needed
         sab_loader = None
         if dataset_type == "science_agent_bench":
             sab_loader = ScienceAgentBenchLoader()
             self.logger.info("[PAPERS DATASET MODE] ScienceAgentBench mode activated")
-        # Initialize file transfer utility
+
         file_transfer = LocalTransfer(
             workspace_path=self.config.workspace_dir,
             runs_capsule_dir=self.config.runs_capsule_dir
@@ -273,6 +332,17 @@ Provide your analysis following the specified output format."""
                         capsule_name, goal,
                         analysis, execution_time
                     )
+                    
+                    # Evaluate with ScienceAgentBench metrics if applicable
+                    if dataset_type == "science_agent_bench" and sab_loader:
+                        execution_data = self._evaluate_with_science_agent_bench(
+                            capsule_name=capsule_name,
+                            row=row,
+                            runs=runs,
+                            sab_loader=sab_loader,
+                            execution_data=execution_data
+                        )
+                    
                     print(f"\033[95m✅ Iteration {i + 1} completed\033[0m")
                     print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                     print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
@@ -280,6 +350,7 @@ Provide your analysis following the specified output format."""
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
                     raise e
+
 
         self._print_final_summary()
 
@@ -292,7 +363,24 @@ Provide your analysis following the specified output format."""
                           if exec_data.get("success_level") in ["High", "Medium"]]
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
         print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
-        print(f"\033[95mNotes saved in: {self.run_notes_dir}\033[0m")
+        sab_runs = [exec_data for exec_data in self.execution_history 
+                    if 'VER' in exec_data]
+        if sab_runs:
+            print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")
+            print(f"\033[95m{'-' * 80}\033[0m")
+            
+            ver_success = sum(1 for run in sab_runs if run.get('VER', False))
+            sr_success = sum(1 for run in sab_runs if run.get('SR', False))
+            avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
+            total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
+            
+            print(f"\033[95mVER (Valid Execution Rate): {ver_success}/{len(sab_runs)} ({ver_success/len(sab_runs)*100:.1f}%)\033[0m")
+            print(f"\033[95mSR (Success Rate): {sr_success}/{len(sab_runs)} ({sr_success/len(sab_runs)*100:.1f}%)\033[0m")
+            print(f"\033[95mCBS (CodeBERT Score) Average: {avg_cbs:.3f}\033[0m")
+            print(f"\033[95mTotal API Cost: ${total_cost:.4f}\033[0m")
+            print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
+        
+        print(f"\033[95m\nNotes saved in: {self.run_notes_dir}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
     async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv") -> None:

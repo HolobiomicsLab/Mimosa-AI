@@ -11,7 +11,6 @@ from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
-from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.planner_visualization import PlannerVisualizer
 
 
