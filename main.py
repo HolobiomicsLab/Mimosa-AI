@@ -20,7 +20,7 @@ from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.papers_mode import PaperEvaluationMode
-from sources.utils.scenario_loader import ScenarioLoader
+from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 
