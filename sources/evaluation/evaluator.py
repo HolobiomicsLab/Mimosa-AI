@@ -110,7 +110,7 @@ class BaseEvaluator:
         workflow_path = Path(self.workflow_dir) / workflow_id
 
         if not workflow_path.exists():
-            raise WorkflowDataError(f"Workflow directory not found: {workflow_path}")
+            return WorkflowInfo(workflow_id, workflow_path)
 
         if not workflow_path.is_dir():
             raise WorkflowDataError(f"Workflow path is not a directory: {workflow_path}")
@@ -151,7 +151,7 @@ class BaseEvaluator:
             goal = workflow_info.goal or "Goal not specified"
             
             if not state_result and not workflow_code:
-                raise Exception(f"No workflow data available for {uuid}")
+                return "workflow execution fully failed. report it."
 
             result = workflow_info.answers
 
