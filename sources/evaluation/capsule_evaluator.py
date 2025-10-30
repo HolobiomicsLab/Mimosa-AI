@@ -72,16 +72,17 @@ class CapsuleEvaluator:
             }
         """
         self.logger.info(f"[EVAL] Starting evaluation for task {self.instance_id}")
-        # 1. Evaluate Valid Execution Rate
-        ver_success, ver_msg = self.evaluate_exec_rate()
-        self.metrics['VER'] = (ver_success, ver_msg)
-        # 2. Evaluate Success Rate (only if VER passed)
-        if ver_success:
-            sr_success, sr_msg = self.evaluate_success_rate()
+        # 1. VER + Evaluate Success Rate 
+        sr_success, sr_msg = self.evaluate_success_rate()
+        ver_success = False
+        if sr_success:
+            ver_success = True
+            self.metrics['VER'] = (True, sr_msg)
             self.metrics['SR'] = (sr_success, sr_msg)
         else:
-            self.metrics['SR'] = (False, "VER failed - execution prerequisite not met")
-        # 3. Calculate CodeBERTScore
+            self.metrics['VER'] = (False, "VER failed due to script failure.")
+            self.metrics['SR'] = (False, "VER failed - SR is therefore False")
+        # 2. Calculate CodeBERTScore
         if self.metrics['SR'][0]:
             self.metrics['CBS'] = 1.0
             self.logger.info("[EVAL] SR=1, setting CBS=1.0 automatically")
@@ -92,44 +93,6 @@ class CapsuleEvaluator:
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")
         self.logger.info(f"[EVAL] Results: VER={ver_success}, SR={self.metrics['SR'][0]}, CBS={self.metrics['CBS']:.3f}, Cost=${self.api_cost:.4f}")
         return self.metrics
-    
-    def evaluate_exec_rate(self) -> tuple[bool, str]:
-        """
-        Evaluate Valid Execution Rate (VER).
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            py_files = list(self.capsule_path.glob("*.py"))
-            if not py_files:
-                return False, "No Python file found in capsule"
-            if len(py_files) > 1:
-                self.logger.warning(f"[EVAL] Multiple Python files found: {[f.name for f in py_files]}, using first one")
-            
-            py_file = py_files[0]
-            self.logger.info(f"[EVAL] Executing: {py_file.name}")
-            # Execute the Python file
-            success, message, output_created = self.sandbox.execute_safely(
-                script_path=py_file,
-                expected_output=self.expected_output,
-                timeout=300  # 5 minutes timeout
-            )
-            
-            if not success:
-                return False, f"Execution failed: {message}"
-            
-            if self.expected_output:
-                output_path = self.capsule_path / self.expected_output
-                if not output_path.exists():
-                    return False, f"Expected output file not created: {self.expected_output}"
-                
-                self.logger.info(f"[EVAL] Output file created: {self.expected_output}")
-            
-            return True, "Execution successful, output file created"
-            
-        except Exception as e:
-            self.logger.error(f"[EVAL] Error in VER evaluation: {str(e)}")
-            return False, f"Evaluation error: {str(e)}"
     
     def evaluate_success_rate(self) -> tuple[bool, str]:
         """
