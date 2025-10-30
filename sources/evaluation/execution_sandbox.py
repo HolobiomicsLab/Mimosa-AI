@@ -251,7 +251,7 @@ class ExecutionSandbox:
                     self.logger.warning("[SANDBOX] No pred_results directory in capsule")
                 
                 # Copy gold_results
-                gold_results_src = eval_script_path.parent / "gold_results"
+                gold_results_src = eval_script_path.parent / "eval_programs" /  "gold_results"
                 if gold_results_src.exists():
                     gold_results_dst = benchmark_dir / "gold_results"
                     shutil.copytree(gold_results_src, gold_results_dst)
@@ -279,7 +279,7 @@ class ExecutionSandbox:
                 if result.returncode != 0:
                     error_msg = f"Eval script failed with code {result.returncode}"
                     if result.stderr:
-                        error_msg += f": {result.stderr[:300]}"
+                        error_msg += f": {result.stderr[:1024]}"
                     self.logger.error(f"[SANDBOX] {error_msg}")
                     return False, error_msg
                 output = result.stdout.strip()
