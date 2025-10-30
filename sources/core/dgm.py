@@ -365,21 +365,19 @@ class GodelMachine:
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
         
         # Check termination conditions
-        if (runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success) and not learning_mode:
+        if runs[-1].iteration_count >= runs[-1].max_depth-1:
+            return runs
+        if  all_success:
             self._save_final_plots(assertion_history, rewards_history, uuid)
-
-            # Send success notification when all iterations complete
-            if all_success:
-                self.notifier.send_message(
-                    f"DGM completed successfully!\n"
-                    f"Goal: {runs[-1].goal[:128]}...\n"
-                    f"Final UUID: {uuid}\n"
-                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
-                    f"All workflows successful!",
-                    title=f"DGM success - {uuid}",
-                    priority=0
-                )
-
+            self.notifier.send_message(
+                f"DGM completed successfully!\n"
+                f"Goal: {runs[-1].goal[:128]}...\n"
+                f"Final UUID: {uuid}\n"
+                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                f"All workflows successful!",
+                title=f"DGM success - {uuid}",
+                priority=0
+            )
             return runs
 
         # Continue recursion
