@@ -73,14 +73,11 @@ class CapsuleEvaluator:
         """
         self.logger.info(f"[EVAL] Starting evaluation for task {self.instance_id}")
         # 1. VER + Evaluate Success Rate 
-        sr_success, sr_msg = self.evaluate_success_rate()
-        ver_success = False
-        if sr_success:
-            ver_success = True
-            self.metrics['VER'] = (True, sr_msg)
+        sr_success, sr_msg, ver_success = self.evaluate_success_rate()
+        self.metrics['VER'] = (ver_success, sr_msg)
+        if ver_success:
             self.metrics['SR'] = (sr_success, sr_msg)
         else:
-            self.metrics['VER'] = (False, "VER failed due to script failure.")
             self.metrics['SR'] = (False, "VER failed - SR is therefore False")
         # 2. Calculate CodeBERTScore
         if self.metrics['SR'][0]:
@@ -94,7 +91,7 @@ class CapsuleEvaluator:
         self.logger.info(f"[EVAL] Results: VER={ver_success}, SR={self.metrics['SR'][0]}, CBS={self.metrics['CBS']:.3f}, Cost=${self.api_cost:.4f}")
         return self.metrics
     
-    def evaluate_success_rate(self) -> tuple[bool, str]:
+    def evaluate_success_rate(self) -> tuple[bool, str, bool]:
         """
         Evaluate Success Rate (SR).
         
@@ -106,12 +103,12 @@ class CapsuleEvaluator:
         """
         try:
             if not self.eval_script_name:
-                return False, "No evaluation script specified for this task"
+                return False, "No evaluation script specified for this task", False
             
             eval_script_path = self.sab_loader.get_eval_script_path(self.task_data)
             
             if not eval_script_path.exists():
-                return False, f"Evaluation script not found: {eval_script_path}"
+                return False, f"Evaluation script not found: {eval_script_path}", False
             
             self.logger.info(f"[EVAL] Running evaluation script: {eval_script_path.name}")
             
@@ -120,11 +117,11 @@ class CapsuleEvaluator:
                 timeout=180
             )
             
-            return success, message
+            return success, message, True
             
         except Exception as e:
             self.logger.error(f"[EVAL] Error in SR evaluation: {str(e)}")
-            return False, f"Evaluation error: {str(e)}"
+            return False, f"Evaluation error: {str(e)}", False
     
     def calculate_codebert_score(self) -> float:
         """
