@@ -98,8 +98,7 @@ class ExecutionSandbox:
                 )
                 if result.returncode != 0:
                     return self._handle_execution_failure(
-                        result,
-                        expected_output
+                        result
                     )
                 return self._handle_execution_success(
                     expected_output
