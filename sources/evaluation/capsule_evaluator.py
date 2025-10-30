@@ -154,7 +154,6 @@ class CapsuleEvaluator:
             
             success, message = self.sandbox.run_eval_script(
                 eval_script_path=eval_script_path,
-                capsule_path=self.capsule_path,
                 timeout=180
             )
             

@@ -251,9 +251,9 @@ class ExecutionSandbox:
                     self.logger.warning("[SANDBOX] No pred_results directory in capsule")
                 
                 # Copy gold_results
-                gold_results_src = eval_script_path.parent / "eval_programs" /  "gold_results"
+                gold_results_src = eval_script_path.parent /  "gold_results"
                 if gold_results_src.exists():
-                    gold_results_dst = benchmark_dir / "gold_results"
+                    gold_results_dst = benchmark_dir / "eval_programs" / "gold_results"
                     shutil.copytree(gold_results_src, gold_results_dst)
                     self.logger.info("[SANDBOX] Copied gold_results for evaluation")
                 else:
