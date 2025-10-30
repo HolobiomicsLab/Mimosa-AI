@@ -7,6 +7,7 @@ Provides isolated execution environment with automatic dependency management.
 import logging
 import os
 import subprocess
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -234,6 +235,9 @@ class ExecutionSandbox:
                 # Create expected directory structure
                 pred_results_dir = temp_path / "pred_results"
                 pred_results_dir.mkdir(parents=True, exist_ok=True)
+                # Create benchmark directory structure
+                benchmark_dir = temp_path / "benchmark" 
+                benchmark_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Copy pred_results from capsule to temp directory
                 capsule_pred_results = self.capsule_path / "pred_results"
@@ -246,21 +250,18 @@ class ExecutionSandbox:
                 else:
                     self.logger.warning("[SANDBOX] No pred_results directory in capsule")
                 
-                # Create benchmark directory structure
-                benchmark_dir = temp_path / "benchmark" / "eval_programs"
-                benchmark_dir.mkdir(parents=True, exist_ok=True)
-                
                 # Copy gold_results
                 gold_results_src = eval_script_path.parent / "gold_results"
                 if gold_results_src.exists():
-                    import shutil
                     gold_results_dst = benchmark_dir / "gold_results"
                     shutil.copytree(gold_results_src, gold_results_dst)
                     self.logger.info("[SANDBOX] Copied gold_results for evaluation")
+                # copy eval script
+                shutil.copy2(eval_script_path, temp_dir / "eval.py")
                 
                 # Execute eval script
                 python_exe = sys.executable
-                cmd = [python_exe, str(eval_script_path)]
+                cmd = [python_exe, "eval.py"]
                 
                 result = subprocess.run(
                     cmd,
@@ -277,8 +278,6 @@ class ExecutionSandbox:
                         error_msg += f": {result.stderr[:300]}"
                     self.logger.error(f"[SANDBOX] {error_msg}")
                     return False, error_msg
-                
-                # Parse output
                 output = result.stdout.strip()
                 self.logger.debug(f"[SANDBOX] Eval output: {output}")
                 

@@ -15,6 +15,10 @@ class ScenarioLoader:
     def __init__(self, scenarios_dir: str = "datasets/scenarios"):
         self.scenarios_dir = Path(scenarios_dir)
         self._scenario_cache = {}
+    
+    @property 
+    def scenario_dir(self):
+        return self.scenario_dir
 
     def load_scenario(self, scenario_id: str) -> dict[str, Any] | None:
         """

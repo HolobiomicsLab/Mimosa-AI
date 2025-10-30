@@ -14,7 +14,6 @@ class ScienceAgentBenchLoader:
     def __init__(self, base_path: str = "datasets/ScienceAgentBench"):
         """
         Initialize ScienceAgentBench loader.
-        
         Args:
             base_path: Base directory for ScienceAgentBench dataset
         """
@@ -30,10 +29,8 @@ class ScienceAgentBenchLoader:
     def load_csv_data(self, csv_path: str = None) -> list[dict[str, str]]:
         """
         Load the ScienceAgentBench CSV file.
-        
         Args:
             csv_path: Optional custom path to CSV file
-            
         Returns:
             List of dictionaries, one per task row
         """
@@ -57,11 +54,9 @@ class ScienceAgentBenchLoader:
     def get_task_by_index(self, index: int, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by row index (0-based).
-        
         Args:
             index: Row index (0-101 for 102 tasks)
             csv_path: Optional custom path to CSV file
-            
         Returns:
             Dictionary containing task data
         """
@@ -73,11 +68,9 @@ class ScienceAgentBenchLoader:
     def get_task_by_id(self, instance_id: int, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by instance_id (1-102).
-        
         Args:
             instance_id: Task instance ID (1-102)
             csv_path: Optional custom path to CSV file
-            
         Returns:
             Dictionary containing task data
         """
@@ -90,11 +83,9 @@ class ScienceAgentBenchLoader:
     def get_task_by_name(self, task_name: str, csv_path: str = None) -> dict[str, str]:
         """
         Get task data by gold program name or eval script name.
-        
         Args:
             task_name: Name to search for (with or without .py extension)
             csv_path: Optional custom path to CSV file
-            
         Returns:
             Dictionary containing task data
         """
@@ -115,10 +106,8 @@ class ScienceAgentBenchLoader:
     def get_dataset_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the dataset directory path for a task.
-        
         Args:
             task_data: Task dictionary from CSV
-            
         Returns:
             Path to task's dataset directory
         """
@@ -145,10 +134,8 @@ class ScienceAgentBenchLoader:
     def get_eval_script_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the evaluation script path for a task.
-        
         Args:
             task_data: Task dictionary from CSV
-            
         Returns:
             Path to evaluation script
         """
@@ -166,10 +153,8 @@ class ScienceAgentBenchLoader:
     def get_gold_program_path(self, task_data: dict[str, str]) -> Path:
         """
         Get the gold program path for a task.
-        
         Args:
             task_data: Task dictionary from CSV
-            
         Returns:
             Path to gold program
         """
@@ -187,10 +172,8 @@ class ScienceAgentBenchLoader:
     def get_output_path(self, task_data: dict[str, str]) -> str:
         """
         Get the expected output file path for a task.
-        
         Args:
             task_data: Task dictionary from CSV
-            
         Returns:
             Expected output file path (relative)
         """
@@ -199,10 +182,8 @@ class ScienceAgentBenchLoader:
     def get_task_summary(self, task_data: dict[str, str]) -> str:
         """
         Get a formatted summary of task information.
-        
         Args:
             task_data: Task dictionary from CSV
-            
         Returns:
             Formatted task summary string
         """
