@@ -56,7 +56,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
             return (passed / total) >= 0.8
         if 'generic' in eval_data and eval_data['generic']:
             score = eval_data['generic'].get('overall_score', 0.0)
-            return score >= 7.0
+            return score >= 0.7
     if answers:
         return check_answer_success(answers[-1])
     return False
