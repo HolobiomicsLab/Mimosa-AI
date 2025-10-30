@@ -175,8 +175,8 @@ class CapsuleEvaluator:
         
         summary = f"""
 Task {self.instance_id} Evaluation Results:
-  VER (Valid Execution): {ver_status} - {self.metrics['VER'][1]}
-  SR (Success Rate): {sr_status} - {self.metrics['SR'][1]}
+  VER (Valid Execution): {ver_status}
+  SR (Success Rate): {sr_status}
   CBS (CodeBERT Score): {cbs_value:.3f}
   API Cost: ${self.metrics['cost']:.4f}
 """
