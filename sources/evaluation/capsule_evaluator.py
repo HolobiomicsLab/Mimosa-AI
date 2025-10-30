@@ -182,7 +182,7 @@ Task {self.instance_id} Evaluation Results:
 """
         return summary.strip()
     
-    def save_results(self, output_path: Path | None) -> Path:
+    def save_results(self, output_path = None) -> Path:
         """
         Save evaluation results to JSON file.
         
