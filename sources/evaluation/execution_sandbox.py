@@ -256,12 +256,16 @@ class ExecutionSandbox:
                     gold_results_dst = benchmark_dir / "gold_results"
                     shutil.copytree(gold_results_src, gold_results_dst)
                     self.logger.info("[SANDBOX] Copied gold_results for evaluation")
+                else:
+                    self.logger.info("[SANDBOX] Could not find gold results.")
+                    return False, "Failed to find gold results folder."
+
                 # copy eval script
-                shutil.copy2(eval_script_path, temp_dir / "eval.py")
+                shutil.copy2(eval_script_path, temp_path / eval_script_path.name)
                 
                 # Execute eval script
                 python_exe = sys.executable
-                cmd = [python_exe, "eval.py"]
+                cmd = [python_exe, eval_script_path.name]
                 
                 result = subprocess.run(
                     cmd,
