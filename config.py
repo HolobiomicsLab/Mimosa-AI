@@ -43,7 +43,7 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
+        self.planner_llm_model: str = "deepseek/deepseek-chat"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
         self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
         self.smolagent_model_id: str = "deepseek/deepseek-chat"
@@ -69,8 +69,8 @@ class Config:
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
-            #AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+            #AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
         self.runner_requirements: list[str] = [
             "python-dotenv",

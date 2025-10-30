@@ -88,11 +88,10 @@ class ExecutionSandbox:
             self.logger.info(f"[SANDBOX] Timeout: {timeout}s")
             
             python_exe = sys.executable
-            cmd = [python_exe, str(script_path)]
+            cmd = [python_exe, self.capsule_path / script_path.name]
             
             result = subprocess.run(
                 cmd,
-                cwd=str(self.capsule_path),
                 capture_output=True,
                 text=True,
                 timeout=timeout,
