@@ -327,13 +327,6 @@ Provide your analysis following the specified output format."""
                         "success_level": analysis.get("success_level", "Unknown"),
                         "key_insight": analysis.get("full_analysis", "Unknown")
                     }
-                    self.execution_history.append(execution_data)
-                    self._save_run_notes(
-                        capsule_name, goal,
-                        analysis, execution_time
-                    )
-                    
-                    # Evaluate with ScienceAgentBench metrics if applicable
                     if dataset_type == "science_agent_bench" and sab_loader:
                         execution_data = self._evaluate_with_science_agent_bench(
                             capsule_name=capsule_name,
@@ -342,6 +335,12 @@ Provide your analysis following the specified output format."""
                             sab_loader=sab_loader,
                             execution_data=execution_data
                         )
+
+                    self.execution_history.append(execution_data)
+                    self._save_run_notes(
+                        capsule_name, goal,
+                        analysis, execution_time
+                    )
                     
                     print(f"\033[95m✅ Iteration {i + 1} completed\033[0m")
                     print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")

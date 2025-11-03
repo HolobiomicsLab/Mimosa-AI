@@ -148,7 +148,7 @@ class ExecutionSandbox:
                 if result.returncode != 0:
                     error_msg = f"Eval script failed with code {result.returncode}"
                     if result.stderr:
-                        error_msg += f": {result.stderr[:1024]}"
+                        error_msg += f": {result.stderr[:4096]}"
                     self.logger.error(f"[SANDBOX] {error_msg}")
                     return False, error_msg
                 output = result.stdout.strip()

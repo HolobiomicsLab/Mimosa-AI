@@ -179,7 +179,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for learning a task."
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for learning a task."
     )
 
     add_config_arguments(parser, config)
