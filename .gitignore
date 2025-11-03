@@ -26,6 +26,8 @@ datasets/**/*.pkl
 datasets/**/*.np
 datasets/**/*.mtx
 datasets/**/*.tif"
+datasets/ScienceAgentBench/datasets/
+runs_notes/
 
 ### react ###
 .DS_*
