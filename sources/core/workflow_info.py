@@ -118,9 +118,8 @@ class WorkflowInfo:
         """Load workflow code file."""
         code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
         if not code_file.exists():
-            raise ValueError(
-                f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}."
-            )
+            print(f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}.")
+            return ""
         
         try:
             with open(code_file) as f:
