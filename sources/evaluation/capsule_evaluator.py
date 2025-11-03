@@ -30,7 +30,7 @@ class CapsuleEvaluator:
         capsule_path: Path,
         task_data: dict[str, str],
         sab_loader: ScienceAgentBenchLoader,
-        api_cost: float = 0.0
+        api_cost: float = 0.000
     ):
         """
         Initialize CapsuleEvaluator.
@@ -105,7 +105,7 @@ class CapsuleEvaluator:
             if not self.eval_script_name:
                 return False, "No evaluation script specified for this task", False
             
-            eval_script_path = self.sab_loader.get_eval_script_path(self.task_data)
+            eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
             
             if not eval_script_path.exists():
                 return False, f"Evaluation script not found: {eval_script_path}", False
@@ -114,6 +114,7 @@ class CapsuleEvaluator:
             
             success, message = self.sandbox.run_eval_script(
                 eval_script_path=eval_script_path,
+                visual_judge_path=judge_path,
                 timeout=180
             )
             

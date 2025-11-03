@@ -327,6 +327,7 @@ class GodelMachine:
 
         iteration_start_time = time.time()
         uuid = None
+        total_cost = 0.0
 
         # Execute workflow
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
@@ -347,6 +348,7 @@ class GodelMachine:
             eval_type, total_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
             )
+            runs[-1].cost = total_cost
 
         # Update tracking data
         rewards_history.append(wf_info.overall_score)

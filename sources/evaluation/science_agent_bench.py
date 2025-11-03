@@ -133,7 +133,7 @@ class ScienceAgentBenchLoader:
     
     def get_eval_script_path(self, task_data: dict[str, str]) -> Path:
         """
-        Get the evaluation script path for a task.
+        Get the evaluation script path for a task and gpt4 visual judge
         Args:
             task_data: Task dictionary from CSV
         Returns:
@@ -144,11 +144,14 @@ class ScienceAgentBenchLoader:
             raise ValueError(f"No eval script name for task {task_data.get('instance_id')}")
         
         eval_path = self.eval_programs_path / eval_script_name
+        judge_path = self.eval_programs_path / "gpt4_visual_judge.py"
         
         if not eval_path.exists():
             raise FileNotFoundError(f"Evaluation script not found: {eval_path}")
+        if not eval_path.exists():
+            raise FileNotFoundError(f"Visual judge script not found: {judge_path}")
         
-        return eval_path
+        return eval_path, judge_path
     
     def get_gold_program_path(self, task_data: dict[str, str]) -> Path:
         """

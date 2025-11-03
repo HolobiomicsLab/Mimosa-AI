@@ -96,6 +96,7 @@ class ExecutionSandbox:
     def run_eval_script(
         self,
         eval_script_path: Path,
+        visual_judge_path: Path = None,
         timeout: int = 60
     ) -> tuple[bool, str]:
         """
@@ -132,6 +133,8 @@ class ExecutionSandbox:
                     return False, "Failed to find gold results folder."
                 
                 shutil.copy2(eval_script_path, temp_path / eval_script_path.name)
+                if visual_judge_path:
+                    shutil.copy2(visual_judge_path, temp_path / visual_judge_path.name)
                 
                 python_exe = sys.executable
                 cmd = [python_exe, eval_script_path.name]
