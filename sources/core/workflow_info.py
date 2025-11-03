@@ -118,9 +118,8 @@ class WorkflowInfo:
         """Load workflow code file."""
         code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
         if not code_file.exists():
-            raise ValueError(
-                f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}."
-            )
+            print(f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}.")
+            return ""
         
         try:
             with open(code_file) as f:
@@ -138,10 +137,13 @@ class WorkflowInfo:
         evaluation = state_result.get("evaluation", {})
         scores = []
         if evaluation:
-            if "generic" in evaluation:
-                scores.append(evaluation["generic"]["overall_score"])
-            elif "scenario" in evaluation:
-                scores.append(evaluation["scenario"]["score"])
+            try:
+                if "generic" in evaluation:
+                        scores.append(evaluation["generic"]["overall_score"])
+                elif "scenario" in evaluation:
+                    scores.append(evaluation["scenario"]["score"])
+            except Exception as _:
+                scores.append(0)
         return mean(scores) if scores else 0.0
 
     def is_valid(self) -> bool:

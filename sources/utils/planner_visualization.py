@@ -48,7 +48,7 @@ class PlannerVisualizer:
         pygame.init()
 
         self.plan = plan
-        self.tasks: List[Task] = []
+        self.tasks: list[Task] = []
         self.total_cost: float = 0.0
         self.width = width
         self.height = height
@@ -78,7 +78,7 @@ class PlannerVisualizer:
 
         self.running = True
 
-    def update_tasks(self, tasks: List[Task], total_cost: float = None):
+    def update_tasks(self, tasks: list[Task], total_cost: float = None):
         """
         Update the task list and refresh the display.
 

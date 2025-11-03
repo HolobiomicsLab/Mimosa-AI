@@ -1,0 +1,82 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Bathymetry Data",
+      "description": "Correctly loads the bathymetry raster data from the path 'benchmark/datasets/CoralSponge/CatalinaBathymetry.tif'.",
+      "points": 5
+    },
+    {
+      "name": "Load Coral and Sponge Data",
+      "description": "Correctly reads the coral and sponge data from the path 'benchmark/datasets/CoralSponge/CoralandSpongeCatalina.geojson'.",
+      "points": 5
+    },
+    {
+      "name": "CRS Transformation",
+      "description": "Correctly transforms the CRS of the GeoDataFrame to EPSG:4326.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Elevation Conversion",
+      "description": "Correctly converts elevation values by multiplying with -1.",
+      "points": 5
+    },
+    {
+      "name": "Calculate Gradient",
+      "description": "Accurately calculates the gradient (grad_x, grad_y) using numpy's gradient function.",
+      "points": 5
+    },
+    {
+      "name": "Calculate Slope",
+      "description": "Correctly calculates the slope in degrees from the gradients.",
+      "points": 5
+    },
+    {
+      "name": "Calculate Aspect",
+      "description": "Correctly calculates the aspect in degrees and adjusts any negative values.",
+      "points": 10
+    },
+    {
+      "name": "Coordinate to Raster Index Conversion",
+      "description": "Correctly implements the function to convert coordinates to raster grid indices.",
+      "points": 15
+    },
+    {
+      "name": "Extract Slope and Aspect",
+      "description": "Extracts slope and aspect values for each point in the GeoDataFrame correctly.",
+      "points": 10
+    },
+    {
+      "name": "Add Slope and Aspect to GeoDataFrame",
+      "description": "Successfully adds the extracted slope and aspect values as new columns to the GeoDataFrame.",
+      "points": 5
+    },
+    {
+      "name": "Group by VernacularNameCategory",
+      "description": "Correctly groups the GeoDataFrame by 'VernacularNameCategory' and computes mean values for slope and aspect.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Bar Plot for Mean Slope",
+      "description": "Correctly creates a bar plot showing the mean slope per species.",
+      "points": 5
+    },
+    {
+      "name": "Bar Plot for Mean Aspect",
+      "description": "Correctly creates a bar plot showing the mean aspect per species.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Plots",
+      "description": "Saves the plots as 'mean_slope_per_species.png', 'mean_aspect_per_species.png', and 'pred_results/CoralandSponge.png'.",
+      "points": 5
+    }
+  ],
+  "total_points": 90
+}

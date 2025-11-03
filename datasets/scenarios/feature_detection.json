@@ -1,36 +1,37 @@
 {
-  "id": "mzml_feature_detection",
-  "goal": "Perform feature detection on QC_0.mzML file to identify and quantify peaks",
-  "assertions": [
+  "data_loading": [
     {
-      "id": "1",
-      "description": "mzML file was successfully loaded and validated",
-      "evaluation_criteria": "Workflow confirms file exists and is valid mzML format"
-    },
-    {
-      "id": "2",
-      "description": "Feature detection algorithm executed",
-      "evaluation_criteria": "Peak picking/chromatogram analysis performed (e.g., XCMS, OpenMS)"
-    },
-    {
-      "id": "3",
-      "description": "Feature table generated with m/z and retention times",
-      "evaluation_criteria": "Output contains detected features with intensity values"
-    },
-    {
-      "id": "4",
-      "description": "Quality metrics calculated for features",
-      "evaluation_criteria": "Results include peak width, symmetry, or signal-to-noise ratios"
-    },
-    {
-      "id": "5",
-      "description": "Results saved in standard format",
-      "evaluation_criteria": "Feature table exported as CSV/mzTab"
+      "name": "mzML File Loading",
+      "description": "The program successfully loads and validates the QC_0.mzML file, confirming it exists and is in valid mzML format.",
+      "points": 10
     }
   ],
-  "optional": {
-    "required_tools": ["xcms_mcp"],
-    "judge_model": "gpt-4o",
-    "timeout": 600
-  }
+  "data_processing": [
+    {
+      "name": "Feature Detection Algorithm",
+      "description": "The program executes a feature detection algorithm such as peak picking or chromatogram analysis (e.g., using XCMS, OpenMS or equivalent tools).",
+      "points": 15
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Feature Table Generation",
+      "description": "The program generates a feature table containing detected features with m/z values, retention times, and intensity values.",
+      "points": 10
+    },
+    {
+      "name": "Quality Metrics Calculation",
+      "description": "The program calculates quality metrics for the detected features, including measurements such as peak width, symmetry, or signal-to-noise ratios.",
+      "points": 10
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Results Export",
+      "description": "The program saves the feature table in a standard format such as CSV or mzTab to the specified output location.",
+      "points": 5
+    }
+  ],
+  "total_points": 50
 }

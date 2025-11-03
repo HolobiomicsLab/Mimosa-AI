@@ -20,8 +20,9 @@ from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.papers_mode import PaperEvaluationMode
-from sources.utils.scenario_loader import ScenarioLoader
+from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
+from sources.utils.transfer_toolomics import LocalTransfer
 
 dotenv.load_dotenv()
 
@@ -29,11 +30,15 @@ def validate_environment() -> None:
     """Validate required environment configuration."""
     if not os.getenv("HF_TOKEN"):
         raise ValueError(
-            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token."
+            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token. "
         )
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv("ANTHROPIC_API_KEY"):
         raise ValueError(
-            "⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key."
+            "⚠️ ANTHROPIC_API_KEY environment variable is not set. Please set it to your OpenAI API key."
+        )
+    if not os.getenv("PUSHOVER_USER") or not os.getenv("PUSHOVER_TOKEN"):
+        print(
+            "⚠️ PUSHOVER_USER/PUSHOVER_TOKEN not set. We advice using pushover for getting notifications upon task completion. "
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
@@ -93,10 +98,13 @@ async def manual_mode(args, config):
 
 async def papers_mode(args, config):
     papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_autonomous_mode()
+    await papers.start_paper_eval_mode(dataset_type="default", dataset_path=args.papers)
+
+async def science_bench_papers_mode(args, config):
+    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv")
 
 async def learning_mode(args, config):
-    from sources.utils.shared_visualization import SharedVisualizationData
     dgm = GodelMachine(config)
     await dgm.start_dgm(goal=args.learn,
                         judge=True,
@@ -105,7 +113,6 @@ async def learning_mode(args, config):
                        )
 
 async def normal_execution_mode(args, config):
-    from sources.utils.shared_visualization import SharedVisualizationData
     dgm = GodelMachine(config)
     planner = Planner(config)
     if args.scenario:
@@ -122,6 +129,8 @@ async def normal_execution_mode(args, config):
                                     judge=not args.disable_judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
+        trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
+        trs.transfer_workspace_files_to_capsule(args.goal or args.task)
     else:
         raise ValueError("No goal provided. Use --task, --goal to start.")
 
@@ -146,7 +155,10 @@ async def main():
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
     )
     parser.add_argument(
-        "--papers", action="store_true", help="Autonomous mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
+        "--papers", type=str, help="Papers evaluation mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
+    )
+    parser.add_argument(
+        "--papers_science_bench", action="store_true", help="Papers mode on ScienceAgentBench (Run Mimosa on multiple science bench papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
         "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
@@ -158,7 +170,7 @@ async def main():
         "--disable_judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
     parser.add_argument(
-        "--scenario", type=str, help="Scenario for workflow evaluation"
+        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
     )
     parser.add_argument(
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
@@ -167,7 +179,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for learning a task."
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for learning a task."
     )
 
     add_config_arguments(parser, config)
@@ -188,6 +200,8 @@ async def main():
             await manual_mode(args, config)
         elif (args.papers):
             await papers_mode(args, config)
+        elif (args.papers_science_bench):
+            await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         elif args.learn:

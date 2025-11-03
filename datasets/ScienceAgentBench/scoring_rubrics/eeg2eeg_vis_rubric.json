@@ -1,0 +1,42 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Fake Data",
+      "description": "Correctly loads the fake EEG data from the specified file path './benchmark/datasets/eeg2eeg_vis/fake_sub03.npy'.",
+      "points": 5
+    },
+    {
+      "name": "Load Real Data",
+      "description": "Correctly loads the real EEG data from the specified file path './benchmark/datasets/eeg2eeg_vis/sub03.npy'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Average Fake and Real Data",
+      "description": "Accurately computes the average of the fake  and real data across the specified axes (0, 1).",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Plot Real Data",
+      "description": "Plots the real data against time.",
+      "points": 5
+    },
+    {
+      "name": "Plot Fake Data",
+      "description": "Plots the fake data against time.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Plot",
+      "description": "Correctly saves the plot to the specified path './pred_results/eeg2eeg_vis_pred.png'.",
+      "points": 5
+    }
+  ],
+  "total_points": 30
+}

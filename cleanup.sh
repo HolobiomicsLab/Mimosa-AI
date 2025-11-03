@@ -4,7 +4,7 @@
 # while preserving the directories themselves
 
 # Define directories to clean
-DIRS=("tmp" "sources/workflows" "sources/memory")
+DIRS=("tmp" "sources/workflows")
 
 # Function to clean a directory
 clean_directory() {

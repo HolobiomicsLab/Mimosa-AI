@@ -9,12 +9,12 @@ import re
 import time
 from pathlib import Path
 
-from sources.post_processing.evaluator import WorkflowEvaluator
+from sources.evaluation.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
-from sources.utils.scenario_loader import ScenarioLoader
+from sources.evaluation.scenario_loader import ScenarioLoader
 
 from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
@@ -56,7 +56,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
             return (passed / total) >= 0.8
         if 'generic' in eval_data and eval_data['generic']:
             score = eval_data['generic'].get('overall_score', 0.0)
-            return score >= 7.0
+            return score >= 0.7
     if answers:
         return check_answer_success(answers[-1])
     return False
@@ -327,6 +327,7 @@ class GodelMachine:
 
         iteration_start_time = time.time()
         uuid = None
+        total_cost = 0.0
 
         # Execute workflow
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
@@ -347,6 +348,7 @@ class GodelMachine:
             eval_type, total_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
             )
+            runs[-1].cost = total_cost
 
         # Update tracking data
         rewards_history.append(wf_info.overall_score)
@@ -365,21 +367,19 @@ class GodelMachine:
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
         
         # Check termination conditions
-        if (runs[-1].iteration_count >= runs[-1].max_depth-1 or all_success) and not learning_mode:
+        if runs[-1].iteration_count >= runs[-1].max_depth-1:
+            return runs
+        if  all_success:
             self._save_final_plots(assertion_history, rewards_history, uuid)
-
-            # Send success notification when all iterations complete
-            if all_success:
-                self.notifier.send_message(
-                    f"DGM completed successfully!\n"
-                    f"Goal: {runs[-1].goal[:128]}...\n"
-                    f"Final UUID: {uuid}\n"
-                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
-                    f"All workflows successful!",
-                    title=f"DGM success - {uuid}",
-                    priority=0
-                )
-
+            self.notifier.send_message(
+                f"DGM completed successfully!\n"
+                f"Goal: {runs[-1].goal[:128]}...\n"
+                f"Final UUID: {uuid}\n"
+                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                f"All workflows successful!",
+                title=f"DGM success - {uuid}",
+                priority=0
+            )
             return runs
 
         # Continue recursion
@@ -514,7 +514,7 @@ class GodelMachine:
         scenario_id: str, uuid: str
     ):
         """Update assertion progress plot."""
-        from sources.utils.scenario_loader import ScenarioLoader
+        from sources.evaluation.scenario_loader import ScenarioLoader
 
         scenario = ScenarioLoader().load_scenario(scenario_id)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0

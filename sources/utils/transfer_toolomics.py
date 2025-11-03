@@ -12,7 +12,7 @@ class LocalTransfer:
     Class transfer results of run between workspace folder and a capsule folder to cnetralize run results.
     """
 
-    def __init__(self, workspace_path, runs_capsule_dir):
+    def __init__(self, workspace_path, runs_capsule_dir = "runs_capsule"):
         self.workspace_path = workspace_path 
         self.runs_capsule_dir = runs_capsule_dir
         self.config_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
@@ -43,18 +43,47 @@ class LocalTransfer:
         except Exception as e:
             raise e
     
-    def create_capsule_folder(self, capsule_name):
+    def create_capsule_folder(self, capsule_name) -> str:
         path = f"{self.runs_capsule_dir}/{capsule_name}"
         os.makedirs(path, exist_ok=True)
         return path
     
-    def copy_files_recursive(self, source: Path, target: Path):
+    def count_files_recursive(self, directory: Path) -> int:
+        """
+        Count total number of files in a directory recursively.
+        
+        Args:
+            directory: Directory path to count files in
+            
+        Returns:
+            Total number of files (excluding directories)
+        """
+        if not directory.exists():
+            return 0
+        
+        if not directory.is_dir():
+            return 0
+        
+        count = 0
+        try:
+            for item in directory.rglob('*'):
+                if item.is_file():
+                    count += 1
+        except Exception as e:
+            print(f"Error counting files in {directory}: {e}")
+        
+        return count
+    
+    def copy_files_recursive(self, source: Path, target: Path) -> int:
         """
         Recursively copy files and directories from source to target.
 
         Args:
             source: Source directory path
             target: Target directory path
+            
+        Returns:
+            Number of files successfully copied
         """
         if not source.exists():
             raise FileNotFoundError(f"Source directory '{source}' does not exist")
@@ -63,29 +92,86 @@ class LocalTransfer:
             raise ValueError(f"Source '{source}' is not a directory")
 
         target.mkdir(parents=True, exist_ok=True)
+        
+        files_copied = 0
         for item in source.iterdir():
             source_path = item
             target_path = target / item.name
             if source_path.is_dir():
-                self.copy_files_recursive(source_path, target_path)
+                files_copied += self.copy_files_recursive(source_path, target_path)
             else:
                 try:
                     shutil.copy2(source_path, target_path)
+                    files_copied += 1
                 except Exception as e:
                     print(f"Error copying {source_path}: {e}")
+        
+        return files_copied
 
-    def transfer_workspace_files_to_capsule(self, goal):
+    def transfer_files_to_workspace(self, path_files_folder: str) -> int:
+        """
+        Transfer files from a source folder to the workspace.
+        
+        Args:
+            path_files_folder: Path to source folder containing files to transfer
+            
+        Returns:
+            Number of files successfully transferred
+            
+        Raises:
+            FileNotFoundError: If source folder doesn't exist
+            ValueError: If no files were transferred
+        """
+        folder_name = path_files_folder.split('/')[-1]
+        path_destination = Path(f"{self.workspace_path}/{folder_name}")
+        path_files = Path(path_files_folder)
+        
+        if not path_files.exists():
+            raise FileNotFoundError(f"Source folder does not exist: {path_files}")
+        
+        if not path_files.is_dir():
+            raise ValueError(f"Source path is not a directory: {path_files}")
+        
+        # Count files in source before transfer
+        source_file_count = self.count_files_recursive(path_files)
+        
+        # Perform the transfer
+        files_copied = self.copy_files_recursive(path_files, path_destination)
+        
+        # Verify files were actually transferred
+        if files_copied == 0:
+            raise ValueError(
+                f"No files were transferred from {path_files} to {path_destination}. "
+                f"Source contained {source_file_count} files."
+            )
+        
+        # Verify workspace has files after transfer
+        workspace_file_count = self.count_files_recursive(Path(self.workspace_path))
+        if workspace_file_count == 0:
+            raise ValueError(
+                f"Workspace is empty after transfer. "
+                f"Expected {files_copied} files but found none."
+            )
+        
+        return files_copied
+
+    def transfer_workspace_files_to_capsule(self, goal) -> str:
         capsule_name = self.create_capsule_name(goal)
         path_capsule = Path(self.create_capsule_folder(capsule_name))
         path_workspace = Path(self.workspace_path)
         self.copy_files_recursive(path_workspace, path_capsule)
         self.clean_workspace()
+        return capsule_name
 
-    def clean_workspace(self):
+    def clean_workspace(self) -> None:
         """Remove all files and directories in the workspace folder."""
         workspace = Path(self.workspace_path)
-        shutil.rmtree(workspace, ignore_errors=True)
-        workspace.mkdir(parents=True, exist_ok=True)
+        if workspace.exists() and workspace.is_dir():
+            for item in workspace.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+                else:
+                    item.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     trans = LocalTransfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")

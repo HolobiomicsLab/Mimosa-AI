@@ -459,14 +459,17 @@ if WORKFLOW_PATH:
         except Exception as e:
             self.logger.error(f"craft_workflow: Failed to load required code files: {str(e)}")
             raise RuntimeError(f"Failed to load required code files: {str(e)}") from e
-        # Generate workflow code - let DGM handle retries
         allow_cache = goal == craft_instructions # if goal and craft instructions are the same it mean last workflow didn't fail (dgm level)
-        workflow_code = self.create_workflow_code(
-            craft_instructions, existing_tool_prompt, memory_path, allow_cache
-        )
+        try:
+            workflow_code = self.create_workflow_code(
+                craft_instructions, existing_tool_prompt, memory_path, allow_cache
+            ) # Generate workflow code - let DGM handle retries
+        except Exception as e:
+            raise e # raise error for dgm-level to handle
         # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal, original_task)
+
         try:
             self.validate_workflow_structure(workflow_code)
         except Exception as e:
