@@ -309,7 +309,7 @@ Provide your analysis following the specified output format."""
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
-                                    judge=False,
+                                    judge=True,
                                     max_dgm_iteration=1,
                                     max_task_retry=2
                                    )
