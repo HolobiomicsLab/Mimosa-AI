@@ -154,6 +154,7 @@ class Planner:
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
                     cost=0.0,
+                    score=0.0,
                     depends_on=step_dict.get("depends_on", []),
                     required_inputs=step_dict.get("required_inputs", []),
                     expected_outputs=step_dict.get("expected_outputs", []),
@@ -521,7 +522,7 @@ Original request:
 
     async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True, original_task=None):
         """
-        Execute DGM runs for a given task with comprehensive error handling.
+        Execute DGM runs for a given task.
         Args:
             task: Task description string (may be knowledge-wrapped)
             judge: Whether to use judge evaluation
@@ -627,6 +628,7 @@ Original request:
 
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
+        attempt_score = 0.0
         while attempt < max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
@@ -645,7 +647,6 @@ Original request:
                 )
 
                 attempt_cost += sum([r.cost for r in dgm_runs])
-
                 last_run = dgm_runs[-1]
 
                 final_answers = []
@@ -658,6 +659,7 @@ Original request:
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
 
                 dgm_success = self._get_dgm_success(last_run)
+                attempt_score = last_run.reward
                 task = Task(
                     name=step_name,
                     description=step_task,
@@ -675,7 +677,7 @@ Original request:
 
                 self.task_history.append(task)
 
-                if dgm_success:
+                if dgm_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     if outputs_produced:
@@ -683,10 +685,9 @@ Original request:
                         break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        #self.request_user_exit("Retry task (will exit otherwise) ?")
                         break
                 else:
-                    print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
+                    print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
                     continue
 
             except Exception as e:
@@ -694,6 +695,7 @@ Original request:
 
         step.status = TaskStatus.COMPLETED
         step.cost = attempt_cost
+        step.score = attempt_score
         return step
 
     async def start_planner(

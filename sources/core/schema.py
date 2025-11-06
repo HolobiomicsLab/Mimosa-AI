@@ -54,6 +54,7 @@ class PlanStep:
     name: str
     task: str
     cost: int
+    score: float
     depends_on: list[str] = field(default_factory=list)
     required_inputs: list[str] = field(default_factory=list)
     expected_outputs: list[str] = field(default_factory=list)
