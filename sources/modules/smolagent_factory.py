@@ -147,7 +147,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 max_steps=32,
+                 max_steps=64,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
