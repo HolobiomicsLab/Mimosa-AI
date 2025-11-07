@@ -256,7 +256,7 @@ class GodelMachine:
         judge: bool = True,
         scenario_id: str = None,
         max_iteration: int = 5,
-        learning_mode: bool = True,
+        learning_mode: bool = False,
         original_task: str = None
     ) -> list[GodelRun]:
         """
@@ -369,7 +369,18 @@ class GodelMachine:
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1:
             return runs
-        if  all_success:
+        if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
+            # reach learning threshold
+            self._save_final_plots(assertion_history, rewards_history, uuid)
+            self.notifier.send_message(
+                f"DGM done learning task: {wf_info.goal[:256]} \n",
+                f"Final UUID: {uuid}\n",
+                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
+                title="DGM done learning task.",
+                priority=0
+            )
+            return runs
+        elif not learning_mode and all_success:
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
                 f"DGM completed successfully!\n"

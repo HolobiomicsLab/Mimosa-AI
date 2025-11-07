@@ -12,6 +12,7 @@ from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.planner_visualization import PlannerVisualizer
+from sources.extensibility.text_to_speech import create_tts_service
 
 
 class PlanValidationError(Exception):
@@ -30,7 +31,7 @@ class Planner:
     and input/output verification.
     """
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, enable_tts=True) -> None:
         if config is None:
             raise ValueError("❌ Planner: Configuration cannot be None")
 
@@ -52,6 +53,7 @@ class Planner:
         self.visualizer_thread: threading.Thread | None = None
         self.use_visualization: bool = True  # Can be disabled if pygame not available
         self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
+        self.tts = create_tts_service() if enable_tts else None
 
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
@@ -634,6 +636,8 @@ Original request:
             attempt_counts[step_name] = attempt
 
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
+            if self.tts:
+                self.tts.speak(f"now starting task {step_name}", "en", voice_index=0)
 
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
@@ -688,6 +692,8 @@ Original request:
                         break
                 else:
                     print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
+                    if self.tts:
+                        self.tts.speak(f"Task {step_name} failure, retrying...", "en", voice_index=0)
                     continue
 
             except Exception as e:
@@ -696,6 +702,12 @@ Original request:
         step.status = TaskStatus.COMPLETED
         step.cost = attempt_cost
         step.score = attempt_score
+        if self.tts:
+            answer = '. '.join(final_answers)
+            tts_text = f"""
+            Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
+            """
+            self.tts.speak(tts_text, "en", voice_index=0)
         return step
 
     async def start_planner(

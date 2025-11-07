@@ -266,7 +266,7 @@ Provide your analysis following the specified output format."""
         
         return execution_data
 
-    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
+    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool) -> None:
         """
         Main autonomous execution loop.
         Generates goals, executes them, analyzes results, and learns.
@@ -305,7 +305,7 @@ Provide your analysis following the specified output format."""
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal, judge=True)
+                        runs = await self.dgm.start_dgm(goal=goal, judge=True, learning_mode=learning)
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
@@ -382,10 +382,10 @@ Provide your analysis following the specified output format."""
         print(f"\033[95m\nNotes saved in: {self.run_notes_dir}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
-    async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv") -> None:
+    async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
         """Public method to start the autonomous mode."""
         try:
-            await self.run_autonomous_eval_loop(dataset_type, dataset_path)
+            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning)
         except KeyboardInterrupt:
             print("\n\033[95m⚠️ Autonomous mode interrupted by user\033[0m")
             self._print_final_summary()
