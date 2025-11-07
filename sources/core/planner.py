@@ -558,7 +558,8 @@ Original request:
                 best_match = past_wf_lookups[0]
                 if best_match is None:
                     print("⚠️ Best match is None, proceeding with new DGM run")
-                elif self._get_dgm_success(best_match):
+                #elif self._get_dgm_success(best_match):
+                elif best_match.is_success:
                     print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
 
                     run = GodelRun(

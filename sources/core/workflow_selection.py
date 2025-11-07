@@ -87,8 +87,8 @@ class WorkflowSelector:
             for wf in similar_workflows:
                 sim = self.cosine_similarity(wf.original_task[-512:], goal[-512:])
                 print(f"UUID: {wf.uuid}\n"
-                      f"Original Task:\n{wf.original_task}\n"
-                      f"Target:\n{goal}\n"
+                      f"Original Task:\n{wf.original_task[:512]}\n"
+                      f"Target:\n{goal[:512]}\n"
                       f"Similarity: {sim:.4f}\n---\n")
         
         return [
