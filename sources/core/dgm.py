@@ -49,7 +49,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
     """
     if wf_info.state_result and 'evaluation' in wf_info.state_result:
         eval_data = wf_info.state_result['evaluation']
-        
+
         if 'scenario' in eval_data and eval_data['scenario']:
             passed = eval_data['scenario'].get('passed_assertions', 0)
             total = eval_data['scenario'].get('total_assertions', 1)
@@ -340,6 +340,7 @@ class GodelMachine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
+        runs[-1].reward = wf_info.overall_score
         flow_answers = self.get_flow_answers(wf_info.state_result)
         self.show_answers(flow_answers)
 
@@ -365,7 +366,7 @@ class GodelMachine:
 
         # Evaluate workflow success using hybrid approach
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
-        
+
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1:
             return runs
