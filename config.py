@@ -43,10 +43,10 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
-        self.planner_llm_model: str = "deepseek/deepseek-chat"
-        self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
-        self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+        self.prompts_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
+        self.workflow_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5-20251001"
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
