@@ -80,7 +80,7 @@ class Planner:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(prompt, use_cache=not (attempt>1))
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")

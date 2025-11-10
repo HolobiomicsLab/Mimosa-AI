@@ -99,8 +99,18 @@ class LLMProvider:
         memory_path=None,
         system_msg: str = None,
         config: LLMConfig = None,
+        use_flat_cache: bool = False,
     ) -> None:
-        """Initialize the LLM provider with API clients."""
+        """Initialize the LLM provider with API clients.
+        
+        Args:
+            agent_name: Name of the agent for cache identification
+            memory_path: Path to memory directory
+            system_msg: System message for the LLM
+            config: LLM configuration
+            use_flat_cache: If True, cache files are stored/searched directly in memory_path
+                           without UUID subfolders (useful for plan generation)
+        """
         if not config:
             config = LLMConfig()
 
@@ -108,6 +118,7 @@ class LLMProvider:
         self.sys_msg = system_msg
         self.agent_name = agent_name
         self.memory_path = memory_path
+        self.use_flat_cache = use_flat_cache
         self.max_retries = 3
         self.logger = logging.getLogger(__name__)
 
@@ -142,6 +153,25 @@ class LLMProvider:
             expected_messages.append({"content": self.sys_msg, "role": "system"})
         expected_messages.append({"role": "user", "content": prompt})
 
+        # For flat cache, search directly in memory_path
+        if self.use_flat_cache:
+            agent_file = os.path.join(self.memory_path, f"{self.agent_name}.json")
+            if os.path.exists(agent_file):
+                try:
+                    with open(agent_file) as f:
+                        cached_data = json.load(f)
+
+                    cached_messages = cached_data.get('message', [])
+                    if self._messages_match(expected_messages, cached_messages):
+                        self.logger.info(f"Cache hit (flat) for agent '{self.agent_name}' with complete context match")
+                        return cached_data.get('response', '')
+                except OSError as e:
+                    self.logger.warning(f"Error reading cache file {agent_file}: {e}")
+            
+            self.logger.info(f"Cache miss (flat) for agent '{self.agent_name}'")
+            return None
+
+        # For UUID-based cache, search in subfolders
         base_memory_dir = os.path.dirname(self.memory_path) if self.memory_path else "sources/memory"
         uuid_pattern = os.path.join(base_memory_dir, "*")
         uuid_folders = [d for d in glob.glob(uuid_pattern) if os.path.isdir(d)]

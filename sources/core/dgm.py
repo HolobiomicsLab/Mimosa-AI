@@ -336,20 +336,20 @@ class GodelMachine:
             original_task=runs[-1].original_task
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
-
-        runs[-1].current_uuid = uuid
-        runs[-1].answers = wf_info.answers
-        runs[-1].state_result = wf_info.state_result
-        runs[-1].reward = wf_info.overall_score
-        flow_answers = self.get_flow_answers(wf_info.state_result)
-        self.show_answers(flow_answers)
-
-        # Evaluate and calculate costs
         if workflow_code:
+            # Evaluate and calculate costs
             eval_type, total_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
             )
             runs[-1].cost = total_cost
+            runs[-1].reward = wf_info.overall_score
+    
+        runs[-1].current_uuid = uuid
+        runs[-1].answers = wf_info.answers
+        runs[-1].state_result = wf_info.state_result
+        flow_answers = self.get_flow_answers(wf_info.state_result)
+        self.show_answers(flow_answers)
+
 
         # Update tracking data
         rewards_history.append(wf_info.overall_score)
