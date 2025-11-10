@@ -341,8 +341,6 @@ class GodelMachine:
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
         runs[-1].reward = wf_info.overall_score
-        if wf_info.code:
-            assert wf_info.overall_score > 0.0, "overall score cannot be 0.0 at this stage"
         flow_answers = self.get_flow_answers(wf_info.state_result)
         self.show_answers(flow_answers)
 
