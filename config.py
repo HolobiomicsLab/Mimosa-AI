@@ -58,6 +58,8 @@ class Config:
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 
+        self.learned_score_threshold = 0.85
+
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
