@@ -216,7 +216,7 @@ class SmolAgentFactory:
             print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=0.7,
+                temperature=1.0,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":

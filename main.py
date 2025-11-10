@@ -98,19 +98,11 @@ async def manual_mode(args, config):
 
 async def papers_mode(args, config):
     papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_paper_eval_mode(dataset_type="default", dataset_path=args.papers)
+    await papers.start_paper_eval_mode(dataset_type="default", dataset_path=args.papers, learning=args.learn)
 
 async def science_bench_papers_mode(args, config):
     papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv")
-
-async def learning_mode(args, config):
-    dgm = GodelMachine(config)
-    await dgm.start_dgm(goal=args.learn,
-                        judge=True,
-                        max_iteration=args.max_dgm_iterations or 5,
-                        learning_mode=True
-                       )
+    await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
 
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
@@ -123,6 +115,7 @@ async def normal_execution_mode(args, config):
                             judge=not args.disable_judge,
                             scenario_id=args.scenario,
                             max_iteration=args.max_dgm_iterations,
+                            learning_mode=args.learn
                            )
     elif args.goal:
         await planner.start_planner(goal=args.goal,
@@ -149,7 +142,7 @@ async def main():
         "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--learn",  type=str, help="Task learning mode"
+        "--learn", action="store_true", help="Learning mode. Retry task with DGM until threshold score it met.", default=False
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
@@ -179,7 +172,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for learning a task."
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)
@@ -204,8 +197,6 @@ async def main():
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
-        elif args.learn:
-            await learning_mode(args, config)
         else:
             raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:
