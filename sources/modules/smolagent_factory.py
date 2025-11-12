@@ -263,7 +263,7 @@ FILESYSTEM ARCHITECTURE:
   ✅ files = execute_command("ls -la")
   ✅ content = execute_command("cat file.txt")
   ❌ os.listdir()  # Will fail - wrong context
-  ❌ subprocess.run(...)  # Will fail - wrong context
+  ❌ subprocess.run(...)  # Will fail - wrong context - subprocess forbidden
   ❌ requests.get(...) # will download in wrong context
 
 BRAIN CAPABILITIES:

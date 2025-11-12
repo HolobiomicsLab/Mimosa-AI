@@ -704,7 +704,7 @@ Original request:
         step.cost = attempt_cost
         step.score = attempt_score
         if self.tts:
-            answer = '. '.join(final_answers)
+            answer = '. '.join([x[:128] for x in final_answers])
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
