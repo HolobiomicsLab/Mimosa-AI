@@ -49,7 +49,7 @@ class WorkflowOrchestrator:
         def progress_handler(line: str):
             print(line)
 
-        print("\033[96m🚀 Executing workflow in Python sandbox...\033[0m")
+        print("\033[96m▶ Executing workflow in Python sandbox...\033[0m")
         result = await self.workflow_runner.execute(
             workflow_code, progress_callback=progress_handler
         )
@@ -149,7 +149,7 @@ class WorkflowOrchestrator:
             )
 
             # Execution phase
-            print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
+            print(f"\n\033[96m{'▶ WORKFLOW EXECUTION PHASE':^80}\033[0m")
             print(f"\033[96m{'=' * 80}\033[0m")
             exec_start = time.time()
             execution_output = await self.workflow_sandbox_run(complete_code)

@@ -263,13 +263,8 @@ FILESYSTEM ARCHITECTURE:
   ✅ files = execute_command("ls -la")
   ✅ content = execute_command("cat file.txt")
   ❌ os.listdir()  # Will fail - wrong context
-  ❌ subprocess.run(...)  # Will fail - wrong context - subprocess forbidden
+  ❌ subprocess.run(...)  # Will fail - subprocess forbidden
   ❌ requests.get(...) # will download in wrong context
-
-BRAIN CAPABILITIES:
-Never ever read whole content of a file that might be large (eg: csv), this would saturate and kill you.
-  ✅ execute_command("head -n 20 data.csv")
-  ❌ execute_command("cat data.csv") # this would kill you
 
 TASK:
 {self.instruct_prompt}

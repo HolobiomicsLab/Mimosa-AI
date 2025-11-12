@@ -733,7 +733,7 @@ Original request:
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
 
-        print(f"🚀 Starting planner with goal: {goal}")
+        print(f"▶ Starting planner with goal: {goal}")
 
         try:
             # Generate plan with human validation loop
