@@ -638,7 +638,7 @@ Original request:
 
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             if self.tts:
-                self.tts.speak(f"now starting task {step_name}", "en", voice_index=0)
+                self.tts.speak(f"now starting task {step_name}", voice_index=0)
 
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
@@ -694,7 +694,7 @@ Original request:
                 else:
                     print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
                     if self.tts:
-                        self.tts.speak(f"Task {step_name} failure, retrying...", "en", voice_index=0)
+                        self.tts.speak(f"Task {step_name} failure, retrying...", voice_index=0)
                     continue
 
             except Exception as e:
@@ -708,7 +708,7 @@ Original request:
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
-            self.tts.speak(tts_text, "en", voice_index=0)
+            self.tts.speak(tts_text, voice_index=0)
         return step
 
     async def start_planner(

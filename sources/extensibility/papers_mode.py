@@ -337,6 +337,7 @@ Provide your analysis following the specified output format."""
                         )
 
                     self.execution_history.append(execution_data)
+                    self._print_final_summary()
                     self._save_run_notes(
                         capsule_name, goal,
                         analysis, execution_time
@@ -355,11 +356,11 @@ Provide your analysis following the specified output format."""
 
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
-        print(f"\n\033[95m{'🏁 AUTONOMOUS MODE COMPLETED':^80}\033[0m")
-        print(f"\033[95m{'=' * 80}\033[0m")
 
         successful_runs = [exec_data for exec_data in self.execution_history
                           if exec_data.get("success_level") in ["High", "Medium"]]
+        print(f"\n\033[95mSUMMARY step: {len(self.execution_history)}\033[0m")
+        print(f"\033[95m{'=' * 80}\033[0m")
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
         print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
         sab_runs = [exec_data for exec_data in self.execution_history 
@@ -367,7 +368,6 @@ Provide your analysis following the specified output format."""
         if sab_runs:
             print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")
             print(f"\033[95m{'-' * 80}\033[0m")
-            
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
             sr_success = sum(1 for run in sab_runs if run.get('SR', False))
             avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
@@ -378,8 +378,6 @@ Provide your analysis following the specified output format."""
             print(f"\033[95mCBS (CodeBERT Score) Average: {avg_cbs:.3f}\033[0m")
             print(f"\033[95mTotal API Cost: ${total_cost:.4f}\033[0m")
             print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
-        
-        print(f"\033[95m\nNotes saved in: {self.run_notes_dir}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
     async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
