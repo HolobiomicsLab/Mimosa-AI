@@ -23,6 +23,7 @@ from sources.extensibility.papers_mode import PaperEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.precheck import PreCheck
 
 dotenv.load_dotenv()
 
@@ -187,6 +188,8 @@ async def main():
 
     config.create_paths()
     config.validate_paths()
+
+    PreCheck(config).run()
 
     try:
         if (args.manual):

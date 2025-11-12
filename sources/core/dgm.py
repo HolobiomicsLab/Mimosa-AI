@@ -374,8 +374,8 @@ class GodelMachine:
             # reach learning threshold
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
-                f"DGM done learning task: {wf_info.goal[:256]} \n",
-                f"Final UUID: {uuid}\n",
+                f"DGM done learning task: {wf_info.goal[:256]} \n"
+                f"Final UUID: {uuid}\n"
                 f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
                 title="DGM done learning task.",
                 priority=0
