@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-12T10:03:52.540861",
+  "timestamp": "2025-11-13T10:10:10.568450",
   "pricing": {
     "kwaipilot/kat-coder-pro:free": {
       "input": 0.0,
@@ -126,8 +126,8 @@
       "output": 1.75
     },
     "z-ai/glm-4.6:exacto": {
-      "input": 0.44999999999999996,
-      "output": 1.9
+      "input": 0.6,
+      "output": 2.2
     },
     "anthropic/claude-sonnet-4.5": {
       "input": 3.0,
@@ -334,8 +334,8 @@
       "output": 0.39999999999999997
     },
     "openai/gpt-oss-120b": {
-      "input": 0.04,
-      "output": 0.39999999999999997
+      "input": 0.0,
+      "output": 0.0
     },
     "openai/gpt-oss-120b:exacto": {
       "input": 0.049999999999999996,
@@ -367,7 +367,7 @@
     },
     "z-ai/glm-4.5": {
       "input": 0.35,
-      "output": 1.55
+      "output": 1.5
     },
     "z-ai/glm-4.5-air:free": {
       "input": 0.0,

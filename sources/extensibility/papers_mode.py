@@ -38,7 +38,7 @@ class PaperEvaluationMode:
         self.run_notes_dir.mkdir(exist_ok=True)
         self.done_rows = []
 
-        model_name = "openai/gpt-4o"  # judge 
+        model_name = "anthropic/claude-haiku-4-5-20251001"  # judge 
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(
@@ -89,18 +89,95 @@ Provide a structured analysis with:
 2. COMMENTS: Comments on what the multi-agents workflow tried to do, what worked, what failed and why. 
 """
 
+    def _load_previous_run_notes(self) -> dict | None:
+        """
+        Load the run notes file with the highest total_eval count.
+        This allows recovery of previous execution statistics.
+        
+        Returns:
+            Dictionary with previous run data, or None if no valid notes found
+        """
+        if not self.run_notes_dir.exists():
+            return None
+        
+        best_notes = None
+        max_total_eval = 0
+        
+        for notes_file in self.run_notes_dir.glob("*.json"):
+            try:
+                with open(notes_file, 'r', encoding='utf-8') as f:
+                    notes = json.load(f)
+                    total_eval = notes.get('total_eval', 0)
+                    if total_eval > max_total_eval:
+                        max_total_eval = total_eval
+                        best_notes = notes
+            except (json.JSONDecodeError, IOError) as e:
+                self.logger.warning(f"[CACHE RECOVERY] Could not load {notes_file}: {e}")
+                continue
+        
+        if best_notes:
+            self.logger.info(
+                f"[CACHE RECOVERY] Loaded previous run with {max_total_eval} evaluations"
+            )
+        return best_notes
+    
+    def _restore_execution_history_from_cache(self, cached_notes: dict) -> None:
+        """
+        Restore execution history statistics from cached run notes.
+        This reconstructs aggregate metrics for continued evaluation runs.
+        
+        Args:
+            cached_notes: Dictionary containing previous run statistics
+        """
+        if not cached_notes or 'total_eval' not in cached_notes:
+            return
+        
+        # Create synthetic execution_history entries to represent cached runs
+        # We create one entry per evaluation from cache to maintain count accuracy
+        total_eval = cached_notes.get('total_eval', 0)
+        ver_success = cached_notes.get('ver_success', 0)
+        sr_success = cached_notes.get('sr_success', 0)
+        avg_cbs = cached_notes.get('avg_cbs', 0.0)
+        total_cost = cached_notes.get('total_cost', 0.0)
+        
+        if total_eval > 0:
+            # Calculate per-run averages
+            avg_cost_per_run = total_cost / total_eval
+            
+            # Create synthetic entries representing cached runs
+            # We distribute VER/SR successes across the entries
+            for i in range(total_eval):
+                synthetic_entry = {
+                    "iteration": -(i + 1),  # Negative to distinguish from new runs
+                    "goal": "[Cached from previous run]",
+                    "execution_time": 0,
+                    "success_level": "Cached",
+                    "key_insight": "Restored from cache",
+                    "VER": i < ver_success,  # Distribute successes
+                    "SR": i < sr_success,
+                    "CBS": avg_cbs,  # Use average for all
+                    "eval_cost": avg_cost_per_run
+                }
+                self.execution_history.append(synthetic_entry)
+            
+            self.logger.info(
+                f"[CACHE RECOVERY] Restored {total_eval} evaluations: "
+                f"VER={ver_success}, SR={sr_success}, CBS={avg_cbs:.3f}"
+            )
+            print(f"\033[95mRestored {total_eval} previous evaluations from cache\033[0m")
+    
     def _save_run_notes(self, capsule_name: str, goal: str,
                        analysis: dict, execution_time: float) -> None:
         """Save detailed notes about the run."""
         timestamp = datetime.now().isoformat()
+        sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
         notes = {
             "timestamp": timestamp,
             "goal": goal,
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
+            "total_eval": len(sab_runs)
         }
-        sab_runs = [exec_data for exec_data in self.execution_history 
-                    if 'VER' in exec_data]
         if sab_runs:
             notes = {
                 **notes,
@@ -283,6 +360,13 @@ Provide your analysis following the specified output format."""
         papers_csv_path = Path(dataset_path)
         user_input = input("Enter starting row ([Enter] 0 by default): ")
         start_row = int(user_input)-1 if user_input.strip() else -1
+        
+        # Load and restore from cache if available
+        cached_notes = self._load_previous_run_notes()
+        if cached_notes:
+            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
+            if restore_input.strip().lower() != 'n':
+                self._restore_execution_history_from_cache(cached_notes)
         
         sab_loader = None
         if dataset_type == "science_agent_bench":

@@ -771,7 +771,6 @@ Original request:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
                         self.request_user_exit(f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}")
-                        continue
 
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
