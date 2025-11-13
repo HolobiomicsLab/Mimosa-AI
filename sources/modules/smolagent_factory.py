@@ -411,6 +411,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                 except Exception as e:
                     print(str(e))
                     print("retrying...")
+                    instructions += "\nLast run got stuck and crashed. You be very careful and avoid reading large files or produce large output. always reduce input/ouput to 8096 characters."
                     error = True
                 #result['exception'] = e
                 #result['completed'] = True
