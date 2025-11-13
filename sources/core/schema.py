@@ -27,7 +27,7 @@ class GodelRun:
     prompt: str
     cost: float = 0.0
     reward: float = 0.0
-    max_depth: int = 5
+    max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False
     current_uuid: str | None = None

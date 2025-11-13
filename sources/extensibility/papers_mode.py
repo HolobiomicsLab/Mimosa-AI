@@ -38,7 +38,7 @@ class PaperEvaluationMode:
         self.run_notes_dir.mkdir(exist_ok=True)
         self.done_rows = []
 
-        model_name = "deepseek/deepseek-chat"  # judge 
+        model_name = "openai/gpt-4o"  # judge 
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(
@@ -99,12 +99,21 @@ Provide a structured analysis with:
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
         }
+        sab_runs = [exec_data for exec_data in self.execution_history 
+                    if 'VER' in exec_data]
+        if sab_runs:
+            notes = {
+                **notes,
+                "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
+                "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
+                "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
+                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs)
+        }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
         notes_file.parent.mkdir(parents=True, exist_ok=True)
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
-
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
     
     def _generate_task_default(self, row):
