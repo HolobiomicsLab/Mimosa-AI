@@ -245,7 +245,7 @@ Provide a structured analysis with:
 
     def _format_task_mode_results(self, run: GodelRun) -> str:
         state_result = run.state_result
-        if isinstance(state_result["answers"], list) and "step_name" in state_result:
+        if isinstance(state_result.get("answers", None), list) and "step_name" in state_result:
             return "\n".join(
                 f"agent {n}: {x}"
                 for (n, x) in zip(state_result["step_name"], state_result["answers"], strict=True)
