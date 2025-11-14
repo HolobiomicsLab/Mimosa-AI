@@ -262,7 +262,7 @@ class HumanMode:
         addr = mcp.address
         port = mcp.port
         
-        print(f"🚀 Executing tool: {tool_name}...")
+        print(f"▶ Executing tool: {tool_name}...")
         print("⏳ Please wait...")
         
         try:

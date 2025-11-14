@@ -263,8 +263,9 @@ FILESYSTEM ARCHITECTURE:
   ✅ files = execute_command("ls -la")
   ✅ content = execute_command("cat file.txt")
   ❌ os.listdir()  # Will fail - wrong context
-  ❌ subprocess.run(...)  # Will fail - wrong context
+  ❌ subprocess.run(...)  # Will fail - subprocess forbidden
   ❌ requests.get(...) # will download in wrong context
+
 TASK:
 {self.instruct_prompt}
 Address complain from the last agent informations if any.

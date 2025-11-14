@@ -638,7 +638,7 @@ Original request:
 
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
             if self.tts:
-                self.tts.speak(f"now starting task {step_name}", "en", voice_index=0)
+                self.tts.speak(f"now starting task {step_name}", voice_index=0)
 
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
@@ -694,7 +694,7 @@ Original request:
                 else:
                     print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
                     if self.tts:
-                        self.tts.speak(f"Task {step_name} failure, retrying...", "en", voice_index=0)
+                        self.tts.speak(f"Task {step_name} failure, retrying...", voice_index=0)
                     continue
 
             except Exception as e:
@@ -704,11 +704,11 @@ Original request:
         step.cost = attempt_cost
         step.score = attempt_score
         if self.tts:
-            answer = '. '.join(final_answers)
+            answer = '. '.join([x[:128] for x in final_answers])
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
-            self.tts.speak(tts_text, "en", voice_index=0)
+            self.tts.speak(tts_text, voice_index=0)
         return step
 
     async def start_planner(
@@ -733,7 +733,7 @@ Original request:
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
 
-        print(f"🚀 Starting planner with goal: {goal}")
+        print(f"▶ Starting planner with goal: {goal}")
 
         try:
             # Generate plan with human validation loop
@@ -771,7 +771,6 @@ Original request:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
                         self.request_user_exit(f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}")
-                        continue
 
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING

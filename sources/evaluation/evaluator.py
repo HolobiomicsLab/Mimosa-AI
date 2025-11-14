@@ -74,7 +74,7 @@ class BaseEvaluator:
             self.memory_dir.mkdir(parents=True, exist_ok=True)
             self.workflow_dir.mkdir(parents=True, exist_ok=True)
 
-            self.judge_model = "deepseek/deepseek-chat"
+            self.judge_model = "openai/gpt-4o"
             try:
                 provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
                 self.llm_config = LLMConfig().from_dict({

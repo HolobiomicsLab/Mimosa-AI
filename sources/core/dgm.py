@@ -255,7 +255,7 @@ class GodelMachine:
         template_uuid: str | None = None,
         judge: bool = True,
         scenario_id: str = None,
-        max_iteration: int = 5,
+        max_iteration: int = 3,
         learning_mode: bool = False,
         original_task: str = None
     ) -> list[GodelRun]:
@@ -330,6 +330,7 @@ class GodelMachine:
         total_cost = 0.0
 
         # Execute workflow
+        print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,

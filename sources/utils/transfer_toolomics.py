@@ -15,7 +15,7 @@ class LocalTransfer:
     def __init__(self, workspace_path, runs_capsule_dir = "runs_capsule"):
         self.workspace_path = workspace_path 
         self.runs_capsule_dir = runs_capsule_dir
-        self.config_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
+        self.config_llm = LLMConfig.from_dict({"model": "gpt-4o", "provider": "openai"})
 
     def create_capsule_name(self, goal: str) -> str:
         """

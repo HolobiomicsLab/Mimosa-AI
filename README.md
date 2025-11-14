@@ -21,7 +21,7 @@ Its mission is to provide a modular and open alternative to big tech initiatives
 - Python 3.10 or higher
 - pip3 package manager
 
-## 🚀 Install & Run
+## ▶ Install & Run
 
 ### Step 1: Environment Setup
 
