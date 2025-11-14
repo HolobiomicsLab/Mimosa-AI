@@ -455,7 +455,8 @@ Provide your analysis following the specified output format."""
         print(f"\n\033[95mSUMMARY step: {len(self.execution_history)}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
-        print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
+        if len(self.execution_history) > 0:
+            print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
         sab_runs = [exec_data for exec_data in self.execution_history 
                     if 'VER' in exec_data]
         if sab_runs:
