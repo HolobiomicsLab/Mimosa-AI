@@ -39,7 +39,7 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-DANGEROUS_FUNCTIONS = {}
+#DANGEROUS_FUNCTIONS = {}
 DANGEROUS_MODULES = {os}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")

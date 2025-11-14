@@ -632,7 +632,7 @@ Original request:
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
-        while attempt < max_attempts:
+        while attempt <= max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
 
@@ -685,6 +685,7 @@ Original request:
                 if dgm_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
+                    step.status = TaskStatus.COMPLETED
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
                         break
@@ -700,7 +701,6 @@ Original request:
             except Exception as e:
                 raise e
 
-        step.status = TaskStatus.COMPLETED
         step.cost = attempt_cost
         step.score = attempt_score
         if self.tts:
