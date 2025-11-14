@@ -370,9 +370,11 @@ class GodelMachine:
 
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1:
+            print("\nmax recursive depth reached for DGM.\n")
             return runs
         if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
             # reach learning threshold
+            print("\nDGM done learning task.\n")
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
                 f"DGM done learning task: {wf_info.goal[:256]} \n"
@@ -384,6 +386,7 @@ class GodelMachine:
             return runs
         elif not learning_mode and all_success:
             self._save_final_plots(assertion_history, rewards_history, uuid)
+            print("\nDGM completed task.\n")
             self.notifier.send_message(
                 f"DGM completed successfully!\n"
                 f"Goal: {runs[-1].goal[:128]}...\n"
