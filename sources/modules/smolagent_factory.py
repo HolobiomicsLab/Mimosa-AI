@@ -164,9 +164,9 @@ class SmolAgentFactory:
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.timeout = 3600*5
+        os.makedirs(self.memory_folder, exist_ok=True)
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
-        os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
 

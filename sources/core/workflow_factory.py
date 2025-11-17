@@ -335,7 +335,7 @@ The following tools packages are available for agents:
         """
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent
-        memory_path = (script_dir / memory_path).resolve()
+        memory_path = str((script_dir / memory_path).resolve())
         initial_state = {
             key: (
                 uuid_str
