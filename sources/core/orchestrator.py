@@ -33,7 +33,7 @@ class WorkflowOrchestrator:
             timeout=self.config.runner_default_timeout,
             max_memory_mb=self.config.runner_default_max_memory_mb,
         )
-        self.workflow_runner = WorkflowRunner(self.runner_config)
+        self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 
     async def workflow_requirements_install(self):
         deps = self.config.runner_requirements

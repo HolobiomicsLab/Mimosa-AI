@@ -290,7 +290,7 @@ The following tools packages are available for agents:
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
-        self.logger.debug(f"▶ Workflow entry point: START → {entry_node}")
+        self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
 
         self.logger.info("✅ Workflow structure validation passed")
 
@@ -333,7 +333,9 @@ The following tools packages are available for agents:
         Returns:
             str: Complete workflow code ready for execution
         """
-
+        from pathlib import Path
+        script_dir = Path(__file__).resolve().parent
+        memory_path = (script_dir / memory_path).resolve()
         initial_state = {
             key: (
                 uuid_str

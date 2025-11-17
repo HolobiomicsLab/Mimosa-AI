@@ -254,18 +254,6 @@ class SmolAgentFactory:
 OPERATIONAL CONTEXT:
 {prev_infos}
 
-FILESYSTEM ARCHITECTURE:
-- Your Python code and tools operate in SEPARATE contexts
-- NEVER use Python's os, pathlib, or filesystem operations
-- ALWAYS use bash commands via execute_command() for file operations
-
-  Example:
-  ✅ files = execute_command("ls -la")
-  ✅ content = execute_command("cat file.txt")
-  ❌ os.listdir()  # Will fail - wrong context
-  ❌ subprocess.run(...)  # Will fail - subprocess forbidden
-  ❌ requests.get(...) # will download in wrong context
-
 TASK:
 {self.instruct_prompt}
 Address complain from the last agent informations if any.
@@ -273,6 +261,7 @@ Address complain from the last agent informations if any.
 CONSTRAINTS:
 - No placeholder/example values.
 - No assumptions about missing data - investigate first available data in workspace
+- Always use plot (matplotlib) on another safe thread. Avoid plotting to user and simply save plot to disk.
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """
