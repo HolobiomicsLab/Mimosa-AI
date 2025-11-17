@@ -334,8 +334,9 @@ The following tools packages are available for agents:
             str: Complete workflow code ready for execution
         """
         from pathlib import Path
-        script_dir = Path(__file__).resolve().parent
+        script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path = str((script_dir / memory_path).resolve())
+        workflow_path = str((script_dir / workflow_path).resolve())
         initial_state = {
             key: (
                 uuid_str
