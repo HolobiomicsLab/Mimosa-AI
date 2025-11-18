@@ -12,6 +12,7 @@ from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.planner_visualization import PlannerVisualizer
+from sources.utils.list_files import list_files
 from sources.extensibility.text_to_speech import create_tts_service
 
 
@@ -733,6 +734,7 @@ Original request:
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
 
+        goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
         print(f"▶ Starting planner with goal: {goal}")
 
         try:

@@ -24,6 +24,7 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
+from sources.utils.list_files import list_files
 
 dotenv.load_dotenv()
 

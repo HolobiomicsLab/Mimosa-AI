@@ -138,7 +138,10 @@ class VisualizationUtils:
             rewards_history: list of reward values
         """
         iterations = list(range(1, len(rewards_history) + 1))
-        self.update_curve_plot(iterations, rewards_history)
+        try:
+            self.update_curve_plot(iterations, rewards_history)
+        except Exception as _:
+            pass
 
     def create_multi_curve_plot(
         self,

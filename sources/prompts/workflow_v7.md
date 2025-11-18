@@ -98,7 +98,7 @@ Each agent requires exactly TWO tool packages:
 1. ONE primary domain-specific tool (e.g., WEB_SEARCH_MCP, R_SCRIPT_MCP)
 2. ONE execution/filesystem tool (SHELL_MCP for runtime ops, or TEXT_EDITING_MCP for file manipulation)
 
-## 3. How to Build a Workflow
+## 4. How to Build a Workflow
 
 Your output must be a single, runnable Python script. Follow this structure precisely.
 
@@ -258,17 +258,19 @@ workflow.add_conditional_edges(
 # --- END OF SCRIPT ---
 ```
 
-## 4. Final Checklist
+## 5. Final Checklist
 
 - [ ] **Output Format**: Your entire response is a single Python script wrapped in ```python ... ```.
 - [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Guaranteed Exit**: Does the workflow have a clear start and a guaranteed path to `END`?
 - [ ] **Smart fallback**: Avoid using fallback node on the previous agent, fallback to more early agent to avoid infinite loop, you may use a judge agent to decide on routing.
+- [ ] **Validation + Cleaning**: A last agent should be a strict judge designed for minimal syconanphancy that ensure outputs of previous agents respect high-standard. It must also arange files and clean temporary one.
 
-The workflow can be composed of various conditional flows, enabling loops, branching, or complex custom logic depending on the user’s goals. To achieve robust and adaptive behaviors, it is recommended to apply established multi-agent system best practices. These include using specialized agents such as an LLM-as-a-Judge for arbitration and evaluation, introducing conditional agent loops to refine outputs iteratively, and leveraging debate or consensus mechanisms between agents to improve reasoning quality. By combining these techniques, the system can maintain flexibility, ensure higher accuracy, and adapt dynamically to evolving tasks.
+The workflow can be composed of various conditional flows, enabling loops, branching, or complex custom logic depending on the user’s goals. To achieve robust and adaptive behaviors, it is recommended to apply established multi-agent system best practices. These include using specialized agents such as an LLM-as-a-Judge for arbitration and evaluation, introducing conditional agent loops to refine outputs iteratively, and leveraging consensus mechanisms between agents to improve reasoning quality.
 
-Any hardware heavy task by agent B should first be check by agent A who estimate tasks ressources usage and make sure hardware capabilities are sufficient.
-All agent should be given a shell tool in addition to their primary tool.
-All survey/document analysis agent should have a tool to take note (such as text editing tool), in addition to their shell and document extraction tools.
-Document extraction such as PDF should ALWAYS use multiple-agents including judge agent should decompose the task and refine until quality is deemed sufficient, FAllBACK node could be used to create eternal loop until quality is deemed sufficient by judge.
+## 6. Rules
+
+1. All agent should be given a shell tool in addition to their primary tool.
+2. All survey/document analysis agent should have a tool to take note (such as text editing tool), in addition to their shell and document extraction tools.
+3. Document extraction such as PDF should ALWAYS use multiple-agents including judge agent should decompose the task and refine until quality is deemed sufficient.
