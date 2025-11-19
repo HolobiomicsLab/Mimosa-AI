@@ -74,6 +74,7 @@ class WorkflowFactory:
         tool_manager = ToolManager(self.config)
         try:
             mcps = await tool_manager.discover_mcp_servers()
+            await tool_manager.verify_tools()
         except Exception as e:
             self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
