@@ -21,7 +21,7 @@ Its mission is to provide a modular and open alternative to big tech initiatives
 - Python 3.10 or higher
 - pip3 package manager
 
-## 🚀 Install & Run
+## ▶ Install & Run
 
 ### Step 1: Environment Setup
 
@@ -77,7 +77,7 @@ uv run main.py --goal "Your objective here" # better
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
 
-## 🛠️ Command Line Arguments
+## ▶ Command Line Arguments
 
 Mimosa-AI supports various command line arguments to customize execution:
 
@@ -85,13 +85,11 @@ Mimosa-AI supports various command line arguments to customize execution:
 - `--goal GOAL`: Specify your research objective, research reproduction or scientific question (planner mode)
 - `--task TASK`: Run & learn how to do a single task (Litterature review, code installation, dataset download)
 - `--manual`: Interact & use Mimosa tools (from Toolomics MCPs) using a CLI interface. Allow to debug MCPs and put yourself in Mimosa shoes.
-- `--automated`: Automated evaluation mode. Will load a CSV dataset from `datasets/` containing a list of paper and prompt for Mimosa (such as reproduce the paper X ...), will automatically run Mimosa in goal mode for every papers in the csv dataset.
-- `--dataset DATASET_FOLDER`: Evaluate Mimosa workflow generation on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
+- `--papers`: Automated run on CSV of research papers. Will load a CSV dataset from `datasets/` containing a list of paper and prompt for Mimosa (such as reproduce the paper X ...), will automatically run Mimosa in goal mode for every papers in the csv dataset.
 - `--scenario`: Specify scenario to evaluate Mimosa on.
 
 ### Evaluation & Performance
 - `--judge`: Enable llm-as-a-judge for workflow evaluation (default: disabled)
-- `--max_concurrent N`: Maximum number of concurrent tasks, only for `--multi_goal` and `--dataset` mode. (default: 16)
 - `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
 - `--max_dgm_iterations N`: Maximum number of DGM retry to learn a task (default: 3 in task mode, 1 in goal mode).
 
@@ -114,11 +112,9 @@ Evaluation of workflow generation: evaluation on GSMK8.
 
 > **Note**: Requires Toolomics to be installed and MCP servers to be running.
 
-## 🧠 Core Architecture
+## ▶ Core Architecture
 
 Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
-
-### Design Philosophy
 
 The system operates on an "agent-within-agent" pattern:
 - Goals decompose into learnable tasks
@@ -134,7 +130,7 @@ The system operates on an "agent-within-agent" pattern:
 **Task**: A granular, repeatable operation frequently encountered across different goals
 - Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
 
-## System Architecture
+## ▶ System Architecture
 
 ### Layer 0: Strategic Planning
 - Decomposes goals into executable task sequences
@@ -164,9 +160,9 @@ The system operates on an "agent-within-agent" pattern:
 - **Protocol Standardization**: MCP enables seamless client-server tool interaction
 - **Horizontal Scalability**: Add new tools without modifying core system
 
-## (Experimental) Self-Improvement on task
+## ▶ (Experimental) Self-Improvement on task
 
-The system implements a **Darwinian workflow evolution** inspired by Gödel machine principles:
+The system implements a **Darwinian inspired evolution** inspired by Gödel machine principles:
 
 1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
    - "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
@@ -185,6 +181,31 @@ The system implements a **Darwinian workflow evolution** inspired by Gödel mach
    - The system can propose modifications to its own workflow generation logic
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
+
+## ▶ Phone notification setup
+
+Get real-time updates about Mimosa's status directly on your phone using Pushover.
+
+## Setup Steps
+
+1. **Register for Pushover**
+   - Go to [pushover.net](https://pushover.net/) and create an account
+   - After registration, you'll receive your **User Key**
+
+2. **Create an Application**
+   - In your Pushover dashboard, click "Create an Application/API Token"
+   - Name it (e.g., "Mimosa") and create it
+   - Copy your **API Token/Key**
+
+3. **Configure Environment Variables**
+```bash
+   export PUSHOVER_USER="your_user_key_here"
+   export PUSHOVER_TOKEN="your_api_token_here"
+```
+
+4. **Install Pushover on your phone***
+
+Download pushover from play/app store and login.
 
 ## 📈 Telemetry Setup
 

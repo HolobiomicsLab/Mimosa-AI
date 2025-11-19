@@ -49,14 +49,17 @@ class RuntimeConfig:
 class WorkflowRunner:
     """Async workflow execution engine for python code."""
 
-    def __init__(self, config: RuntimeConfig = None):
+    def __init__(self, config: RuntimeConfig = None, execution_dir = '.'):
         self.config = config or RuntimeConfig()
+        self.execution_dir = execution_dir
         self.logger = logging.getLogger(__name__)
         self._active_processes: dict[str, asyncio.subprocess.Process] = {}
         self._setup_environment()
 
     def _setup_environment(self) -> None:
         """Initialize the execution environment."""
+        # Convert temp_dir to absolute path to ensure it's created in the right location
+        self.config.temp_dir = os.path.abspath(self.config.temp_dir)
         os.makedirs(self.config.temp_dir, exist_ok=True)
         # Validate python version availability
         if not self._check_python_version():
@@ -123,11 +126,12 @@ class WorkflowRunner:
             execution_id or f"exec_{time.strftime('%m%d_%H%M%S')}_{id(code) % 10000}"
         )
 
-        script_path = os.path.join(self.config.temp_dir, f"{execution_id}.py")
+        # Use absolute path for script to ensure it's accessible regardless of execution_dir
+        script_path = os.path.abspath(os.path.join(self.config.temp_dir, f"{execution_id}.py"))
         with open(script_path, "w") as f:
             f.write(code)
         print(f"Executing script: {script_path}")
-        cmd = [f"python{self.config.python_version}", str(script_path)]
+        cmd = [f"python{self.config.python_version}", script_path]
         return await self._run_command(cmd, execution_id, progress_callback)
 
     async def _run_command(
@@ -147,6 +151,7 @@ class WorkflowRunner:
                 stderr=asyncio.subprocess.PIPE,
                 limit=1024 * 1024,  # 1MB buffer limit
                 env=dict(os.environ),  # Pass host environment variables
+                cwd=self.execution_dir,  # Set working directory for execution
             )
 
             if execution_id:

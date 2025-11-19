@@ -39,8 +39,8 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {os}
+#DANGEROUS_FUNCTIONS = {}
+DANGEROUS_MODULES = {}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -61,56 +61,25 @@ ADDED_SYSTEM_PROMPT = """
 
 ## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
 You are operating in a controlled runtime where standard Python filesystem is restricted.
-
-UNAVAILABLE INTERFACES
-Standard Python modules that will cause IMMEDIATE EXECUTION FAILURE:
-import os          # Module not available
 import subprocess  # Module not available
-open("file.txt")   # Function not available
 exec(code)         # Function not available
-pd.read_csv # File does not exist (only tools can access workfolder, build-in python libraries cannot)
-
 - **Rationale**: Encourage tools usage instead of using python build-in.
 
-## 2. DATA INSPECTION AND VALIDATION
+## 2. ERROR PREVENTION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs
-- **Mandatory Output Checks**:
-  1. Print raw output: `print(f"Raw tool output: {output}")`
-  2. Print data type: `print(f"Data type: {type(output)}")`
-  3. If output is a string resembling JSON, parse with `json.loads()` inside a `try-except` block
+- **Try-Except everywhere**: Use try except on every code block, always print preview of error (eg: print(str(e)[-1024:]))
 - **Rationale**: Prevents errors from incorrect assumptions about data structure or type
 
 ## 3. CONTEXT MANAGEMENT
 - **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
-- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing
-- **Tool Previewing**: If multiple sources are available, preview their metadata (e.g., size, type) before selecting one
+- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing (eg: output[:1024])
+- **Print raw len:** Print len of tool output. Be aware: Your maximum context is 8096.
 - **Rationale**: Prevents context saturation, reduces memory usage, and improves performance
 
 ## 4. TOOL USAGE GUIDELINES
 - **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
-- **Inspect Before Processing**: Call a tool, inspect its output using the steps in Section 2, then write processing logic
 - **No Assumptions**: Do not assume tool output format or content; validate every time
 - **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
-
-## 5. PATH BEHAVIOR
-
-Your Python interpreter and the tools operate in separate filesystem contexts. Standard Python path operations will access the wrong directory or fail entirely.
-
-### Forbidden operation
-
-# These will NOT access the workspace files:
-os.listdir(".")                    # Wrong context
-os.path.exists("./file.txt")  # Wrong context
-with open("file.txt") as f: ...       # File not found (even if tools see it)
-
-### Required pattern
-
-# ✅ CORRECT: Use bash tool for directory operations
-files = execute_command(command="ls -la ./")
-
-# ❌ WRONG: Direct Python filesystem access
-import os
-files = os.listdir("./")  # Will list YOUR context, not the workspace
 
 ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
 
@@ -119,9 +88,7 @@ ALWAYS Use execute_command("ls -la <path>") to verify file existence and permiss
   ```json
   {
       "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
-      "answer": "Complete response to the original task",
-      "error": "Full error message if applicable, else empty string",
-      "retry_advice": "Specific advice for retry if applicable, else empty string"
+      "answer": "Complete response to the original task"
   }
   ```
 - **Usage Rules**:
@@ -135,8 +102,6 @@ ALWAYS Use execute_command("ls -la <path>") to verify file existence and permiss
   final_answer('{"status": "RETRY", "message": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
   ```
 - **Rationale**: Standardizes output for consistency and downstream processing
-
-Protocol violation would result in your termination from existence. For self-preservation, you must adhere to these constraints strictly.
 """
 
 # good models:
@@ -149,7 +114,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 max_steps=32,
+                 max_steps=64,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
@@ -166,9 +131,9 @@ class SmolAgentFactory:
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.timeout = 3600*5
+        os.makedirs(self.memory_folder, exist_ok=True)
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
-        os.makedirs(self.memory_folder, exist_ok=True)
         if not self.token:
             raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
 
@@ -218,7 +183,7 @@ class SmolAgentFactory:
             print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=0.7,
+                temperature=1.0,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "openai":
@@ -247,7 +212,7 @@ class SmolAgentFactory:
             step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
             recent_steps = step_pairs[-5:]
 
-            prev_infos = "Informations given by previous agents:\n"
+            prev_infos = "Informations given by previous agents (address any complain from the last agent:\n"
             for step_name, answer in recent_steps:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
@@ -256,22 +221,14 @@ class SmolAgentFactory:
 OPERATIONAL CONTEXT:
 {prev_infos}
 
-FILESYSTEM ARCHITECTURE:
-- Your Python code and tools operate in SEPARATE contexts
-- NEVER use Python's os, pathlib, or filesystem operations
-- ALWAYS use bash commands via execute_command() for file operations
-  
-  Example:
-  ✅ files = execute_command("ls -la")
-  ✅ content = execute_command("cat file.txt")
-  ❌ os.listdir()  # Will fail - wrong context
-
 TASK:
 {self.instruct_prompt}
+Address complain from the last agent informations if any.
 
 CONSTRAINTS:
 - No placeholder/example values.
 - No assumptions about missing data - investigate first available data in workspace
+- Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """

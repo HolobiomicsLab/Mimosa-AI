@@ -1,0 +1,30 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Dataset",
+      "description": "Dataset is correctly loaded from 'benchmark/datasets/pbmc_umap/pbmc.h5ad' using anndata.read_h5ad.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Compute Hierarchical Clustering",
+      "description": "Performs hierarchical clustering using scanpy.tl.dendrogram on 'bulk_labels'.",
+      "points": 5
+    },
+    {
+      "name": "Plot Dendrogram",
+      "description": "Correctly plots the dendrogram for 'bulk_labels' using scanpy.pl.dendrogram.",
+      "points": 5
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Output Figure",
+      "description": "Output figure is saved in 'pred_results/dendrogram.png'.",
+      "points": 5
+    }
+  ],
+  "total_points": 20
+}

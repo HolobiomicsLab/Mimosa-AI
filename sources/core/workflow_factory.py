@@ -10,7 +10,7 @@ import uuid
 
 from sources.modules import state_schema
 
-from .llm_provider import LLMConfig, LLMProvider
+from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
 
 
@@ -74,13 +74,18 @@ class WorkflowFactory:
         tool_manager = ToolManager(self.config)
         try:
             mcps = await tool_manager.discover_mcp_servers()
+            await tool_manager.verify_tools()
         except Exception as e:
             self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
         if not mcps:
             raise ValueError(
-                "\nNo MCP servers found."
-                "Please ensure at least one MCP is running on toolomics."
+                "\n" + "=" * 80 + 
+                "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
+                "\n" + "-" * 80 +
+                "\nPlease ensure at least one MCP instance is running on Toolomics."
+                "\nRetrying until MCPs detected.... use CTRL+C to stop."
+                "\n" + "=" * 80 + "\n"
             )
         for mcp in mcps:
             client_code = tool_manager.get_client_code(mcp)
@@ -100,16 +105,6 @@ class WorkflowFactory:
                 line.strip().startswith("import ") or line.strip().startswith("from ")
             )
         )
-    
-    def extract_model_pattern(self, workflow_llm_model: str) -> tuple[str, str]:
-        # Extract provider and model from OpenRouter format (provider/model)
-        if "/" in workflow_llm_model:
-            provider, model = workflow_llm_model.split("/", 1)
-        else:
-            # Fallback for backward compatibility
-            provider = "openai"
-            model = self.config.workflow_llm_model
-        return provider, model
 
     def llm_make_prompts(
         self,
@@ -117,6 +112,7 @@ class WorkflowFactory:
         craft_instructions: str,
         existing_tool_prompt: str,
         path: str,
+        allow_cache: bool
     ) -> str:
         """Generate prompts code using the LLM."""
         prompt = f"""
@@ -136,16 +132,17 @@ Then, generate Python code that defines prompt templates for each agent.
 Do not generate the whole workflow, just the prompts as Python code.
 Generate the prompt within python blocks ```python<code with prompt>```
 Previous workflow failed due to python error ? You don't need to change prompts.
-Keep the prompt short and efficient.
+Keep the prompt short and efficient. Agents are smart domains expert, not children.
+document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
         """
-        
-        provider, model = self.extract_model_pattern(self.config.prompts_llm_model)
+
+        provider, model = extract_model_pattern(self.config.prompts_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
     def llm_make_workflow(
         self,
@@ -154,47 +151,49 @@ Keep the prompt short and efficient.
         existing_tool_prompt: str,
         path: str,
         prompts_code: str,
+        allow_cache: bool
     ) -> str:
         """Generate a workflow using the LLM."""
         prompt = f"""
-You are an expert in generating LangGraph workflows using SmolAgent nodes.
+# EXISTING PROMPTS:
+
+The prompts have already been generated for you as Python code:
+
+{prompts_code}
+
+You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not EVER rewrite prompt you wish to keep, they will be automatically part of the context. You may add a prompt by including it in the workflow code you write but do NOT rewrite existing prompt.
+
+# INSTRUCTIONS/GOAL:
+
+Generate a workflow for this goal:
+{craft_instructions}
 
 # AVAILABLE TOOLS:
 
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-CRITICAL CONSTRAINT: Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST either:
-1. Find alternative approaches using available tools (e.g., use shell commands instead of web_search)  
-2. Clearly state that the task cannot be completed with available tools
-Do NOT assume any tools exist beyond what is explicitly listed above.
+# CONSTRAINT:
 
-# EXISTING PROMPTS:
-
-The prompts have already been generated for you as Python code:
-
-{prompts_code} 
-
-Given that prompts are already defined, your task is to generate a workflow that uses these prompts.
-You should not modify or rewrite the prompts.
-
-# INSTRUCTIONS/GOAL:
-{craft_instructions}
-
-You must write a commentary before the prompt explaining the workflow.
-The last agent in the workflow must determine whenever the task was a success or failure.
+1. Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST clearly state that the task cannot be completed and give up.
+2. Use smart routing, fallback could go all the way back to first agent, not the previous agent.
+3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
+4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
+5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
+6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organise non-critical files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
+7. Agent should always be provided with tool to use shell and take notes, in addition to a primary tool.
         """
-        
-        provider, model = self.extract_model_pattern(self.config.workflow_llm_model)
+
+        provider, model = extract_model_pattern(self.config.workflow_llm_model)
         llm_config = LLMConfig(
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort
         )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt)
+        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
     def create_workflow_code(
-        self, craft_instructions: str, existing_tool_prompt: str, path: str
+        self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
     ) -> str:
         """Generate and validate workflow code.
         Args:
@@ -208,13 +207,16 @@ The last agent in the workflow must determine whenever the task was a success or
         try:
             print("📝 Step 1/2: Generating prompts code...")
             llm_output = self.llm_make_prompts(
-                system_prompt, craft_instructions, existing_tool_prompt, path
+                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             prompts_code = self.extract_python_code(llm_output)
+            commentary = llm_output.replace(prompts_code, "").split("```python")[0]
+            print("💬 LLM commentary on prompt:")
+            print(commentary)
 
             print("🔧 Step 2/2: Generating workflow code...")
             llm_output = self.llm_make_workflow(
-                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code
+                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
@@ -332,7 +334,10 @@ The last agent in the workflow must determine whenever the task was a success or
         Returns:
             str: Complete workflow code ready for execution
         """
-
+        from pathlib import Path
+        script_dir = Path(__file__).resolve().parent.parent.parent
+        memory_path = str((script_dir / memory_path).resolve())
+        workflow_path = str((script_dir / workflow_path).resolve())
         initial_state = {
             key: (
                 uuid_str
@@ -415,13 +420,15 @@ if WORKFLOW_PATH:
         goal: str,
         craft_instructions: str,
         save_workflow: bool = True,
+        original_task: str = None,
     ) -> tuple[str, str]:
         """Main method to craft a complete workflow.
         Args:
-            goal: The goal description
+            goal: The goal description (may be knowledge-wrapped)
             craft_instructions: The instructions for crafting the workflow
             template_workflow: pre-existing workflow template UUID
             save_workflow: Whether to save the workflow
+            original_task: The original unwrapped task for similarity matching
         Returns:
             str: Complete executable workflow code
         """
@@ -456,13 +463,17 @@ if WORKFLOW_PATH:
         except Exception as e:
             self.logger.error(f"craft_workflow: Failed to load required code files: {str(e)}")
             raise RuntimeError(f"Failed to load required code files: {str(e)}") from e
-        # Generate workflow code - let DGM handle retries
-        workflow_code = self.create_workflow_code(
-            craft_instructions, existing_tool_prompt, memory_path
-        )
+        allow_cache = goal == craft_instructions # if goal and craft instructions are the same it mean last workflow didn't fail (dgm level)
+        try:
+            workflow_code = self.create_workflow_code(
+                craft_instructions, existing_tool_prompt, memory_path, allow_cache
+            ) # Generate workflow code - let DGM handle retries
+        except Exception as e:
+            raise e # raise error for dgm-level to handle
         # Save workflow code immediately so DGM can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
-            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal)
+            self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal, original_task)
+
         try:
             self.validate_workflow_structure(workflow_code)
         except Exception as e:
@@ -489,9 +500,17 @@ if WORKFLOW_PATH:
         return complete_code, workflow_code, uuid_str
 
     def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_code: str, goal: str
+        self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
     ) -> None:
-        """Save workflow code and metadata to files."""
+        """Save workflow code and metadata to files.
+        
+        Args:
+            path: Directory path to save files
+            uuid_str: Unique workflow identifier
+            workflow_code: Generated workflow code
+            goal: The goal description (may be knowledge-wrapped)
+            original_task: The original unwrapped task for similarity matching
+        """
         try:
             with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
                 f.write(workflow_code)
@@ -516,3 +535,12 @@ if WORKFLOW_PATH:
             self.logger.info(f"Saved goal to: {path}/goal_{uuid_str}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save goal: {str(e)}")
+        
+        # Save original task for better similarity matching
+        if original_task:
+            try:
+                with open(os.path.join(path, f"original_task_{uuid_str}.txt"), "w") as f:
+                    f.write(original_task)
+                self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
+            except Exception as e:
+                self.logger.error(f"Failed to save original task: {str(e)}")

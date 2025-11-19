@@ -21,7 +21,14 @@ memory/*
 sources/memory/*
 sources/workflows/
 mimosa-env/*
-
+datasets/**/*.h5ad
+datasets/**/*.pkl
+datasets/**/*.np
+datasets/**/*.mtx
+datasets/**/*.tif"
+datasets/ScienceAgentBench/datasets/
+runs_notes/
+*.wav
 ### react ###
 .DS_*
 *.log

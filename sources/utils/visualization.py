@@ -17,6 +17,7 @@ class VisualizationUtils:
     def __init__(self):
         """Initialize the VisualizationUtils class."""
         self.active_plots = {}
+        self.plot_data = None
 
     def create_real_time_curve_plot(
         self,
@@ -65,11 +66,11 @@ class VisualizationUtils:
         plot_id = f"{title}_{id(fig)}"
         self.active_plots[plot_id] = (fig, ax, line)
 
+        self.plot_data = (fig, ax, line)
         return fig, ax, line
 
     def update_curve_plot(
         self,
-        plot_data: list[Any, Any, Any],
         x_data: list[float],
         y_data: list[float],
         auto_scale: bool = True,
@@ -79,13 +80,14 @@ class VisualizationUtils:
         Update a real-time curve plot with new data.
 
         Args:
-            plot_data: list containing (figure, axis, line) objects
             x_data: list of x-axis values
             y_data: list of y-axis values
             auto_scale: Whether to auto-scale the axes
             x_margin: Margin to add to x-axis limits
         """
-        fig, ax, line = plot_data
+        if not self.plot_data:
+            return
+        fig, ax, line = self.plot_data
 
         # Update line data
         line.set_data(x_data, y_data)
@@ -97,9 +99,8 @@ class VisualizationUtils:
             # Set x-axis limits with margin
             if x_data:
                 ax.set_xlim(0, max(5, max(x_data) + x_margin))
-
-        # Remove problematic GUI operations that cause threading issues on macOS
         # plt.draw() and plt.pause() removed
+        plt.draw()
 
     def create_rewards_curve_plot(
         self, goal: str, figsize: list[int, int] = (10, 6)
@@ -114,7 +115,7 @@ class VisualizationUtils:
         Returns:
             list containing (figure, axis, line) objects
         """
-        return self.create_real_time_curve_plot(
+        plot_data = self.create_real_time_curve_plot(
             title=f"Rewards Curve - {goal}",
             xlabel="Iteration",
             ylabel="Rewards",
@@ -125,19 +126,22 @@ class VisualizationUtils:
             line_width=2,
             marker_size=6,
         )
+        return plot_data
 
     def update_rewards_curve(
-        self, plot_data: list[Any, Any, Any], rewards_history: list[float]
+        self, rewards_history: list[float]
     ) -> None:
         """
         Update the rewards curve plot with new rewards data.
 
         Args:
-            plot_data: list containing (figure, axis, line) objects
             rewards_history: list of reward values
         """
         iterations = list(range(1, len(rewards_history) + 1))
-        self.update_curve_plot(plot_data, iterations, rewards_history)
+        try:
+            self.update_curve_plot(iterations, rewards_history)
+        except Exception as _:
+            pass
 
     def create_multi_curve_plot(
         self,
@@ -194,12 +198,11 @@ class VisualizationUtils:
         if len(curve_configs) > 1:
             ax.legend()
 
-        # Remove plt.show() to avoid GUI threading issues
-        return fig, ax, lines
+        self.plot_data = fig, ax, lines
+        return self.plot_data
 
     def update_multi_curve_plot(
         self,
-        plot_data: list[Any, Any, list[Any]],
         curves_data: list[list[list[float], list[float]]],
         auto_scale: bool = True,
     ) -> None:
@@ -207,11 +210,10 @@ class VisualizationUtils:
         Update a multi-curve plot with new data.
 
         Args:
-            plot_data: list containing (figure, axis, list_of_lines) objects
             curves_data: list of lists, each containing (x_data, y_data) for a curve
             auto_scale: Whether to auto-scale the axes
         """
-        fig, ax, lines = plot_data
+        fig, ax, lines = self.plot_data
 
         for i, (x_data, y_data) in enumerate(curves_data):
             if i < len(lines):
@@ -275,7 +277,6 @@ class VisualizationUtils:
 
     def save_plot(
         self,
-        plot_data: list[Any, Any, Any],
         filename: str,
         dpi: int = 300,
         bbox_inches: str = "tight",
@@ -284,23 +285,23 @@ class VisualizationUtils:
         Save a plot to file.
 
         Args:
-            plot_data: list containing plot objects (figure is first element)
             filename: Name of the file to save
             dpi: Resolution in dots per inch
             bbox_inches: Bounding box setting
         """
-        fig = plot_data[0]
+        if not self.plot_data:
+            return
+        fig = self.plot_data[0]
         fig.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
         print(f"Plot saved to {filename}")
 
-    def close_plot(self, plot_data: list[Any, Any, Any]) -> None:
+    def close_plot(self) -> None:
         """
         Close a plot and free up memory.
-
-        Args:
-            plot_data: list containing plot objects (figure is first element)
         """
-        fig = plot_data[0]
+        if not self.plot_data:
+            return
+        fig = self.plot_data[0]
         plt.close(fig)
 
     def close_all_plots(self) -> None:
@@ -364,7 +365,7 @@ class VisualizationUtils:
         Returns:
             list containing (figure, axis, line) objects
         """
-        return self.create_real_time_curve_plot(
+        self.plot_data = self.create_real_time_curve_plot(
             title=f"Assertion Validation Progress - {scenario_id}",
             xlabel="DGM Iteration",
             ylabel="Assertions Passed",
@@ -375,10 +376,10 @@ class VisualizationUtils:
             line_width=2,
             marker_size=6,
         )
+        return self.plot_data
 
     def update_assertion_progress_plot(
         self,
-        plot_data: list[Any, Any, Any],
         assertion_history: list[list[int]],
         total_assertions: int,
     ) -> None:
@@ -393,12 +394,12 @@ class VisualizationUtils:
         if not assertion_history:
             return
 
-        fig, ax, line = plot_data
+        fig, ax, line = self.plot_data
         iterations = list(range(1, len(assertion_history) + 1))
         passed_counts = [entry[0] for entry in assertion_history]
 
         # Update the main line
-        self.update_curve_plot(plot_data, iterations, passed_counts)
+        self.update_curve_plot(iterations, passed_counts)
 
         # Add target line showing total assertions
         ax.axhline(y=total_assertions, color='red', linestyle='--', 

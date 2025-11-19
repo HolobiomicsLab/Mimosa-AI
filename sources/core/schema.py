@@ -27,10 +27,9 @@ class GodelRun:
     prompt: str
     cost: float = 0.0
     reward: float = 0.0
-    max_depth: int = 5
+    max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False
-    need_human_validation: bool = False
     current_uuid: str | None = None
     template_uuid: str | None = None
     workflow_template: str | None = None
@@ -39,13 +38,13 @@ class GodelRun:
     answers: list[str] | None = None
     state_result: dict | None = None
     plot: str | None = ""
+    original_task: str | None = None  # Original unwrapped task for similarity matching
 
     def __str__(self) -> str:
         return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
                 f"cost={self.cost}, reward={self.reward}, max_depth={self.max_depth}, "
                 f"iteration_count={self.iteration_count}, answers={self.answers}, "
                 f"state_result={self.state_result}, judge={self.judge}, "
-                f"need_human_validation={self.need_human_validation}, "
                 f"current_uuid={self.current_uuid}, template_uuid={self.template_uuid}, "
                 f"eval_type={self.eval_type})")
 
@@ -54,6 +53,8 @@ class PlanStep:
     """Represents a single step in a plan with dependencies and I/O requirements."""
     name: str
     task: str
+    cost: int
+    score: float
     depends_on: list[str] = field(default_factory=list)
     required_inputs: list[str] = field(default_factory=list)
     expected_outputs: list[str] = field(default_factory=list)
@@ -101,6 +102,7 @@ class Task:
     run_id: int = 0
     dgm_runs: list[GodelRun] = field(default_factory=list) # godel run result for task
     final_answers: list[str] = field(default_factory=list) # last godel run answers
+    cost: float = 0
     final_uuid: str | None = None # last godel run uuid
     workflow_uuid: str | None = None # last workflow uuid
     status: TaskStatus = TaskStatus.PENDING

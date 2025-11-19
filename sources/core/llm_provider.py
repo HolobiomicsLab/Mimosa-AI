@@ -8,12 +8,22 @@ import glob
 
 import litellm
 
+def extract_model_pattern(llm_model: str) -> tuple[str, str]:
+    # Extract provider and model from OpenRouter format (provider/model)
+    if "/" in llm_model:
+        provider, model = llm_model.split("/", 1)
+    else:
+        # Fallback for backward compatibility
+        provider = "openai"
+        model = llm_model
+    return provider, model
+
 
 @dataclass
 class LLMConfig:
     """Configuration for Large Language Model interactions."""
 
-    model: str = "claude-opus-4-20250514"
+    model: str = "claude-3-7-sonnet-20250219"
     provider: str = "anthropic"
     temperature: float = 1.0
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
@@ -36,7 +46,7 @@ class LLMConfig:
             self.key = os.getenv("OPENAI_API_KEY", "")
         elif self.provider == "deepseek" and not self.key:
             self.key = os.getenv("DEEPSEEK_API_KEY", "")
-            
+
         if not self.key:
             if self.provider == "anthropic":
                 env_var = "ANTHROPIC_API_KEY"
@@ -46,12 +56,12 @@ class LLMConfig:
                 env_var = "DEEPSEEK_API_KEY"
             else:
                 env_var = f"{self.provider.upper()}_API_KEY"
-            
-            raise ValueError(
-                f"API key not provided and {env_var} environment variable not set"
-            )
+
+            #raise ValueError(
+            #    f"API key not provided and {env_var} environment variable not set"
+            #)
         self.temperature = float(self.temperature)  # Ensure numeric type
-        
+
         # Validate reasoning effort
         valid_efforts = {"minimal", "low", "medium", "high"}
         if self.reasoning_effort not in valid_efforts:
@@ -74,12 +84,12 @@ class LLMConfig:
 
 class LLMProvider:
     """Handles interactions with various LLM APIs including OpenAI, Anthropic, and DeepSeek.
-    
+
     Supported providers:
     - anthropic: Claude models (claude-3-5-sonnet, claude-3-opus, etc.)
     - openai: GPT models (gpt-4, gpt-3.5-turbo, o1, o3, etc.)
     - deepseek: DeepSeek models (deepseek-chat, deepseek-coder, etc.)
-    
+
     Uses litellm for unified API access across providers.
     """
 
@@ -89,8 +99,18 @@ class LLMProvider:
         memory_path=None,
         system_msg: str = None,
         config: LLMConfig = None,
+        use_flat_cache: bool = False,
     ) -> None:
-        """Initialize the LLM provider with API clients."""
+        """Initialize the LLM provider with API clients.
+        
+        Args:
+            agent_name: Name of the agent for cache identification
+            memory_path: Path to memory directory
+            system_msg: System message for the LLM
+            config: LLM configuration
+            use_flat_cache: If True, cache files are stored/searched directly in memory_path
+                           without UUID subfolders (useful for plan generation)
+        """
         if not config:
             config = LLMConfig()
 
@@ -98,6 +118,7 @@ class LLMProvider:
         self.sys_msg = system_msg
         self.agent_name = agent_name
         self.memory_path = memory_path
+        self.use_flat_cache = use_flat_cache
         self.max_retries = 3
         self.logger = logging.getLogger(__name__)
 
@@ -132,6 +153,25 @@ class LLMProvider:
             expected_messages.append({"content": self.sys_msg, "role": "system"})
         expected_messages.append({"role": "user", "content": prompt})
 
+        # For flat cache, search directly in memory_path
+        if self.use_flat_cache:
+            agent_file = os.path.join(self.memory_path, f"{self.agent_name}.json")
+            if os.path.exists(agent_file):
+                try:
+                    with open(agent_file) as f:
+                        cached_data = json.load(f)
+
+                    cached_messages = cached_data.get('message', [])
+                    if self._messages_match(expected_messages, cached_messages):
+                        self.logger.info(f"Cache hit (flat) for agent '{self.agent_name}' with complete context match")
+                        return cached_data.get('response', '')
+                except OSError as e:
+                    self.logger.warning(f"Error reading cache file {agent_file}: {e}")
+            
+            self.logger.info(f"Cache miss (flat) for agent '{self.agent_name}'")
+            return None
+
+        # For UUID-based cache, search in subfolders
         base_memory_dir = os.path.dirname(self.memory_path) if self.memory_path else "sources/memory"
         uuid_pattern = os.path.join(base_memory_dir, "*")
         uuid_folders = [d for d in glob.glob(uuid_pattern) if os.path.isdir(d)]
@@ -151,7 +191,7 @@ class LLMProvider:
                 except OSError as e:
                     self.logger.warning(f"Error reading cache file {agent_file}: {e}")
                     continue
-                
+
         self.logger.info(f"Cache miss for agent '{self.agent_name}'")
         return None
 
@@ -165,14 +205,14 @@ class LLMProvider:
             r_b = cached_msg.get('role')
             c_a = exp_msg.get('content')
             c_b = cached_msg.get('content')
-    
+
             if (r_a != r_b or c_a != c_b):
                 return False
 
         return True
 
-    def __call__(self, prompt: str, timeout: int = 180):
-        cached_response = self._find_cache_match(prompt)
+    def __call__(self, prompt: str, timeout: int = 180, use_cache: bool = True):
+        cached_response = self._find_cache_match(prompt) if use_cache else None
         if cached_response:
             self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
             return cached_response
@@ -196,7 +236,7 @@ class LLMProvider:
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
-                
+
                 response = litellm.completion(**completion_params)
                 break
             except TimeoutError:
@@ -232,7 +272,7 @@ if __name__ == "__main__":
         key=os.getenv("DEEPSEEK_API_KEY", ""),
         reasoning_effort="medium"
     )
-    
+
     # Use DeepSeek provider
     llm_provider = LLMProvider(
         agent_name="test_agent",
@@ -240,7 +280,7 @@ if __name__ == "__main__":
         system_msg="You are a helpful assistant.",
         config=deepseek_config
     )
-    
+
     prompt = "Explain the theory of relativity in simple terms."
     try:
         response = llm_provider(prompt)

@@ -19,11 +19,12 @@ from config import Config
 from sources.core.dgm import GodelMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.automated_mode import AutomatedMode
-from sources.utils.dataset import calculate_good_answer_average, read_dataset
-from sources.utils.scenario_loader import ScenarioLoader
-from sources.utils.user_entry import collect_goals_from_user
+from sources.extensibility.papers_mode import PaperEvaluationMode
+from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
+from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.precheck import PreCheck
+from sources.utils.list_files import list_files
 
 dotenv.load_dotenv()
 
@@ -31,11 +32,15 @@ def validate_environment() -> None:
     """Validate required environment configuration."""
     if not os.getenv("HF_TOKEN"):
         raise ValueError(
-            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token."
+            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token. "
         )
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv("ANTHROPIC_API_KEY"):
         raise ValueError(
-            "⚠️ OPENAI_API_KEY environment variable is not set. Please set it to your OpenAI API key."
+            "⚠️ ANTHROPIC_API_KEY environment variable is not set. Please set it to your OpenAI API key."
+        )
+    if not os.getenv("PUSHOVER_USER") or not os.getenv("PUSHOVER_TOKEN"):
+        print(
+            "⚠️ PUSHOVER_USER/PUSHOVER_TOKEN not set. We advice using pushover for getting notifications upon task completion. "
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
@@ -85,7 +90,7 @@ def setup_signal_handlers():
             if not task.done():
                 task.cancel()
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -93,36 +98,13 @@ async def manual_mode(args, config):
     hm = HumanMode(config)
     await hm.shellLoop()
 
-async def dataset_execution_mode(args, config):
-    planner = Planner(config)
-    print(f"Using {args.dataset} dataset")
-    dataset_questions = read_dataset(args.dataset, args.num_samples)
-    if dataset_questions:
-        print(f"Running {len(dataset_questions)} questions with max {args.max_concurrent} concurrent tasks")
-        semaphore = asyncio.Semaphore(args.max_concurrent)
-        async def run_with_semaphore(question, answer):
-            """Run a single question with semaphore to limit concurrency"""
-            async with semaphore:
-                return question, answer, await planner.start_planner(
-                    goal=question,
-                    template_uuid=args.load_template,
-                    judge=True,
-                    answer=answer,
-                    max_iteration=1
-                )
-        tasks = []
-        for question, answer in dataset_questions:
-            task = asyncio.create_task(run_with_semaphore(question, answer))
-            tasks.append(task)
-        all_run = await asyncio.gather(*tasks)
-        calculate_good_answer_average(all_run, dataset_name=args.dataset, workflow_prompt=config.prompt_workflow_creator)
-    else:
-        print("❌ No questions found in dataset or no goal provided.")
+async def papers_mode(args, config):
+    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_paper_eval_mode(dataset_type="default", dataset_path=args.papers, learning=args.learn)
 
-async def automated_mode(args, config):
-    """Run autonomous mode where LLM generates and executes tasks automatically."""
-    automated = AutomatedMode(config, max_iterations=args.max_iterations)
-    await automated.start_autonomous_mode()
+async def science_bench_papers_mode(args, config):
+    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
 
 async def normal_execution_mode(args, config):
     dgm = GodelMachine(config)
@@ -130,19 +112,20 @@ async def normal_execution_mode(args, config):
     if args.scenario:
         scenario_file = ScenarioLoader().load_scenario(args.scenario)
         args.task = scenario_file["goal"]
-        args.judge = True
     if args.task:
         await dgm.start_dgm(goal=args.task,
-                            judge=args.judge, 
+                            judge=not args.disable_judge,
                             scenario_id=args.scenario,
-                            human_validation=False,
-                            max_iteration=args.max_dgm_iterations
+                            max_iteration=args.max_dgm_iterations,
+                            learning_mode=args.learn
                            )
     elif args.goal:
-        await planner.start_planner(goal=args.goal, 
-                                    judge=args.judge,
+        await planner.start_planner(goal=args.goal,
+                                    judge=not args.disable_judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
+        trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
+        trs.transfer_workspace_files_to_capsule(args.goal or args.task)
     else:
         raise ValueError("No goal provided. Use --task, --goal to start.")
 
@@ -150,7 +133,7 @@ async def main():
     """Main execution function"""
     config = Config()
     setup_signal_handlers()
-    
+
     parser = argparse.ArgumentParser(
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
@@ -161,28 +144,28 @@ async def main():
         "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
+        "--learn", action="store_true", help="Learning mode. Retry task with DGM until threshold score it met.", default=False
+    )
+    parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
     )
     parser.add_argument(
-        "--automated", action="store_true", help="Autonomous mode (LLM generates and executes tasks automatically)"
+        "--papers", type=str, help="Papers evaluation mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--max_iterations", type=int, default=10, help="Maximum number of autonomous iterations (for --automated mode)"
+        "--papers_science_bench", action="store_true", help="Papers mode on ScienceAgentBench (Run Mimosa on multiple science bench papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--dataset", type=str, help="Dataset eval mode, specify dataset folder to use (csv)"
+        "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
     )
     parser.add_argument(
         "--load_template", type=str, help="Optional workflow UUID to load", default=None
     )
     parser.add_argument(
-        "--judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+        "--disable_judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
     )
     parser.add_argument(
-        "--scenario", type=str, help="Scenario for workflow evaluation"
-    )
-    parser.add_argument(
-        "--num_samples", type=int, default=16, help="Number of samples to use from dataset"
+        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
     )
     parser.add_argument(
         "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
@@ -191,15 +174,15 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations"
+        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
-    
+
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
-    
+
     apply_config_overrides(args, config)
 
     validate_environment()
@@ -207,17 +190,19 @@ async def main():
     config.create_paths()
     config.validate_paths()
 
+    PreCheck(config).run()
+
     try:
-        if (args.dataset):
-            await dataset_execution_mode(args, config)
-        elif (args.manual):
+        if (args.manual):
             await manual_mode(args, config)
-        elif (args.automated):
-            await automated_mode(args, config)
+        elif (args.papers):
+            await papers_mode(args, config)
+        elif (args.papers_science_bench):
+            await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
         else:
-            raise ValueError("No goal provided. Use --task, --goal, --automated  to start.")
+            raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:

@@ -1,14 +1,19 @@
 import json
+import time
 import os
 import re
+import sys
 import time
+import threading
 from pathlib import Path
 from .dgm import GodelMachine
-from .llm_provider import LLMProvider, LLMConfig
+from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
-from sources.utils.transfer_toolomics import Transfer
+from sources.utils.planner_visualization import PlannerVisualizer
+from sources.utils.list_files import list_files
+from sources.extensibility.text_to_speech import create_tts_service
 
 
 class PlanValidationError(Exception):
@@ -27,10 +32,10 @@ class Planner:
     and input/output verification.
     """
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, enable_tts=True) -> None:
         if config is None:
             raise ValueError("❌ Planner: Configuration cannot be None")
-        
+
         self.config = config
         self.workspace_path = config.workspace_dir
         self.dgm = GodelMachine(config)
@@ -38,8 +43,18 @@ class Planner:
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
-        self.config_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+        provider, model = extract_model_pattern(self.config.planner_llm_model)
+        self.config_llm = LLMConfig(
+            model=model,
+            provider=provider,
+            reasoning_effort=self.config.reasoning_effort
+        )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
+        self.visualizer: PlannerVisualizer | None = None
+        self.visualizer_thread: threading.Thread | None = None
+        self.use_visualization: bool = True  # Can be disabled if pygame not available
+        self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
+        self.tts = create_tts_service() if enable_tts else None
 
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
@@ -57,19 +72,20 @@ class Planner:
             raise ValueError("❌ Planner: system_prompt must be a non-empty string")
         if not goal_prompt or not isinstance(goal_prompt, str):
             raise ValueError("❌ Planner: goal_prompt must be a non-empty string")
-        
+
         last_error = None
-        
+
+        prompt = f"You must generate a plan for goal:\n{goal_prompt}\nImportant: Every task description should be very detailled and specific with the full path of all input output files specified."
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
-                
+
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm)(goal_prompt)
-                
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
+
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
-                
+
                 print(f"📝 Received plan response ({len(raw_plan)} characters)")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
@@ -77,29 +93,29 @@ class Planner:
                 plan = self._parse_and_validate_plan(plan_dict)
                 print(f"✅ Successfully generated and validated plan with {len(plan.steps)} steps")
                 return plan
-                
+
             except (ValueError, PlanValidationError, json.JSONDecodeError) as e:
                 last_error = e
                 error_msg = str(e)
                 print(f"⚠️ Attempt {attempt} failed: {error_msg}")
-                
+
                 if attempt < max_retries:
                     wait_time = 2 ** attempt
                     print(f"⏳ Waiting {wait_time} seconds before retry...")
                     time.sleep(wait_time)
-                    
+
                     if attempt > 1:
                         goal_prompt = self._enhance_prompt_with_error(goal_prompt, error_msg)
                 else:
                     print(f"❌ All {max_retries} attempts failed")
-            
+
             except Exception as e:
                 last_error = e
                 print(f"❌ Unexpected error in attempt {attempt}: {str(e)}")
                 if attempt >= max_retries:
                     break
                 time.sleep(2 ** attempt)
-        
+
         # All retries exhausted - send notification
         error_details = f"Failed after {max_retries} attempts. Last error: {str(last_error)}"
         self.notifier.send_message(
@@ -123,23 +139,25 @@ class Planner:
         """
         if "steps" not in plan_dict:
             raise PlanValidationError("❌ Planner: No steps found in the generated plan")
-        
+
         if not isinstance(plan_dict["steps"], list):
             raise PlanValidationError("❌ Planner: Steps should be a list")
-        
+
         if not plan_dict["steps"]:
             raise PlanValidationError("❌ Planner: Plan must contain at least one step")
-        
+
         goal = plan_dict.get("goal", "")
         if not goal:
             raise PlanValidationError("❌ Planner: Plan must have a goal")
-        
+
         steps = []
         for i, step_dict in enumerate(plan_dict["steps"]):
             try:
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
+                    cost=0.0,
+                    score=0.0,
                     depends_on=step_dict.get("depends_on", []),
                     required_inputs=step_dict.get("required_inputs", []),
                     expected_outputs=step_dict.get("expected_outputs", []),
@@ -148,12 +166,12 @@ class Planner:
                 steps.append(step)
             except ValueError as e:
                 raise PlanValidationError(f"❌ Planner: Invalid step {i}: {str(e)}") from e
-        
+
         try:
             plan = Plan(goal=goal, steps=steps)
         except ValueError as e:
             raise PlanValidationError(f"❌ Planner: Plan validation failed: {str(e)}") from e
-        
+
         return plan
 
     @staticmethod
@@ -161,7 +179,7 @@ class Planner:
         """Extract JSON from markdown code blocks (```json ... ```)"""
         code_blocks = []
         in_code_block = False
-        
+
         for line in text.splitlines():
             line_stripped = line.strip()
             if line_stripped.startswith("```json") or line_stripped.startswith("```JSON"):
@@ -172,12 +190,12 @@ class Planner:
                 continue
             if in_code_block:
                 code_blocks.append(line)
-        
+
         if code_blocks:
             json_str = "\n".join(code_blocks)
             return json.loads(json_str)
         return None
-    
+
     @staticmethod
     def _enhance_prompt_with_error(original_prompt: str, error_msg: str) -> str:
         """
@@ -189,7 +207,8 @@ class Planner:
             str: Enhanced prompt
         """
         enhancement = f"""
-IMPORTANT: Previous attempt failed with error: {error_msg}
+IMPORTANT: Previous attempt failed with error:
+{error_msg}
 
 Please ensure your response:
 1. Contains ONLY valid JSON (no additional text)
@@ -226,17 +245,17 @@ Original request:
         """
         if not self.task_history:
             return task_description
-        
+
         knowledge_sections = []
         for task in self.task_history:
             if task.final_answers and task.status == TaskStatus.COMPLETED:
                 tfa = [str(a) for a in task.final_answers]
                 answers_text = '\n\t - '.join(tfa)
                 knowledge_sections.append(f"* From task '{task.name}':\n\t - {answers_text}")
-        
+
         if not knowledge_sections:
             return task_description
-        
+
         return '\n'.join([
             "From previous tasks you learned:",
             *knowledge_sections,
@@ -270,6 +289,135 @@ Original request:
                 print(f"   Expected Outputs: {', '.join(step.expected_outputs)}")
         print("\n" + "=" * 80)
 
+    def _request_human_plan_validation(self, plan: Plan) -> tuple[bool, str]:
+        """
+        Request human validation of the generated plan.
+        Returns:
+            tuple[bool, str]: (is_approved, feedback)
+                - is_approved: True if human pressed Enter (approve), False otherwise
+                - feedback: User's correction/feedback if plan not approved
+        """
+        print("\n" + "_" * 40)
+        print("👤 HUMAN VALIDATION REQUIRED")
+        print("_" * 40)
+        print("\nPlease review the plan above.")
+        print("\nOptions:")
+        print("   • Press [ENTER] to approve and execute the plan")
+        print("   • Type your corrections/feedback and press [ENTER] to regenerate")
+        print("\n" + "─" * 80)
+        
+        user_input = input("\n👉 Your decision: ").strip()
+        if not user_input:
+            print("\n✅ Plan approved by human. Proceeding with execution...")
+            return True, ""
+        else:
+            print(f"\n📝 Feedback received: {user_input}")
+            print("🔄 Will regenerate plan based on your feedback...")
+            return False, user_input
+
+    def _generate_plan_with_human_validation(self, goal: str, max_attempts: int = 10) -> Plan:
+        """
+        Generate a plan with iterative human validation and feedback loop.
+        Args:
+            goal: The goal description for the planner
+            max_attempts: Maximum number of plan generation attempts (default: 10)
+        Returns:
+            Plan: Human-approved plan object
+        Raises:
+            ValueError: If maximum attempts reached without approval or plan generation fails
+        """
+        system_prompt = self._read_prompt()
+        plan_approved = False
+        human_feedback = ""
+        
+        while not plan_approved:
+            
+            current_goal = goal
+            if human_feedback:
+                current_goal = f"{goal}\n\nHUMAN FEEDBACK ON PREVIOUS PLAN:\n{human_feedback}\n\nPlease address this feedback in the new plan."
+            plan = self.make_plan(system_prompt, current_goal)
+            if plan is None:
+                raise ValueError("❌ Planner: Failed to generate a valid plan")
+            self._display_plan(plan)
+            plan_approved, human_feedback = self._request_human_plan_validation(plan)
+        return plan
+
+    def _init_visualization(self, plan: Plan) -> None:
+        """
+        Initialize the pygame visualization window.
+        On macOS, pygame must run on the main thread due to Cocoa requirements.
+        On Linux, it can run in a separate thread for better performance.
+
+        Args:
+            plan: The execution plan to visualize
+        """
+        if not self.use_visualization:
+            return
+
+        try:
+            self.visualizer = PlannerVisualizer(plan)
+            print("🎨 Visualization window initialized")
+
+            # On Linux, use a separate thread for event handling
+            # On macOS, event handling must be done from main thread (will be called periodically)
+            if not self.is_macos:
+                def visualization_loop():
+                    import pygame
+                    clock = pygame.time.Clock()
+                    while self.visualizer and self.visualizer.is_running():
+                        self.visualizer.handle_events()
+                        clock.tick(30)  # 30 FPS
+
+                self.visualizer_thread = threading.Thread(target=visualization_loop, daemon=True)
+                self.visualizer_thread.start()
+                print("🎨 Visualization running in separate thread (Linux)")
+            else:
+                print("🎨 Visualization will update from main thread (macOS)")
+
+        except Exception as e:
+            print(f"⚠️ Could not initialize visualization: {str(e)}")
+            print("⚠️ Continuing without visualization...")
+            self.use_visualization = False
+            self.visualizer = None
+
+    def _update_visualization(self, total_cost: float = 0.0) -> None:
+        """
+        Update the visualization with the current task states.
+        On macOS, also handle events since we can't use a separate thread.
+        
+        Args:
+            total_cost: The cumulative cost to display
+        """
+        if self.visualizer and self.use_visualization:
+            try:
+                # On mac handle events from main thread
+                if self.is_macos:
+                    self.visualizer.handle_events()
+
+                self.visualizer.update_tasks(self.task_history, total_cost=total_cost)
+            except Exception as e:
+                print(f"⚠️ Error updating visualization: {str(e)}")
+
+    def _cleanup_visualization(self) -> None:
+        """
+        Clean up and close the visualization window.
+        """
+        if self.visualizer:
+            try:
+                # Mark visualizer as not running to stop the thread (if using thread)
+                self.visualizer.running = False
+                # On mac handle any remaining events before closing
+                if self.is_macos:
+                    self.visualizer.handle_events()
+                self.visualizer.close()
+                if self.visualizer_thread and self.visualizer_thread.is_alive():
+                    self.visualizer_thread.join(timeout=0.5)
+                self.visualizer = None
+                self.visualizer_thread = None
+                print("🎨 Visualization window closed")
+            except Exception as e:
+                print(f"⚠️ Error closing visualization: {str(e)}")
+
 
     def _get_workspace_files(self) -> list[str]:
         """
@@ -283,10 +431,10 @@ Original request:
             if not workspace_path.exists():
                 print(f"⚠️ Workspace path does not exist: {self.workspace_path}")
                 return files
-            
+
             for root, dirs, filenames in os.walk(workspace_path):
                 dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.git']]
-                
+
                 for filename in filenames:
                     if not filename.startswith('.'):
                         file_path = Path(root) / filename
@@ -297,7 +445,7 @@ Original request:
                             continue
         except Exception as e:
             print(f"⚠️ Error scanning workspace files: {str(e)}")
-        
+
         return files
 
     def _capture_workspace_snapshot(self) -> None:
@@ -317,7 +465,7 @@ Original request:
             Tuple[bool, List[str]]: (all_available, missing_inputs)
         """
         missing_inputs = []
-        
+
         for required_input in step.required_inputs:
             if required_input not in self._get_workspace_files():
                 missing_inputs.append(required_input)
@@ -325,7 +473,7 @@ Original request:
 
     def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
-        Verify that expected outputs were produced.
+        Verify that expected outputs files were produced.
         Args:
             step: The plan step
             produced_outputs: List of actually produced outputs
@@ -333,13 +481,18 @@ Original request:
             Tuple[bool, List[str]]: (all_produced, missing_outputs)
         """
         missing_outputs = []
-        
         workspace_files = self._capture_workspace_snapshot()
+
         for expected_output in step.expected_outputs:
-            found = any(expected_output in produced for produced in workspace_files)
+            exp_terms = set(re.sub(r'[_\-.]', ' ', os.path.splitext(expected_output)[0].lower()).split())
+            found = any(
+                expected_output in actual or
+                len(exp_terms & set(re.sub(r'[_\-.]', ' ', os.path.splitext(actual)[0].lower()).split())) >= len(exp_terms) * 0.7
+                for actual in workspace_files
+            )
             if not found:
                 missing_outputs.append(expected_output)
-        
+
         return len(missing_outputs) == 0, missing_outputs
 
     def _can_execute_step(self, step: PlanStep) -> tuple[bool, list[str]]:
@@ -351,29 +504,34 @@ Original request:
             Tuple[bool, List[str]]: (can_execute, missing_dependencies)
         """
         missing_deps = []
-        
+
         for dep_name in step.depends_on:
             dep_task = next((task for task in self.task_history if task.name == dep_name), None)
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
                 missing_deps.append(dep_name)
         return len(missing_deps) == 0, missing_deps
-    
+
     def request_user_exit(self, msg: str) -> None:
+        self.notifier.send_message(
+            f"Mimosa is requesting exit:\n{msg}",
+            title="Mimosa exit request."
+        )
         print(msg)
         choice = input("\nContinue ? (y(yes)/n(no))")
         if choice.lower() == "y" or choice.lower() == "yes":
             return
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
-    
 
-    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True):
+    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True, original_task=None):
         """
-        Execute DGM runs for a given task with comprehensive error handling.
+        Execute DGM runs for a given task.
         Args:
-            task: Task description string
+            task: Task description string (may be knowledge-wrapped)
             judge: Whether to use judge evaluation
             max_dgm_iteration: Maximum iterations for DGM
+            cached_wf_allow: Whether to allow using cached workflows
+            original_task: Original unwrapped task for similarity matching
         Returns:
             List[GodelRun]: List of DGM runs
         Raises:
@@ -381,26 +539,30 @@ Original request:
         """
         if not task or not isinstance(task, str):
             raise ValueError("❌ Planner: Task must be a non-empty string")
-        
+
         if max_dgm_iteration is None or max_dgm_iteration < 1:
             max_dgm_iteration = 2
             print(f"⚠️ Invalid max_dgm_iteration, using default: {max_dgm_iteration}")
-        
+
         print(f"🎯 Starting DGM runs for task: {task[:50]}...")
-        
+
         try:
+            # Use original_task for lookup to avoid knowledge wrapper interference
+            lookup_task = original_task if original_task else task
+            
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                task, threshold_similary=0.9, threshod_score=0.0 # TODO change values
+                lookup_task, threshold_similary=0.8, threshod_score=0.7
             ) if cached_wf_allow else []
-            
+
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]
                 if best_match is None:
                     print("⚠️ Best match is None, proceeding with new DGM run")
-                else:
+                #elif self._get_dgm_success(best_match):
+                elif best_match.is_success:
                     print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
-                    
+
                     run = GodelRun(
                         goal=best_match.goal,
                         prompt=best_match.goal,
@@ -411,28 +573,29 @@ Original request:
                         workflow_template=best_match.code
                     )
                     return [run]
-            
+
             # Generate new workflows via DGM
             print(f"🔄 No cached run found, starting DGM task learning (max_iter: {max_dgm_iteration})")
-            
+
             if self.dgm is None:
                 raise ValueError("❌ Planner: DGM instance is None")
-            
+
             runs = await self.dgm.start_dgm(
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                human_validation=False,
-                max_iteration=max_dgm_iteration
+                max_iteration=max_dgm_iteration,
+                original_task=original_task
             )
-            
+
             if runs is None:
                 print("⚠️ DGM returned None, returning empty list")
                 return []
 
             return runs
-            
+
         except Exception as e:
+            raise e
             print(f"❌ Error in dgm_runs: {str(e)}")
             raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
@@ -456,40 +619,53 @@ Original request:
         if step is None:
             print("❌ Step is None, cannot execute")
             return step
-        
+
         if attempt_counts is None:
             attempt_counts = {}
-        
+
         if max_attempts is None or max_attempts < 1:
             max_attempts = 1
             print(f"⚠️ Invalid max_attempts, using default: {max_attempts}")
-        
+
         step_name = getattr(step, 'name', 'unknown_step')
         step_task = getattr(step, 'task', '')
-        
+
         attempt = attempt_counts.get(step_name, 0)
-        while attempt < max_attempts:
+        attempt_cost = 0
+        attempt_score = 0.0
+        while attempt <= max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
-            
+
             print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
-            
+            if self.tts:
+                self.tts.speak(f"now starting task {step_name}", voice_index=0)
+
             try:
-                #enhanced_task = self._build_knowledge_aware_task(step_task)
-                dgm_runs = await self.dgm_runs(step_task, judge, max_dgm_iteration, cached_wf_allow=(attempt<=1))
-                
+                enhanced_task = self._build_knowledge_aware_task(step_task)
+                # Pass both enhanced task and original task for proper workflow matching
+                dgm_runs = await self.dgm_runs(
+                    enhanced_task, 
+                    judge, 
+                    max_dgm_iteration, 
+                    cached_wf_allow=(attempt<=1),
+                    original_task=step_task  # Pass original for similarity matching
+                )
+
+                attempt_cost += sum([r.cost for r in dgm_runs])
                 last_run = dgm_runs[-1]
-                
+
                 final_answers = []
                 final_uuid = None
                 workflow_uuid = None
-                
+
                 if last_run is not None:
                     final_answers = getattr(last_run, 'answers', []) or []
                     final_uuid = getattr(last_run, 'current_uuid', None)
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
-                
+
                 dgm_success = self._get_dgm_success(last_run)
+                attempt_score = last_run.reward
                 task = Task(
                     name=step_name,
                     description=step_task,
@@ -504,25 +680,36 @@ Original request:
                     complexity=getattr(step, 'complexity', 'medium'),
                     produced_outputs=self._workspace_files_before_step
                 )
-                
+
                 self.task_history.append(task)
-                
-                if dgm_success:
+
+                if dgm_success and attempt_score >= 0.7:
+                    time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
+                    step.status = TaskStatus.COMPLETED
                     if outputs_produced:
                         print(f"✅ Task '{step_name}' completed successfully")
+                        break
                     else:
                         print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                    break
+                        break
                 else:
-                    print(f"❌ Task '{step_name}' failed (attempt {attempt}/{max_attempts})")
-                    if attempt < max_attempts:
-                        print("🔄 Retrying...")
-                    
+                    print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
+                    if self.tts:
+                        self.tts.speak(f"Task {step_name} failure, retrying...", voice_index=0)
+                    continue
+
             except Exception as e:
                 raise e
-        
-        step.status = TaskStatus.COMPLETED
+
+        step.cost = attempt_cost
+        step.score = attempt_score
+        if self.tts:
+            answer = '. '.join([x[:128] for x in final_answers])
+            tts_text = f"""
+            Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
+            """
+            self.tts.speak(tts_text, voice_index=0)
         return step
 
     async def start_planner(
@@ -546,61 +733,62 @@ Original request:
         """
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
-        
-        print(f"🚀 Starting planner with goal: {goal}")
-        
+
+        goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
+        print(f"▶ Starting planner with goal: {goal}")
+
         try:
-            # Generate and validate plan
-            system_prompt = self._read_prompt()
-            self.current_plan = self.make_plan(system_prompt, goal)
-            
+            # Generate plan with human validation loop
+            self.current_plan = self._generate_plan_with_human_validation(goal)
+
             if self.current_plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
-            
-            self._display_plan(self.current_plan)
-            
+
+            # Initialize visualization after plan is approved
+            self._init_visualization(self.current_plan)
             # Check for stop condition
             if self._check_stop_condition(self.current_plan):
                 print("⏹️ Stop condition found in plan. Exiting.")
                 return self.task_history
-            
+
             # Validate plan has steps
             if not hasattr(self.current_plan, 'steps') or not self.current_plan.steps:
                 raise ValueError("❌ Planner: Plan has no executable steps")
-            
+
             # Execute plan steps
             attempt_counts = {}
-            
+
             lst_step = None
+            total_cost = 0
             for step_idx, step in enumerate(self.current_plan.steps):
                 if step is None:
                     print(f"⚠️ Step {step_idx + 1} is None, skipping")
                     continue
-                
                 step_name = getattr(step, 'name', f'step_{step_idx}')
-                
                 print(f"\n{'='*60}")
                 print(f"📋 Executing Step {step_idx + 1}/{len(self.current_plan.steps)}: {step_name}")
                 print(f"{'='*60}")
-                
                 # Check if step can be executed (dependencies satisfied)
                 if lst_step:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
                         self.request_user_exit(f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}")
-                        continue
-                
+
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
+                self._update_visualization(total_cost)  # Update to show running status
                 max_attempts = max_task_retry
-                
+
                 try:
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration)
+                    total_cost += step.cost
+                    self._update_visualization(total_cost)  # Update after step completes
                 except Exception as e:
                     step.status = TaskStatus.FAILED
+                    self._update_visualization(total_cost)  # Update to show failed status
                     raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
                 lst_step = step
-                
+
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED
                     # Send notification for task failure
@@ -612,9 +800,9 @@ Original request:
                         priority=1
                     )
                     raise Exception(f"❌ Giving up on task '{step_name}' after {max_attempts} attempts")
-            
-            print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks.")
-            
+
+            print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks. Cost: {total_cost}")
+
             # Send success notification
             completed_tasks = sum(1 for t in self.task_history if t.status == TaskStatus.COMPLETED)
             self.notifier.send_message(
@@ -624,11 +812,13 @@ Original request:
                 title="Planner execution completed",
                 priority=0
             )
-            trs = Transfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
-            trs.transfer_workspace_files_to_capsule(goal)
+
+            if self.visualizer:
+                self._cleanup_visualization()
             return self.task_history
-            
+
         except Exception as e:
             print(f"❌ Critical error in planner execution: {str(e)}")
             self.notifier.send_message(str(e), title="error during Mimosa execution.")
+            self._cleanup_visualization()
             raise ValueError(f"❌ Planner: Execution failed: {str(e)}") from e

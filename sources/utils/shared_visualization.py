@@ -26,7 +26,7 @@ except ImportError:
 class SharedVisualizationData:
     """Manages shared visualization data across multiple parallel processes."""
 
-    def __init__(self, results_dir: Path):
+    def __init__(self, results_dir: Path = Path("run_notes/")):
         """Initialize shared visualization data manager.
 
         Args:
