@@ -377,6 +377,20 @@ class ToolManager:
                 print(f"❌ Failed to discover MCP servers on {addr}: {e}")
                 continue
         return mcps
+    
+    async def verify_tools(self) -> None:
+        bash_found = False
+        for tool in self.mcps:
+            try:
+                name = getattr(tool, 'name', None)
+                if not name:
+                    raise AttributeError(f"Tool name is empty or None: {tool}")
+                if "execute_command" in name:
+                    bash_found = True
+            except AttributeError as e:
+                raise e
+        if not bash_found:
+            raise ValueError("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
 
     async def discover_mcp_servers(self) -> list[MCP]:
         """Discover MCP servers using ToolHive only."""

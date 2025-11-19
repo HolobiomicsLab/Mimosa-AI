@@ -77,7 +77,7 @@ uv run main.py --goal "Your objective here" # better
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
 
-## 🛠️ Command Line Arguments
+## ▶ Command Line Arguments
 
 Mimosa-AI supports various command line arguments to customize execution:
 
@@ -112,11 +112,9 @@ Evaluation of workflow generation: evaluation on GSMK8.
 
 > **Note**: Requires Toolomics to be installed and MCP servers to be running.
 
-## 🧠 Core Architecture
+## ▶ Core Architecture
 
 Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
-
-### Design Philosophy
 
 The system operates on an "agent-within-agent" pattern:
 - Goals decompose into learnable tasks
@@ -132,7 +130,7 @@ The system operates on an "agent-within-agent" pattern:
 **Task**: A granular, repeatable operation frequently encountered across different goals
 - Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
 
-## System Architecture
+## ▶ System Architecture
 
 ### Layer 0: Strategic Planning
 - Decomposes goals into executable task sequences
@@ -162,9 +160,9 @@ The system operates on an "agent-within-agent" pattern:
 - **Protocol Standardization**: MCP enables seamless client-server tool interaction
 - **Horizontal Scalability**: Add new tools without modifying core system
 
-## (Experimental) Self-Improvement on task
+## ▶ (Experimental) Self-Improvement on task
 
-The system implements a **Darwinian workflow evolution** inspired by Gödel machine principles:
+The system implements a **Darwinian inspired evolution** inspired by Gödel machine principles:
 
 1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
    - "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
@@ -184,7 +182,7 @@ The system implements a **Darwinian workflow evolution** inspired by Gödel mach
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
 
-## Phone notification setup
+## ▶ Phone notification setup
 
 Get real-time updates about Mimosa's status directly on your phone using Pushover.
 
