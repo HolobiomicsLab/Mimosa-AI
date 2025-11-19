@@ -44,9 +44,9 @@ class Config:
 
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
-        self.prompts_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
+        self.prompts_llm_model: str = "deepseek/deepseek-chat"
         self.workflow_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
-        self.smolagent_model_id: str = "openai/gpt-4o"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
         # LLM as a judge model
         self.judge_model = "anthropic/claude-haiku-4-5-20251001"

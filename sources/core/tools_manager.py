@@ -380,12 +380,10 @@ class ToolManager:
     
     async def verify_tools(self) -> None:
         bash_found = False
-        for tool in self.mcps:
+        for mcp in self.mcps:
+            tools = '\n'.join(mcp.tool_names)
             try:
-                name = getattr(tool, 'name', None)
-                if not name:
-                    raise AttributeError(f"Tool name is empty or None: {tool}")
-                if "execute_command" in name:
+                if "execute_command" in tools:
                     bash_found = True
             except AttributeError as e:
                 raise e

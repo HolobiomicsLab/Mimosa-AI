@@ -403,8 +403,8 @@ Provide your analysis following the specified output format."""
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_dgm_iteration=1,
-                                    max_task_retry=2
+                                    max_dgm_iteration=5,
+                                    max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
                     print("\033[95m📊 Transfering results files...\033[0m")

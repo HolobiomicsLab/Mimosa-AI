@@ -153,59 +153,56 @@ class GodelMachine:
     def improvement_prompt(
         self,
         goal: str,
-        wf_state: any,
+        wf_info: WorkflowInfo,
         flow_code: str,
-        run_stdout: str,
+        run_stderr: str,
         iteration_count: int,
     ) -> str:
-        flow_answers = ""
+        exec_result = ""
+        wf_state = wf_info.state_result
+        judge_eval = wf_info.judge_evaluation
 
-        if wf_state is not None:
-            flow_answers = self.get_flow_answers(wf_state)
-            self.show_answers(flow_answers)
-        else:
-            flow_answers = run_stdout.strip()
+        if judge_eval: # use judge evalu if possible
+            exec_result = judge_eval
+        elif wf_state: # alternative: use agents answer dict
+            exec_result = self.get_flow_answers(wf_state)
+            self.show_answers(exec_result)
+        else: # use stdout/stderr if execution failed
+            exec_result = run_stderr.strip()
 
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
-                "## WORKFLOW ATTEMPT ANALYSIS:",
-                "Your previous attempt at generating a workflow did not succeed or was incomplete.",
+                "## DARWIN GÖDEL MACHINE: SELF-IMPROVEMENT STEP",
+                "Your previous attempt at generating a workflow did not succeed or didn't reach success threshold.",
                 "Your goal was: ",
                 goal,
-                "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
                 "## Previous workflow code:",
                 "<python>",
                 flow_code,
                 "</python>",
                 "\n",
-                "## Previous execution results:",
+                "## EXECUTION RESULTS::",
                 "This is the answer from each agent during the last execution.",
                 "<results>",
-                flow_answers,
+                exec_result,
                 "</results>",
+                "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
-                "## FAILURE ANALYSIS:",
-                "1. Analyze the previous workflow code and its execution results.",
-                "2. Evaluate task completion. Did the workflow really achieve the goal?",
-                "3. Think of specific improvements to the workflow code to address these failures.",
+                "## ANALYZE FAILURES:",
+                "1. If the workflow code execution failed, analyze the error and fix the python code.",
+                "2. If an agent failed due to tool limitations, consider an alternative tool.",
+                "3. If an agent failed due to lack of information, add a research step.",
+                "4. If agent didn't behave as expected, refine the prompt or agent role.",
+                "5. Consider adding error handling or validation steps.",
                 "\n",
-                "## IMPROVEMENT SUGGESTIONS:",
+                "## GENERATE ONE IMPROVEMENT:",
+                "Select the SINGLE most impactful change from above.",
+                "Apply ONLY that one change to the code.",
+                "Explain what will improve and why.",
                 "\n",
-                "1. If the workflow code execution failed, analyze the error messages and fix the python code.",
-                "2. If an agent failed due to limitation of its tool capabilities, consider an alternative tool that would allow to complete the task (eg: use web search tool if arxiv search doesn't seem to work).",
-                "3. If an agent failed due to lack of information, consider adding an initial research step to gather more information before attempting the main task.",
-                "4. If agent didn't behave as expected, consider changing the prompt or the agent role to better align with the task requirements.",
-                "5. Consider adding fallback agents that can take over if a primary agent fails.",
-                "6. Consider adding error handling and validation steps to ensure robustness.",
-                "7. Consider breaking down complex tasks into smaller, manageable sub-tasks.",
-                "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
-                "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
-                "\n",
-                "Getting invalid syntax (<workflow>, line 284) error with no clear message ? It may be because the code and prompt exceed your token limits, make sacrifice for shorter prompt or a simpler workflow.",
-                "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
-                "The new version must be different from the previous attempt.\n"
+                "Your improvement will be empirically validated against the baseline.",
             ])
 
         return "".join(
@@ -400,7 +397,7 @@ class GodelMachine:
 
         # Continue recursion
         runs[-1].prompt = self.improvement_prompt(
-            runs[-1].goal, wf_info.state_result, workflow_code, run_stdout, runs[-1].iteration_count
+            runs[-1].goal, wf_info, workflow_code, run_stdout, runs[-1].iteration_count
         )
 
         # add godel run class instance to list
