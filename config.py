@@ -45,11 +45,11 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
         self.prompts_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+        self.workflow_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
         self.smolagent_model_id: str = "openai/gpt-4o"
         self.engine_name: str = "litellm" # for smolagent
         # LLM as a judge model
-        self.judge_model = "openai/gpt-4o"
+        self.judge_model = "anthropic/claude-haiku-4-5-20251001"
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -74,7 +74,7 @@ class Config:
         self.runner_temp_dir: str = "./tmp"
         self.discovery_addresses: list[AddressMCP] = [
             #AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5120)
         ]
         self.runner_requirements: list[str] = [
             "python-dotenv",
