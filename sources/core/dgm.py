@@ -251,7 +251,7 @@ class DarwinMachine:
     def get_craft_instructions(self, goal, wf):
         if wf:
             return self.improvement_prompt(
-                goal, wf.state_result, wf.code, "", 0
+                goal, wf, wf.code, "", 0
             )
         else:
             return goal
@@ -357,8 +357,8 @@ class DarwinMachine:
         
         if runs[-1].iteration_count > 0:
             validation_result = self.improvement_validator.validate_improvement(
-                baseline_run=runs[-5],
-                new_run=runs[-1],
+                baseline_run=runs[-5:],
+                new_run=runs[-1:],
                 threshold=0.05  # 5% improvement threshold
             )
             
@@ -426,7 +426,7 @@ class DarwinMachine:
         )
         code = wf_info_best.code if wf_info_best else ""
         runs[-1].prompt = self.improvement_prompt(
-            runs[-1].original_task, wf_info_best, code, run_stdout, runs[-1].iteration_count
+            runs[-1].original_task or runs[-1].goal, wf_info_best, code, run_stdout, runs[-1].iteration_count
         )
 
         # add godel run class instance to list

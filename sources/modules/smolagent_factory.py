@@ -130,7 +130,7 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.timeout = 3600*5
+        self.timeout = 3600
         os.makedirs(self.memory_folder, exist_ok=True)
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 

@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 import glob
+import random
 
 import litellm
 
@@ -211,6 +212,49 @@ class LLMProvider:
 
         return True
 
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Check if an error is retryable (temporary/transient).
+        
+        Args:
+            error: The exception to check
+            
+        Returns:
+            True if the error is retryable, False otherwise
+        """
+        error_str = str(error).lower()
+        
+        # Check for specific retryable errors
+        retryable_patterns = [
+            "overload",  # Overloaded error
+            "rate_limit",  # Rate limiting
+            "timeout",  # Timeout errors
+            "connection",  # Connection errors
+            "temporarily unavailable",  # Service temporarily unavailable
+            "internal server error",  # 500 errors
+            "service unavailable",  # 503 errors
+            "gateway",  # Gateway errors
+            "too many requests",  # 429 errors
+        ]
+        
+        return any(pattern in error_str for pattern in retryable_patterns)
+
+    def _calculate_backoff_wait(self, attempt: int, max_wait: int = 500) -> float:
+        """Calculate exponential backoff with jitter.
+        
+        Args:
+            attempt: The attempt number (0-indexed)
+            max_wait: Maximum wait time in seconds (default 500s)
+            
+        Returns:
+            Number of seconds to wait before the next attempt
+        """
+        # Exponential backoff: 2^attempt with jitter
+        base_wait = min(2 ** attempt, max_wait)
+        # Add random jitter (±10% to avoid thundering herd)
+        jitter = base_wait * (0.1 * random.random())
+        wait_time = base_wait + jitter
+        return min(wait_time, max_wait)
+
     def __call__(self, prompt: str, timeout: int = 180, use_cache: bool = True):
         cached_response = self._find_cache_match(prompt) if use_cache else None
         if cached_response:
@@ -223,7 +267,10 @@ class LLMProvider:
 
         message.append({"role": "user", "content": prompt})
 
-        for attempt in range(self.max_retries):
+        attempt = 0
+        max_wait = 500  # Maximum wait time in seconds
+        
+        while True:  # Infinite retry loop
             try:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
@@ -238,15 +285,32 @@ class LLMProvider:
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
 
                 response = litellm.completion(**completion_params)
+                
+                # Success - break out of retry loop
                 break
-            except TimeoutError:
-                print(f"⌛ Timeout on attempt {attempt + 1}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(0.1)  # Small delay before retry
-                    continue
-                raise RuntimeError(f"❌ LLM Tiemout {self.max_retries} times") from None
+                
+            except TimeoutError as e:
+                # Timeout is retryable
+                wait_time = self._calculate_backoff_wait(attempt, max_wait)
+                self.logger.warning(
+                    f"⌛ Timeout on attempt {attempt + 1}. Retrying in {wait_time:.1f}s..."
+                )
+                time.sleep(wait_time)
+                attempt += 1
+                
             except Exception as e:
-                raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
+                # Check if this is a retryable error
+                if self._is_retryable_error(e):
+                    wait_time = self._calculate_backoff_wait(attempt, max_wait)
+                    self.logger.warning(
+                        f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:100]}. "
+                        f"Retrying in {wait_time:.1f}s..."
+                    )
+                    time.sleep(wait_time)
+                    attempt += 1
+                else:
+                    # Non-retryable error - raise immediately
+                    raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
 
