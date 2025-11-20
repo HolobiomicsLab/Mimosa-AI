@@ -67,7 +67,7 @@ exec(code)         # Function not available
 
 ## 2. ERROR PREVENTION
 - **No Assumptions**: Never assume the structure, format, or content of tool outputs
-- **Try-Except everywhere**: Use try except on every code block, always print preview of error (eg: print(str(e)[-1024:]))
+- **Try-Except on critical code**: Use try except on every code block, always print preview of error (eg: print(str(e)[-1024:]))
 - **Rationale**: Prevents errors from incorrect assumptions about data structure or type
 
 ## 3. CONTEXT MANAGEMENT

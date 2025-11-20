@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from sources.core.dgm import GodelMachine
+from sources.core.dgm import DarwinMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
 from sources.core.schema import Task, GodelRun
@@ -32,7 +32,7 @@ class PaperEvaluationMode:
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
-        self.dgm = GodelMachine(config)
+        self.dgm = DarwinMachine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
@@ -398,7 +398,7 @@ Provide your analysis following the specified output format."""
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal, judge=True, learning_mode=learning)
+                        runs = await self.dgm.start_dgm(goal=goal, judge=True, learning_mode=learning, max_iteration=self.config.max_learning_dgm_iterations)
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,

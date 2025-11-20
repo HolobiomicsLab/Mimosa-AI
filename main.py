@@ -16,7 +16,7 @@ import dotenv
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from config import Config
-from sources.core.dgm import GodelMachine
+from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.extensibility.papers_mode import PaperEvaluationMode
@@ -24,7 +24,6 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
-from sources.utils.list_files import list_files
 
 dotenv.load_dotenv()
 
@@ -107,7 +106,7 @@ async def science_bench_papers_mode(args, config):
     await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
 
 async def normal_execution_mode(args, config):
-    dgm = GodelMachine(config)
+    dgm = DarwinMachine(config)
     planner = Planner(config)
     if args.scenario:
         scenario_file = ScenarioLoader().load_scenario(args.scenario)

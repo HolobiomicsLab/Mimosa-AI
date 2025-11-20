@@ -39,13 +39,13 @@ class Config:
         self.memory_dir: str = "sources/memory"
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics_2/workspace"
         self.runs_capsule_dir = "runs_capsule/"
 
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
-        self.prompts_llm_model: str = "deepseek/deepseek-chat"
-        self.workflow_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
+        self.prompts_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
+        self.workflow_llm_model: str = "anthropic/claude-opus-4-1-20250805"
         self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
         # LLM as a judge model
@@ -61,6 +61,7 @@ class Config:
         self._model_pricing_cache = None
 
         self.learned_score_threshold = 0.85
+        self.max_learning_dgm_iterations = 10
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"

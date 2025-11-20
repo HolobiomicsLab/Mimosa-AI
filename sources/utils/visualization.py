@@ -283,6 +283,9 @@ class VisualizationUtils:
     ) -> None:
         """
         Save a plot to file.
+        
+        Forces y-axis scale to be between 0 and 1.0 for consistent visualization
+        of normalized metrics (rewards, scores, etc.).
 
         Args:
             filename: Name of the file to save
@@ -292,6 +295,11 @@ class VisualizationUtils:
         if not self.plot_data:
             return
         fig = self.plot_data[0]
+        ax = self.plot_data[1]
+        
+        # Force y-axis scale to be between 0 and 1.0 for normalized metrics
+        ax.set_ylim(0, 1.0)
+        
         fig.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
         print(f"Plot saved to {filename}")
 
