@@ -1,5 +1,5 @@
 """
-PaperEvaluationMode - Autonomous goal generation and execution system
+CsvEvaluationMode - Autonomous goal generation and execution system
 """
 
 import csv
@@ -17,14 +17,14 @@ from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 
-class PaperEvaluationMode:
+class CsvEvaluationMode:
     """
     Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
     """
 
     def __init__(self, config, csv_runs_limit: int = 100):
         """
-        Initialize PaperEvaluationMode.
+        Initialize CsvEvaluationMode.
 
         Args:
             config: Mimosa configuration object
@@ -473,7 +473,7 @@ Provide your analysis following the specified output format."""
             print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
-    async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
+    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
         """Public method to start the autonomous mode."""
         try:
             await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning)

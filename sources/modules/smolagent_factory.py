@@ -230,7 +230,8 @@ CONSTRAINTS:
 - No placeholder/example values.
 - No assumptions about missing data - investigate first available data in workspace
 - Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
-- Remember: use tools instead of doing everything with your base python capabilities as much as possible.
+- only use execute_command to install package.
+- wrap command that might take significant time (>5min) in a timeout
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """

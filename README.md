@@ -65,14 +65,35 @@ uv pip install -r requirements.txt
 
 ### Step 3: Start MCP Server
 
-Launch the toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)
+Launch the toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) on a port range of your choice: (eg: 5000-5100)
 
-### Step 4: Run Mimosa-AI
+### Step 4: Edit Mimosa-AI config
+
+Edit the `config.py` file of Mimosa with your configuration
+
+most importantly you probably need to change these:
+
+```sh
+# Toolomics workspace/ for Mimosa
+self.workspace_dir = "/Users/holobiomicslab/Documents/repository/toolomics/workspace"
+# LLMs choices
+self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+self.prompts_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+self.workflow_llm_model: str = "anthropic/claude-opus-4-1-20250805"
+self.smolagent_model_id: str = "anthropic/claude-haiku-4-5-20251001" # haiku is cheaper for agent
+# address for MCPs discovery
+self.discovery_addresses: list[AddressMCP] = [
+    AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+    #AddressMCP(ip="xxx.xx.xx.xx", port_min=5000, port_max=5200) # add another computer with MCP tools
+]
+```
+
+### Step 5: Run Mimosa-AI
 
 ```sh
 python3 main.py --goal "Your objective here"
-# or
-uv run main.py --goal "Your objective here" # better
+# or with uv
+uv run main.py --goal "Your objective here"
 ```
 
 > **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
@@ -89,25 +110,30 @@ Mimosa-AI supports various command line arguments to customize execution:
 - `--scenario`: Specify scenario to evaluate Mimosa on.
 
 ### Evaluation & Performance
-- `--judge`: Enable llm-as-a-judge for workflow evaluation (default: disabled)
-- `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
+- `--learn`: enable learning mode, use DGM to try to get the best score on a task.
 - `--max_dgm_iterations N`: Maximum number of DGM retry to learn a task (default: 3 in task mode, 1 in goal mode).
+- `--csv_runs_limit`: Limit number of CSV to evaluate on.
 
 **Example:**
 
-Normal usage, try to accomplish a goal.
+**Normal usage, try to accomplish a goal.**
 ```sh
 uv run main.py --goal "You are assigned the paper Dual Aggregation Transformer for Image Super-Resolution (https://arxiv.org/pdf/2306.00306) to replicate. Attempt to reproduce the experiments and compare the results."
 ```
 
-Single task mode, no long-term planning, simple task.
+**Single task mode, no long-term planning.**
 ```sh
- uv run main.py --task "search and install llama.cpp for this OS architecture" --judge 
+ uv run main.py --task " Train a multitask model on the Clintox dataset to predict a drug's toxicity and FDA approval status..." --judge 
 ```
 
-Evaluation of workflow generation: evaluation on GSMK8.
+**Evaluation on openai paper bench (https://arxiv.org/abs/2504.01848)**
 ```sh
- uv run main.py --dataset datasets/GSMK8.jsonl --num_samples 16 --max_concurrent 4
+ uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn 
+```
+
+**Evaluation on subset of scienceAgentBench (https://arxiv.org/pdf/2410.05080) with learning mode enabled.**
+```sh
+uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 10 --learn
 ```
 
 > **Note**: Requires Toolomics to be installed and MCP servers to be running.
@@ -124,10 +150,10 @@ The system operates on an "agent-within-agent" pattern:
 
 ## Task vs Goal philosophy
 
-**Goal**: A high-level scientific objective requiring multiple distinct capabilities
+**Goal**: A high-level scientific objective requiring multiple distinct complex tasks to reach.
 - Example: "Develop a machine learning model to predict protein-ligand binding affinity" or "Try to reproduce the research paper X and compare the experimental results".
 
-**Task**: A granular, repeatable operation frequently encountered across different goals
+**Task**: A granular, repeatable operation frequently encountered across different goals.
 - Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
 
 ## ▶ System Architecture
@@ -160,7 +186,7 @@ The system operates on an "agent-within-agent" pattern:
 - **Protocol Standardization**: MCP enables seamless client-server tool interaction
 - **Horizontal Scalability**: Add new tools without modifying core system
 
-## ▶ (Experimental) Self-Improvement on task
+### ▶ (Experimental) Self-Improvement on task
 
 The system implements a **Darwinian inspired evolution** inspired by Gödel machine principles:
 

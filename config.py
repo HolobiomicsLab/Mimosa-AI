@@ -35,21 +35,23 @@ class Config:
     """Configuration class for Mimosa AI Agent Framework."""
 
     def __init__(self):
-        self.workflow_dir: str = "sources/workflows"
-        self.memory_dir: str = "sources/memory"
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics_2/workspace"
-        self.runs_capsule_dir = "runs_capsule/"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+
+        # MCPs server discovery
+        self.discovery_addresses: list[AddressMCP] = [
+            #AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5120)
+        ]
 
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-opus-4-1-20250805"
         self.prompts_llm_model: str = "anthropic/claude-haiku-4-5-20251001"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-1-20250805"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
-        self.engine_name: str = "litellm" # for smolagent
-        # LLM as a judge model
+        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5-20251001"
         self.judge_model = "anthropic/claude-haiku-4-5-20251001"
+        self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -60,23 +62,24 @@ class Config:
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 
+        # DGM learning parameters
         self.learned_score_threshold = 0.85
         self.max_learning_dgm_iterations = 10
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        # folder path for cache
+        self.runs_capsule_dir = "runs_capsule/"
+        self.workflow_dir: str = "sources/workflows"
+        self.memory_dir: str = "sources/memory"
 
         # runner settings
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 3600*24
+        self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
-        self.discovery_addresses: list[AddressMCP] = [
-            #AddressMCP(ip="134.59.7.31", port_min=5000, port_max=5200)
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5120)
-        ]
         self.runner_requirements: list[str] = [
             "python-dotenv",
             "fastmcp==2.8.1",

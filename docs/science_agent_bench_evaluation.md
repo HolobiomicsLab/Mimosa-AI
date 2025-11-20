@@ -112,15 +112,15 @@ def eval():
 ### Running ScienceAgentBench Evaluation
 
 ```python
-from sources.extensibility.papers_mode import PaperEvaluationMode
+from sources.extensibility.papers_mode import CsvEvaluationMode
 import asyncio
 
 # Initialize
 config = Config()  # Your Mimosa config
-evaluator = PaperEvaluationMode(config, csv_runs_limit=10)
+evaluator = CsvEvaluationMode(config, csv_runs_limit=10)
 
 # Run on ScienceAgentBench dataset
-await evaluator.start_paper_eval_mode(
+await evaluator.start_evaluation(
     dataset_type="science_agent_bench",
     dataset_path="datasets/ScienceAgentBench.csv"
 )

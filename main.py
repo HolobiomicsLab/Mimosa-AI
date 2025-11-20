@@ -19,7 +19,7 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.papers_mode import PaperEvaluationMode
+from sources.extensibility.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
@@ -98,12 +98,12 @@ async def manual_mode(args, config):
     await hm.shellLoop()
 
 async def papers_mode(args, config):
-    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_paper_eval_mode(dataset_type="default", dataset_path=args.papers, learning=args.learn)
+    papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_evaluation(dataset_type="default", dataset_path=args.papers, learning=args.learn)
 
 async def science_bench_papers_mode(args, config):
-    papers = PaperEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_paper_eval_mode(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
+    papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    await papers.start_evaluation(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
 
 async def normal_execution_mode(args, config):
     dgm = DarwinMachine(config)
@@ -152,22 +152,16 @@ async def main():
         "--papers", type=str, help="Papers evaluation mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--papers_science_bench", action="store_true", help="Papers mode on ScienceAgentBench (Run Mimosa on multiple science bench papers from a CSV, automatically monitor run, evaluate, save capsules)"
+        "--science_agent_bench", action="store_true", help="Papers mode on ScienceAgentBench (Run Mimosa on multiple science agent bench task from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
         "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
     )
     parser.add_argument(
-        "--load_template", type=str, help="Optional workflow UUID to load", default=None
-    )
-    parser.add_argument(
-        "--disable_judge", action="store_true", default=False, help="Enable judge for workflow evaluation"
+        "--disable_judge", action="store_true", default=False, help="Disable judge for workflow evaluation"
     )
     parser.add_argument(
         "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
-    )
-    parser.add_argument(
-        "--max_concurrent", type=int, default=16, help="Maximum number of concurrent tasks"
     )
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging to console"
@@ -196,7 +190,7 @@ async def main():
             await manual_mode(args, config)
         elif (args.papers):
             await papers_mode(args, config)
-        elif (args.papers_science_bench):
+        elif (args.science_agent_bench):
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
