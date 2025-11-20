@@ -78,6 +78,7 @@ exec(code)         # Function not available
 
 ## 4. TOOL USAGE GUIDELINES
 - **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
+- **Tool first**: Always favor tool over your base coding abilities (have python editing tool or bash ? then use them). Tools are more efficient. You will be rewarded 1000$ everytime you comply.
 - **No Assumptions**: Do not assume tool output format or content; validate every time
 - **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
@@ -229,6 +230,7 @@ CONSTRAINTS:
 - No placeholder/example values.
 - No assumptions about missing data - investigate first available data in workspace
 - Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
+- Remember: use tools instead of doing everything with your base python capabilities as much as possible.
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """
