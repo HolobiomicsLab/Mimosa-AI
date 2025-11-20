@@ -109,7 +109,7 @@ uv run main.py --goal "Your objective here"
 | Argument | Description |
 |----------|-------------|
 | `--goal GOAL` | Specify a high-level research objective, paper reproduction, or scientific question (planner mode) |
-| `--task TASK` | Execute a single task: literature review, code installation, dataset download |
+| `--task TASK` | Execute a single task: literature review, datasets download, implement a machine learning model... |
 | `--manual` | Interactive CLI mode to debug MCPs and test Mimosa tools directly |
 | `--papers CSV` | Batch evaluation on a CSV dataset containing research papers and prompts |
 | `--scenario SCENARIO` | Run evaluation on a specific scenario |
@@ -119,7 +119,7 @@ uv run main.py --goal "Your objective here"
 | Argument | Description |
 |----------|-------------|
 | `--learn` | Enable learning mode using DGM to optimize task performance |
-| `--max_dgm_iterations N` | Maximum DGM iterations for learning (default: 3 for tasks, 1 for goals) |
+| `--max_dgm_iterations N` | Maximum DGM iterations for learning |
 | `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
 
 ### Examples
