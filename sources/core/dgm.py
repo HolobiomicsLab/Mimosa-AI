@@ -333,7 +333,6 @@ class DarwinMachine:
         total_cost = 0.0
 
         # Execute workflow
-        assert learning_mode
         print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
