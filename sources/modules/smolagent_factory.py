@@ -39,9 +39,8 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-#DANGEROUS_FUNCTIONS = {}
-import subprocess
-DANGEROUS_MODULES = {subprocess}
+DANGEROUS_FUNCTIONS = {open}
+DANGEROUS_MODULES = {os}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -60,16 +59,52 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 ADDED_SYSTEM_PROMPT = """
 # CODE GENERATION CONSTRAINTS
 
-## 1. CRITICAL: SANDBOXED EXECUTION ENVIRONMENT
-You are operating in a controlled runtime where standard Python filesystem is restricted.
-import subprocess  # Module not available
-exec(code)         # Function not available
-- **Rationale**: Encourage tools usage instead of using python build-in.
+## GOLDEN RULE: TOOLS ARE YOUR ONLY EXECUTION INTERFACE
+You have ZERO direct access to:
+- `import` for packages not in base Python
+- `subprocess`, `os.system`, or any shell execution
+- `exec()`, `eval()`, or dynamic code execution
+- File I/O beyond reading provided data
 
-## 2. ERROR PREVENTION
-- **No Assumptions**: Never assume the structure, format, or content of tool outputs
-- **Try-Except on critical code**: Use try except on every code block, always print preview of error (eg: print(str(e)[-1024:]))
-- **Rationale**: Prevents errors from incorrect assumptions about data structure or type
+The ONLY way to:
+- Install/use external packages → `execute_command()`
+- Write files to disk → `create_python_file()`
+- Run scripts → `execute_command("python3 <filename>")`
+- Test code locally → `execute_command()`
+
+**Any attempt to use subprocess, import external packages directly, or execute code without tools WILL FAIL.**
+
+## 1. MANDATORY TOOL WORKFLOW FOR EXTERNAL OPERATIONS
+
+When you need to use a package like `deepchem`:
+1. **Never** try `import deepchem` directly in your code block
+2. **Always** use: `execute_command(cmd="python3 -m pip install deepchem")`
+3. **Confirm** installation with the tool output
+4. **Then** create a separate Python file via `create_python_file()` that imports and uses it
+5. **Execute** that file via `execute_command(cmd="python3 <filename>")`
+
+Example pattern (REQUIRED):
+```python
+# Step 1: Install
+result = execute_command(cmd="python3 -m pip install deepchem -q")
+print("Install result:", result[:500])
+# Step 2: Create file with actual logic
+file_result = create_python_file(filename="work.py", content=code)
+# Step 3: Execute
+exec_result = execute_command(cmd="python3 work.py")
+print("Execution output:", exec_result[:1024])
+```
+
+## 2. ERROR PREVENTION WITH TOOL-FIRST MINDSET
+- **Try-Except around tool calls**: Wrap every tool invocation in try-except
+- **Print tool output**: Always inspect what tools returned before proceeding
+```python
+try:
+    output = execute_command(cmd="python3 -m pip install package_name")
+    # print or process
+except Exception as e:
+    print("Tool failed:", str(e)[-512:])
+```
 
 ## 3. CONTEXT MANAGEMENT
 - **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
@@ -85,7 +120,7 @@ exec(code)         # Function not available
 
 ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
 
-## 7. FINAL ANSWER FORMAT
+## 5. FINAL ANSWER FORMAT
 - **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
   ```json
   {
