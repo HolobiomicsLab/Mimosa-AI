@@ -182,7 +182,7 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
-                additional_authorized_imports=[json, os],
+                additional_authorized_imports=['requests', 'bs4', 'json'],
 
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
