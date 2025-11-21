@@ -333,6 +333,7 @@ class DarwinMachine:
         total_cost = 0.0
 
         # Execute workflow
+        assert learning_mode
         print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
@@ -449,7 +450,8 @@ class DarwinMachine:
         runs = await self.recursive_self_improvement(
             runs,
             rewards_history=rewards_history,
-            assertion_history=assertion_history
+            assertion_history=assertion_history,
+            learning_mode=learning_mode
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
