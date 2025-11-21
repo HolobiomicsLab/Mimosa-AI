@@ -584,6 +584,7 @@ Original request:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
+                learning_mode=True,
                 max_iteration=max_dgm_iteration,
                 original_task=original_task
             )

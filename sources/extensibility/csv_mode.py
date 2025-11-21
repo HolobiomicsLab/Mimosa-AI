@@ -398,7 +398,11 @@ Provide your analysis following the specified output format."""
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal, judge=True, learning_mode=learning, max_iteration=self.config.max_learning_dgm_iterations)
+                        runs = await self.dgm.start_dgm(goal=goal,
+                                                        judge=True,
+                                                        learning_mode=learning,
+                                                        max_iteration=self.config.max_learning_dgm_iterations
+                                                       )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,

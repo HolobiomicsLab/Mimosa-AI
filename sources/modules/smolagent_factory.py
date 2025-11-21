@@ -40,7 +40,8 @@ from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTI
 import signal
 
 #DANGEROUS_FUNCTIONS = {}
-DANGEROUS_MODULES = {}
+import subprocess
+DANGEROUS_MODULES = {subprocess}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -231,6 +232,7 @@ CONSTRAINTS:
 - No assumptions about missing data - investigate first available data in workspace
 - Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
 - only use execute_command to install package.
+- You are only allowed to use tools to create and execute the code used to accomplish the goal. Use python/code editing tools when availabl.
 - wrap command that might take significant time (>5min) in a timeout
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
