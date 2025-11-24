@@ -221,9 +221,14 @@ class LLMProvider:
         Returns:
             True if the error is retryable, False otherwise
         """
+        error_type_name = type(error).__name__.lower()
         error_str = str(error).lower()
         
-        # Check for specific retryable errors
+        # Check for specific error types (including context window exceeded)
+        if "contextwindowexceeded" in error_type_name:
+            return True
+        
+        # Check for specific retryable error patterns
         retryable_patterns = [
             "overload",  # Overloaded error
             "rate_limit",  # Rate limiting
@@ -234,6 +239,8 @@ class LLMProvider:
             "service unavailable",  # 503 errors
             "gateway",  # Gateway errors
             "too many requests",  # 429 errors
+            "context",  # Context window errors
+            "token limit",  # Token limit errors
         ]
         
         return any(pattern in error_str for pattern in retryable_patterns)
@@ -269,6 +276,7 @@ class LLMProvider:
 
         attempt = 0
         max_wait = 500  # Maximum wait time in seconds
+        context_window_retry_count = 0  # Track context window errors specifically
         
         while True:  # Infinite retry loop
             try:
@@ -301,13 +309,33 @@ class LLMProvider:
             except Exception as e:
                 # Check if this is a retryable error
                 if self._is_retryable_error(e):
-                    wait_time = self._calculate_backoff_wait(attempt, max_wait)
-                    self.logger.warning(
-                        f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:100]}. "
-                        f"Retrying in {wait_time:.1f}s..."
-                    )
-                    time.sleep(wait_time)
-                    attempt += 1
+                    error_type = type(e).__name__.lower()
+                    is_context_error = "contextwindowexceeded" in error_type or "context" in str(e).lower()
+                    
+                    if is_context_error and context_window_retry_count < 3:
+                        # For context window errors, reduce the prompt and retry
+                        context_window_retry_count += 1
+                        reduction_factor = 0.5 ** context_window_retry_count  # 0.5, 0.25, 0.125
+                        
+                        # Reduce the user prompt content
+                        if len(message) > 0 and message[-1].get("role") == "user":
+                            original_length = len(message[-1]["content"])
+                            message[-1]["content"] = message[-1]["content"][:int(original_length * reduction_factor)]
+                            self.logger.warning(
+                                f"Context window error on attempt {attempt + 1}. "
+                                f"Reduced prompt to {len(message[-1]['content'])} chars (factor: {reduction_factor}). "
+                                f"Retrying immediately..."
+                            )
+                        attempt += 1
+                    else:
+                        # Regular retry with backoff for other retryable errors
+                        wait_time = self._calculate_backoff_wait(attempt, max_wait)
+                        self.logger.warning(
+                            f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:100]}. "
+                            f"Retrying in {wait_time:.1f}s..."
+                        )
+                        time.sleep(wait_time)
+                        attempt += 1
                 else:
                     # Non-retryable error - raise immediately
                     raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
@@ -328,27 +356,22 @@ class LLMProvider:
         return res
 
 if __name__ == "__main__":
-    # DeepSeek example
-    deepseek_config = LLMConfig(
-        model="deepseek-chat",
-        provider="deepseek",
-        temperature=0.7,
-        key=os.getenv("DEEPSEEK_API_KEY", ""),
-        reasoning_effort="medium"
+    config = LLMConfig(
+        model="claude-haiku-4-5-20251001",
+        provider="anthropic"
     )
 
-    # Use DeepSeek provider
     llm_provider = LLMProvider(
         agent_name="test_agent",
         memory_path=None,
         system_msg="You are a helpful assistant.",
-        config=deepseek_config
+        config=config
     )
 
-    prompt = "Explain the theory of relativity in simple terms."
+    prompt = """hello"""
     try:
         response = llm_provider(prompt)
-        print("DeepSeek Response:", response)
+        print("Response:", response)
     except Exception as e:
-        print(f"Error with DeepSeek: {e}")
+        print(f"Error : {e}")
         print("Make sure DEEPSEEK_API_KEY environment variable is set")
