@@ -2,12 +2,21 @@
 
 **An open framework for autonomous AI-driven science**
 
-Mimosa is an automated AI scientist framework designed to reproduce scientific findings and enable autonomous research. Its mission is to provide a modular and open alternative to big tech initiatives, empowering academic researchers with next-generation AI tools for scientific discovery.
+Mimosa is an automated AI-scientist framework built to reproduce published findings and carry out end-to-end research autonomously. Its goal is to offer a modular, transparent alternative to closed corporate systems, giving academics powerful AI tooling for real scientific discovery.
 
 ## Objectives
 
-- Reproduce scientific research with reliability and transparency
-- Enable autonomous research by generating new hypotheses and insights
+- Faithfully reproduce scientific studies with traceability and rigor
+- Enable fully automated scientific pipelines—bioinformatics, docking, metabolomics, and more
+
+## How does it work ?
+
+The user gives Mimosa a research goal.
+
+- Mimosa automatically discovers available MCP-based tools on the local network or via Toolhive (anything from data analysis utilities to web browsers or lab instruments like mass spectrometers).
+- Using the user’s objective and the discovered tools, Mimosa decomposes the problem, builds a tailored multi-agent workflow for each tasks.
+- Each task runs autonomously. Failures are used for self-improvement via a Darwin-/Gödel-Machine-inspired meta-learning loop.
+- Mimosa generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
 ---
 
@@ -111,7 +120,7 @@ uv run main.py --goal "Your objective here"
 | `--goal GOAL` | Specify a high-level research objective, paper reproduction, or scientific question (planner mode) |
 | `--task TASK` | Execute a single task: literature review, datasets download, implement a machine learning model... |
 | `--manual` | Interactive CLI mode to debug MCPs and test Mimosa tools directly |
-| `--papers CSV` | Batch evaluation on a CSV dataset containing research papers and prompts |
+| `--papers CSV` | Evaluation on a CSV dataset containing research papers and prompts |
 | `--scenario SCENARIO` | Run evaluation on a specific scenario |
 
 ### Learning & Optimization
@@ -134,7 +143,7 @@ uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transfor
 uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge
 ```
 
-**Batch evaluation - OpenAI Paper Bench:**
+**Evaluation on OpenAI Paper Bench:**
 ```bash
 uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
 ```
@@ -149,6 +158,8 @@ uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 10
 ---
 
 ## Architecture
+
+![dgm](./docs/images/architecture.png)
 
 ### System Overview
 
@@ -171,57 +182,33 @@ The system operates on an **agent-within-agent** pattern:
 - *Example:* "Download dataset from source Y"
 - *Example:* "Implement algorithm Z"
 
-### Layered Architecture
-
-**Layer 0: Strategic Planning**
-- Decomposes goals into executable task sequences
-- Maintains adaptive execution roadmap
-- Adjusts plans based on workflow performance feedback
-
-**Layer 1: Meta-Orchestration**
-- Dynamic Workflow Synthesis: Advanced LLMs generate task-specific multi-agent architectures
-- Architecture Search: Designs custom agent topologies rather than applying generic pipelines
-- Pattern Recognition: Identifies structural similarities across tasks for improved generation
-
-**Layer 2: Workflow Execution (LangGraph)**
-- Implements workflows as directed graphs with heterogeneous nodes
-  - SmolAgent Nodes: Autonomous code-generating agents for complex reasoning
-  - Deterministic Nodes: Validation, transformation, and control logic
-- Graph Flexibility: Supports arbitrary agent topologies (sequential, conditional, cyclical)
-- State Management: Maintains workflow context across distributed execution
-
-**Layer 3: Agent Runtime (SmolAgent)**
-- Code-generating agents operating in action-observation loops
-- Tool-as-Code Paradigm: Agents generate Python to interact with tools
-- Iterative Refinement: Continues execution until success criteria met or failure threshold reached
-
-**Layer 4: Tool Ecosystem (MCP)**
-- Extensible tool primitives built on Model Context Protocol
-- Distributed Execution: Tools run on HPC clusters, lab instruments, cloud infrastructure
-- Protocol Standardization: MCP enables seamless client-server tool interaction
-- Horizontal Scalability: Add new tools without modifying core system
-
-### Self-Improvement Mechanism (Experimental)
+### Self-Improvement Mechanism (DGM)
 
 The system implements a Darwinian-inspired evolution approach based on Gödel machine principles:
 
-1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
-   - *Example:* "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
-
-2. **Task Recognition** (Layer 1): For each task, the system:
-   - Searches its workflow library for similar historical tasks
+1. **Task Recognition**: For each task, the system:
+   - Searches workflow library for similar historical tasks
    - If found: Uses best-performing workflow as template, adapting for current context
    - If novel: Synthesizes new workflow from scratch
 
-3. **Evolutionary Optimization**: Over time, the system:
+2. **Evolutionary Optimization**: Over time, the system:
    - Maintains multiple workflow variants per task type
-   - Selects high-performing workflows based on success metrics (speed, accuracy, cost)
+   - Selects high-performing workflows based on success metrics
    - Mutates/recombines successful patterns to explore architecture space
 
-4. **Self-Improvement**: 
+3. **Self-Improvement**: 
    - The system can propose modifications to its own workflow generation logic
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
+
+
+**Progress visualization:**
+
+Reward progress plot will be saved under the `sources/workflows/<uuid>` folder under the filename `reward_progress.png`.
+
+***For example:***
+
+![dgm](./docs/images/dgm_example.png)
 
 ---
 
@@ -290,7 +277,3 @@ The telemetry dashboard provides:
 > **Note:** Telemetry is optional but recommended for debugging and performance optimization.
 
 ---
-
-## Support & Contributing
-
-For issues, questions, or contributions, please visit the project repository at [github.com/HolobiomicsLab/Mimosa-AI](https://github.com/HolobiomicsLab/Mimosa-AI).
