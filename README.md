@@ -1,6 +1,6 @@
 # Mimosa-AI
 
-<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="500"/>
+<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
 
 **An open framework for autonomous AI-driven science**
 
