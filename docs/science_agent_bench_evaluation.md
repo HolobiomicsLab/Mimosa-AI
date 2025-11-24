@@ -151,11 +151,6 @@ Saved to `runs_capsule/<capsule_name>/evaluation_results.json`:
 Displayed at completion:
 
 ```
-🏁 AUTONOMOUS MODE COMPLETED
-================================================================================
-Successful runs: 8
-Success rate: 80.0%
-
 ScienceAgentBench Metrics
 --------------------------------------------------------------------------------
 VER (Valid Execution Rate): 9/10 (90.0%)
@@ -320,78 +315,6 @@ async def evaluate_batch(tasks):
         ])
     return results
 ```
-
-## Troubleshooting
-
-### Common Issues
-
-**1. "No Python file found in capsule"**
-- Ensure workspace transfer completed successfully
-- Check that Mimosa generated a .py file
-
-**2. "Expected output file not created"**
-- Verify output_fname in CSV is correct
-- Check generated code for file writing logic
-
-**3. "CodeBERT model loading failed"**
-- Install transformers: `pip install transformers torch`
-- Check internet connection for model download
-- Use fallback scorer if needed
-
-**4. "Evaluation script not found"**
-- Verify eval_script_name column in CSV
-- Check file exists in `datasets/ScienceAgentBench/eval_programs/`
-
-### Debug Mode
-
-Enable detailed logging:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-## Extending the System
-
-### Adding Custom Metrics
-
-```python
-def calculate_custom_metric(self) -> float:
-    """Add custom evaluation metric."""
-    # Your implementation
-    return score
-
-# Add to evaluate_all():
-self.metrics['custom_metric'] = self.calculate_custom_metric()
-```
-
-### Custom Evaluation Scripts
-
-Create task-specific evaluators in `eval_programs/`:
-
-```python
-def eval():
-    # Load predictions
-    preds = load_predictions()
-    
-    # Load ground truth
-    labels = load_gold_results()
-    
-    # Calculate metric
-    score = your_metric(preds, labels)
-    
-    # Return (success, message)
-    return score > threshold, f"Score: {score}"
-```
-
-## Best Practices
-
-1. **Clean Workspace:** Always clean workspace between tasks
-2. **Save Intermediate Results:** Keep evaluation logs for debugging
-3. **Monitor Costs:** Track API costs per task
-4. **Batch Processing:** Process similar tasks together
-5. **Error Logging:** Capture detailed error information
-6. **Timeout Configuration:** Adjust timeouts based on task complexity
 
 ## References
 

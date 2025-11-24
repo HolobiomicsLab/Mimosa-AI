@@ -20,7 +20,7 @@ The user gives Mimosa a research goal.
 
 ---
 
-## Installation
+## Installation & Run
 
 ### Prerequisites
 
@@ -76,6 +76,8 @@ uv pip install -r requirements.txt
 
 Start the Toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics).
 
+You could add your custom MCPs to toolomics, see [toolomics documentation](https://github.com/HolobiomicsLab/toolomics/README.md).
+
 Configure the server to run on a port range (e.g., 5000-5100).
 
 ### Step 5: Configure Mimosa-AI
@@ -94,7 +96,7 @@ self.smolagent_model_id = "anthropic/claude-haiku-4-5-20251001"
 
 # MCP Server Discovery
 self.discovery_addresses = [
-    AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+    AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200) # same port range as toolomics
     # Add additional MCP servers from other machines as needed
 ]
 ```
@@ -108,6 +110,10 @@ uv run main.py --goal "Your objective here"
 ```
 
 > **Note:** Remember to activate your virtual environment before running Mimosa-AI in future sessions.
+
+### Access output files
+
+Output files will appear in **toolomics** `workspace` folder, when the execution its content will be transfered inside a new folder in `runs_capsule/`
 
 ---
 
