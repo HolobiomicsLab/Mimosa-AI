@@ -27,7 +27,7 @@ datasets/**/*.np
 datasets/**/*.mtx
 datasets/**/*.tif"
 datasets/ScienceAgentBench/datasets/
-runs_notes/
+runs_notes/*
 *.wav
 ### react ###
 .DS_*
