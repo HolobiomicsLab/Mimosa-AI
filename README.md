@@ -1,5 +1,7 @@
 # Mimosa-AI
 
+<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="500"/>
+
 **An open framework for autonomous AI-driven science**
 
 Mimosa is an automated AI-scientist framework built to reproduce published findings and carry out end-to-end research autonomously. Its goal is to offer a modular, transparent alternative to closed corporate systems, giving academics powerful AI tooling for real scientific discovery.
