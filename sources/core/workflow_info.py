@@ -98,6 +98,20 @@ class WorkflowInfo:
             self._overall_score = self.calculate_overall_score()
         return self._overall_score
 
+    @property
+    def judge_evaluation(self) -> dict:
+        """Load state_result.json file."""
+        eval_file = self.workflow_folder / "evaluation.txt"
+        if not eval_file.exists():
+            return {}
+        
+        try:
+            with open(eval_file) as f:
+                return f.read().strip()
+        except Exception as e:
+            print(f"❌ Can't read state_result.json for UUID {self.uuid}: {e}")
+            return "No evaluation. execution failed."
+
     def load_state_result(self) -> dict:
         """Load state_result.json file."""
         state_file = self.workflow_folder / "state_result.json"

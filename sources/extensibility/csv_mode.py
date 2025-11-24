@@ -1,5 +1,5 @@
 """
-PaperEvaluationMode - Autonomous goal generation and execution system
+CsvEvaluationMode - Autonomous goal generation and execution system
 """
 
 import csv
@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from sources.core.dgm import GodelMachine
+from sources.core.dgm import DarwinMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
 from sources.core.schema import Task, GodelRun
@@ -17,14 +17,14 @@ from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 
-class PaperEvaluationMode:
+class CsvEvaluationMode:
     """
     Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
     """
 
     def __init__(self, config, csv_runs_limit: int = 100):
         """
-        Initialize PaperEvaluationMode.
+        Initialize CsvEvaluationMode.
 
         Args:
             config: Mimosa configuration object
@@ -32,7 +32,7 @@ class PaperEvaluationMode:
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
-        self.dgm = GodelMachine(config)
+        self.dgm = DarwinMachine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
@@ -398,13 +398,17 @@ Provide your analysis following the specified output format."""
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal, judge=True, learning_mode=learning)
+                        runs = await self.dgm.start_dgm(goal=goal,
+                                                        judge=True,
+                                                        learning_mode=learning,
+                                                        max_iteration=self.config.max_learning_dgm_iterations
+                                                       )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_dgm_iteration=1,
-                                    max_task_retry=2
+                                    max_dgm_iteration=5,
+                                    max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
                     print("\033[95m📊 Transfering results files...\033[0m")
@@ -442,7 +446,7 @@ Provide your analysis following the specified output format."""
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    pass
+                    raise e
 
         self._print_final_summary()
 
@@ -473,7 +477,7 @@ Provide your analysis following the specified output format."""
             print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
-    async def start_paper_eval_mode(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
+    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
         """Public method to start the autonomous mode."""
         try:
             await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning)

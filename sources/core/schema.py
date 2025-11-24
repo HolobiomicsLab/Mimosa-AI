@@ -4,6 +4,7 @@ Schema for for storing and managing data in the Mimosa AI system.
 
 from dataclasses import dataclass, field
 from enum import Enum
+from datetime import datetime
 
 class TaskStatus(Enum):
     """Enumeration for task execution status."""
@@ -18,6 +19,23 @@ class TaskComplexity(Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+# ImprovementLog class for tracking validated improvements in Darwin Gödel Machine
+@dataclass
+class ImprovementLog:
+    """Tracks validated improvements in the Darwin Gödel Machine."""
+    from_iteration: int
+    to_iteration: int
+    improvement_type: str  # "prompt_refinement", "tool_change", "error_fix", "strategy_adaptation"
+    delta_reward: float
+    is_validated: bool
+    confidence: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    def __str__(self) -> str:
+        status = "✅ VALIDATED" if self.is_validated else "⚠️ NOT VALIDATED"
+        return (f"ImprovementLog({status}, type={self.improvement_type}, "
+                f"delta={self.delta_reward:+.3f}, confidence={self.confidence:.0%})")
 
 # GodelRun class used in the Darwin Godel Machine for tracking run iterations.
 @dataclass

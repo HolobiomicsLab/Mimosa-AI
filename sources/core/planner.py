@@ -6,7 +6,7 @@ import sys
 import time
 import threading
 from pathlib import Path
-from .dgm import GodelMachine
+from .dgm import DarwinMachine
 from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
 from .workflow_selection import WorkflowSelector
@@ -38,7 +38,7 @@ class Planner:
 
         self.config = config
         self.workspace_path = config.workspace_dir
-        self.dgm = GodelMachine(config)
+        self.dgm = DarwinMachine(config)
         self.task_history: list[Task] = []
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
@@ -584,6 +584,7 @@ Original request:
                 goal=task,
                 template_uuid=None,
                 judge=judge,
+                learning_mode=True,
                 max_iteration=max_dgm_iteration,
                 original_task=original_task
             )

@@ -19,7 +19,8 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
-from .schema import GodelRun
+from .schema import GodelRun, ImprovementLog
+from .improvement_validator import ImprovementValidator
 
 
 def check_answer_success(answer: str) -> bool:
@@ -62,7 +63,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
     return False
 
 
-class GodelMachine:
+class DarwinMachine:
     """Darwin Godel Machine for self-improvement workflows."""
 
     def __init__(
@@ -82,6 +83,8 @@ class GodelMachine:
         self.viz_utils = viz_utils or VisualizationUtils()
         self.process_id = process_id
         self.pricing = PricingCalculator(config)
+        self.improvement_validator = ImprovementValidator(min_improvement_threshold=0.05)
+        self.logger = logging.getLogger(__name__)
 
     def load_wf_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
@@ -153,59 +156,56 @@ class GodelMachine:
     def improvement_prompt(
         self,
         goal: str,
-        wf_state: any,
+        wf_info: WorkflowInfo,
         flow_code: str,
-        run_stdout: str,
+        run_stderr: str,
         iteration_count: int,
     ) -> str:
-        flow_answers = ""
+        exec_result = ""
+        wf_state = wf_info.state_result if wf_info else None
+        judge_eval = wf_info.judge_evaluation if wf_info else None
 
-        if wf_state is not None:
-            flow_answers = self.get_flow_answers(wf_state)
-            self.show_answers(flow_answers)
-        else:
-            flow_answers = run_stdout.strip()
+        if judge_eval: # use judge evalu if possible
+            exec_result = judge_eval
+        elif wf_state: # alternative: use agents answer dict
+            exec_result = self.get_flow_answers(wf_state)
+            self.show_answers(exec_result)
+        else: # use stdout/stderr if execution failed
+            exec_result = run_stderr.strip()
 
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
-                "## WORKFLOW ATTEMPT ANALYSIS:",
-                "Your previous attempt at generating a workflow did not succeed or was incomplete.",
+                "## DARWIN GÖDEL MACHINE: SELF-IMPROVEMENT STEP",
+                "Your previous attempt at generating a workflow did not succeed or didn't reach success threshold.",
                 "Your goal was: ",
                 goal,
-                "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
                 "## Previous workflow code:",
                 "<python>",
                 flow_code,
                 "</python>",
                 "\n",
-                "## Previous execution results:",
+                "## EXECUTION RESULTS::",
                 "This is the answer from each agent during the last execution.",
                 "<results>",
-                flow_answers,
+                exec_result,
                 "</results>",
+                "Reflect on your previous attempt and identify what went wrong.",
                 "\n",
-                "## FAILURE ANALYSIS:",
-                "1. Analyze the previous workflow code and its execution results.",
-                "2. Evaluate task completion. Did the workflow really achieve the goal?",
-                "3. Think of specific improvements to the workflow code to address these failures.",
+                "## ANALYZE FAILURES:",
+                "1. If the workflow code execution failed, analyze the error and fix the python code. If no workflow was generated, this is most likely because prompt were too long,  invalid syntax or ``` delimitation missing (```python...```)",
+                "2. If an agent failed due to tool limitations, consider an alternative tool.",
+                "3. If an agent failed due to lack of information, add a research step.",
+                "4. If agent didn't behave as expected, refine the prompt or agent role.",
+                "5. Consider adding error handling or validation steps.",
                 "\n",
-                "## IMPROVEMENT SUGGESTIONS:",
+                "## GENERATE ONE IMPROVEMENT:",
+                "Select the SINGLE most impactful change from above.",
+                "Apply ONLY that one change to the code.",
+                "Explain what will improve and why.",
                 "\n",
-                "1. If the workflow code execution failed, analyze the error messages and fix the python code.",
-                "2. If an agent failed due to limitation of its tool capabilities, consider an alternative tool that would allow to complete the task (eg: use web search tool if arxiv search doesn't seem to work).",
-                "3. If an agent failed due to lack of information, consider adding an initial research step to gather more information before attempting the main task.",
-                "4. If agent didn't behave as expected, consider changing the prompt or the agent role to better align with the task requirements.",
-                "5. Consider adding fallback agents that can take over if a primary agent fails.",
-                "6. Consider adding error handling and validation steps to ensure robustness.",
-                "7. Consider breaking down complex tasks into smaller, manageable sub-tasks.",
-                "8. Consider adding feedback loops where agents can review and refine each other's outputs.",
-                "9. Always Consider alternative strategies. Tool seem to fail or not fit ? Then explore other tools or approaches that might be more effective."
-                "\n",
-                "Getting invalid syntax (<workflow>, line 284) error with no clear message ? It may be because the code and prompt exceed your token limits, make sacrifice for shorter prompt or a simpler workflow.",
-                "Generate an IMPROVED version that addresses identified failure modes or with added steps for reaching the goal.",
-                "The new version must be different from the previous attempt.\n"
+                "Your improvement will be empirically validated against the baseline.",
             ])
 
         return "".join(
@@ -217,7 +217,7 @@ class GodelMachine:
             ]
         )
 
-    def select_workflow_template(self, goal, template_uuid: str = None) -> str:
+    def select_workflow_template(self, goal, template_uuid: str = None) -> WorkflowInfo:
         """Select and load a workflow template from the workflow directory or by UUID.
 
         Args:
@@ -238,7 +238,7 @@ class GodelMachine:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal,
                 threshold_similary=0.8,
-                threshod_score=self.config.learned_score_threshold,
+                threshod_score=0.0,
             )
             print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m")
@@ -246,8 +246,15 @@ class GodelMachine:
             print(f"\033[96mTop candidate: {candidates[0].uuid if candidates else str(None)}\033[0m")
             print(f"\033[96m{'─' * 60}\033[0m\n")
             return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
-        # load specified template UUID
         return WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
+    
+    def get_craft_instructions(self, goal, wf):
+        if wf:
+            return self.improvement_prompt(
+                goal, wf, wf.code, "", 0
+            )
+        else:
+            return goal
 
     async def start_dgm(
         self,
@@ -270,17 +277,13 @@ class GodelMachine:
         - learning_mode (bool): Whether in learning mode.
         - original_task (str, optional): Original unwrapped task for similarity matching.
         """
+        if learning_mode:
+            max_iteration = max(max_iteration, self.config.max_learning_dgm_iterations)
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
         )
-
-        if wf:
-            craft_instructions = self.improvement_prompt(
-                goal, wf.state_result, wf.code, "", 0
-            )
-        else:
-            craft_instructions = goal
+        craft_instructions = self.get_craft_instructions(goal, wf)
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
@@ -350,10 +353,30 @@ class GodelMachine:
         runs[-1].state_result = wf_info.state_result
         flow_answers = self.get_flow_answers(wf_info.state_result)
         self.show_answers(flow_answers)
-
-
-        # Update tracking data
         rewards_history.append(wf_info.overall_score)
+        
+        if runs[-1].iteration_count > 0:
+            validation_result = self.improvement_validator.validate_improvement(
+                baseline_run=runs[-5:],
+                new_run=runs[-1:],
+                threshold=0.05  # 5% improvement threshold
+            )
+            
+            improvement_log = ImprovementLog(
+                from_iteration=runs[-2].iteration_count,
+                to_iteration=runs[-1].iteration_count,
+                improvement_type=self.improvement_validator.get_improvement_type(runs[-2], runs[-1]),
+                delta_reward=validation_result["absolute_improvement"],
+                is_validated=validation_result["valid"],
+                confidence=validation_result["confidence"]
+            )
+            
+            if not hasattr(runs[-1], 'improvement_history'):
+                runs[-1].improvement_history = []
+            runs[-1].improvement_history.append(improvement_log)
+            
+            self.logger.info(f"[IMPROVEMENT VALIDATION] {improvement_log}")
+        
         # Update visualizations
         self._update_visualizations(
             rewards_history, assertion_history,
@@ -365,7 +388,6 @@ class GodelMachine:
             wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
-        # Evaluate workflow success using hybrid approach
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
 
         # Check termination conditions
@@ -398,9 +420,13 @@ class GodelMachine:
             )
             return runs
 
-        # Continue recursion
+        # select and use best scoring workflow
+        wf_info_best = self.select_workflow_template(
+            runs[-1].goal, template_uuid=None
+        )
+        code = wf_info_best.code if wf_info_best else ""
         runs[-1].prompt = self.improvement_prompt(
-            runs[-1].goal, wf_info.state_result, workflow_code, run_stdout, runs[-1].iteration_count
+            runs[-1].original_task or runs[-1].goal, wf_info_best, code, run_stdout, runs[-1].iteration_count
         )
 
         # add godel run class instance to list
@@ -423,7 +449,8 @@ class GodelMachine:
         runs = await self.recursive_self_improvement(
             runs,
             rewards_history=rewards_history,
-            assertion_history=assertion_history
+            assertion_history=assertion_history,
+            learning_mode=learning_mode
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
