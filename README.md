@@ -131,6 +131,8 @@ Output files will appear in **toolomics** `workspace` folder, when the execution
 
 ## Evaluation
 
+Mimosa can be evaluated either on [ScienceAgentBench](https://arxiv.org/abs/2410.05080) or [PaperBench](https://arxiv.org/pdf/2504.01848).
+
 **Evaluation on ScienceAgentBench with DGM**
 ```sh
 uv run main.py --science_agent_bench --learn
@@ -142,8 +144,24 @@ uv run main.py --science_agent_bench --learn
 uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4 --learn
 ```
 
+**Evaluation on OpenAI PaperBench with learning mode**
+
+OpenAI PaperBench benchmark provider is a benchmark for evaluating the ability of AI agents to replicate AI research, from the paper `PaperBench: Evaluating AI’s Ability to Replicate AI Research`.
+
 ```sh
-uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 10  --learn
+uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn
+```
+
+/!\ This will save in runs_capsule/ folder the result of all paper's reproduction attempt, refer to [Paper Bench documentation](https://github.com/openai/frontier-evals/tree/main/project/paperbench) for complete evaluation.
+
+**Evaluation on custom benchmark of research paper**
+
+1. Place your benchmark CSV with the same format as `paper_bench.csv` in `datasets/<your_benchmark_name>.csv`.
+
+2. Run on your benchmark:
+
+```sh
+uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20  --learn
 ```
 
 ---
