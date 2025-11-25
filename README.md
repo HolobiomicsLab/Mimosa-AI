@@ -111,11 +111,40 @@ python3 main.py --goal "Your objective here"
 uv run main.py --goal "Your objective here"
 ```
 
+**Standard usage - accomplish a goal:**
+```bash
+uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results."
+```
+
+**Single task mode - no long-term planning:**
+```bash
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge
+```
+
 > **Note:** Remember to activate your virtual environment before running Mimosa-AI in future sessions.
 
 ### Access output files
 
 Output files will appear in **toolomics** `workspace` folder, when the execution its content will be transfered inside a new folder in `runs_capsule/`
+
+---
+
+## Evaluation
+
+**Evaluation on ScienceAgentBench with DGM**
+```sh
+uv run main.py --science_agent_bench --learn
+```
+
+**Evaluation on ScienceAgentBench limited to 10 tasks with learning limited to 4 DGM iterations**
+
+```sh
+uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4 --learn
+```
+
+```sh
+uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 10  --learn
+```
 
 ---
 
@@ -128,8 +157,8 @@ Output files will appear in **toolomics** `workspace` folder, when the execution
 | `--goal GOAL` | Specify a high-level research objective, paper reproduction, or scientific question (planner mode) |
 | `--task TASK` | Execute a single task: literature review, datasets download, implement a machine learning model... |
 | `--manual` | Interactive CLI mode to debug MCPs and test Mimosa tools directly |
-| `--papers CSV` | Evaluation on a CSV dataset containing research papers and prompts |
-| `--scenario SCENARIO` | Run evaluation on a specific scenario |
+| `--papers <CSV path>` | Evaluation on a CSV dataset containing research papers and prompts |
+| `--scenario <SCENARIO>` | Use a scenario file for evaluation |
 
 ### Learning & Optimization
 
@@ -141,24 +170,14 @@ Output files will appear in **toolomics** `workspace` folder, when the execution
 
 ### Examples
 
-**Standard usage - accomplish a goal:**
+**Accomplish a goal:**
 ```bash
 uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results."
 ```
 
-**Single task mode - no long-term planning:**
+**Single task mode:**
 ```bash
-uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge
-```
-
-**Evaluation on OpenAI Paper Bench:**
-```bash
-uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
-```
-
-**ScienceAgentBench evaluation with learning:**
-```bash
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 10 --learn
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status"
 ```
 
 > **Note:** Requires Toolomics to be installed and MCP servers to be running.
