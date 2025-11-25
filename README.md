@@ -141,7 +141,7 @@ uv run main.py --science_agent_bench --learn
 **Evaluation on ScienceAgentBench limited to 10 tasks with learning limited to 4 DGM iterations**
 
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4 --learn
+uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4
 ```
 
 **Evaluation on OpenAI PaperBench with learning mode**
