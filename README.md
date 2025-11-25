@@ -133,6 +133,8 @@ Output files will appear in **toolomics** `workspace` folder, when the execution
 
 Mimosa can be evaluated either on [ScienceAgentBench](https://arxiv.org/abs/2410.05080) or [PaperBench](https://arxiv.org/pdf/2504.01848).
 
+⚠️ For unbiased evaluation it is advised to run `./cleanup.sh` first, this will prevent Mimosa from using existing or cached workflows.
+
 **Evaluation on ScienceAgentBench with DGM**
 ```sh
 uv run main.py --science_agent_bench --learn
@@ -146,13 +148,13 @@ uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4
 
 **Evaluation on OpenAI PaperBench with learning mode**
 
-OpenAI PaperBench benchmark provider is a benchmark for evaluating the ability of AI agents to replicate AI research, from the paper `PaperBench: Evaluating AI’s Ability to Replicate AI Research`.
+OpenAI PaperBench is a benchmark for evaluating the ability of AI agents to replicate AI research, from the paper `PaperBench: Evaluating AI’s Ability to Replicate AI Research`.
 
 ```sh
 uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn
 ```
 
-/!\ This will save in runs_capsule/ folder the result of all paper's reproduction attempt, refer to [Paper Bench documentation](https://github.com/openai/frontier-evals/tree/main/project/paperbench) for complete evaluation.
+⚠️ This will save in runs_capsule/ folder the result of all paper's reproduction attempt, refer to [Paper Bench documentation](https://github.com/openai/frontier-evals/tree/main/project/paperbench) for complete evaluation.
 
 **Evaluation on custom benchmark of research paper**
 
@@ -163,6 +165,7 @@ uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn
 ```sh
 uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20  --learn
 ```
+
 
 ---
 
@@ -176,15 +179,16 @@ uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20  
 | `--task TASK` | Execute a single task: literature review, datasets download, implement a machine learning model... |
 | `--manual` | Interactive CLI mode to debug MCPs and test Mimosa tools directly |
 | `--papers <CSV path>` | Evaluation on a CSV dataset containing research papers and prompts |
-| `--scenario <SCENARIO>` | Use a scenario file for evaluation |
+| `--science_agent_bench` | Evaluation on ScienceAgentBench |
 
-### Learning & Optimization
-
+### Other parameters
 | Argument | Description |
 |----------|-------------|
 | `--learn` | Enable learning mode using DGM to optimize task performance |
 | `--max_dgm_iterations N` | Maximum DGM iterations for learning |
 | `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
+| `--scenario <scenario file name>` | Use specific scenario based assertions instead of LLM-as-a-judge for scoring execution  |
+| `--debug` | Enable debug mode for more verbose logging |
 
 ### Examples
 
