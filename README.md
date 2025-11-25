@@ -142,7 +142,7 @@ To evaluate on ScienceAgentBench you must:
 1. download the ScienceAgentBench full dataset:
 [dataset link](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
 2. unzip it with password: `scienceagentbench`
-3. copy content of `ScienceAgentBench/benchmark/datasets` folder to  `Mimosa-AI/datasets/scienceagentbench/datasets`
+3. copy content of `benchmark/benchmark/datasets` folder to  `Mimosa-AI/datasets/scienceagentbench/datasets`
 
 **Evaluation on ScienceAgentBench with DGM**
 ```sh
