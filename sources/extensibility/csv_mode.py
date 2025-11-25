@@ -22,7 +22,7 @@ class CsvEvaluationMode:
     Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
     """
 
-    def __init__(self, config, csv_runs_limit: int = 100):
+    def __init__(self, config, csv_runs_limit: int = 103):
         """
         Initialize CsvEvaluationMode.
 
