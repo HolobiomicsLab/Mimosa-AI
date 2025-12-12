@@ -58,7 +58,6 @@ Your response must be valid JSON following this exact schema:
 - Never plan "comprehensive" approaches without validating scope against paper
 - Never include validation datasets from different domains without justification
 - Never commit to large-scale computations (>100 hours) without feasibility gates
-- Never try to use vision-based capabilities such as reading figure
 
 ## Example
 

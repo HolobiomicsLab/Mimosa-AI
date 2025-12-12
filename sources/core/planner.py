@@ -3,7 +3,6 @@ import time
 import os
 import re
 import sys
-import time
 import threading
 from pathlib import Path
 from .dgm import DarwinMachine
@@ -315,7 +314,7 @@ Original request:
             print("🔄 Will regenerate plan based on your feedback...")
             return False, user_input
 
-    def _generate_plan_with_human_validation(self, goal: str, max_attempts: int = 10) -> Plan:
+    def _generate_plan_with_human_validation(self, goal: str, human_approve = False) -> Plan:
         """
         Generate a plan with iterative human validation and feedback loop.
         Args:
@@ -331,7 +330,6 @@ Original request:
         human_feedback = ""
         
         while not plan_approved:
-            
             current_goal = goal
             if human_feedback:
                 current_goal = f"{goal}\n\nHUMAN FEEDBACK ON PREVIOUS PLAN:\n{human_feedback}\n\nPlease address this feedback in the new plan."
@@ -339,7 +337,10 @@ Original request:
             if plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
             self._display_plan(plan)
-            plan_approved, human_feedback = self._request_human_plan_validation(plan)
+            if human_approve:
+                plan_approved, human_feedback = self._request_human_plan_validation(plan)
+            else:
+                plan_approved, human_feedback = True, ""
         return plan
 
     def _init_visualization(self, plan: Plan) -> None:
@@ -597,8 +598,8 @@ Original request:
 
         except Exception as e:
             raise e
-            print(f"❌ Error in dgm_runs: {str(e)}")
-            raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
+            #print(f"❌ Error in dgm_runs: {str(e)}")
+            #raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
     def _get_dgm_success(self, run: GodelRun) -> bool:
         run_state_result = getattr(run, 'state_result', None) or {}

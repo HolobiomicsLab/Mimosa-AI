@@ -1,5 +1,5 @@
 """
-Darwin Godel Machine
+Darwin Godel Machine inspired iterative multi-agent workflows improvements.
 """
 
 import json
@@ -34,10 +34,7 @@ def check_answer_success(answer: str) -> bool:
     failure_patterns = [
         r'\bfailed\b', r'\berror\b', r'\failure\b',
     ]
-    for pattern in failure_patterns:
-        if re.search(pattern, answer_lower):
-            return False
-    return True
+    return all(not re.search(pattern, answer_lower) for pattern in failure_patterns)
 
 def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
     """
@@ -65,12 +62,10 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
 
 class DarwinMachine:
     """Darwin Godel Machine for self-improvement workflows."""
-
     def __init__(
         self,
         config,
         viz_utils: VisualizationUtils = None,
-        shared_viz_data: SharedVisualizationData = None,
         process_id: int = None,
     ) -> None:
         self.config = config
@@ -88,7 +83,6 @@ class DarwinMachine:
 
     def load_wf_state_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
-
         Args:
             uuid: UUID of the workflow state to load
         Returns:
@@ -219,7 +213,6 @@ class DarwinMachine:
 
     def select_workflow_template(self, goal, template_uuid: str = None) -> WorkflowInfo:
         """Select and load a workflow template from the workflow directory or by UUID.
-
         Args:
             template_uuid: Optional UUID of workflow template to load
         Returns:
@@ -267,7 +260,7 @@ class DarwinMachine:
         original_task: str = None
     ) -> list[GodelRun]:
         """
-        Start the Dynamic Goal Management (DGM) process for achieving a specified goal.
+        Start the DGM process for achieving a specified goal.
         Args:
         - goal (str): The primary goal or objective to be accomplished (may be knowledge-wrapped).
          template_uuid (str | None, optional): UUID of a workflow template to use.

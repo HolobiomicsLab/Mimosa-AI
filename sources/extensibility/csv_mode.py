@@ -355,7 +355,7 @@ Provide your analysis following the specified output format."""
     async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool) -> None:
         """
         Main autonomous execution loop.
-        Generates goals, executes them, analyzes results, and learns.
+        Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
         user_input = input("Enter starting row ([Enter] 0 by default): ")

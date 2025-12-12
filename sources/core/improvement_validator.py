@@ -5,7 +5,7 @@ Validates that workflow improvements are statistically significant before accept
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 class ImprovementValidator:
@@ -14,7 +14,6 @@ class ImprovementValidator:
     def __init__(self, min_improvement_threshold: float = 0.05):
         """
         Initialize the improvement validator.
-        
         Args:
             min_improvement_threshold: Minimum relative improvement required (5% default)
                                       Example: 0.05 means new reward must be 5% higher
@@ -26,28 +25,16 @@ class ImprovementValidator:
         self,
         baseline_run: Any,
         new_run: Any,
-        threshold: Optional[float] = None
-    ) -> Dict[str, Any]:
+        threshold: float | None = None
+    ) -> dict[str, Any]:
         """
         Statistically validate if new_run significantly improved over baseline.
-        
-        This is a key DGM principle: improvements must be formally validated
-        before being accepted as genuine progress.
-        
         Args:
             baseline_run: GodelRun from previous iteration
             new_run: GodelRun from current iteration
             threshold: Minimum relative improvement override (uses class default if None)
-        
         Returns:
-            dict with keys:
-                - 'valid': bool - Whether improvement is statistically significant
-                - 'relative_improvement': float - Relative change (0.15 = 15% improvement)
-                - 'absolute_improvement': float - Absolute change in reward
-                - 'baseline_reward': float - Starting reward
-                - 'new_reward': float - New reward
-                - 'validated_at': datetime - When validation occurred
-                - 'confidence': float - Confidence in the improvement (0.0-1.0)
+            dict with improvements info
         """
         threshold = threshold or self.min_improvement_threshold
         
@@ -100,16 +87,14 @@ class ImprovementValidator:
         before_metric: float,
         after_metric: float,
         improvement_type: str = "generic"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Validate effectiveness of a specific improvement strategy.
-        
         Args:
             strategy_name: Name of the improvement strategy (e.g., "refine_prompt")
             before_metric: Metric value before applying strategy
             after_metric: Metric value after applying strategy
             improvement_type: Category of improvement for tracking
-        
         Returns:
             dict with validation results and strategy effectiveness
         """
@@ -143,27 +128,22 @@ class ImprovementValidator:
     ) -> bool:
         """
         Determine if iterations should continue based on improvement patterns.
-        
         Args:
             current_reward: Current iteration's reward
             best_reward: Best reward achieved so far
             iterations_without_improvement: Count of consecutive non-improving iterations
             max_iterations_without_improvement: Max allowed non-improving iterations
-        
         Returns:
             bool - Whether to continue iterating
         """
         if current_reward > best_reward:
-            # We're improving, always continue
             return True
-        
         if iterations_without_improvement >= max_iterations_without_improvement:
             self.logger.warning(
                 f"⏹️ Stopping iterations: {iterations_without_improvement} iterations "
                 f"without improvement (max: {max_iterations_without_improvement})"
             )
             return False
-        
         return True
 
     def get_improvement_type(self, baseline_run: Any, new_run: Any) -> str:

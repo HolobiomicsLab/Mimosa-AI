@@ -26,7 +26,7 @@ class ImprovementLog:
     """Tracks validated improvements in the Darwin Gödel Machine."""
     from_iteration: int
     to_iteration: int
-    improvement_type: str  # "prompt_refinement", "tool_change", "error_fix", "strategy_adaptation"
+    improvement_type: str
     delta_reward: float
     is_validated: bool
     confidence: float = 0.0
