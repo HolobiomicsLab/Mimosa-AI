@@ -446,7 +446,7 @@ Provide your analysis following the specified output format."""
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    raise e
+                    continue
 
         self._print_final_summary()
 

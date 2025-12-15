@@ -137,6 +137,9 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
+        "--config", type=str, help="Path to configuration JSON file to load"
+    )
+    parser.add_argument(
         "--goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
     )
     parser.add_argument(
@@ -173,9 +176,15 @@ async def main():
     add_config_arguments(parser, config)
     args = parser.parse_args()
 
+    # Load config from file if provided
+    if args.config:
+        config.load(args.config)
+        print(f"Configuration loaded from: {args.config}")
+
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
+    # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
 
     validate_environment()
