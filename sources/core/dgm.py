@@ -435,7 +435,8 @@ class DarwinMachine:
             judge=runs[-1].judge,
             answers=wf_info.answers,
             state_result=wf_info.state_result,
-            scenario_id=runs[-1].scenario_id
+            scenario_id=runs[-1].scenario_id,
+            original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
         time.sleep(5)

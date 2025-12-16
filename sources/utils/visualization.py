@@ -49,6 +49,7 @@ class VisualizationUtils:
             list containing (figure, axis, line) objects
         """
         # Use non-interactive mode to avoid threading issues
+        title = title[:512]
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
@@ -116,7 +117,7 @@ class VisualizationUtils:
             list containing (figure, axis, line) objects
         """
         plot_data = self.create_real_time_curve_plot(
-            title=f"Rewards Curve - {goal}",
+            title=f"Rewards Curve - {goal[:512]}",
             xlabel="Iteration",
             ylabel="Rewards",
             figsize=figsize,
@@ -175,6 +176,7 @@ class VisualizationUtils:
             ]
 
         # Use non-interactive mode to avoid threading issues
+        title = title[:512]
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
@@ -247,6 +249,7 @@ class VisualizationUtils:
         Returns:
             list containing (figure, axis) objects
         """
+        title = title[:512]
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_title(title)
         ax.set_xlabel(xlabel)

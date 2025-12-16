@@ -499,6 +499,27 @@ if WORKFLOW_PATH:
 
         return complete_code, workflow_code, uuid_str
 
+    def _extract_original_from_goal(self, goal: str) -> str:
+        """Extract original task from knowledge-wrapped goal.
+        
+        Args:
+            goal: Goal text that may be wrapped with knowledge context
+            
+        Returns:
+            str: Extracted original task or goal if not wrapped
+        """
+        if not goal:
+            return ""
+        
+        # Pattern: "...Now, use this knowledge to complete:\n<actual_task>"
+        # This is the pattern used by planner._build_knowledge_aware_task()
+        match = re.search(r'Now, use this knowledge to complete:\s*\n(.*)', goal, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        
+        # If no wrapper pattern found, return goal as-is
+        return goal
+
     def save_workflow_files(
         self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
     ) -> None:
@@ -537,10 +558,12 @@ if WORKFLOW_PATH:
             self.logger.error(f"Failed to save goal: {str(e)}")
         
         # Save original task for better similarity matching
-        if original_task:
+        # Extract from goal if not provided explicitly
+        task_to_save = original_task if original_task else self._extract_original_from_goal(goal)
+        if task_to_save:
             try:
                 with open(os.path.join(path, f"original_task_{uuid_str}.txt"), "w") as f:
-                    f.write(original_task)
+                    f.write(task_to_save)
                 self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
             except Exception as e:
                 self.logger.error(f"Failed to save original task: {str(e)}")
