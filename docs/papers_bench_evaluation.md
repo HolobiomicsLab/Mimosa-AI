@@ -1,4 +1,4 @@
-# Running PaperBench Locally (Quick Note)
+g Running PaperBench Locally (Quick Note)
 
 This note captures the minimum you need to run PaperBench with pre-existing submissions (via `PBDirectSubmissionSolver`). For a full walkthrough see `paperbench/README.md`.
 
@@ -33,6 +33,7 @@ cd frontier-evals/project/paperbench
 
 **Paper IDs:**
 
+```text
 fre
 mechanistic-understanding
 bridging-data-gaps
@@ -53,6 +54,7 @@ bbox
 lbcs
 bam
 ftrl
+```
 
 ## 2. Choose the split
 
