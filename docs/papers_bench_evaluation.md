@@ -34,23 +34,41 @@ cd frontier-evals/project/paperbench
 ## **Paper IDs:**
 
 1. **adaptive-pruning**: APT: Adaptive Pruning and Tuning Pretrained Language Models for Efficient Training and Inference
+
 2. **all-in-one**: All-in-one simulation-based inference
+
 3. **bbox**: Batch and match: black-box variational inference with a score-based divergence
+
 4. **fre**: Unsupervised Zero-Shot Reinforcement Learning via Functional Reward Encodings
+
 5.**ftrl**: Fine-tuning reinforcement models is a secretyly a forgetting problem
+
 6. **bam**: Refined coreset selection
+
 7. **lca-on-the-line**: LCA-on-the-Line: Benchmarking Out of Distribution Generalization with Class Taxonomies
+
 8. **mechanistic-understanding**: A Mechanistic Understanding of Alignment Algorithms: A Case Study on DPO and Toxicity
+
 9. **pinn**: Challenges in Training PINNs: A Loss Landscape Perspective
+
 10. **rice**: RICE: Breaking Through the Training Bottlenecks of Reinforcement Learning with Explanation ML
+
 11. **robust-clip**: Robust CLIP: Unsupervised Adversarial Fine-Tuning of Vision Embeddings for Robust Large Vision-Language Models
+
 12. **sample-specific-masks**: Sample-specific Masks for Visual Reprogramming-based Prompting
+
 13. **sapg**: SAPG: Split and Aggregate Policy Gradients
+
 14. **sequential-neural-score-estimation**: Sequential Neural Score Estimation: Likelihood-Free Inference with Conditional Score Based Diffusion Models
+
 15. **stay-on-topic-with-classifier-free-guidance**: Stay on Topic with Classifier-Free Guidance
+
 16. **stochastic-interpolants**: Stochastic Interpolants with Data-Dependent Couplings
+
 17. **test-time-model-adaptation**: Test-Time Model Adaptation with Only Forward Passes
+
 18. **what-will-my-model-forget**: What Will My Model Forget? Forecasting Forgotten Examples in Language Model Refinement
+
 
 ## 2. Choose the split
 
