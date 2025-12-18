@@ -118,7 +118,7 @@ class CapsuleEvaluator:
                 timeout=180
             )
             
-            return success, message, True
+            return success, message, success
             
         except Exception as e:
             self.logger.error(f"[EVAL] Error in SR evaluation: {str(e)}")
