@@ -124,8 +124,6 @@ code my_config.json
 | `runner_*` | Execution, timeout, and resource settings. **Do not touch.** |
 
 
-Then you wouldn't need to use `--config <config file>` when using mimosa through command line.
-
 ### Step 6: Run Mimosa-AI
 
 ```bash
