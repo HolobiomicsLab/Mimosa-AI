@@ -16,7 +16,7 @@
   "prompt_planner": "sources/prompts/planner_paperbench_codedev.md",
   "prompt_workflow_creator": "sources/prompts/workflow_v7.md",
   "reasoning_effort": "high",
-  "learned_score_threshold": 0.85,
+  "learned_score_threshold": 0.8,
   "max_learning_dgm_iterations": 10,
   "schema_code_path": "sources/modules/state_schema.py",
   "smolagent_factory_code_path": "sources/modules/smolagent_factory.py",

@@ -173,7 +173,7 @@ class Config:
             "runner_temp_dir": self.runner_temp_dir,
             "runner_requirements": self.runner_requirements,
         }
-
+    
     def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workspace_dir = data.get("workspace_dir", self.workspace_dir)

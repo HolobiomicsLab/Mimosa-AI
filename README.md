@@ -84,41 +84,64 @@ Configure the server to run on a port range (e.g., 5000-5100).
 
 ### Step 5: Configure Mimosa-AI
 
-Edit `config.py` with your settings. Key configuration parameters:
+Create your custom **config.json** file.
 
-```python
-# Toolomics workspace directory
-self.workspace_dir = "/path/to/toolomics/workspace"
-
-# LLM Model Selection
-self.planner_llm_model = "anthropic/claude-opus-4-1-20250805"
-self.prompts_llm_model = "anthropic/claude-opus-4-1-20250805"
-self.workflow_llm_model = "anthropic/claude-opus-4-1-20250805"
-self.smolagent_model_id = "anthropic/claude-haiku-4-5-20251001"
-
-# MCP Server Discovery
-self.discovery_addresses = [
-    AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200) # same port range as toolomics
-    # Add additional MCP servers from other machines as needed
-]
+1. copy default config:
+```sh
+cp config_default.json my_config.json
 ```
+
+2. edit the config:
+```sh
+vim my_config.json
+# or:
+code my_config.json
+# or: just open it in VS code the normal way
+```
+
+**Mimosa Configuration Overview**
+
+| Parameter | Description |
+|---------|-------------|
+| `workspace_dir` | Path to the Toolomics workspace. All files created or modified by Mimosa appear here. Must point to the Toolomics project directory. |
+| `discovery_addresses` | Network ranges (IP + port range) used to discover MCP tool servers. |
+| `planner_llm_model` | LLM used to decompose tasks and build execution plans. |
+| `prompts_llm_model` | LLM used for workflow prompts generation. |
+| `workflow_llm_model` | LLM used to generate and orchestrate multi-agent workflows. |
+| `smolagent_model_id` | Model used for HuggingFace SmolAgents handling execution subtasks. |
+| `judge_model` | LLM used to evaluate Mimosa’s own outputs and assign performance scores. |
+| `engine_name` | Inference engine used to route and manage model calls (LiteLLM). |
+| `prompt_planner` | Prompt file used by the planner to decompose tasks. |
+| `prompt_workflow_creator` | Prompt used to create multi-agent workflows. **Do not modify.** |
+| `reasoning_effort` | Controls the depth of reasoning for **gpt5** only. |
+| `learned_score_threshold` | Score at which self-improvement stops and the result is accepted. |
+| `max_learning_dgm_iterations` | Maximum number of self-improvement iterations allowed. |
+| `schema_code_path` | Internal state schema definition. **Do not modify.** |
+| `smolagent_factory_code_path` | SmolAgent factory implementation. **Do not modify.** |
+| `runs_capsule_dir` | Directory where each run saves a full workspace snapshot in an auto-named capsule. |
+| `workflow_dir` | Directory containing predefined multi-agent workflows. |
+| `memory_dir` | Persistent storage for Mimosa’s long-term memory. |
+| `runner_*` | Execution, timeout, and resource settings. **Do not touch.** |
+
+
+Then you wouldn't need to use `--config <config file>` when using mimosa through command line.
 
 ### Step 6: Run Mimosa-AI
 
 ```bash
-python3 main.py --goal "Your objective here"
+python3 main.py --goal "Your objective here" --config config_default.json
 # OR with uv:
-uv run main.py --goal "Your objective here"
+uv run main.py --goal "Your objective here" --config config_default.json
 ```
 
 **Standard usage - accomplish a goal:**
 ```bash
-uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results."
+uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." --config config_default.json
 ```
 
 **Single task mode - no long-term planning:**
 ```bash
-uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge --config config_default.json
 ```
 
 > **Note:** Remember to activate your virtual environment before running Mimosa-AI in future sessions.
