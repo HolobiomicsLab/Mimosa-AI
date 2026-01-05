@@ -542,7 +542,7 @@ Original request:
             raise ValueError("❌ Planner: Task must be a non-empty string")
 
         if max_dgm_iteration is None or max_dgm_iteration < 1:
-            max_dgm_iteration = 2
+            max_dgm_iteration = 1
             print(f"⚠️ Invalid max_dgm_iteration, using default: {max_dgm_iteration}")
 
         print(f"🎯 Starting DGM runs for task: {task[:50]}...")
@@ -718,7 +718,7 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_dgm_iteration: int = 2,
+        max_dgm_iteration: int = 1,
         max_task_retry: int = 5
     ) -> list[Task]:
         """

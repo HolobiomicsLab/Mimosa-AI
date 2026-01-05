@@ -173,6 +173,7 @@ Provide a structured analysis with:
         sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
         notes = {
             "timestamp": timestamp,
+            "model": self.config.smolagent_model_id,
             "goal": goal,
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
@@ -407,7 +408,7 @@ Provide your analysis following the specified output format."""
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_dgm_iteration=5,
+                                    max_dgm_iteration=self.config.max_learning_dgm_iterations,
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)

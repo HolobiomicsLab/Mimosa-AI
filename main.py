@@ -80,6 +80,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
+    if args.max_dgm_iterations:
+        config.max_learning_dgm_iterations = args.max_dgm_iterations
 
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
@@ -170,7 +172,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
+        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)

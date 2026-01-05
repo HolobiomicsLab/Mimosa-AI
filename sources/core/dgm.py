@@ -255,7 +255,7 @@ class DarwinMachine:
         template_uuid: str | None = None,
         judge: bool = True,
         scenario_id: str = None,
-        max_iteration: int = 3,
+        max_iteration: int = 1,
         learning_mode: bool = False,
         original_task: str = None
     ) -> list[GodelRun]:
@@ -267,11 +267,11 @@ class DarwinMachine:
         - judge (bool, optional): Whether to enable judging mode for evaluation.
         - scenario_id (str, optional): ID of scenario for evaluation.
         - max_iteration (int): Maximum number of iterations.
-        - learning_mode (bool): Whether in learning mode.
+        - learning_mode (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
         - original_task (str, optional): Original unwrapped task for similarity matching.
         """
         if learning_mode:
-            max_iteration = max(max_iteration, self.config.max_learning_dgm_iterations)
+            max_iteration = max(3, self.config.max_learning_dgm_iterations)
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
