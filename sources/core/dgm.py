@@ -323,7 +323,7 @@ class DarwinMachine:
 
         iteration_start_time = time.time()
         uuid = None
-        total_cost = 0.0
+        exec_cost = 0.0
 
         # Execute workflow
         print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
@@ -335,10 +335,10 @@ class DarwinMachine:
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
         if workflow_code:
             # Evaluate and calculate costs
-            eval_type, total_cost = await self._evaluate_and_calculate_cost(
+            eval_type, exec_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
             )
-            runs[-1].cost = total_cost
+            runs[-1].cost = exec_cost
             runs[-1].reward = wf_info.overall_score
     
         runs[-1].current_uuid = uuid
@@ -378,7 +378,7 @@ class DarwinMachine:
         # Log and notify completion
         self._log_iteration_completion(
             runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-            wf_info.overall_score, total_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+            wf_info.overall_score, exec_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
@@ -426,7 +426,7 @@ class DarwinMachine:
         runs.append(GodelRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
-            cost=total_cost,
+            cost=exec_cost + runs[-1].cost,
             current_uuid=uuid,
             template_uuid=None,
             workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
@@ -486,7 +486,7 @@ class DarwinMachine:
         """Evaluate workflow and calculate cost."""
         logger = logging.getLogger(__name__)
         eval_type = None
-        total_cost = 0.0
+        exec_cost = 0.0
 
         if judge and uuid:
             answer = answer if executed else "workflow failed to execute."
@@ -495,11 +495,11 @@ class DarwinMachine:
         # Calculate cost regardless of execution success
         # This includes workflow generation LLM costs even when execution fails
         cost_start = time.time()
-        total_cost = self.pricing.calculate_cost(uuid)
+        exec_cost = self.pricing.calculate_cost(uuid)
         cost_time = time.time() - cost_start
         logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
 
-        return eval_type, total_cost
+        return eval_type, exec_cost
 
     async def _evaluate_workflow(
         self, uuid: str, answer: str, scenario_id: str, assertion_history: list
@@ -567,7 +567,7 @@ class DarwinMachine:
 
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
-        wf_rewards: float, total_cost: float, goal: str, uuid: str,
+        wf_rewards: float, exec_cost: float, goal: str, uuid: str,
         wf_state: any, rewards_history: list
     ):
         """Log iteration completion and send notification."""
@@ -576,19 +576,19 @@ class DarwinMachine:
 
         logger.info(
             f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
-            f"Rewards: {wf_rewards:.1f}, Cost: {total_cost:.3f} USD"
+            f"Rewards: {wf_rewards:.1f}, Cost: {exec_cost:.3f} USD"
         )
 
         print(f"\n\033[94m{'-' * 60}\033[0m")
         print(f"\033[94mTotal rewards: {wf_rewards:.1f}\033[0m")
-        print(f"\033[94mTotal cost: {total_cost:.6f} USD\033[0m")
+        print(f"\033[94mTotal cost: {exec_cost:.6f} USD\033[0m")
         print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
         print(f"\033[94m{'-' * 60}\033[0m\n")
 
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n"
             f"Goal: {goal[:128]}...\n"
-            f"Cost: {total_cost:.6f} USD.\n"
+            f"Cost: {exec_cost:.6f} USD.\n"
             f"Rewards history: {rewards_history}"
             f"Answers: {self.get_flow_answers(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
