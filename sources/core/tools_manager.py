@@ -4,6 +4,7 @@ This class manages the discovery and interaction with MCP tools.
 
 import asyncio
 import json
+import time
 import subprocess
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -383,7 +384,7 @@ class ToolManager:
                 continue
         return mcps
     
-    async def verify_tools(self) -> None:
+    async def verify_tools(self) -> bool:
         """Verify that at least a bash tool (execute_command) is available."""
         bash_found = False
         for mcp in self.mcps:
@@ -392,9 +393,12 @@ class ToolManager:
                 if "execute_command" in tools:
                     bash_found = True
             except AttributeError as e:
-                raise e
+                return False
         if not bash_found:
-            raise ValueError("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
+            print("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
+            time.sleep(2)
+            return False
+        return True
 
     async def discover_mcp_servers(self) -> list[MCP]:
         """

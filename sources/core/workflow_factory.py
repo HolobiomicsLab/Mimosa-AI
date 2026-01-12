@@ -73,8 +73,10 @@ class WorkflowFactory:
         existing_tool_prompt = ""
         tool_manager = ToolManager(self.config)
         try:
-            mcps = await tool_manager.discover_mcp_servers()
-            await tool_manager.verify_tools()
+            tool_setup = False
+            while tool_setup == False:
+                mcps = await tool_manager.discover_mcp_servers()
+                tool_setup = await tool_manager.verify_tools()
         except Exception as e:
             self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
@@ -180,8 +182,8 @@ The following tools packages are available for agents:
 3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
 4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
 5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organise non-critical files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
-7. Agent should always be provided with tool to use shell and take notes, in addition to a primary tool.
+6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organize files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
+7. Agent should always be provided with tool to use shell, take notes and retrieve their own memory in addition to a primary tool.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
