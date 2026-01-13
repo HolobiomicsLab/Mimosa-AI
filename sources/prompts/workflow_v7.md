@@ -94,10 +94,6 @@ A list of tool package and their given tools will be specified, for example:
 Tool `MCP_5098` is a collection of tools with the following capabilities: ['extract_code_from_html', 'list_html_files']
 Tool `MCP_WEB_BROWSER` is a collection of tools with the following capabilities: ['search', 'navigate']
 
-Each agent requires exactly TWO tool packages:
-1. ONE primary domain-specific tool (e.g., WEB_SEARCH_MCP, R_SCRIPT_MCP)
-2. ONE execution/filesystem tool (SHELL_MCP for runtime ops, or TEXT_EDITING_MCP for file manipulation)
-
 ## 4. How to Build a Workflow
 
 Your output must be a single, runnable Python script. Follow this structure precisely.
@@ -233,7 +229,7 @@ workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
 # 5. EDGE DEFINITION (Wire the graph together here)
 workflow.add_edge(START, "researcher")
 
-master_router is a method that can return one of ["next_node", "retry_node", "fallback_node", END]
+# master_router is a method that can return one of ["next_node", "retry_node", "fallback_node", END]
 workflow.add_conditional_edges(
     "researcher",
     master_router, # always trust the master_router
