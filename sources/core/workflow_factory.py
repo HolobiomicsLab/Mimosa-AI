@@ -500,7 +500,7 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Memory path: {memory_path}")
 
         return complete_code, workflow_code, uuid_str
-
+    
     def _extract_original_from_goal(self, goal: str) -> str:
         """Extract original task from knowledge-wrapped goal.
         
@@ -569,3 +569,83 @@ if WORKFLOW_PATH:
                 self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
             except Exception as e:
                 self.logger.error(f"Failed to save original task: {str(e)}")
+
+    async def craft_single_agent(self, goal: str):
+        """
+        For crafting single agent test code.
+        """
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        short_uuid = str(uuid.uuid4())[:8]
+        uuid_str = f"{timestamp}_{short_uuid}"
+        try:
+            tools_code, existing_tool_prompt = await self.load_tools_code()
+        except Exception as e:
+            self.logger.error(f"craft_workflow: Failed to load tools code: {str(e)}")
+            raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
+        INSTRUCTIONS = ". ".join([
+            "TASK:",
+            goal,
+            "",
+            "Address complaints from the last agent informations if any.",
+            "",
+            "CONSTRAINTS:",
+            "- No placeholder or example values.",
+            "- No assumptions about missing data. Investigate first using available workspace data.",
+            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
+            "- Save outputs instead of plotting.",
+            "- Only use execute_command to install packages.",
+            "- You are only allowed to use tools to create and execute the code required to accomplish the goal.",
+            "- Use python/code editing tools when available.",
+            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
+            "",
+            "INITIAL STEP:",
+            "- Assess the workspace by running: ls -la"
+        ])
+        code = f"""
+import os
+import json
+
+import smolagents
+from smolagents import CodeAgent, LiteLLMModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MODEL_ID = {self.config.smolagent_model_id!r}
+GOAL = {goal!r}
+INSTRUCTIONS = {INSTRUCTIONS!r}
+
+engine = LiteLLMModel(
+    model_id=MODEL_ID,
+    temperature=1.0,
+    max_tokens=8096,
+)
+
+{tools_code}
+
+MCPS = [
+    MCP_5002_TOOLS,
+    MCP_5005_TOOLS,
+    MCP_5006_TOOLS,
+    MCP_5007_TOOLS,
+    MCP_5008_TOOLS,
+    MCP_5009_TOOLS,
+    MCP_5011_TOOLS,
+]
+
+all_tools = []
+for mcp_tools in MCPS:
+    all_tools.extend(mcp_tools)
+
+agent = CodeAgent(
+    tools=all_tools,
+    model=engine,
+    name="dummy",
+    max_steps=256,
+    additional_authorized_imports=["requests", "bs4", "json"],
+)
+
+agent.run(INSTRUCTIONS)
+        """
+
+        return code, code, f"single_agent_{uuid_str}"

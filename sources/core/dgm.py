@@ -257,7 +257,8 @@ class DarwinMachine:
         scenario_id: str = None,
         max_iteration: int = 1,
         learning_mode: bool = False,
-        original_task: str = None
+        original_task: str = None,
+        single_agent_mode = False
     ) -> list[GodelRun]:
         """
         Start the DGM process for achieving a specified goal.
@@ -308,7 +309,8 @@ class DarwinMachine:
             [run0],
             rewards_history=rewards_history,
             assertion_history=assertion_history,
-            learning_mode=learning_mode
+            learning_mode=learning_mode,
+            single_agent_mode=single_agent_mode
         )
 
     async def recursive_self_improvement(
@@ -316,7 +318,8 @@ class DarwinMachine:
         runs: list[GodelRun],
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
-        learning_mode: bool = False
+        learning_mode: bool = False,
+        single_agent_mode = False
     ):
         """Run a self-improvement loop for the workflow."""
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
@@ -444,7 +447,8 @@ class DarwinMachine:
             runs,
             rewards_history=rewards_history,
             assertion_history=assertion_history,
-            learning_mode=learning_mode
+            learning_mode=learning_mode,
+            single_agent_mode=single_agent_mode
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)

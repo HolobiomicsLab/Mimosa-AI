@@ -68,7 +68,8 @@ class WorkflowOrchestrator:
         self,
         goal: str,
         craft_instructions: str,
-        original_task: str = None
+        original_task: str = None,
+        single_agent_mode = False
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
@@ -91,12 +92,17 @@ class WorkflowOrchestrator:
         # Workflow generation timing
         generation_start = time.time()
         try:
-            complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
-                goal,
-                craft_instructions,
-                save_workflow=True,
-                original_task=original_task
-            )
+            if not single_agent_mode:
+                complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                    goal,
+                    craft_instructions,
+                    save_workflow=True,
+                    original_task=original_task
+                )
+            else:
+                complete_code, workflow_code, uuid = await self.workflow_factory.craft_single_agent(
+                    goal
+                )
         except Exception as e:
             generation_time = time.time() - generation_start
             # Extract UUID from exception message if available

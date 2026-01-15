@@ -353,7 +353,7 @@ Provide your analysis following the specified output format."""
         
         return execution_data
 
-    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool) -> None:
+    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
         """
         Main autonomous execution loop.
         Generates goals from CSV entries, executes them, analyzes results, and learns.
@@ -402,7 +402,8 @@ Provide your analysis following the specified output format."""
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
-                                                        max_iteration=self.config.max_learning_dgm_iterations
+                                                        max_iteration=self.config.max_learning_dgm_iterations,
+                                                        single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
@@ -478,10 +479,10 @@ Provide your analysis following the specified output format."""
             print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
-    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
+    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False, single_agent_mode=False) -> None:
         """Public method to start the autonomous mode."""
         try:
-            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning)
+            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
         except KeyboardInterrupt:
             print("\n\033[95m⚠️ Autonomous mode interrupted by user\033[0m")
             self._print_final_summary()
