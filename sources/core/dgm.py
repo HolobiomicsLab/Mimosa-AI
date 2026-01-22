@@ -258,7 +258,7 @@ class DarwinMachine:
         max_iteration: int = 1,
         learning_mode: bool = False,
         original_task: str = None,
-        single_agent_mode = False
+        single_agent_mode: bool = False
     ) -> list[GodelRun]:
         """
         Start the DGM process for achieving a specified goal.
@@ -319,29 +319,30 @@ class DarwinMachine:
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
         learning_mode: bool = False,
-        single_agent_mode = False
+        single_agent_mode: bool = False
     ):
         """Run a self-improvement loop for the workflow."""
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
 
         iteration_start_time = time.time()
         uuid = None
-        exec_cost = 0.0
+        current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
 
         # Execute workflow
         print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
-            original_task=runs[-1].original_task
+            original_task=runs[-1].original_task,
+            single_agent_mode=single_agent_mode
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
         if workflow_code:
             # Evaluate and calculate costs
-            eval_type, exec_cost = await self._evaluate_and_calculate_cost(
+            eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
             )
-            runs[-1].cost = exec_cost
+            # Don't overwrite runs[-1].cost - it contains cumulative from previous iterations
             runs[-1].reward = wf_info.overall_score
     
         runs[-1].current_uuid = uuid
@@ -378,10 +379,14 @@ class DarwinMachine:
             rewards_history, assertion_history,
             runs[-1].goal, runs[-1].scenario_id, uuid
         )
+        
+        # Calculate cumulative cost for logging
+        cumulative_cost = runs[-1].cost + current_iteration_cost
+        
         # Log and notify completion
         self._log_iteration_completion(
             runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-            wf_info.overall_score, exec_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+            wf_info.overall_score, cumulative_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
@@ -429,7 +434,7 @@ class DarwinMachine:
         runs.append(GodelRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
-            cost=exec_cost + runs[-1].cost,
+            cost=runs[-1].cost + current_iteration_cost,  # Correct cumulative cost
             current_uuid=uuid,
             template_uuid=None,
             workflow_template=runs[-1].workflow_template if wf_info.state_result else None,

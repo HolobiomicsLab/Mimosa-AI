@@ -101,7 +101,8 @@ class WorkflowOrchestrator:
                 )
             else:
                 complete_code, workflow_code, uuid = await self.workflow_factory.craft_single_agent(
-                    goal
+                    goal,
+                    original_task=original_task
                 )
         except Exception as e:
             generation_time = time.time() - generation_start

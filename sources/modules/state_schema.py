@@ -138,3 +138,14 @@ def master_router(state: WorkflowState) -> str:
     else :
         print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FALLBACK/FAILURE. Terminating.")
         return END
+
+def debate_router(state: WorkflowState) -> str:
+    recent_answers = state["answers"][-3:]  # Last 3 agents
+    votes = [json.loads(a).get("verdict") for a in recent_answers]
+    
+    if votes.count("APPROVE") >= 2:
+        return "next_node"
+    elif len(recent_answers) < 9:  # Max 3 debate rounds
+        return "another_round"
+    else:
+        return "fallback_node"

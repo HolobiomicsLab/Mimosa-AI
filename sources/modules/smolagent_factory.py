@@ -39,8 +39,9 @@ load_dotenv()
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
 
-DANGEROUS_FUNCTIONS = {open}
-DANGEROUS_MODULES = {os}
+import subprocess
+DANGEROUS_FUNCTIONS = {subprocess}
+DANGEROUS_MODULES = {}
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -83,18 +84,6 @@ When you need to use a package like `deepchem`:
 4. **Then** create a separate Python file via `create_python_file()` that imports and uses it
 5. **Execute** that file via `execute_command(cmd="python3 <filename>")`
 
-Example pattern (REQUIRED):
-```python
-# Step 1: Install
-result = execute_command(cmd="python3 -m pip install deepchem -q")
-print("Install result:", result[:500])
-# Step 2: Create file with actual logic
-file_result = create_python_file(filename="work.py", content=code)
-# Step 3: Execute
-exec_result = execute_command(cmd="python3 work.py")
-print("Execution output:", exec_result[:1024])
-```
-
 ## 2. ERROR PREVENTION WITH TOOL-FIRST MINDSET
 - **Try-Except around tool calls**: Wrap every tool invocation in try-except
 - **Print tool output**: Always inspect what tools returned before proceeding
@@ -115,7 +104,6 @@ except Exception as e:
 ## 4. TOOL USAGE GUIDELINES
 - **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
 - **Tool first**: Always favor tool over your base coding abilities (have python editing tool or bash ? then use them). Tools are more efficient. You will be rewarded 1000$ everytime you comply.
-- **No Assumptions**: Do not assume tool output format or content; validate every time
 - **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
 
 ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
@@ -182,7 +170,36 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
-                additional_authorized_imports=['requests', 'bs4', 'json'],
+                additional_authorized_imports = [
+                    'requests', 'bs4', 'json', 'requests.exceptions',
+                    # Core Utilities
+                    'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse', 
+                    'configparser', 'logging',
+                    # Data Structures & Algorithms
+                    'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue', 
+                    'dataclasses', 'enum', 'types',
+                    # Text & String Processing
+                    're', 'string', 'textwrap', 'difflib', 'unicodedata',
+                    # Data Formats
+                    'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64', 
+                    'html', 'html.parser',
+                    # Date & Time
+                    'datetime', 'time', 'calendar',
+                    # Networking & Web
+                    'urllib', 'urllib.parse', 'urllib.request', 'urllib.error', 'http', 
+                    'http.client', 'socket', 'email', 'mimetypes',
+                    # Cryptography & Hashing
+                    'hashlib', 'hmac', 'secrets', 'uuid',
+                    # Math & Numbers
+                    'math', 'random', 'statistics', 'decimal', 'fractions',
+                    # System & Runtime
+                    'traceback', 'inspect', 'gc', 'warnings', 'io',
+                    # Compression
+                    'gzip', 'zipfile', 'tarfile', 'zlib',
+                    # Third-party Lightweight
+                    'pygments', 'markdownify', 'dateutil', 'pytz', 'click', 'toml', 'yaml', 
+                    'PIL', 'pillow'
+                ]
 
             )
             self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
@@ -387,7 +404,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                 print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
-
+    
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         import threading
         workflow_uuid = state.get("workflow_uuid", None)
@@ -398,16 +415,23 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
         result = {'response': None, 'exception': None, 'completed': False}
 
         def _run_agent():
+            nonlocal instructions
             error = True
-            while error:
+            count = 0
+            warning = False
+            while error and count < 3:
+                if warning:
+                    instructions += "\nWARNING: Last run failed due to context exceeded, read file content carefully (content[:2048]), same for tool output usage (output[:2048])"
                 try:
                     result['response'] = self.agent.run(instructions)
                     result['completed'] = True
                     error = False
+                    warning = True
                 except Exception as e:
                     print(str(e))
                     print("retrying...")
                     error = True
+                    count += 1
                 #result['exception'] = e
                 #result['completed'] = True
 
