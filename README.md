@@ -9,7 +9,7 @@ Mimosa is an automated AI-scientist framework built to reproduce published findi
 ## Objectives
 
 - Faithfully reproduce scientific studies with traceability and rigor
-- Enable fully automated scientific pipelines—bioinformatics, docking, metabolomics, and more
+- Enable fully automated scientific pipelines: bioinformatics, docking, metabolomics, and more
 
 ## How does it work ?
 
@@ -52,16 +52,19 @@ Create a `.env` file in the project root with your API keys:
 
 ```env
 HF_TOKEN=your_hugging_face_token          # OR use DEEPSEEK_API_KEY
-ANTHROPIC_API_KEY=your_anthropic_key
+OPENROUTER_API_KEY=your_openrouter_key # if using openrouter
 LANGFUSE_PUBLIC_KEY=your_langfuse_public_key    # Optional
 LANGFUSE_PRIVATE_KEY=your_langfuse_private_key  # Optional
 ```
 
-**Provider Options:**
+**Explanations:**
 - `HF_TOKEN`: Hugging Face token for LLM access
-- `DEEPSEEK_API_KEY`: DeepSeek API key (alternative to HF_TOKEN)
-- `ANTHROPIC_API_KEY`: Anthropic API for Claude models
-- `LANGFUSE_*`: Optional telemetry keys for monitoring (see [Telemetry Setup](#telemetry-setup))
+- `OPENROUTER_API_KEY`: openrouter API key, if using openrouter to use any model (**see:** [Openrouter](https://openrouter.ai/))
+- `MISTRAL_API_KEY`: Mistral API key, if using Mistral.
+- `DEEPSEEK_API_KEY`: Deepseek API key, if using a Deepseek model.
+- `OPENAI_API_KEY`: OpenAI API key, if using GPT model such as GPT-5.2.
+- `ANTHROPIC_API_KEY`: Anthropic API key, if using Claude.
+- `LANGFUSE_*`: Totally telemetry keys for monitoring (see [Telemetry Setup](#telemetry-setup))
 
 ### Step 3: Install Dependencies
 
@@ -99,6 +102,8 @@ code my_config.json
 # or: just open it in VS code the normal way
 ```
 
+**Alternative**: directly modify the config value in `config.py`
+
 **Mimosa Configuration Overview**
 
 | Parameter | Description |
@@ -106,8 +111,8 @@ code my_config.json
 | `workspace_dir` | Path to the Toolomics workspace. All files created or modified by Mimosa appear here. Must point to the Toolomics project directory. |
 | `discovery_addresses` | Network ranges (IP + port range) used to discover MCP tool servers. |
 | `planner_llm_model` | LLM used to decompose tasks and build execution plans. |
-| `prompts_llm_model` | LLM used for workflow prompts generation. |
-| `workflow_llm_model` | LLM used to generate and orchestrate multi-agent workflows. |
+| `prompts_llm_model` | LLM used for workflow prompts generation.  |
+| `workflow_llm_model` | LLM used to generate and orchestrate multi-agent workflows.  (**Recommand:** anthropic/claude-opus-4-5-20251101)  |
 | `smolagent_model_id` | Model used for HuggingFace SmolAgents handling execution subtasks. |
 | `judge_model` | LLM used to evaluate Mimosa’s own outputs and assign performance scores. |
 | `engine_name` | Inference engine used to route and manage model calls (LiteLLM). |
@@ -127,19 +132,19 @@ code my_config.json
 ### Step 6: Run Mimosa-AI
 
 ```bash
-python3 main.py --goal "Your objective here" --config config_default.json
+python3 main.py --goal "Your objective here" --config my_config.json
 # OR with uv:
-uv run main.py --goal "Your objective here" --config config_default.json
+uv run main.py --goal "Your objective here" --config my_config.json
 ```
 
 **Standard usage - accomplish a goal:**
 ```bash
-uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." --config config_default.json
+uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." --config my_config.json
 ```
 
 **Single task mode - no long-term planning:**
 ```bash
-uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --judge --config config_default.json
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --config my_config.json
 ```
 
 > **Note:** Remember to activate your virtual environment before running Mimosa-AI in future sessions.

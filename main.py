@@ -109,6 +109,8 @@ async def papers_mode(args, config):
 
 async def science_bench_papers_mode(args, config):
     papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    if args.single_agent:
+        print(f"⚠️ Starting in single agent mode")
     await papers.start_evaluation(dataset_type="science_agent_bench",
                                   dataset_path="datasets/ScienceAgentBench.csv",
                                   learning=args.learn,
@@ -146,6 +148,8 @@ async def normal_execution_mode(args, config):
     if args.task:
         # Load goal from file if args.task is a file path
         goal_content = load_goal_from_file_or_string(args.task)
+        if args.single_agent:
+            print(f"⚠️ Starting in single agent mode")
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_id=args.scenario,

@@ -619,6 +619,11 @@ if WORKFLOW_PATH:
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path_abs = str((script_dir / memory_path).resolve())
         workflow_path_abs = str((script_dir / workflow_path).resolve())
+
+        mcp_vars = sorted(set(
+            re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
+        ))
+        mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
         
         code = f"""
 import os
@@ -646,15 +651,7 @@ engine = LiteLLMModel(
 )
 
 {tools_code}
-
-MCPS = [
-    MCP_5202_TOOLS,
-    MCP_5206_TOOLS,
-    MCP_5207_TOOLS,
-    MCP_5208_TOOLS,
-    MCP_5209_TOOLS,
-    MCP_5211_TOOLS
-]
+{mcps_string}
 
 all_tools = []
 for mcp_tools in MCPS:
