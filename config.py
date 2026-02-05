@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -84,15 +84,17 @@ class Config:
             "python-dotenv",
             "fastmcp==2.8.1",
             "requests>=2.31.0",
-            "smolagents[all]",
+            # avoid optional extras that pull in packages like `helium`/`selenium`
+            "pillow>=12.1.0",
+            "smolagents[litellm,mlx-lm,telemetry,mcp]",
             "langgraph>=0.4.7",
             "matplotlib>=3.9.0",
             "numpy>=2.0.0",
-            "python_a2a",
+            # correct PyPI package name
+            "python-a2a",
             "opentelemetry-sdk",
             "opentelemetry-exporter-otlp",
             "openinference-instrumentation-smolagents",
-            "asyncio==3.4.3",
         ]
         # notifications
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
@@ -173,7 +175,7 @@ class Config:
             "runner_temp_dir": self.runner_temp_dir,
             "runner_requirements": self.runner_requirements,
         }
-    
+
     def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workspace_dir = data.get("workspace_dir", self.workspace_dir)
