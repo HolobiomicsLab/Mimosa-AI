@@ -31,6 +31,30 @@ cd frontier-evals/project/paperbench
    ```
    Each `submission_try_*` folder should contain the files you want graded. Missing paper folders simply count as zero for that paper.
 
+## Docker Image Pull Issue - Quick Resolution Report
+
+### Issue
+
+When running PaperBench evaluations, you get the error:
+`ImageNotFound: pull access denied for pb-env, repository does not exist or may require 'docker login'`
+
+**Root Cause:**
+The system defaults to pulling Docker images from remote registries (Docker Hub) instead of using your locally built pb-env:latest image.
+
+### Quick Fix
+Configure your LocalConfig with pull_from_registry=False:
+
+**Command Line:**
+
+```bash
+python -m paperbench.nano.eval --paperbench.solver.computer_runtime.env="alcatraz.clusters.local:LocalConfig(pull_from_registry=False)"
+```
+
+Or in your config:
+
+```bash
+LocalConfig(pull_from_registry=False)  # instead of default LocalConfig()
+```
 ## **Paper IDs:**
 
 1. **adaptive-pruning**: APT: Adaptive Pruning and Tuning Pretrained Language Models for Efficient Training and Inference
