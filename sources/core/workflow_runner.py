@@ -88,6 +88,10 @@ class WorkflowRunner:
                 [f"python{self.config.python_version}", "-m", "ensurepip"],
                 check=True,
             )
+            subprocess.run(
+                [f"python{self.config.python_version}" "apt", "install", "-y", "python3.10-venv", "python3.10-distutils"],
+                check=True,
+            )
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Failed to ensure pip: {e}")
 
