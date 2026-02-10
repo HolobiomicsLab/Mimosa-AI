@@ -73,8 +73,10 @@ class WorkflowFactory:
         existing_tool_prompt = ""
         tool_manager = ToolManager(self.config)
         try:
-            mcps = await tool_manager.discover_mcp_servers()
-            await tool_manager.verify_tools()
+            tool_setup = False
+            while tool_setup == False:
+                mcps = await tool_manager.discover_mcp_servers()
+                tool_setup = await tool_manager.verify_tools()
         except Exception as e:
             self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
@@ -180,8 +182,8 @@ The following tools packages are available for agents:
 3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
 4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
 5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organise non-critical files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
-7. Agent should always be provided with tool to use shell and take notes, in addition to a primary tool.
+6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organize files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
+7. Agent should always be provided with tool to use shell, take notes and retrieve their own memory in addition to a primary tool.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
@@ -498,6 +500,27 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Memory path: {memory_path}")
 
         return complete_code, workflow_code, uuid_str
+    
+    def _extract_original_from_goal(self, goal: str) -> str:
+        """Extract original task from knowledge-wrapped goal.
+        
+        Args:
+            goal: Goal text that may be wrapped with knowledge context
+            
+        Returns:
+            str: Extracted original task or goal if not wrapped
+        """
+        if not goal:
+            return ""
+        
+        # Pattern: "...Now, use this knowledge to complete:\n<actual_task>"
+        # This is the pattern used by planner._build_knowledge_aware_task()
+        match = re.search(r'Now, use this knowledge to complete:\s*\n(.*)', goal, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        
+        # If no wrapper pattern found, return goal as-is
+        return goal
 
     def save_workflow_files(
         self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
@@ -537,10 +560,175 @@ if WORKFLOW_PATH:
             self.logger.error(f"Failed to save goal: {str(e)}")
         
         # Save original task for better similarity matching
-        if original_task:
+        # Extract from goal if not provided explicitly
+        task_to_save = original_task if original_task else self._extract_original_from_goal(goal)
+        if task_to_save:
             try:
                 with open(os.path.join(path, f"original_task_{uuid_str}.txt"), "w") as f:
-                    f.write(original_task)
+                    f.write(task_to_save)
                 self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
             except Exception as e:
                 self.logger.error(f"Failed to save original task: {str(e)}")
+
+    async def craft_single_agent(self, goal: str, original_task: str = None):
+        """
+        For crafting single agent with cost tracking support.
+        
+        Args:
+            goal: The goal description (may be knowledge-wrapped)
+            original_task: The original unwrapped task for similarity matching
+            
+        Returns:
+            tuple[str, str, str]: (complete_code, workflow_code, uuid)
+        """
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        short_uuid = str(uuid.uuid4())[:8]
+        uuid_str = f"single_agent_{timestamp}_{short_uuid}"
+        
+        try:
+            tools_code, existing_tool_prompt = await self.load_tools_code()
+        except Exception as e:
+            self.logger.error(f"craft_single_agent: Failed to load tools code: {str(e)}")
+            raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
+        
+        # Create folder structure for cost tracking (like multi-agent mode)
+        workflow_path, memory_path = self.create_folder_structure(uuid_str)
+        
+        INSTRUCTIONS = ". ".join([
+            "TASK:",
+            goal,
+            "",
+            "Address complaints from the last agent informations if any.",
+            "",
+            "CONSTRAINTS:",
+            "- No placeholder or example values.",
+            "- No assumptions about missing data. Investigate first using available workspace data.",
+            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
+            "- Save outputs instead of plotting.",
+            "- Only use execute_command to install packages.",
+            "- You are only allowed to use tools to create and execute the code required to accomplish the goal.",
+            "- Use python/code editing tools when available.",
+            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
+            "",
+            "INITIAL STEP:",
+            "- Assess the workspace by running: ls -la"
+        ])
+        
+        # Resolve absolute paths (like craft_workflow does)
+        from pathlib import Path
+        script_dir = Path(__file__).resolve().parent.parent.parent
+        memory_path_abs = str((script_dir / memory_path).resolve())
+        workflow_path_abs = str((script_dir / workflow_path).resolve())
+
+        mcp_vars = sorted(set(
+            re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
+        ))
+        mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
+        
+        code = f"""
+import os
+import json
+from dataclasses import asdict
+from typing import List
+
+import smolagents
+from smolagents import CodeAgent, LiteLLMModel, ActionStep
+from smolagents.models import get_dict_from_nested_dataclasses
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MODEL_ID = {self.config.smolagent_model_id!r}
+GOAL = {goal!r}
+INSTRUCTIONS = {INSTRUCTIONS!r}
+MEMORY_PATH = {memory_path_abs!r}
+WORKFLOW_PATH = {workflow_path_abs!r}
+
+engine = LiteLLMModel(
+    model_id=MODEL_ID,
+    temperature=1.0,
+    max_tokens=8096,
+)
+
+{tools_code}
+{mcps_string}
+
+all_tools = []
+for mcp_tools in MCPS:
+    all_tools.extend(mcp_tools)
+
+agent = CodeAgent(
+    tools=all_tools,
+    model=engine,
+    name="single_agent",
+    max_steps=256,
+    additional_authorized_imports=["requests", "bs4", "json"],
+)
+
+def save_agent_memories(agent, memory_path: str, agent_name: str):
+    print(f"Saving agent memory to: {{{{memory_path}}}}")
+    try:
+        memories = []
+        for idx, step in enumerate(agent.memory.steps):
+            if isinstance(step, ActionStep):
+                action_step = step.dict()
+                action_step["model_input_messages"] = (
+                    get_dict_from_nested_dataclasses(
+                        [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], 
+                        ignore_key="raw"
+                    )
+                    if step.model_input_messages
+                    else None
+                )
+                action_step["model_output_message"] = (
+                    get_dict_from_nested_dataclasses(
+                        step.model_output_message, ignore_key="raw"
+                    )
+                    if step.model_output_message
+                    else None
+                )
+                memories.append(action_step)
+        
+        os.makedirs(memory_path, exist_ok=True)
+        agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
+        with open(agent_task_path, "w") as f:
+            json.dump(memories, f, indent=2)
+        print(f"✅ Agent memories saved successfully to {{{{agent_task_path}}}}")
+    except Exception as e:
+        print(f"⚠️  Failed to save memory: {{{{str(e)}}}}")
+
+# Run agent
+result = agent.run(INSTRUCTIONS)
+
+# Save agent memories for cost tracking
+save_agent_memories(agent, MEMORY_PATH, "single_agent")
+
+# Save state_result.json for cost tracking and evaluation
+state_result = {{
+    "model_id": MODEL_ID,
+    "goal": GOAL,
+    "workflow_uuid": "{uuid_str}",
+    "single_agent_mode": True,
+    "step_name": ["single_agent"],
+    "answers": [str(result)],
+    "success": [True]  # Assume success if no exception
+}}
+
+try:
+    with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
+        json.dump(state_result, f, indent=2)
+    print(f"✅ Saved state_result.json to {{WORKFLOW_PATH}}")
+except Exception as e:
+    print(f"❌ Failed to save state_result.json: {{e}}")
+        """
+        
+        # Save metadata files (like multi-agent mode)
+        self.save_workflow_files(
+            workflow_path, 
+            uuid_str, 
+            code,  # Save the single agent code
+            goal, 
+            original_task
+        )
+        
+        return code, code, uuid_str

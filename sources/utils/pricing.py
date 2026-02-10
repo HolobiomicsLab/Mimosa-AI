@@ -81,13 +81,13 @@ class PricingCalculator:
 
         llm_calls: list[TokenUsage] = []
 
-        # Orchestrator and Judge LLM calls
-
+        # Orchestrator and Judge LLM calls (multi-agent mode)
+        orchestrator_calls_found = False
         for call in ["workflow_creator", "judge"]:
             memory_file = memory_path / f"{call}.json"
             if not memory_file.exists():
                 continue
-
+            orchestrator_calls_found = True
             with open(memory_file) as f:
                 json_call = json.load(f)
                 llm_calls.append(
@@ -99,6 +99,10 @@ class PricingCalculator:
                         json_call["usage"]["total_tokens"],
                     )
                 )
+        
+        # Check for single agent mode (no orchestrator calls but has task files)
+        if not orchestrator_calls_found:
+            print("📊 Single agent mode detected - calculating agent execution costs only")
 
         workflow_path = Path(self.workflow_dir) / uuid
 
@@ -119,7 +123,7 @@ class PricingCalculator:
         if model_id:
             try:
                 for file in os.listdir(memory_path):
-                    if file.startswith("task_") and file.endswith(".json"):
+                    if (file.startswith("task_") or file.startswith("single_agent")) and file.endswith(".json"):
                         with open(memory_path / file) as f:
                             steps = json.load(f)
                             token_usage = {

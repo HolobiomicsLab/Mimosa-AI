@@ -109,21 +109,10 @@ def eval():
 
 ## Usage
 
-### Running ScienceAgentBench Evaluation
+**Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 DGM iterations**
 
-```python
-from sources.extensibility.papers_mode import CsvEvaluationMode
-import asyncio
-
-# Initialize
-config = Config()  # Your Mimosa config
-evaluator = CsvEvaluationMode(config, csv_runs_limit=10)
-
-# Run on ScienceAgentBench dataset
-await evaluator.start_evaluation(
-    dataset_type="science_agent_bench",
-    dataset_path="datasets/ScienceAgentBench.csv"
-)
+```sh
+uv run main.py --science_agent_bench --csv_runs_limit 102 --max_dgm_iterations 10
 ```
 
 ### Output Structure
@@ -163,79 +152,6 @@ Notes saved in: run_notes
 ================================================================================
 ```
 
-## Implementation Details
-
-### CapsuleEvaluator Class
-
-**Location:** `sources/evaluation/capsule_evaluator.py`
-
-**Key Methods:**
-
-```python
-class CapsuleEvaluator:
-    def __init__(self, capsule_path, task_data, sab_loader, api_cost):
-        """Initialize with task context and paths."""
-        
-    def evaluate_all(self) -> Dict[str, Any]:
-        """Run all evaluation metrics."""
-        
-    def evaluate_exec_rate(self) -> Tuple[bool, str]:
-        """VER evaluation."""
-        
-    def evaluate_success_rate(self) -> Tuple[bool, str]:
-        """SR evaluation."""
-        
-    def calculate_codebert_score(self) -> float:
-        """CBS calculation."""
-        
-    def save_results(self, output_path: Optional[Path] = None) -> Path:
-        """Save results to JSON."""
-```
-
-### Execution Sandbox
-
-**Location:** `sources/evaluation/execution_sandbox.py`
-
-**Features:**
-- Safe code execution with timeouts
-- Subprocess isolation
-- Resource management
-- Error capturing
-
-**Key Functions:**
-
-```python
-def execute_safely(
-    script_path: Path,
-    working_dir: Path,
-    expected_output: str = "",
-    timeout: int = 300
-) -> Tuple[bool, str, bool]:
-    """Execute Python script safely."""
-
-def run_eval_script(
-    eval_script_path: Path,
-    capsule_path: Path,
-    timeout: int = 60
-) -> Tuple[bool, str]:
-    """Run ScienceAgentBench evaluation script."""
-```
-
-### CodeBERT Scorer
-
-**Location:** `sources/evaluation/codebert_scorer.py`
-
-**Model:** `microsoft/codebert-base`
-
-**Dependencies:**
-```bash
-pip install transformers torch
-```
-
-**Features:**
-- Proper CodeBERT implementation
-- Token-based fallback if transformers unavailable
-- Model caching for efficiency
 
 ## Configuration
 
@@ -275,46 +191,6 @@ ScienceAgentBench CSV requires these columns:
 - `output_fname`: Expected output file name
 - `eval_script_name`: Evaluation script filename
 - `gold_program_name`: Reference implementation filename
-
-## Error Handling
-
-The evaluation system is designed to be fault-tolerant:
-
-1. **VER Failure:** SR automatically set to False
-2. **SR Failure:** CBS still calculated
-3. **CBS Failure:** Returns 0.0, continues evaluation
-4. **Evaluation Error:** Logs error, marks metrics as failed, continues to next task
-
-## Performance Optimization
-
-### Preload CodeBERT Model
-
-For multiple evaluations, preload the model:
-
-```python
-from sources.evaluation.codebert_scorer import preload_codebert_model
-
-# Preload once at start
-tokenizer, model = preload_codebert_model()
-```
-
-### Parallel Evaluation
-
-For batch processing:
-
-```python
-# Evaluate multiple tasks concurrently
-import asyncio
-from concurrent.futures import ProcessPoolExecutor
-
-async def evaluate_batch(tasks):
-    with ProcessPoolExecutor() as executor:
-        results = await asyncio.gather(*[
-            executor.submit(evaluate_task, task)
-            for task in tasks
-        ])
-    return results
-```
 
 ## References
 

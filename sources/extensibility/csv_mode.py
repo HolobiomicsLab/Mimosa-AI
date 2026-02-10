@@ -107,6 +107,12 @@ Provide a structured analysis with:
             try:
                 with open(notes_file, 'r', encoding='utf-8') as f:
                     notes = json.load(f)
+                    model = notes.get('model', '')
+                    assert model
+                    assert self.config.smolagent_model_id
+                    if model != self.config.smolagent_model_id:
+                        continue
+
                     total_eval = notes.get('total_eval', 0)
                     if total_eval > max_total_eval:
                         max_total_eval = total_eval
@@ -173,6 +179,7 @@ Provide a structured analysis with:
         sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
         notes = {
             "timestamp": timestamp,
+            "model": self.config.smolagent_model_id,
             "goal": goal,
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
@@ -184,8 +191,9 @@ Provide a structured analysis with:
                 "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
                 "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
                 "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
-                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs)
-        }
+                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
+                "is_success": sab_runs[-1].get('SR', False)
+            }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
         notes_file.parent.mkdir(parents=True, exist_ok=True)
@@ -337,7 +345,8 @@ Provide your analysis following the specified output format."""
                 f"[SAB EVAL] Task {row.get('instance_id')}: "
                 f"VER={eval_results['VER'][0]}, "
                 f"SR={eval_results['SR'][0]}, "
-                f"CBS={eval_results['CBS']:.3f}"
+                f"CBS={eval_results['CBS']:.3f}, "
+                f"eval_cost={eval_results['cost']:.3f}"
             )
             
         except Exception as eval_error:
@@ -352,14 +361,14 @@ Provide your analysis following the specified output format."""
         
         return execution_data
 
-    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool) -> None:
+    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
         """
         Main autonomous execution loop.
-        Generates goals, executes them, analyzes results, and learns.
+        Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
         user_input = input("Enter starting row ([Enter] 0 by default): ")
-        start_row = int(user_input)-1 if user_input.strip() else -1
+        start_row = int(user_input)-1 if user_input.strip() else 0
         
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -388,8 +397,9 @@ Provide your analysis following the specified output format."""
             print(f"\033[95m{'=' * 80}\033[0m")
             for i, row in enumerate(reader):
                 if i < start_row:
+                    print("Skipping evaluation (using cache) for :", i+1)
                     continue
-                if i > self.csv_runs_limit:
+                if i >= self.csv_runs_limit:
                     break
                 try:
                     iteration_start_time = time.time()
@@ -401,13 +411,14 @@ Provide your analysis following the specified output format."""
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
-                                                        max_iteration=self.config.max_learning_dgm_iterations
+                                                        max_iteration=self.config.max_learning_dgm_iterations,
+                                                        single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_dgm_iteration=5,
+                                    max_dgm_iteration=self.config.max_learning_dgm_iterations,
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
@@ -446,21 +457,26 @@ Provide your analysis following the specified output format."""
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    raise e
+                    continue
 
         self._print_final_summary()
 
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
-
-        successful_runs = [exec_data for exec_data in self.execution_history
+        # Filter out cached entries to count only actual runs from this session
+        current_runs = [exec_data for exec_data in self.execution_history
+                       if exec_data.get("success_level") != "Cached"]
+        
+        successful_runs = [exec_data for exec_data in current_runs
                           if exec_data.get("success_level") in ["High", "Medium"]]
-        print(f"\n\033[95mSUMMARY step: {len(self.execution_history)}\033[0m")
+        print(f"\n\033[95mSUMMARY step: {len(current_runs)}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
-        if len(self.execution_history) > 0:
-            print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
-        sab_runs = [exec_data for exec_data in self.execution_history 
+        if len(current_runs) > 0:
+            print(f"\033[95mSuccess rate: {len(successful_runs)/len(current_runs)*100:.1f}%\033[0m")
+        
+        # For SAB metrics, also exclude cached entries
+        sab_runs = [exec_data for exec_data in current_runs 
                     if 'VER' in exec_data]
         if sab_runs:
             print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")
@@ -477,10 +493,10 @@ Provide your analysis following the specified output format."""
             print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m\n")
 
-    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False) -> None:
+    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False, single_agent_mode=False) -> None:
         """Public method to start the autonomous mode."""
         try:
-            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning)
+            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
         except KeyboardInterrupt:
             print("\n\033[95m⚠️ Autonomous mode interrupted by user\033[0m")
             self._print_final_summary()

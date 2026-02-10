@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
 import glob
 import random
 
@@ -331,7 +330,7 @@ class LLMProvider:
                         # Regular retry with backoff for other retryable errors
                         wait_time = self._calculate_backoff_wait(attempt, max_wait)
                         self.logger.warning(
-                            f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:100]}. "
+                            f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:512]}. "
                             f"Retrying in {wait_time:.1f}s..."
                         )
                         time.sleep(wait_time)

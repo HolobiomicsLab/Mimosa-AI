@@ -80,6 +80,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
+    if args.max_dgm_iterations:
+        config.max_learning_dgm_iterations = args.max_dgm_iterations
 
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
@@ -99,11 +101,43 @@ async def manual_mode(args, config):
 
 async def papers_mode(args, config):
     papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_evaluation(dataset_type="default", dataset_path=args.papers, learning=args.learn)
+    await papers.start_evaluation(dataset_type="default",
+                                  dataset_path=args.papers,
+                                  learning=args.learn,
+                                  single_agent_mode=args.single_agent
+                                 )
 
 async def science_bench_papers_mode(args, config):
     papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
-    await papers.start_evaluation(dataset_type="science_agent_bench", dataset_path="datasets/ScienceAgentBench.csv", learning=args.learn)
+    if args.single_agent:
+        print(f"⚠️ Starting in single agent mode")
+    await papers.start_evaluation(dataset_type="science_agent_bench",
+                                  dataset_path="datasets/ScienceAgentBench.csv",
+                                  learning=args.learn,
+                                  single_agent_mode=args.single_agent
+                                 )
+
+def load_goal_from_file_or_string(goal_input: str) -> str:
+    """
+    Load goal from file if the input is a file path, otherwise return the string as-is.
+    
+    Args:
+        goal_input: Either a file path or a goal string
+        
+    Returns:
+        The goal content (either loaded from file or the original string)
+    """
+    if goal_input and os.path.isfile(goal_input):
+        try:
+            with open(goal_input, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                print(f"✅ Loaded goal from file: {goal_input}")
+                return content
+        except Exception as e:
+            print(f"⚠️ Failed to read file '{goal_input}': {e}")
+            print(f"Using input as a literal string instead.")
+            return goal_input
+    return goal_input
 
 async def normal_execution_mode(args, config):
     dgm = DarwinMachine(config)
@@ -112,14 +146,21 @@ async def normal_execution_mode(args, config):
         scenario_file = ScenarioLoader().load_scenario(args.scenario)
         args.task = scenario_file["goal"]
     if args.task:
-        await dgm.start_dgm(goal=args.task,
+        # Load goal from file if args.task is a file path
+        goal_content = load_goal_from_file_or_string(args.task)
+        if args.single_agent:
+            print(f"⚠️ Starting in single agent mode")
+        await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_id=args.scenario,
                             max_iteration=args.max_dgm_iterations,
-                            learning_mode=args.learn
+                            learning_mode=args.learn,
+                            single_agent_mode=args.single_agent
                            )
     elif args.goal:
-        await planner.start_planner(goal=args.goal,
+        # Load goal from file if args.goal is a file path
+        goal_content = load_goal_from_file_or_string(args.goal)
+        await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
                                     max_dgm_iteration=args.max_dgm_iterations
                                    )
@@ -137,6 +178,9 @@ async def main():
         description="Mimosa - A AI Agent Framework for advancing scientific research"
     )
     parser.add_argument(
+        "--config", type=str, help="Path to configuration JSON file to load"
+    )
+    parser.add_argument(
         "--goal", type=str, help="Goal for Mimosa to achieve (for planner mode)"
     )
     parser.add_argument(
@@ -144,6 +188,9 @@ async def main():
     )
     parser.add_argument(
         "--learn", action="store_true", help="Learning mode. Retry task with DGM until threshold score it met.", default=False
+    )
+    parser.add_argument(
+        "--single_agent", action="store_true", help="Single-agent mode for benchmark comparaison, not recommended for real-tasks use.", default=False
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
@@ -167,15 +214,21 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=3, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
+        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
 
+    # Load config from file if provided
+    if args.config:
+        config.load(args.config)
+        print(f"Configuration loaded from: {args.config}")
+
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
+    # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
 
     validate_environment()

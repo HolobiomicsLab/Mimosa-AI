@@ -3,7 +3,6 @@ import time
 import os
 import re
 import sys
-import time
 import threading
 from pathlib import Path
 from .dgm import DarwinMachine
@@ -315,7 +314,7 @@ Original request:
             print("🔄 Will regenerate plan based on your feedback...")
             return False, user_input
 
-    def _generate_plan_with_human_validation(self, goal: str, max_attempts: int = 10) -> Plan:
+    def _generate_plan_with_human_validation(self, goal: str, human_approve = False) -> Plan:
         """
         Generate a plan with iterative human validation and feedback loop.
         Args:
@@ -331,7 +330,6 @@ Original request:
         human_feedback = ""
         
         while not plan_approved:
-            
             current_goal = goal
             if human_feedback:
                 current_goal = f"{goal}\n\nHUMAN FEEDBACK ON PREVIOUS PLAN:\n{human_feedback}\n\nPlease address this feedback in the new plan."
@@ -339,7 +337,10 @@ Original request:
             if plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
             self._display_plan(plan)
-            plan_approved, human_feedback = self._request_human_plan_validation(plan)
+            if human_approve:
+                plan_approved, human_feedback = self._request_human_plan_validation(plan)
+            else:
+                plan_approved, human_feedback = True, ""
         return plan
 
     def _init_visualization(self, plan: Plan) -> None:
@@ -541,7 +542,7 @@ Original request:
             raise ValueError("❌ Planner: Task must be a non-empty string")
 
         if max_dgm_iteration is None or max_dgm_iteration < 1:
-            max_dgm_iteration = 2
+            max_dgm_iteration = 1
             print(f"⚠️ Invalid max_dgm_iteration, using default: {max_dgm_iteration}")
 
         print(f"🎯 Starting DGM runs for task: {task[:50]}...")
@@ -552,7 +553,7 @@ Original request:
             
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                lookup_task, threshold_similary=0.8, threshod_score=0.7
+                lookup_task, threshold_similary=0.8, threshod_score=0.85
             ) if cached_wf_allow else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -597,8 +598,8 @@ Original request:
 
         except Exception as e:
             raise e
-            print(f"❌ Error in dgm_runs: {str(e)}")
-            raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
+            #print(f"❌ Error in dgm_runs: {str(e)}")
+            #raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
     def _get_dgm_success(self, run: GodelRun) -> bool:
         run_state_result = getattr(run, 'state_result', None) or {}
@@ -717,7 +718,7 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_dgm_iteration: int = 2,
+        max_dgm_iteration: int = 1,
         max_task_retry: int = 5
     ) -> list[Task]:
         """
