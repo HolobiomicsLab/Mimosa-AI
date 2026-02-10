@@ -249,13 +249,12 @@ uv run main.py --task "Train a multitask model on the Clintox dataset to predict
 
 ### System Overview
 
-Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+Mimosa-AI is a **self-evolving multi-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
 
-The system operates on an **agent-within-agent** pattern:
 - Goals decompose into learnable tasks
 - Each task triggers synthesis of a specialized multi-agent workflow
 - Successful workflow patterns are retained and refined over time
-- The system continuously optimizes its own architecture through execution feedback
+- The system continuously optimizes task-specific multi-agent architectures through execution feedback
 
 ### Goal vs Task Philosophy
 
@@ -270,7 +269,7 @@ The system operates on an **agent-within-agent** pattern:
 
 ### Self-Improvement Mechanism (DGM)
 
-The system implements a Darwinian-inspired evolution approach based on Gödel machine principles:
+The system implements a Darwinian-inspired evolution approach to workflow evolution:
 
 1. **Task Recognition**: For each task, the system:
    - Searches workflow library for similar historical tasks
