@@ -185,8 +185,9 @@ Provide a structured analysis with:
                 "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
                 "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
                 "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
-                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs)
-        }
+                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
+                "is_success": sab_runs[-1].get('SR', False)
+            }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
         notes_file.parent.mkdir(parents=True, exist_ok=True)
@@ -338,7 +339,8 @@ Provide your analysis following the specified output format."""
                 f"[SAB EVAL] Task {row.get('instance_id')}: "
                 f"VER={eval_results['VER'][0]}, "
                 f"SR={eval_results['SR'][0]}, "
-                f"CBS={eval_results['CBS']:.3f}"
+                f"CBS={eval_results['CBS']:.3f}, "
+                f"eval_cost={eval_results['cost']:.3f}"
             )
             
         except Exception as eval_error:
@@ -390,7 +392,7 @@ Provide your analysis following the specified output format."""
             for i, row in enumerate(reader):
                 if i < start_row:
                     continue
-                if i > self.csv_runs_limit:
+                if i >= self.csv_runs_limit:
                     break
                 try:
                     iteration_start_time = time.time()
@@ -454,15 +456,20 @@ Provide your analysis following the specified output format."""
 
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
-
-        successful_runs = [exec_data for exec_data in self.execution_history
+        # Filter out cached entries to count only actual runs from this session
+        current_runs = [exec_data for exec_data in self.execution_history
+                       if exec_data.get("success_level") != "Cached"]
+        
+        successful_runs = [exec_data for exec_data in current_runs
                           if exec_data.get("success_level") in ["High", "Medium"]]
-        print(f"\n\033[95mSUMMARY step: {len(self.execution_history)}\033[0m")
+        print(f"\n\033[95mSUMMARY step: {len(current_runs)}\033[0m")
         print(f"\033[95m{'=' * 80}\033[0m")
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
-        if len(self.execution_history) > 0:
-            print(f"\033[95mSuccess rate: {len(successful_runs)/len(self.execution_history)*100:.1f}%\033[0m")
-        sab_runs = [exec_data for exec_data in self.execution_history 
+        if len(current_runs) > 0:
+            print(f"\033[95mSuccess rate: {len(successful_runs)/len(current_runs)*100:.1f}%\033[0m")
+        
+        # For SAB metrics, also exclude cached entries
+        sab_runs = [exec_data for exec_data in current_runs 
                     if 'VER' in exec_data]
         if sab_runs:
             print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")

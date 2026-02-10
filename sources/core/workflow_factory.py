@@ -665,7 +665,7 @@ agent = CodeAgent(
     additional_authorized_imports=["requests", "bs4", "json"],
 )
 
-def save_agent_memories(agent, memory_path: str, agent_name: str = "single_agent"):
+def save_agent_memories(agent, memory_path: str, agent_name: str):
     print(f"Saving agent memory to: {{{{memory_path}}}}")
     try:
         memories = []
@@ -690,7 +690,7 @@ def save_agent_memories(agent, memory_path: str, agent_name: str = "single_agent
                 memories.append(action_step)
         
         os.makedirs(memory_path, exist_ok=True)
-        agent_task_path = os.path.join(memory_path, f"task_{{{{agent_name}}}}.json")
+        agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
         with open(agent_task_path, "w") as f:
             json.dump(memories, f, indent=2)
         print(f"✅ Agent memories saved successfully to {{{{agent_task_path}}}}")

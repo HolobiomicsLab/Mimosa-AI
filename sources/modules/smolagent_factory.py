@@ -196,9 +196,6 @@ class SmolAgentFactory:
                     'traceback', 'inspect', 'gc', 'warnings', 'io',
                     # Compression
                     'gzip', 'zipfile', 'tarfile', 'zlib',
-                    # Third-party Lightweight
-                    'pygments', 'markdownify', 'dateutil', 'pytz', 'click', 'toml', 'yaml', 
-                    'PIL', 'pillow'
                 ]
 
             )

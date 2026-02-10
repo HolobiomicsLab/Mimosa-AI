@@ -1,6 +1,18 @@
 {
-  "timestamp": "2026-02-03T10:20:33.481295",
+  "timestamp": "2026-02-09T11:29:19.649046",
   "pricing": {
+    "openrouter/pony-alpha": {
+      "input": 0.0,
+      "output": 0.0
+    },
+    "anthropic/claude-opus-4.6": {
+      "input": 5.0,
+      "output": 25.0
+    },
+    "qwen/qwen3-coder-next": {
+      "input": 0.07,
+      "output": 0.3
+    },
     "openrouter/free": {
       "input": 0.0,
       "output": 0.0
@@ -14,8 +26,8 @@
       "output": 0.0
     },
     "moonshotai/kimi-k2.5": {
-      "input": 0.5,
-      "output": 2.8
+      "input": 0.44999999999999996,
+      "output": 2.25
     },
     "upstage/solar-pro-3:free": {
       "input": 0.0,
@@ -46,16 +58,16 @@
       "output": 2.4
     },
     "z-ai/glm-4.7-flash": {
-      "input": 0.07,
+      "input": 0.06,
       "output": 0.39999999999999997
     },
     "openai/gpt-5.2-codex": {
       "input": 1.75,
       "output": 14.0
     },
-    "allenai/molmo-2-8b:free": {
-      "input": 0.0,
-      "output": 0.0
+    "allenai/molmo-2-8b": {
+      "input": 0.19999999999999998,
+      "output": 0.19999999999999998
     },
     "allenai/olmo-3.1-32b-instruct": {
       "input": 0.19999999999999998,
@@ -71,7 +83,7 @@
     },
     "minimax/minimax-m2.1": {
       "input": 0.27,
-      "output": 1.1
+      "output": 0.95
     },
     "z-ai/glm-4.7": {
       "input": 0.39999999999999997,
@@ -289,10 +301,6 @@
       "input": 0.017,
       "output": 0.11
     },
-    "deepcogito/cogito-v2-preview-llama-405b": {
-      "input": 3.5,
-      "output": 3.5
-    },
     "openai/gpt-5-image-mini": {
       "input": 2.5,
       "output": 2.0
@@ -383,7 +391,7 @@
     },
     "qwen/qwen3-vl-235b-a22b-instruct": {
       "input": 0.19999999999999998,
-      "output": 1.2
+      "output": 0.88
     },
     "qwen/qwen3-max": {
       "input": 1.2,
@@ -411,15 +419,15 @@
     },
     "alibaba/tongyi-deepresearch-30b-a3b": {
       "input": 0.09,
-      "output": 0.39999999999999997
+      "output": 0.44999999999999996
     },
     "qwen/qwen3-coder-flash": {
       "input": 0.3,
       "output": 1.5
     },
     "opengvlab/internvl3-78b": {
-      "input": 0.09999999999999999,
-      "output": 0.39
+      "input": 0.15,
+      "output": 0.6
     },
     "qwen/qwen3-next-80b-a3b-thinking": {
       "input": 0.15,
@@ -461,18 +469,6 @@
       "input": 0.6,
       "output": 2.5
     },
-    "deepcogito/cogito-v2-preview-llama-70b": {
-      "input": 0.88,
-      "output": 0.88
-    },
-    "deepcogito/cogito-v2-preview-llama-109b-moe": {
-      "input": 0.18,
-      "output": 0.59
-    },
-    "stepfun-ai/step3": {
-      "input": 0.5700000000000001,
-      "output": 1.42
-    },
     "qwen/qwen3-30b-a3b-thinking-2507": {
       "input": 0.051,
       "output": 0.33999999999999997
@@ -513,10 +509,6 @@
       "input": 0.6,
       "output": 1.7999999999999998
     },
-    "ai21/jamba-mini-1.7": {
-      "input": 0.19999999999999998,
-      "output": 0.39999999999999997
-    },
     "ai21/jamba-large-1.7": {
       "input": 2.0,
       "output": 8.0
@@ -554,8 +546,8 @@
       "output": 0.0
     },
     "openai/gpt-oss-20b": {
-      "input": 0.02,
-      "output": 0.09999999999999999
+      "input": 0.03,
+      "output": 0.14
     },
     "anthropic/claude-opus-4.1": {
       "input": 15.0,
@@ -582,8 +574,8 @@
       "output": 0.0
     },
     "z-ai/glm-4.5-air": {
-      "input": 0.049999999999999996,
-      "output": 0.22
+      "input": 0.13,
+      "output": 0.85
     },
     "qwen/qwen3-235b-a22b-thinking-2507": {
       "input": 0.11,
@@ -599,7 +591,7 @@
     },
     "qwen/qwen3-coder": {
       "input": 0.22,
-      "output": 0.95
+      "output": 1.0
     },
     "qwen/qwen3-coder:exacto": {
       "input": 0.22,
@@ -615,7 +607,7 @@
     },
     "qwen/qwen3-235b-a22b-2507": {
       "input": 0.071,
-      "output": 0.463
+      "output": 0.09999999999999999
     },
     "switchpoint/router": {
       "input": 0.85,
@@ -692,10 +684,6 @@
     "google/gemini-2.5-pro": {
       "input": 1.25,
       "output": 10.0
-    },
-    "moonshotai/kimi-dev-72b": {
-      "input": 0.29,
-      "output": 1.15
     },
     "openai/o3-pro": {
       "input": 20.0,
@@ -1010,8 +998,8 @@
       "output": 4.4
     },
     "mistralai/mistral-small-24b-instruct-2501": {
-      "input": 0.03,
-      "output": 0.11
+      "input": 0.049999999999999996,
+      "output": 0.08
     },
     "deepseek/deepseek-r1-distill-qwen-32b": {
       "input": 0.29,
@@ -1185,10 +1173,6 @@
       "input": 0.65,
       "output": 0.75
     },
-    "qwen/qwen-2.5-vl-7b-instruct:free": {
-      "input": 0.0,
-      "output": 0.0
-    },
     "qwen/qwen-2.5-vl-7b-instruct": {
       "input": 0.19999999999999998,
       "output": 0.19999999999999998
@@ -1225,13 +1209,9 @@
       "input": 0.02,
       "output": 0.049999999999999996
     },
-    "meta-llama/llama-3.1-405b-instruct:free": {
-      "input": 0.0,
-      "output": 0.0
-    },
     "meta-llama/llama-3.1-405b-instruct": {
-      "input": 3.5,
-      "output": 3.5
+      "input": 4.0,
+      "output": 4.0
     },
     "meta-llama/llama-3.1-70b-instruct": {
       "input": 0.39999999999999997,
@@ -1295,7 +1275,7 @@
     },
     "meta-llama/llama-3-8b-instruct": {
       "input": 0.03,
-      "output": 0.06
+      "output": 0.04
     },
     "mistralai/mixtral-8x22b-instruct": {
       "input": 2.0,

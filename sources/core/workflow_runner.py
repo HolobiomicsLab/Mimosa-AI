@@ -89,7 +89,7 @@ class WorkflowRunner:
                 check=True,
             )
             subprocess.run(
-                [f"python{self.config.python_version}" "apt", "install", "-y", "python3.10-venv", "python3.10-distutils"],
+                [f"python{self.config.python_version}", "apt", "install", "-y", "python3.10-venv", "python3.10-distutils"],
                 check=True,
             )
         except subprocess.CalledProcessError as e:
