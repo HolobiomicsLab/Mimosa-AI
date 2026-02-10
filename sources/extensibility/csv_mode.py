@@ -107,6 +107,12 @@ Provide a structured analysis with:
             try:
                 with open(notes_file, 'r', encoding='utf-8') as f:
                     notes = json.load(f)
+                    model = notes.get('model', '')
+                    assert model
+                    assert self.config.smolagent_model_id
+                    if model != self.config.smolagent_model_id:
+                        continue
+
                     total_eval = notes.get('total_eval', 0)
                     if total_eval > max_total_eval:
                         max_total_eval = total_eval
@@ -362,7 +368,7 @@ Provide your analysis following the specified output format."""
         """
         papers_csv_path = Path(dataset_path)
         user_input = input("Enter starting row ([Enter] 0 by default): ")
-        start_row = int(user_input)-1 if user_input.strip() else -1
+        start_row = int(user_input)-1 if user_input.strip() else 0
         
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -391,6 +397,7 @@ Provide your analysis following the specified output format."""
             print(f"\033[95m{'=' * 80}\033[0m")
             for i, row in enumerate(reader):
                 if i < start_row:
+                    print("Skipping evaluation (using cache) for :", i+1)
                     continue
                 if i >= self.csv_runs_limit:
                     break
