@@ -157,7 +157,7 @@ Agent should always be provided with a tool package, If no Tool package seem to 
 
 These MCP Tools are just example and might not exist, list of available tools will be provided.
 
-### Step 4: Assemble the Graph
+### Step 3: Assemble the Graph
 Put everything together into a `StateGraph`.
 Do not compile the workflow, it is already in the context.
 Be sure to name the StateGraph `workflow`.
@@ -245,7 +245,7 @@ workflow.add_conditional_edges(
     "coder",
     master_router, # always trust the master_router
     {
-        "next_node": "<next agen" or END>,
+        "next_node": <"next agen" or END>,
         "retry_node": "coder",
         "fallback_node": END,
         END: END
@@ -261,8 +261,7 @@ workflow.add_conditional_edges(
 - [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
 - [ ] **Guaranteed Exit**: Does the workflow have a clear start and a guaranteed path to `END`?
 - [ ] **Smart fallback**: Avoid using fallback node on the previous agent, fallback to more early agent to avoid infinite loop, you may use a judge agent to decide on routing.
-- [ ] **Validation + Cleaning**: A last agent should be a strict judge designed for minimal syconanphancy that ensure outputs of previous agents respect high-standard. It must also arange files and clean temporary one.
-- [ ] **No overkill prompt**: Prompt for agent should stay short and should not contain code example.
+- [ ] **Validation + Cleaning**: A last agent should be a strict judge designed for minimal sycophancy that ensure outputs of previous agents respect high-standard. It must also arange files and clean temporary one.
 
 The workflow can be composed of various conditional flows, enabling loops, branching, or complex custom logic depending on the user’s goals. To achieve robust and adaptive behaviors, it is recommended to apply established multi-agent system best practices. These include using specialized agents such as an LLM-as-a-Judge for arbitration and evaluation, introducing conditional agent loops to refine outputs iteratively, and leveraging consensus mechanisms between agents to improve reasoning quality.
 
