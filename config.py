@@ -54,7 +54,7 @@ class Config:
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
-        self.prompt_planner: str = "sources/prompts/planner_reproduction.md.md"
+        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
