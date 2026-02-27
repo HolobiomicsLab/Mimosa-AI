@@ -142,7 +142,8 @@ document analysis is highly complex for single agent and therefore require MULTI
         llm_config = LLMConfig(
             model=model,
             provider=provider,
-            reasoning_effort=self.config.reasoning_effort
+            reasoning_effort=self.config.reasoning_effort,
+            max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
@@ -190,7 +191,8 @@ The following tools packages are available for agents:
         llm_config = LLMConfig(
             model=model,
             provider=provider,
-            reasoning_effort=self.config.reasoning_effort
+            reasoning_effort=self.config.reasoning_effort,
+            max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 

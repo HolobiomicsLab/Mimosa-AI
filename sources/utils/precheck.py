@@ -18,7 +18,7 @@ class PreCheck:
             if not model_id:
                 raise ValueError(f"⚠️  No model configured for '{name}', skipping.")
             provider, model = extract_model_pattern(model_id)
-            config = LLMConfig(provider=provider, model=model)
+            config = LLMConfig(provider=provider, model=model, max_tokens=8192)
             try:
                 llm = LLMProvider("test", system_msg="You are nice and concise.", config=config)
                 _ = llm(prompt, use_cache=False)

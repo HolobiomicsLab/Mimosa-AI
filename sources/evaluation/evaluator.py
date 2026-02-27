@@ -80,7 +80,8 @@ class BaseEvaluator:
                 self.llm_config = LLMConfig().from_dict({
                     "model": model,
                     "provider": provider,
-                    "reasoning_effort": config.reasoning_effort
+                    "reasoning_effort": config.reasoning_effort,
+                    "max_tokens": getattr(config, 'max_tokens', 8192)
                 })
             except Exception as e:
                 raise EvaluatorError(f"Failed to initialize LLM configuration: {str(e)}") from e

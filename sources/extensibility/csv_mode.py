@@ -44,7 +44,8 @@ class CsvEvaluationMode:
         self.llm_config = LLMConfig(
             model=model,
             provider=provider,
-            temperature=0.8
+            temperature=0.8,
+            max_tokens=8192
         )
         self.result_analyzer = LLMProvider(
             agent_name="result_analyzer",

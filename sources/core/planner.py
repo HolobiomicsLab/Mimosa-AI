@@ -46,7 +46,8 @@ class Planner:
         self.config_llm = LLMConfig(
             model=model,
             provider=provider,
-            reasoning_effort=self.config.reasoning_effort
+            reasoning_effort=self.config.reasoning_effort,
+            max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None
@@ -86,17 +87,26 @@ class Planner:
                     raise ValueError("LLM returned empty or invalid response")
 
                 print(f"📝 Received plan response ({len(raw_plan)} characters)")
+                print(raw_plan)
+                print("---")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
-                    raise ValueError("Failed to extract valid JSON from LLM response")
-                plan = self._parse_and_validate_plan(plan_dict)
+                    raise ValueError("Failed to extract valid JSON from LLM response\n")
+                plan = self._parse_and_validate_plan(plan_dict, goal_prompt)
                 print(f"✅ Successfully generated and validated plan with {len(plan.steps)} steps")
                 return plan
 
             except (ValueError, PlanValidationError, json.JSONDecodeError) as e:
                 last_error = e
                 error_msg = str(e)
+                # Check if this might be a truncation error (unterminated string at end of response)
+                is_truncation = False
+                if "Unterminated string" in error_msg or "Unexpected end of data" in error_msg:
+                    is_truncation = True
+                    error_msg = f"{error_msg} (This often indicates the response was truncated due to max_tokens limit)"
                 print(f"⚠️ Attempt {attempt} failed: {error_msg}")
+                if is_truncation:
+                    print(f"💡 Tip: Consider increasing max_tokens in your config (current: {getattr(self.config, 'max_tokens', 'not set')})")
 
                 if attempt < max_retries:
                     wait_time = 2 ** attempt
@@ -126,7 +136,7 @@ class Planner:
         )
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
-    def _parse_and_validate_plan(self, plan_dict: dict) -> Plan:
+    def _parse_and_validate_plan(self, plan_dict: dict, goal: str) -> Plan:
         """
         Parse and validate a plan dictionary into a Plan object.
         Args:
@@ -155,6 +165,7 @@ class Planner:
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
+                    goal_context=goal,
                     cost=0.0,
                     score=0.0,
                     depends_on=step_dict.get("depends_on", []),
@@ -597,9 +608,7 @@ Original request:
             return runs
 
         except Exception as e:
-            raise e
-            #print(f"❌ Error in dgm_runs: {str(e)}")
-            #raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
+            raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
 
     def _get_dgm_success(self, run: GodelRun) -> bool:
         run_state_result = getattr(run, 'state_result', None) or {}
@@ -630,8 +639,9 @@ Original request:
             print(f"⚠️ Invalid max_attempts, using default: {max_attempts}")
 
         step_name = getattr(step, 'name', 'unknown_step')
-        step_task = getattr(step, 'task', '')
-
+        goal = getattr(step, 'goal_context', '')
+        task = getattr(step, 'task', '')
+        step_task = f"Broader context:{goal}\n---\nYour task:{task}"
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0

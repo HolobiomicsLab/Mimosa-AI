@@ -70,6 +70,7 @@ class GodelRun:
 class PlanStep:
     """Represents a single step in a plan with dependencies and I/O requirements."""
     name: str
+    goal_context: str
     task: str
     cost: int
     score: float
