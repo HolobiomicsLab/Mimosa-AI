@@ -471,10 +471,10 @@ if WORKFLOW_PATH:
         try:
             workflow_code = self.create_workflow_code(
                 craft_instructions, existing_tool_prompt, memory_path, allow_cache
-            ) # Generate workflow code - let DGM handle retries
+            ) # Generate workflow code - let Evolution handle retries
         except Exception as e:
             raise e # raise error for dgm-level to handle
-        # Save workflow code immediately so DGM can access it even if validation fails
+        # Save workflow code immediately so learning layer can access it even if validation fails
         if save_workflow and isinstance(workflow_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_code, goal, original_task)
 

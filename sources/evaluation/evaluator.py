@@ -611,7 +611,7 @@ class ScenarioEvaluator(BaseEvaluator):
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
         
-        # Return assertion metrics for DGM tracking
+        # Return assertion metrics for Evolution tracking
         return {
             'passed_assertions': passed_count,
             'total_assertions': total_count,
@@ -709,7 +709,7 @@ class ScenarioEvaluator(BaseEvaluator):
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
         
-        # Return metrics for DGM tracking
+        # Return metrics for Evolution tracking
         return {
             'earned_points': total_earned,
             'total_points': total_possible_points,

@@ -12,7 +12,7 @@ from pathlib import Path
 from sources.core.dgm import DarwinMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
-from sources.core.schema import Task, GodelRun
+from sources.core.schema import Task, IndividualRun
 from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
@@ -246,13 +246,13 @@ Provide a structured analysis with:
         """Format task results for analysis."""
         return '\n\n'.join(
             f"Task {task.name}:\n"
-            f"  UUID: {task.dgm_runs[-1].current_uuid}\n"
+            f"  UUID: {task.evolve_runs[-1].current_uuid}\n"
             f"  Description: {task.description}\n"
             f"  Agent Chain: {' -> '.join(task.final_answers)}"
             for task in tasks_data
         )
 
-    def _format_task_mode_results(self, run: GodelRun) -> str:
+    def _format_task_mode_results(self, run: IndividualRun) -> str:
         state_result = run.state_result
         if isinstance(state_result.get("answers", None), list) and "step_name" in state_result:
             return "\n".join(
@@ -312,7 +312,7 @@ Provide your analysis following the specified output format."""
         Args:
             capsule_name: Name of the capsule directory containing results
             row: CSV row data with task information
-            runs: List of GodelRun objects from execution
+            runs: List of IndividualRun objects from execution
             sab_loader: ScienceAgentBenchLoader instance
             execution_data: Dictionary to update with evaluation results
             
@@ -412,14 +412,14 @@ Provide your analysis following the specified output format."""
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
-                                                        max_iteration=self.config.max_learning_dgm_iterations,
+                                                        max_iteration=self.config.max_learning_evolve_iterations,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_dgm_iteration=self.config.max_learning_dgm_iterations,
+                                    max_evolve_iteration=self.config.max_learning_evolve_iterations,
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)

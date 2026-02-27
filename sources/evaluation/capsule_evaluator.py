@@ -39,7 +39,7 @@ class CapsuleEvaluator:
             capsule_path: Path to the runs_capsule directory with generated files
             task_data: Dictionary containing task information from CSV row
             sab_loader: ScienceAgentBenchLoader instance for accessing eval scripts
-            api_cost: API cost tracked from GodelRun
+            api_cost: API cost tracked from IndividualRun
         """
         self.capsule_path = Path(capsule_path)
         self.task_data = task_data

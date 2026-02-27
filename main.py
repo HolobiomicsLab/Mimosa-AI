@@ -80,8 +80,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
-    if args.max_dgm_iterations:
-        config.max_learning_dgm_iterations = args.max_dgm_iterations
+    if args.max_evolve_iterations:
+        config.max_learning_evolve_iterations = args.max_evolve_iterations
 
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
@@ -153,7 +153,7 @@ async def normal_execution_mode(args, config):
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_id=args.scenario,
-                            max_iteration=args.max_dgm_iterations,
+                            max_iteration=args.max_evolve_iterations,
                             learning_mode=args.learn,
                             single_agent_mode=args.single_agent
                            )
@@ -162,7 +162,7 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
-                                    max_dgm_iteration=args.max_dgm_iterations
+                                    max_evolve_iteration=args.max_evolve_iterations
                                    )
         trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
@@ -187,7 +187,7 @@ async def main():
         "--task",  type=str, help="Single task mode (no planner)"
     )
     parser.add_argument(
-        "--learn", action="store_true", help="Learning mode. Retry task with DGM until threshold score it met.", default=False
+        "--learn", action="store_true", help="Learning mode. Retry task with Iterative-Learning until threshold score it met.", default=False
     )
     parser.add_argument(
         "--single_agent", action="store_true", help="Single-agent mode for benchmark comparaison, not recommended for real-tasks use.", default=False
@@ -214,7 +214,7 @@ async def main():
         "--debug", action="store_true", help="Enable debug logging to console"
     )
     parser.add_argument(
-        "--max_dgm_iterations", type=int, default=1, help="Maximum number of DGM retry iterations. Used for retrying/learning a task."
+        "--max_evolve_iterations", type=int, default=1, help="Maximum number of learning iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)

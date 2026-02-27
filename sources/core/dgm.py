@@ -1,5 +1,5 @@
 """
-Darwin Godel Machine inspired iterative multi-agent workflows improvements.
+Darwinian Evolution of multi-agent workflows improvements.
 """
 
 import json
@@ -19,7 +19,7 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 from .orchestrator import WorkflowOrchestrator
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
-from .schema import GodelRun, ImprovementLog
+from .schema import IndividualRun, ImprovementLog
 from .improvement_validator import ImprovementValidator
 
 
@@ -61,7 +61,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
 
 
 class DarwinMachine:
-    """Darwin Godel Machine for self-improvement workflows."""
+    """Darwin Machine for self-improvement workflows."""
     def __init__(
         self,
         config,
@@ -170,7 +170,7 @@ class DarwinMachine:
         improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
         if flow_code is not None:
             improv_prompt = "\n".join([
-                "## DARWIN GÖDEL MACHINE: SELF-IMPROVEMENT STEP",
+                "## SELF-IMPROVEMENT STEP",
                 "Your previous attempt at generating a workflow did not succeed or didn't reach success threshold.",
                 "Your goal was: ",
                 goal,
@@ -259,9 +259,9 @@ class DarwinMachine:
         learning_mode: bool = False,
         original_task: str = None,
         single_agent_mode: bool = False
-    ) -> list[GodelRun]:
+    ) -> list[IndividualRun]:
         """
-        Start the DGM process for achieving a specified goal.
+        Start the learning process for achieving a specified goal.
         Args:
         - goal (str): The primary goal or objective to be accomplished (may be knowledge-wrapped).
          template_uuid (str | None, optional): UUID of a workflow template to use.
@@ -272,7 +272,7 @@ class DarwinMachine:
         - original_task (str, optional): Original unwrapped task for similarity matching.
         """
         if learning_mode:
-            max_iteration = max(3, self.config.max_learning_dgm_iterations)
+            max_iteration = max(3, self.config.max_learning_evolve_iterations)
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
@@ -294,7 +294,7 @@ class DarwinMachine:
                     scenario_id, total_assertions
                 )
 
-        run0 = GodelRun(
+        run0 = IndividualRun(
             goal=goal,
             prompt=craft_instructions,
             template_uuid=template_uuid,
@@ -315,7 +315,7 @@ class DarwinMachine:
 
     async def recursive_self_improvement(
         self,
-        runs: list[GodelRun],
+        runs: list[IndividualRun],
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
         learning_mode: bool = False,
@@ -393,17 +393,17 @@ class DarwinMachine:
 
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1:
-            print("\nmax recursive depth reached for DGM.\n")
+            print("\nmax recursive depth reached.\n")
             return runs
         if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
             # reach learning threshold
             print("\nDGM done learning task.\n")
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
-                f"DGM done learning task: {wf_info.goal[:256]} \n"
+                f"Done learning task: {wf_info.goal[:256]} \n"
                 f"Final UUID: {uuid}\n"
                 f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
-                title="DGM done learning task.",
+                title="Evolution done learning task.",
                 priority=0
             )
             return runs
@@ -411,12 +411,12 @@ class DarwinMachine:
             self._save_final_plots(assertion_history, rewards_history, uuid)
             print("\nDGM completed task.\n")
             self.notifier.send_message(
-                f"DGM completed successfully!\n"
+                f"Evolution completed successfully!\n"
                 f"Goal: {runs[-1].goal[:128]}...\n"
                 f"Final UUID: {uuid}\n"
                 f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
                 f"All workflows successful!",
-                title=f"DGM success - {uuid}",
+                title=f"Evolution success - {uuid}",
                 priority=0
             )
             return runs
@@ -430,8 +430,7 @@ class DarwinMachine:
             runs[-1].original_task or runs[-1].goal, wf_info_best, code, run_stdout, runs[-1].iteration_count
         )
 
-        # add godel run class instance to list
-        runs.append(GodelRun(
+        runs.append(IndividualRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
             cost=runs[-1].cost + current_iteration_cost,  # Correct cumulative cost

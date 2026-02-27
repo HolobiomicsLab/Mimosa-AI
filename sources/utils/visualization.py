@@ -366,7 +366,7 @@ class VisualizationUtils:
         figsize: list[int, int] = (10, 6),
     ) -> list[Any, Any, Any]:
         """
-        Create a plot for tracking assertion validation progress over DGM iterations.
+        Create a plot for tracking assertion validation progress over Evolution iterations.
 
         Args:
             scenario_id: The scenario identifier
@@ -378,7 +378,7 @@ class VisualizationUtils:
         """
         self.plot_data = self.create_real_time_curve_plot(
             title=f"Assertion Validation Progress - {scenario_id}",
-            xlabel="DGM Iteration",
+            xlabel="Evolution Iteration",
             ylabel="Assertions Passed",
             figsize=figsize,
             grid=True,

@@ -30,8 +30,8 @@ class ImprovementValidator:
         """
         Statistically validate if new_run significantly improved over baseline.
         Args:
-            baseline_run: GodelRun from previous iteration
-            new_run: GodelRun from current iteration
+            baseline_run: IndividualRun from previous iteration
+            new_run: IndividualRun from current iteration
             threshold: Minimum relative improvement override (uses class default if None)
         Returns:
             dict with improvements info
@@ -151,8 +151,8 @@ class ImprovementValidator:
         Classify the type of improvement observed.
         
         Args:
-            baseline_run: Previous GodelRun
-            new_run: Current GodelRun
+            baseline_run: Previous IndividualRun
+            new_run: Current IndividualRun
         
         Returns:
             str - Type of improvement ("performance", "cost", "both", "none")
@@ -177,12 +177,12 @@ class ImprovementValidator:
 
 if __name__ == "__main__":
     # Test the validator
-    from sources.core.schema import GodelRun
+    from sources.core.schema import IndividualRun
     
     # Create mock runs for testing
-    baseline = GodelRun(goal="test", prompt="test", reward=0.50)
-    improved = GodelRun(goal="test", prompt="test", reward=0.65)
-    marginal = GodelRun(goal="test", prompt="test", reward=0.51)
+    baseline = IndividualRun(goal="test", prompt="test", reward=0.50)
+    improved = IndividualRun(goal="test", prompt="test", reward=0.65)
+    marginal = IndividualRun(goal="test", prompt="test", reward=0.51)
     
     validator = ImprovementValidator(min_improvement_threshold=0.05)
     
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     print(f"Effective: {result['is_effective']}, Improvement: {result['relative_improvement']:.1%}\n")
     
     print("Test 4: Improvement type classification")
-    baseline_cost = GodelRun(goal="test", prompt="test", reward=0.50, cost=1.00)
-    improved_both = GodelRun(goal="test", prompt="test", reward=0.65, cost=0.80)
+    baseline_cost = IndividualRun(goal="test", prompt="test", reward=0.50, cost=1.00)
+    improved_both = IndividualRun(goal="test", prompt="test", reward=0.65, cost=0.80)
     imp_type = validator.get_improvement_type(baseline_cost, improved_both)
     print(f"Improvement type: {imp_type}")

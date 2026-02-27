@@ -32,14 +32,14 @@ HIGH-LEVEL GOAL (e.g., "Reproduce paper X")
     ↓
 PLANNER decomposes into multiple TASKS with dependencies
     ↓
-Each TASK triggers DGM (Darwin-Gödel Machine) synthesis
+Each TASK triggers workflow synthesis
     ↓
 Specialized WORKFLOW created and executed for each task
     ↓
 Results aggregated into CAPSULE with full artifacts
 ```
 
-#### 3. **Darwin-Gödel Machine (DGM) Self-Improvement**
+#### 3. **Iterative-Learning (IL) Self-Improvement**
 Inspired by evolutionary algorithms and Gödel machines, the system:
 - Maintains a library of successful workflow patterns
 - Learns from past executions via similarity matching
@@ -71,15 +71,15 @@ mimosa-ai/
 │   ├── core/                           # Core orchestration logic
 │   │   ├── orchestrator.py             # Workflow execution manager
 │   │   ├── planner.py                  # Goal → Task decomposition
-│   │   ├── dgm.py                      # Darwin-Gödel Machine (learning loop)
+│   │   ├── dgm.py                      # Iterative-Learning (learning loop)
 │   │   ├── workflow_factory.py         # Workflow synthesis from LLM
 │   │   ├── workflow_runner.py          # Code execution runtime
 │   │   ├── workflow_selection.py       # Similarity-based template matching
 │   │   ├── workflow_info.py            # Workflow metadata & state
 │   │   ├── llm_provider.py             # Multi-provider LLM abstraction
 │   │   ├── tools_manager.py            # MCP tool discovery & management
-│   │   ├── improvement_validator.py    # DGM improvement validation
-│   │   └── schema.py                   # Data classes (GodelRun, Task, Plan, etc.)
+│   │   ├── improvement_validator.py    # Improvement validation
+│   │   └── schema.py                   # Data classes (IndividualRun, Task, Plan, etc.)
 │   │
 │   ├── evaluation/                     # Performance assessment
 │   │   ├── evaluator.py                # Generic/Scenario evaluation
@@ -119,7 +119,7 @@ mimosa-ai/
 │       ├── workflow.py                 # Generated agent code
 │       ├── state_result.json           # Execution state & results
 │       ├── memory/                     # Agent memory traces
-│       ├── reward_progress.png         # DGM learning visualization
+│       ├── reward_progress.png         # learning progress visualization
 │       └── ...
 │
 ├── runs_capsule/                       # Results storage
@@ -165,7 +165,7 @@ mimosa-ai/
 
 ---
 
-### 2. **Darwin-Gödel Machine (DGM)** (`sources/core/dgm.py`)
+### 2. **Iterative-Learning (IL)** (`sources/core/dgm.py`)
 **Purpose**: Execute and iteratively improve task solutions through self-optimization
 
 **Key Responsibilities**:
@@ -296,7 +296,7 @@ Planner.start_planner(goal)
     ├─ Generate multi-step plan
     ├─ Request human approval
     └─ For each step:
-        ├─ DGM.start_dgm(step_task)
+        ├─ start_dgm(step_task)
         │   ├─ Check workflow cache
         │   ├─ Synthesize workflow (if new)
         │   ├─ Execute workflow
@@ -308,11 +308,11 @@ Planner.start_planner(goal)
 Generate Capsule with results
 ```
 
-### Mode 2: Task Mode (Single-step DGM)
+### Mode 2: Task Mode
 ```
 main.py --task "Task description" --learn
     ↓
-DGM.start_dgm(task, learning_mode=True, max_iterations=10)
+start_dgm(task, learning_mode=True, max_iterations=10)
     ├─ Check workflow cache (similarity > 0.8)
     ├─ If found & successful: use cached workflow as inspiration
     ├─ Else: Synthesize workflow

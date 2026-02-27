@@ -65,9 +65,9 @@ class Config:
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 
-        # DGM learning parameters
+        # learning parameters
         self.learned_score_threshold = 0.8
-        self.max_learning_dgm_iterations = 10
+        self.max_learning_evolve_iterations = 10
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
@@ -166,7 +166,7 @@ class Config:
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
-            "max_learning_dgm_iterations": self.max_learning_dgm_iterations,
+            "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "runs_capsule_dir": self.runs_capsule_dir,
@@ -206,8 +206,8 @@ class Config:
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )
-        self.max_learning_dgm_iterations = data.get(
-            "max_learning_dgm_iterations", self.max_learning_dgm_iterations
+        self.max_learning_evolve_iterations = data.get(
+            "max_learning_evolve_iterations", self.max_learning_evolve_iterations
         )
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get(

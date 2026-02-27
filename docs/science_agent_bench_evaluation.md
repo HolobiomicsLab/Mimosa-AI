@@ -109,10 +109,10 @@ def eval():
 
 ## Usage
 
-**Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 DGM iterations**
+**Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 iterations**
 
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 102 --max_dgm_iterations 10
+uv run main.py --science_agent_bench --csv_runs_limit 102 --max_evolve_iterations 10
 ```
 
 ### Output Structure

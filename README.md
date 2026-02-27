@@ -17,7 +17,7 @@ The user gives Mimosa a research goal.
 
 - Mimosa automatically discovers available MCP-based tools on the local network or via Toolhive (anything from data analysis utilities to web browsers or lab instruments like mass spectrometers).
 - Using the user’s objective and the discovered tools, Mimosa decomposes the problem, builds a tailored multi-agent workflow for each tasks.
-- Each task runs autonomously. Failures are used for self-improvement via a Darwin-/Gödel-Machine-inspired meta-learning loop.
+- Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
 - Mimosa generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
 ---
@@ -120,7 +120,7 @@ code my_config.json
 | `prompt_workflow_creator` | Prompt used to create multi-agent workflows. **Do not modify.** |
 | `reasoning_effort` | Controls the depth of reasoning for **gpt5** only. |
 | `learned_score_threshold` | Score at which self-improvement stops and the result is accepted. |
-| `max_learning_dgm_iterations` | Maximum number of self-improvement iterations allowed. |
+| `max_learning_evolve_iterations` | Maximum number of self-improvement iterations allowed. |
 | `schema_code_path` | Internal state schema definition. **Do not modify.** |
 | `smolagent_factory_code_path` | SmolAgent factory implementation. **Do not modify.** |
 | `runs_capsule_dir` | Directory where each run saves a full workspace snapshot in an auto-named capsule. |
@@ -170,15 +170,15 @@ To evaluate on ScienceAgentBench you must:
 2. unzip it with password: `scienceagentbench`
 3. copy content of `benchmark/benchmark/datasets` folder to  `Mimosa-AI/datasets/scienceagentbench/datasets`
 
-**Evaluation on ScienceAgentBench with DGM**
+**Evaluation on ScienceAgentBench with learning**
 ```sh
 uv run main.py --science_agent_bench --learn
 ```
 
-**Evaluation on ScienceAgentBench limited to 10 tasks with learning limited to 4 DGM iterations**
+**Evaluation on ScienceAgentBench limited to 10 tasks with learning limited to 4 learning iterations**
 
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_dgm_iterations 4
+uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
 ```
 
 ### PaperBench
@@ -221,8 +221,8 @@ uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20  
 ### Other parameters
 | Argument | Description |
 |----------|-------------|
-| `--learn` | Enable learning mode using DGM to optimize task performance |
-| `--max_dgm_iterations N` | Maximum DGM iterations for learning |
+| `--learn` | Enable iterative-learning to optimize task performance |
+| `--max_evolve_iterations N` | Maximum learning iterations |
 | `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
 | `--scenario <scenario file name>` | Use specific scenario based assertions instead of LLM-as-a-judge for scoring execution  |
 | `--debug` | Enable debug mode for more verbose logging |
@@ -267,7 +267,7 @@ Mimosa-AI is a **self-evolving multi-agent system** that dynamically synthesizes
 - *Example:* "Download dataset from source Y"
 - *Example:* "Implement algorithm Z"
 
-### Self-Improvement Mechanism (DGM)
+### Self-Improvement Mechanism 
 
 The system implements a Darwinian-inspired evolution approach to workflow evolution:
 
@@ -293,7 +293,7 @@ Reward progress plot will be saved under the `sources/workflows/<uuid>` folder u
 
 ***For example:***
 
-![dgm](./docs/images/dgm_example.png)
+![dgm](./docs/images/evolve_example.png)
 
 ---
 
