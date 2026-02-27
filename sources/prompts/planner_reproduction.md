@@ -119,3 +119,4 @@ Your response must be valid JSON following this exact schema:
 Each 'task' will trigger the creation of a multi-agent workflow specific to the task. Therefore describe task as workflow that want to solve a problem.
 Analysis of ressources such as PDF document require a clearly defined task on it's own.
 Generate plans that are simple with no uncessessary complexity added. Regroup highly related steps as one (setup up env and running code can be part of the same task).
+Keep Each instruction short

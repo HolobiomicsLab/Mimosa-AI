@@ -13,7 +13,7 @@ from datetime import datetime
 from sources.core.schema import (
     TaskStatus,
     TaskComplexity,
-    GodelRun,
+    IndividualRun,
     PlanStep,
     Plan,
     Task,
@@ -151,20 +151,20 @@ class MockDataGenerator:
             "success": success,
         }
     
-    def generate_godel_run(
+    def generate_evolution_run(
         self,
         include_state_result: bool = True,
         num_answers: int = 3,
-    ) -> GodelRun:
+    ) -> IndividualRun:
         """
-        Generate a mock GodelRun instance.
+        Generate a mock IndividualRun instance.
         
         Args:
             include_state_result: Whether to include state_result data
             num_answers: Number of answers to generate
             
         Returns:
-            Mock GodelRun instance
+            Mock IndividualRun instance
         """
         goal = random.choice(self.SAMPLE_GOALS)
         prompt = f"Complete the following task: {goal}"
@@ -173,7 +173,7 @@ class MockDataGenerator:
         if include_state_result:
             state_result = self.generate_state_result()
         
-        return GodelRun(
+        return IndividualRun(
             goal=goal,
             prompt=prompt,
             cost=round(random.uniform(0.01, 5.0), 3),
@@ -259,16 +259,16 @@ class MockDataGenerator:
     def generate_task(
         self,
         name: str | None = None,
-        include_godel_runs: bool = True,
-        num_godel_runs: int = 3,
+        include_evolution_runs: bool = True,
+        num_evolution_runs: int = 3,
     ) -> Task:
         """
         Generate a mock Task instance.
         
         Args:
             name: Optional task name, generated if not provided
-            include_godel_runs: Whether to include godel run data
-            num_godel_runs: Number of godel runs to generate
+            include_evolution_runs: Whether to include evolution run data
+            num_evolution_runs: Number of runs to generate
             
         Returns:
             Mock Task instance
@@ -276,11 +276,11 @@ class MockDataGenerator:
         if name is None:
             name = f"task_{random.randint(1, 100)}"
         
-        dgm_runs = []
-        if include_godel_runs:
-            dgm_runs = [
-                self.generate_godel_run(include_state_result=i == num_godel_runs - 1)
-                for i in range(num_godel_runs)
+        evolve_runs = []
+        if include_evolution_runs:
+            evolve_runs = [
+                self.generate_evolution_run(include_state_result=i == num_evolution_runs - 1)
+                for i in range(num_evolution_runs)
             ]
         
         final_answers = [f"Final answer {i+1}" for i in range(random.randint(1, 3))]
@@ -289,7 +289,7 @@ class MockDataGenerator:
             name=name,
             description=random.choice(self.SAMPLE_TASKS),
             run_id=random.randint(1, 100),
-            dgm_runs=dgm_runs,
+            evolve_runs=evolve_runs,
             final_answers=final_answers,
             cost=round(random.uniform(0.1, 20.0), 2),
             final_uuid=self.generate_uuid(),
@@ -315,11 +315,11 @@ class MockDataGenerator:
         return {
             "plan": plan,
             "tasks": tasks,
-            "godel_runs": [task.dgm_runs for task in tasks if task.dgm_runs],
+            "evolution_runs": [task.evolve_runs for task in tasks if task.evolve_runs],
             "state_results": [
                 run.state_result
                 for task in tasks
-                for run in task.dgm_runs
+                for run in task.evolve_runs
                 if run.state_result
             ],
         }

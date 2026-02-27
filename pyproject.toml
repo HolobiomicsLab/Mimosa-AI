@@ -19,6 +19,9 @@ dependencies = [
     "psutil>=5.9.0",
     "pygame>=2.5.0",
     "torch>=1.11.0",
+    "imageio>=2.37.2",
+    "imageio-ffmpeg>=0.6.0",
+    "pillow>=11.3.0",
 ]
 
 [tool.ruff]

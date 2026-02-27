@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from .dgm import DarwinMachine
 from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
-from .schema import Task, Plan, PlanStep, TaskStatus, GodelRun
+from .schema import Task, Plan, PlanStep, TaskStatus, IndividualRun
 from .workflow_selection import WorkflowSelector
 from sources.utils.notify import PushNotifier
 from sources.utils.planner_visualization import PlannerVisualizer
@@ -46,7 +46,8 @@ class Planner:
         self.config_llm = LLMConfig(
             model=model,
             provider=provider,
-            reasoning_effort=self.config.reasoning_effort
+            reasoning_effort=self.config.reasoning_effort,
+            max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None
@@ -86,17 +87,26 @@ class Planner:
                     raise ValueError("LLM returned empty or invalid response")
 
                 print(f"📝 Received plan response ({len(raw_plan)} characters)")
+                print(raw_plan)
+                print("---")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
-                    raise ValueError("Failed to extract valid JSON from LLM response")
-                plan = self._parse_and_validate_plan(plan_dict)
+                    raise ValueError("Failed to extract valid JSON from LLM response\n")
+                plan = self._parse_and_validate_plan(plan_dict, goal_prompt)
                 print(f"✅ Successfully generated and validated plan with {len(plan.steps)} steps")
                 return plan
 
             except (ValueError, PlanValidationError, json.JSONDecodeError) as e:
                 last_error = e
                 error_msg = str(e)
+                # Check if this might be a truncation error (unterminated string at end of response)
+                is_truncation = False
+                if "Unterminated string" in error_msg or "Unexpected end of data" in error_msg:
+                    is_truncation = True
+                    error_msg = f"{error_msg} (This often indicates the response was truncated due to max_tokens limit)"
                 print(f"⚠️ Attempt {attempt} failed: {error_msg}")
+                if is_truncation:
+                    print(f"💡 Tip: Consider increasing max_tokens in your config (current: {getattr(self.config, 'max_tokens', 'not set')})")
 
                 if attempt < max_retries:
                     wait_time = 2 ** attempt
@@ -126,7 +136,7 @@ class Planner:
         )
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
-    def _parse_and_validate_plan(self, plan_dict: dict) -> Plan:
+    def _parse_and_validate_plan(self, plan_dict: dict, goal: str) -> Plan:
         """
         Parse and validate a plan dictionary into a Plan object.
         Args:
@@ -155,6 +165,7 @@ class Planner:
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
+                    goal_context=goal,
                     cost=0.0,
                     score=0.0,
                     depends_on=step_dict.get("depends_on", []),
@@ -524,28 +535,28 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
-    async def dgm_runs(self, task, judge, max_dgm_iteration, cached_wf_allow=True, original_task=None):
+    async def evolve_runs(self, task, judge, max_evolve_iteration, cached_wf_allow=True, original_task=None):
         """
-        Execute DGM runs for a given task.
+        Execute Iterative-Learning for a given task.
         Args:
             task: Task description string (may be knowledge-wrapped)
             judge: Whether to use judge evaluation
-            max_dgm_iteration: Maximum iterations for DGM
+            max_evolve_iteration: Maximum iterations for Evolution
             cached_wf_allow: Whether to allow using cached workflows
             original_task: Original unwrapped task for similarity matching
         Returns:
-            List[GodelRun]: List of DGM runs
+            List[IndividualRun]: List of Evolution runs
         Raises:
-            ValueError: If task is invalid or DGM execution fails
+            ValueError: If task is invalid or Evolution execution fails
         """
         if not task or not isinstance(task, str):
             raise ValueError("❌ Planner: Task must be a non-empty string")
 
-        if max_dgm_iteration is None or max_dgm_iteration < 1:
-            max_dgm_iteration = 1
-            print(f"⚠️ Invalid max_dgm_iteration, using default: {max_dgm_iteration}")
+        if max_evolve_iteration is None or max_evolve_iteration < 1:
+            max_evolve_iteration = 1
+            print(f"⚠️ Invalid max_evolve_iteration, using default: {max_evolve_iteration}")
 
-        print(f"🎯 Starting DGM runs for task: {task[:50]}...")
+        print(f"🎯 Starting Iterative-Learning for task: {task[:50]}...")
 
         try:
             # Use original_task for lookup to avoid knowledge wrapper interference
@@ -559,12 +570,12 @@ Original request:
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]
                 if best_match is None:
-                    print("⚠️ Best match is None, proceeding with new DGM run")
-                #elif self._get_dgm_success(best_match):
+                    print("⚠️ Best match is None, proceeding with new Evolution run")
+                #elif self._get_evolve_success(best_match):
                 elif best_match.is_success:
                     print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
 
-                    run = GodelRun(
+                    run = IndividualRun(
                         goal=best_match.goal,
                         prompt=best_match.goal,
                         answers=best_match.answers,
@@ -575,38 +586,36 @@ Original request:
                     )
                     return [run]
 
-            # Generate new workflows via DGM
-            print(f"🔄 No cached run found, starting DGM task learning (max_iter: {max_dgm_iteration})")
+            # Generate new workflows via Evolution
+            print(f"🔄 No cached run found, starting task learning (max_iter: {max_evolve_iteration})")
 
             if self.dgm is None:
-                raise ValueError("❌ Planner: DGM instance is None")
+                raise ValueError("❌ Planner: instance is None")
 
             runs = await self.dgm.start_dgm(
                 goal=task,
                 template_uuid=None,
                 judge=judge,
                 learning_mode=True,
-                max_iteration=max_dgm_iteration,
+                max_iteration=max_evolve_iteration,
                 original_task=original_task
             )
 
             if runs is None:
-                print("⚠️ DGM returned None, returning empty list")
+                print("⚠️ Runs is None, returning empty list")
                 return []
 
             return runs
 
         except Exception as e:
-            raise e
-            #print(f"❌ Error in dgm_runs: {str(e)}")
-            #raise ValueError(f"❌ Planner: DGM execution failed: {str(e)}") from e
+            raise ValueError(f"❌ Planner: Evolution execution failed: {str(e)}") from e
 
-    def _get_dgm_success(self, run: GodelRun) -> bool:
+    def _get_evolve_success(self, run: IndividualRun) -> bool:
         run_state_result = getattr(run, 'state_result', None) or {}
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
         return success_list[-1]
 
-    async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_dgm_iteration):
+    async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_evolve_iteration):
         """
         Execute multiple attempts for a step with comprehensive error handling.
         Args:
@@ -614,7 +623,7 @@ Original request:
             max_attempts: Maximum number of attempts allowed
             step: The plan step to execute
             judge: Whether to use judge evaluation
-            max_dgm_iteration: Maximum DGM iterations
+            max_evolve_iteration: Maximum learning iterations
         Returns:
             PlanStep: The updated step with execution status
         """
@@ -630,8 +639,9 @@ Original request:
             print(f"⚠️ Invalid max_attempts, using default: {max_attempts}")
 
         step_name = getattr(step, 'name', 'unknown_step')
-        step_task = getattr(step, 'task', '')
-
+        goal = getattr(step, 'goal_context', '')
+        task = getattr(step, 'task', '')
+        step_task = f"Broader context:{goal}\n---\nYour task:{task}"
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
@@ -646,16 +656,16 @@ Original request:
             try:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
                 # Pass both enhanced task and original task for proper workflow matching
-                dgm_runs = await self.dgm_runs(
+                evolve_runs = await self.evolve_runs(
                     enhanced_task, 
                     judge, 
-                    max_dgm_iteration, 
+                    max_evolve_iteration, 
                     cached_wf_allow=(attempt<=1),
                     original_task=step_task  # Pass original for similarity matching
                 )
 
-                attempt_cost += sum([r.cost for r in dgm_runs])
-                last_run = dgm_runs[-1]
+                attempt_cost += sum([r.cost for r in evolve_runs])
+                last_run = evolve_runs[-1]
 
                 final_answers = []
                 final_uuid = None
@@ -666,16 +676,16 @@ Original request:
                     final_uuid = getattr(last_run, 'current_uuid', None)
                     workflow_uuid = getattr(last_run, 'workflow_template', None)
 
-                dgm_success = self._get_dgm_success(last_run)
+                evolve_success = self._get_evolve_success(last_run)
                 attempt_score = last_run.reward
                 task = Task(
                     name=step_name,
                     description=step_task,
-                    dgm_runs=dgm_runs or [],
+                    evolve_runs=evolve_runs or [],
                     final_answers=final_answers,
                     final_uuid=final_uuid,
                     workflow_uuid=workflow_uuid,
-                    status=TaskStatus.COMPLETED if dgm_success else TaskStatus.FAILED,
+                    status=TaskStatus.COMPLETED if evolve_success else TaskStatus.FAILED,
                     depends_on=getattr(step, 'depends_on', []) or [],
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
@@ -685,7 +695,7 @@ Original request:
 
                 self.task_history.append(task)
 
-                if dgm_success and attempt_score >= 0.7:
+                if evolve_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     step.status = TaskStatus.COMPLETED
@@ -718,7 +728,7 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_dgm_iteration: int = 1,
+        max_evolve_iteration: int = 1,
         max_task_retry: int = 5
     ) -> list[Task]:
         """
@@ -726,7 +736,7 @@ Original request:
         Args:
             goal: The goal description for the planner
             judge: Whether to use a judge for evaluation
-            max_dgm_iteration: Maximum number of DGM improvement attempts per task
+            max_evolve_iteration: Maximum number of Evolution improvement attempts per task
             max_task_retry: Maximum number of retries for each task
         Returns:
             List[Task]: List of executed tasks
@@ -782,7 +792,7 @@ Original request:
                 max_attempts = max_task_retry
 
                 try:
-                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_dgm_iteration)
+                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_evolve_iteration)
                     total_cost += step.cost
                     self._update_visualization(total_cost)  # Update after step completes
                 except Exception as e:

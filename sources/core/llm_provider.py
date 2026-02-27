@@ -28,13 +28,15 @@ class LLMConfig:
     temperature: float = 1.0
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     reasoning_effort: str = "medium"
+    max_tokens = 64000
 
-    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium"):
+    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 64000):
         self.model = model
         self.provider = provider.lower()
         self.temperature = temperature
         self.key = key
         self.reasoning_effort = reasoning_effort
+        self.max_tokens = max_tokens
         self.__post_init__()
 
     def __post_init__(self):
@@ -79,6 +81,7 @@ class LLMConfig:
             temperature=config.get("temperature", 1.0),
             key=config.get("key", ""),
             reasoning_effort=config.get("reasoning_effort", "medium"),
+            max_tokens=config.get("max_tokens", 64000),
         )
 
 
@@ -284,6 +287,7 @@ class LLMProvider:
                     "messages": message,
                     "temperature": self.config.temperature,
                     "timeout": timeout,
+                    "max_tokens": self.config.max_tokens,
                 }
                 completion_params["api_key"] = self.config.key
                 # Add reasoning effort if supported (not for Claude models)
@@ -340,7 +344,27 @@ class LLMProvider:
                     raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
-
+        
+        # Log token usage for debugging
+        usage = getattr(response, 'usage', None)
+        if usage:
+            prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
+            completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
+            total_tokens = getattr(usage, 'total_tokens', 0) or 0
+            self.logger.info(
+                f"📊 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, "
+                f"Total: {total_tokens} (max_tokens: {self.config.max_tokens})"
+            )
+        
+        # Check for truncation due to max_tokens limit
+        stop_reason = getattr(response.choices[0], 'stop_reason', None) or \
+                      getattr(response.choices[0], 'finish_reason', None)
+        if stop_reason == 'max_tokens' or stop_reason == 'length':
+            self.logger.warning(
+                f"⚠️  LLM response was truncated due to max_tokens limit ({self.config.max_tokens}). "
+                f"Consider increasing max_tokens in config for longer outputs."
+            )
+        
         json_res = {
             **response.json(),
             "response": res,

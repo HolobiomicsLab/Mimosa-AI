@@ -80,7 +80,8 @@ class BaseEvaluator:
                 self.llm_config = LLMConfig().from_dict({
                     "model": model,
                     "provider": provider,
-                    "reasoning_effort": config.reasoning_effort
+                    "reasoning_effort": config.reasoning_effort,
+                    "max_tokens": getattr(config, 'max_tokens', 8192)
                 })
             except Exception as e:
                 raise EvaluatorError(f"Failed to initialize LLM configuration: {str(e)}") from e
@@ -610,7 +611,7 @@ class ScenarioEvaluator(BaseEvaluator):
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
         
-        # Return assertion metrics for DGM tracking
+        # Return assertion metrics for Evolution tracking
         return {
             'passed_assertions': passed_count,
             'total_assertions': total_count,
@@ -708,7 +709,7 @@ class ScenarioEvaluator(BaseEvaluator):
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
         
-        # Return metrics for DGM tracking
+        # Return metrics for Evolution tracking
         return {
             'earned_points': total_earned,
             'total_points': total_possible_points,

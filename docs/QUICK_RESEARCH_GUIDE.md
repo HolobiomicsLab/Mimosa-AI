@@ -21,7 +21,7 @@
 
 ## Overview
 
-Mimosa is a **self-evolving multi-agent framework** that implements a Darwin-Gödel Machine (DGM) approach to automatically improve workflows through empirical feedback.
+Mimosa is a **self-evolving multi-agent framework** that implements a Iterative-Learning (IL) approach to automatically improve workflows through empirical feedback.
 
 ---
 
@@ -44,7 +44,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json 
 
 **Self-Evolving Multi-Agent (7 tasks):**
 ```bash
-uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --learn --max_dgm_iterations 10
+uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --learn --max_evolve_iterations 10
 ```
 
 It is advised to run for only 7 iterations and try to get maximize results.
@@ -94,20 +94,20 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
-│  Layer 2: Meta-Orchestration (DGM Core)             │
+│  Layer 2: Meta-Orchestration (Neuro-evolution Core) │
 │  ┌───────────────────────────────────────────────┐  │
 │  │ Workflow Selection                            │  │
 │  │ - Embedding similarity search                 │  │
 │  │ - Source: sources/core/workflow_selection.py  │  │
 │  └───────────────────────────────────────────────┘  │
-│                      ↓                               │
+│                      ↓                              │
 │  ┌───────────────────────────────────────────────┐  │
 │  │ Workflow Generation                           │  │
 │  │ - LLM creates LangGraph workflows             │  │
 │  │ - Source: sources/core/workflow_factory.py    │  │
 │  │ - Prompt: sources/prompts/workflow_v7.md      │  │
 │  └───────────────────────────────────────────────┘  │
-│                      ↓                               │
+│                      ↓                              │
 │  ┌───────────────────────────────────────────────┐  │
 │  │ Self-Improvement Loop                         │  │
 │  │ - Execution → Evaluation → Mutation           │  │
@@ -137,7 +137,7 @@ runs_capsule/
 └── <timestamp>_<task_name>/
     ├── state_result.json          # Execution state + evaluation scores
     ├── workflow_<uuid>.png         # Workflow graph visualization
-    ├── reward_progress.png         # DGM improvement curve
+    ├── reward_progress.png         # improvement curve
     └── <workspace files>           # All generated outputs
 
 sources/workflows/
@@ -247,9 +247,9 @@ tail -f logs/mimosa.log | grep "WORKFLOW_GENERATION_ERROR"
 ```python
 # Key hyperparameters in config.py
 
-# DGM parameters
+# Learning parameters
 "learned_score_threshold": 0.85,      # When to stop improving
-"max_learning_dgm_iterations": 5,     # Max retries per task
+"max_learning_evolve_iterations": 5,     # Max retries per task
 
 # Workflow selection
 threshold_similary = 0.8              # In workflow_selection.py

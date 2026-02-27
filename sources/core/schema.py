@@ -37,10 +37,9 @@ class ImprovementLog:
         return (f"ImprovementLog({status}, type={self.improvement_type}, "
                 f"delta={self.delta_reward:+.3f}, confidence={self.confidence:.0%})")
 
-# GodelRun class used in the Darwin Godel Machine for tracking run iterations.
 @dataclass
-class GodelRun:
-    """Tracks information for a single Darwin Godel Machine run iteration."""
+class IndividualRun:
+    """Tracks information for a single evolved workflow run."""
     goal: str
     prompt: str
     cost: float = 0.0
@@ -59,7 +58,7 @@ class GodelRun:
     original_task: str | None = None  # Original unwrapped task for similarity matching
 
     def __str__(self) -> str:
-        return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
+        return (f"IndividualRun(goal='{self.goal}', prompt='{self.prompt}', "
                 f"cost={self.cost}, reward={self.reward}, max_depth={self.max_depth}, "
                 f"iteration_count={self.iteration_count}, answers={self.answers}, "
                 f"state_result={self.state_result}, judge={self.judge}, "
@@ -70,6 +69,7 @@ class GodelRun:
 class PlanStep:
     """Represents a single step in a plan with dependencies and I/O requirements."""
     name: str
+    goal_context: str
     task: str
     cost: int
     score: float
@@ -118,10 +118,10 @@ class Task:
     name: str
     description: str
     run_id: int = 0
-    dgm_runs: list[GodelRun] = field(default_factory=list) # godel run result for task
-    final_answers: list[str] = field(default_factory=list) # last godel run answers
+    evolve_runs: list[IndividualRun] = field(default_factory=list) # evolution run result for task
+    final_answers: list[str] = field(default_factory=list) # last evolution run answers
     cost: float = 0
-    final_uuid: str | None = None # last godel run uuid
+    final_uuid: str | None = None # last evolution run uuid
     workflow_uuid: str | None = None # last workflow uuid
     status: TaskStatus = TaskStatus.PENDING
     depends_on: list[str] = field(default_factory=list)
