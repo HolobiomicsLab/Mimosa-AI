@@ -12,6 +12,7 @@ cookies.json
 workflows/*
 runs_capsule/*
 runs_notes/*
+config_*.json
 parallel_testing_results/
 cached_server/cache/*
 sources/cache/*
