@@ -30,7 +30,3 @@ This wording is intended for repository governance documentation and remains sub
 Current named research co-authors: Martin Legrand, Tao Jiang, Matthieu Feraud, Benjamin Navet, and Louis-Felix Nothias.
 
 This co-authorship note is informational and does not itself determine legal ownership or licensing authority.
-
-## Legal status
-
-This repository setup is a governance draft and not legal advice. Final authority wording should be confirmed by CNRS/Inria/consortium counsel.

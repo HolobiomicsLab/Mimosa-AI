@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing.
 
-For architecture and development workflow details, see `docs/CONTRIBUTING.md`.
+For architecture and development workflow details, see `docs/DEVELOPER_GUIDE.md`.
 
 ## Licensing and Contributor Agreement
 
