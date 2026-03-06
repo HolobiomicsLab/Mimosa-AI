@@ -27,7 +27,7 @@ This wording is intended for repository governance documentation and remains sub
 
 ## Co-authorship context (informational)
 
-Current named research co-authors: Martin Legrand, Tao Jiang, and Louis-Felix Nothias.
+Current named research co-authors: Martin Legrand, Tao Jiang, Matthieu Feraud, Benjamin Navet, and Louis-Felix Nothias.
 
 This co-authorship note is informational and does not itself determine legal ownership or licensing authority.
 
