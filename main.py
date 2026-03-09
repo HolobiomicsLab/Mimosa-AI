@@ -19,7 +19,7 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.csv_mode import CsvEvaluationMode
+from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
@@ -120,10 +120,10 @@ async def science_bench_papers_mode(args, config):
 def load_goal_from_file_or_string(goal_input: str) -> str:
     """
     Load goal from file if the input is a file path, otherwise return the string as-is.
-    
+
     Args:
         goal_input: Either a file path or a goal string
-        
+
     Returns:
         The goal content (either loaded from file or the original string)
     """
