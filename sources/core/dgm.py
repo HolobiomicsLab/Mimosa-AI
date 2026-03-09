@@ -240,7 +240,7 @@ class DarwinMachine:
             print(f"\033[96m{'─' * 60}\033[0m\n")
             return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
         return WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
-    
+
     def get_craft_instructions(self, goal, wf):
         if wf:
             return self.improvement_prompt(
@@ -254,7 +254,7 @@ class DarwinMachine:
         goal: str,
         template_uuid: str | None = None,
         judge: bool = True,
-        scenario_id: str = None,
+        scenario_rubric: str = None,
         max_iteration: int = 1,
         learning_mode: bool = False,
         original_task: str = None,
@@ -266,7 +266,7 @@ class DarwinMachine:
         - goal (str): The primary goal or objective to be accomplished (may be knowledge-wrapped).
          template_uuid (str | None, optional): UUID of a workflow template to use.
         - judge (bool, optional): Whether to enable judging mode for evaluation.
-        - scenario_id (str, optional): ID of scenario for evaluation.
+        - scenario_rubric (str, optional): ID of scenario for evaluation.
         - max_iteration (int): Maximum number of iterations.
         - learning_mode (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
         - original_task (str, optional): Original unwrapped task for similarity matching.
@@ -285,13 +285,13 @@ class DarwinMachine:
         if self.process_id is None and max_iteration > 1:
             print("Setup reward visualization.")
             self.viz_utils.create_rewards_curve_plot(goal)
-        elif scenario_id and judge:
+        elif scenario_rubric and judge:
             print("Setup scenario visualization.")
-            scenario = ScenarioLoader().load_scenario(scenario_id)
+            scenario = ScenarioLoader().load_scenario(scenario_rubric)
             if scenario:
                 total_assertions = len(scenario.get("assertions", []))
                 self.viz_utils.create_assertion_progress_plot(
-                    scenario_id, total_assertions
+                    scenario_rubric, total_assertions
                 )
 
         run0 = IndividualRun(
@@ -301,7 +301,7 @@ class DarwinMachine:
             workflow_template=wf,
             max_depth=max_iteration,
             judge=judge,
-            scenario_id=scenario_id,
+            scenario_rubric=scenario_rubric,
             original_task=original_task
         )
 
@@ -340,25 +340,25 @@ class DarwinMachine:
         if workflow_code:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
-                executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_id, assertion_history
+                executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
             # Don't overwrite runs[-1].cost - it contains cumulative from previous iterations
             runs[-1].reward = wf_info.overall_score
-    
+
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
         flow_answers = self.get_flow_answers(wf_info.state_result)
         self.show_answers(flow_answers)
         rewards_history.append(wf_info.overall_score)
-        
+
         if runs[-1].iteration_count > 0:
             validation_result = self.improvement_validator.validate_improvement(
                 baseline_run=runs[-5:],
                 new_run=runs[-1:],
                 threshold=0.05  # 5% improvement threshold
             )
-            
+
             improvement_log = ImprovementLog(
                 from_iteration=runs[-2].iteration_count,
                 to_iteration=runs[-1].iteration_count,
@@ -367,22 +367,22 @@ class DarwinMachine:
                 is_validated=validation_result["valid"],
                 confidence=validation_result["confidence"]
             )
-            
+
             if not hasattr(runs[-1], 'improvement_history'):
                 runs[-1].improvement_history = []
             runs[-1].improvement_history.append(improvement_log)
-            
+
             self.logger.info(f"[IMPROVEMENT VALIDATION] {improvement_log}")
-        
+
         # Update visualizations
         self._update_visualizations(
             rewards_history, assertion_history,
-            runs[-1].goal, runs[-1].scenario_id, uuid
+            runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
-        
+
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
-        
+
         # Log and notify completion
         self._log_iteration_completion(
             runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
@@ -442,7 +442,7 @@ class DarwinMachine:
             judge=runs[-1].judge,
             answers=wf_info.answers,
             state_result=wf_info.state_result,
-            scenario_id=runs[-1].scenario_id,
+            scenario_rubric=runs[-1].scenario_rubric,
             original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
@@ -489,7 +489,7 @@ class DarwinMachine:
 
     async def _evaluate_and_calculate_cost(
         self, executed: bool, judge: bool, uuid: str,
-        answer: str, scenario_id: str, assertion_history: list
+        answer: str, scenario_rubric: str, assertion_history: list
     ) -> tuple[str, float]:
         """Evaluate workflow and calculate cost."""
         logger = logging.getLogger(__name__)
@@ -498,7 +498,7 @@ class DarwinMachine:
 
         if judge and uuid:
             answer = answer if executed else "workflow failed to execute."
-            eval_type = await self._evaluate_workflow(uuid, answer, scenario_id, assertion_history)
+            eval_type = await self._evaluate_workflow(uuid, answer, scenario_rubric, assertion_history)
 
         # Calculate cost regardless of execution success
         # This includes workflow generation LLM costs even when execution fails
@@ -510,7 +510,7 @@ class DarwinMachine:
         return eval_type, exec_cost
 
     async def _evaluate_workflow(
-        self, uuid: str, answer: str, scenario_id: str, assertion_history: list
+        self, uuid: str, answer: str, scenario_rubric: str, assertion_history: list
     ) -> str:
         """Evaluate the workflow and update assertion history."""
         logger = logging.getLogger(__name__)
@@ -519,15 +519,15 @@ class DarwinMachine:
         print(f"\033[94m{'=' * 80}\033[0m")
 
         eval_start = time.time()
-        eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_id=scenario_id)
-        eval_type = 'scenario' if scenario_id else 'generic'
+        eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_rubric=scenario_rubric)
+        eval_type = 'scenario' if scenario_rubric else 'generic'
         eval_time = time.time() - eval_start
 
-        logger.info(f"[WORKFLOW EVALUATION] {uuid} evaluated in {eval_time:.3f}s")
+        logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
         print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
 
         # Track assertion progress for scenario evaluation
-        if scenario_id and isinstance(eval_result, dict) and assertion_history is not None:
+        if scenario_rubric and isinstance(eval_result, dict) and assertion_history is not None:
             self._update_assertion_history(eval_result, assertion_history)
 
         return eval_type
@@ -542,12 +542,12 @@ class DarwinMachine:
 
     def _update_visualizations(
         self, rewards_history: list, assertion_history: list,
-        goal: str, scenario_id: str, uuid: str
+        goal: str, scenario_rubric: str, uuid: str
     ):
         """Update all visualizations with current data."""
         # Update assertion plot if available
         if assertion_history:
-            self._update_assertion_plot(assertion_history, scenario_id, uuid)
+            self._update_assertion_plot(assertion_history, scenario_rubric, uuid)
         elif rewards_history:
             self._update_rewards_plot(rewards_history)
 
@@ -556,12 +556,12 @@ class DarwinMachine:
 
     def _update_assertion_plot(
         self, assertion_history: list,
-        scenario_id: str, uuid: str
+        scenario_rubric: str, uuid: str
     ):
         """Update assertion progress plot."""
         from sources.evaluation.scenario_loader import ScenarioLoader
 
-        scenario = ScenarioLoader().load_scenario(scenario_id)
+        scenario = ScenarioLoader().load_scenario(scenario_rubric)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0
 
         self.viz_utils.update_assertion_progress_plot(

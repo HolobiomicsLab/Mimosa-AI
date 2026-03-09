@@ -152,7 +152,7 @@ async def normal_execution_mode(args, config):
             print(f"⚠️ Starting in single agent mode")
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
-                            scenario_id=args.scenario,
+                            scenario_rubric=args.scenario,
                             max_iteration=args.max_evolve_iterations,
                             learning_mode=args.learn,
                             single_agent_mode=args.single_agent

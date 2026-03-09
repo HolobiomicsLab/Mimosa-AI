@@ -103,7 +103,11 @@ class CapsuleEvaluator:
         """
         try:
             if not self.eval_script_name:
-                return False, "No evaluation script specified for this task", ver_success
+                return False, "No evaluation script specified for this task", False
+
+            # Get eval script path for smart file matching
+            eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
+
             # Step 1: VER - Run generated code
             self.logger.info("[EVAL] Running generated code for VER evaluation")
             ver_success, ver_message = self.sandbox.run_generated_code(
@@ -119,9 +123,6 @@ class CapsuleEvaluator:
             self.logger.info("[EVAL] VER passed - code executed successfully")
 
             # Step 2: SR - Run evaluation script
-
-            eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
-
             if not eval_script_path.exists():
                 return False, f"Evaluation script not found: {eval_script_path}", ver_success
 

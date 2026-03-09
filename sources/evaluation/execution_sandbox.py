@@ -210,6 +210,7 @@ class ExecutionSandbox:
         Run the generated code in the capsule to produce output.
 
         Args:
+            eval_script_path: Path to evaluation script (used for smart file selection)
             expected_output: Expected output filename to check for
             timeout: Execution timeout in seconds
 
@@ -224,8 +225,9 @@ class ExecutionSandbox:
             if not py_files:
                 return False, "No Python file found in capsule"
 
-            generated_script = eval_script_path
-            self.logger.info(f"[SANDBOX] Found generated script: {generated_script.name}")
+            # Smart file selection based on eval_script_path
+            generated_script = self._select_best_matching_file(py_files, eval_script_path)
+            self.logger.info(f"[SANDBOX] Selected generated script: {generated_script.name}")
 
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
@@ -275,6 +277,89 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Generated code error: {str(e)}")
             return False, f"Code execution error: {str(e)}"
+
+    def _select_best_matching_file(self, py_files: list[Path], eval_script_path: Path = None) -> Path:
+        """
+        Select the best matching Python file from candidates based on eval script name.
+
+        Uses simple string similarity without heavy models.
+        """
+        if not eval_script_path or not py_files:
+            return py_files[0] if py_files else None
+
+        # Extract base name from eval script (remove _eval.py and .py)
+        eval_name = eval_script_path.stem
+        if eval_name.endswith('_eval'):
+            eval_name = eval_name[:-5]  # Remove '_eval' suffix
+
+        # Normalize eval name (remove common separators, lowercase)
+        eval_normalized = eval_name.lower().replace('_', '').replace('-', '')
+
+        best_match = None
+        best_score = 0
+
+        for py_file in py_files:
+            file_name = py_file.stem.lower().replace('_', '').replace('-', '')
+
+            # Calculate simple similarity score
+            score = self._calculate_similarity_score(eval_normalized, file_name)
+
+            if score > best_score:
+                best_score = score
+                best_match = py_file
+
+        # If no good match found (score < 0.3), fall back to first file
+        if best_score < 0.3:
+            self.logger.info(f"[SANDBOX] No good match found (best score: {best_score:.2f}), using first file")
+            return py_files[0]
+
+        self.logger.info(f"[SANDBOX] Best match score: {best_score:.2f} for {best_match.name}")
+        return best_match
+
+    def _calculate_similarity_score(self, str1: str, str2: str) -> float:
+        """
+        Calculate simple string similarity score (0.0 to 1.0).
+        Uses substring matching and length ratio.
+        """
+        if not str1 or not str2:
+            return 0.0
+
+        # Exact match gets perfect score
+        if str1 == str2:
+            return 1.0
+
+        # Substring matching
+        shorter = min(str1, str2, key=len)
+        longer = max(str1, str2, key=len)
+
+        # Check if shorter is contained in longer
+        if shorter in longer:
+            return len(shorter) / len(longer)
+
+        # Find longest common substring
+        lcs_length = self._longest_common_substring_length(str1, str2)
+        if lcs_length > 0:
+            # Weight by the proportion of the shorter string that matches
+            return lcs_length / len(shorter)
+
+        # No match found
+        return 0.0
+
+    def _longest_common_substring_length(self, str1: str, str2: str) -> int:
+        """
+        Find length of longest common substring using dynamic programming.
+        """
+        m, n = len(str1), len(str2)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        max_length = 0
+
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if str1[i - 1] == str2[j - 1]:
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                    max_length = max(max_length, dp[i][j])
+
+        return max_length
 
     def _copy_capsule_contents_to_temp(self, temp_path: Path) -> None:
         """
