@@ -1,5 +1,8 @@
 # Contributing to Mimosa-AI
 
+> Note: This file is the technical contribution guide. For licensing/CLA policy (including the required `CLA Check` status before merge), use the repository-root `CONTRIBUTING.md`.  
+> CLA contact: dr20.spv@listes.cnrs.fr
+
 ## Table of Contents
 1. [Project Philosophy](#project-philosophy)
 2. [Architecture Overview](#architecture-overview)
@@ -138,7 +141,7 @@ mimosa-ai/
 │       └── <scenario_name>.json        # Individual scenario definitions
 │
 ├── docs/                               # Documentation
-│   ├── CONTRIBUTING.md                 # This file
+│   ├── DEVELOPER_GUIDE.md              # This file
 │   ├── science_agent_bench_evaluation.md
 │   ├── diagrams/                       # Architecture diagrams
 │   └── images/                         # Documentation images

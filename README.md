@@ -362,3 +362,14 @@ The telemetry dashboard provides:
 > **Note:** Telemetry is optional but recommended for debugging and performance optimization.
 
 ---
+
+## License
+
+This repository is publicly distributed under the GNU Affero General Public License v3.0 (AGPLv3). A separate commercial licensing path may be available from the designated rights-holder.
+
+For contribution and licensing details, see:
+- `docs/licensing-notes.md`
+- `CLA/INDIVIDUAL_CLA.md`
+- `CLA/CORPORATE_CLA.md`
+
+---
