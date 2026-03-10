@@ -23,14 +23,15 @@ class WorkflowEval:
         self.csv_runs_limit = csv_runs_limit
         self.orchestrator = WorkflowOrchestrator(config)
         self.model_lists = [
-            "anthropic/claude-opus-4-5",
-            "anthropic/claude-sonnet-4-5",
-            "openrouter/minimax/minimax-m2.5",
-            "openrouter/moonshotai/kimi-k2-thinking",
-            "openrouter/moonshotai/kimi-k2.5",
-            "openrouter/openrouter/inception/mercury-2",
+            "openrouter/qwen/qwen3.5-35b-a3b",
             "openrouter/deepseek/deepseek-v3.2",
-            "openrouter/z-ai/glm-5"
+            "openrouter/openrouter/inception/mercury-2",
+            "openrouter/minimax/minimax-m2.5",
+            "openrouter/moonshotai/kimi-k2.5",
+            "openrouter/moonshotai/kimi-k2-thinking",
+            "openrouter/z-ai/glm-5",
+            "anthropic/claude-opus-4-5",
+            "anthropic/claude-sonnet-4-5"
         ]
         self.model_results: Dict[str, List[Tuple[str, bool]]] = {}
     
@@ -87,12 +88,13 @@ class WorkflowEval:
                         single_agent_mode=False,
                         no_run=True
                     )
-                    success = executed and not "error" in run_stdout.lower() and not "failed" in run_stdout.lower()
+                    success = executed and not "error" in workflow_code.lower() and not "failed" in workflow_code.lower()
                     execution_time = time.time() - iteration_start_time
 
                     print("====== CODE ======\n\n")
+                    print(workflow_code)
                     print("\n\n================\n")
-                    print(f"\033[95mBenchmark task {i + 1} Generation success\033[0m")
+                    print(f"\033[95mBenchmark task {i + 1} Generation {"success" if success else "failure"} \033[0m")
                     print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
                     
                 except Exception as e:
