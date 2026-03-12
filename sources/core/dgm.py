@@ -135,8 +135,8 @@ class DarwinMachine:
             return ""
 
         flow_answers = (
-            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
-            if isinstance(wf_state["answers"], list)
+            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state.get("step_name", []), wf_state["answers"], strict=True))
+            if isinstance(wf_state["answers"], list) and "step_name" in wf_state
             else wf_state["answers"]
         )
         return flow_answers
@@ -258,7 +258,8 @@ class DarwinMachine:
         max_iteration: int = 1,
         learning_mode: bool = False,
         original_task: str = None,
-        single_agent_mode: bool = False
+        single_agent_mode: bool = False,
+        mockup_mode: bool = False
     ) -> list[IndividualRun]:
         """
         Start the learning process for achieving a specified goal.
@@ -270,6 +271,8 @@ class DarwinMachine:
         - max_iteration (int): Maximum number of iterations.
         - learning_mode (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
         - original_task (str, optional): Original unwrapped task for similarity matching.
+        - mockup_mode (bool, optional): If True, use existing workflow data from select_workflow_template
+            instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
         if learning_mode:
             max_iteration = max(3, self.config.max_learning_evolve_iterations)
@@ -277,6 +280,36 @@ class DarwinMachine:
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
         )
+
+        # Mockup mode: use existing workflow data without calling orchestrate_workflow
+        if mockup_mode:
+            if wf is None:
+                raise ValueError("❌ Mockup mode requires a valid workflow template. "
+                                 "Please provide a template_uuid or ensure workflows exist in the workflow directory.")
+            print(f"\n\033[93m{'MOCKUP MODE':^60}\033[0m")
+            print(f"\033[93m{'─' * 60}\033[0m")
+            print(f"\033[93mUsing existing workflow data from: {wf.uuid}\033[0m")
+            print(f"\033[93m{'─' * 60}\033[0m\n")
+            mock_run = IndividualRun(
+                goal=wf.goal or goal,
+                prompt=wf.code or goal,
+                template_uuid=template_uuid or wf.uuid,
+                workflow_template=wf,
+                max_depth=max_iteration,
+                judge=judge,
+                scenario_rubric=scenario_rubric,
+                original_task=original_task or wf.original_task,
+                current_uuid=wf.uuid,
+                answers=wf.answers,
+                state_result=wf.state_result,
+                reward=wf.overall_score,
+                iteration_count=1
+            )
+            flow_answers = self.get_flow_answers(wf.state_result)
+            self.show_answers(flow_answers)
+            print(f"\n\033[93mMockup run completed with reward: {wf.overall_score:.1f}\033[0m")
+            return [mock_run]
+
         craft_instructions = self.get_craft_instructions(goal, wf)
 
         rewards_history = []
