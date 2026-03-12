@@ -590,9 +590,10 @@ class ScenarioEvaluator(BaseEvaluator):
                 })
 
         # Calculate score
-        passed_count = sum(1 for result in assertion_results if result.get("passed", False))
+        passed_count = sum(int(result.get("passed", False)) for result in assertion_results)
         total_count = len(assertion_results)
         score = passed_count / total_count if total_count > 0 else 0.0
+        print(f"Scenario evaluation completed for {scenario_rubric}: {passed_count}/{total_count} assertions passed, score: {score:.4f}")
 
         # Generate results
         results = {
@@ -610,6 +611,27 @@ class ScenarioEvaluator(BaseEvaluator):
             self._save_results(results, uuid, 'scenario')
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
+
+        # Save evaluation details to evaluation.txt
+        try:
+            evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
+            evaluation_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(evaluation_path, "w", encoding='utf-8') as file:
+                file.write(f"Scenario Evaluation: {scenario_rubric}\n")
+                file.write(f"Timestamp: {results['timestamp']}\n")
+                file.write(f"Score: {score:.4f}\n")
+                file.write(f"Passed Assertions: {passed_count}/{total_count}\n")
+                file.write(f"Judge Model: {self.judge_model}\n")
+                file.write("\n" + "="*60 + "\n\n")
+                file.write("Assertion Results:\n\n")
+                for result in assertion_results:
+                    status = "✓ PASS" if result.get("passed", False) else "✗ FAIL"
+                    file.write(f"[{status}] {result.get('id', 'unknown')}: {result.get('description', 'No description')}\n")
+                    file.write(f"    Evidence: {result.get('evidence', 'No evidence')}\n")
+                    file.write(f"    Confidence: {result.get('confidence', 0.0):.2f}\n\n")
+            self.logger.info(f"Scenario evaluation saved to: {evaluation_path}")
+        except OSError as e:
+            self.logger.error(f"Failed to save evaluation to file: {str(e)}")
 
         # Return assertion metrics for Evolution tracking
         return {
@@ -668,9 +690,8 @@ class ScenarioEvaluator(BaseEvaluator):
                 if result.get("passed", False):
                     earned = item.get("points", 0)
                 else:
-                    # Partial credit based on confidence
-                    confidence = result.get("confidence", 0.0)
-                    earned = item.get("points", 0) * confidence
+                    # No partial credit for failed rubric items
+                    earned = 0
 
                 total_earned += earned
 
@@ -708,6 +729,28 @@ class ScenarioEvaluator(BaseEvaluator):
             self._save_results(results, uuid, 'scenario')
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
+
+        # Save evaluation details to evaluation.txt
+        try:
+            evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
+            evaluation_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(evaluation_path, "w", encoding='utf-8') as file:
+                file.write(f"Scenario Evaluation (Rubric Format): {scenario_rubric}\n")
+                file.write(f"Timestamp: {results['timestamp']}\n")
+                file.write(f"Score: {score:.4f} ({total_earned:.1f}/{total_possible_points} points)\n")
+                file.write(f"Judge Model: {self.judge_model}\n")
+                file.write("\n" + "="*60 + "\n\n")
+                file.write("Rubric Item Results:\n\n")
+                for result in item_results:
+                    status = "✓ PASS" if result.get("passed", False) else "✗ FAIL"
+                    file.write(f"[{status}] {result.get('category', 'unknown')} - {result.get('name', 'unknown')}\n")
+                    file.write(f"    Description: {result.get('description', 'No description')}\n")
+                    file.write(f"    Points: {result.get('earned_points', 0):.1f}/{result.get('possible_points', 0)}\n")
+                    file.write(f"    Evidence: {result.get('evidence', 'No evidence')}\n")
+                    file.write(f"    Confidence: {result.get('confidence', 0.0):.2f}\n\n")
+            self.logger.info(f"Scenario evaluation saved to: {evaluation_path}")
+        except OSError as e:
+            self.logger.error(f"Failed to save evaluation to file: {str(e)}")
 
         # Return metrics for Evolution tracking
         return {

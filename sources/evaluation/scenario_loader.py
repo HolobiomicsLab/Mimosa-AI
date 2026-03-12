@@ -12,7 +12,7 @@ from typing import Any
 class ScenarioLoader:
     """Manages loading and validation of evaluation scenarios."""
 
-    def __init__(self, scenarios_dir: str = "datasets/scenarios"):
+    def __init__(self, scenarios_dir: str = "datasets/ScienceAgentBench/scoring_rubrics"):
         self.scenarios_dir = Path(scenarios_dir)
         self._scenario_cache = {}
 
@@ -31,7 +31,7 @@ class ScenarioLoader:
         if scenario_rubric in self._scenario_cache:
             return self._scenario_cache[scenario_rubric]
 
-        scenario_file = self.scenarios_dir / f"{scenario_rubric}.json"
+        scenario_file = self.scenarios_dir / f"{scenario_rubric}"
         if not scenario_file.exists():
             print(f"Scenario file not found: {scenario_file}")
             return None

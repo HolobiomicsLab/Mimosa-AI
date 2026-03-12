@@ -187,13 +187,24 @@ Provide a structured analysis with:
             "total_eval": len(sab_runs)
         }
         if sab_runs:
+            runs_data = sab_runs[-1].get('runs', [])
             notes = {
                 **notes,
+                "capsule_name": capsule_name,
                 "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
                 "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
                 "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
                 "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
-                "is_success": sab_runs[-1].get('SR', False)
+                "is_success": sab_runs[-1].get('SR', False),
+                "task_cost": sab_runs[-1].get('eval_cost', 0.0),
+                "max_judge_reward": max((getattr(run, 'reward', 0.0) for run in runs_data), default=0.0),
+                "evolution_iterations": len(runs_data),
+                "evolved_workflows_uuids": [getattr(run, 'current_uuid', '') for run in runs_data],
+                "evolution_rewards": [getattr(run, 'reward', 0.0) for run in runs_data],
+                "evolution_costs": [getattr(run, 'cost', 0.0) for run in runs_data],
+                "evolution_total_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data),
+                "evolution_avg_reward": sum(getattr(run, 'reward', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0,
+                "evolution_avg_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0
             }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
@@ -345,7 +356,8 @@ Provide your analysis following the specified output format."""
                 'SR': eval_results['SR'][0],
                 'SR_message': eval_results['SR'][1],
                 'CBS': eval_results['CBS'],
-                'eval_cost': eval_results['cost']
+                'eval_cost': eval_results['cost'],
+                'runs': runs
             })
             print(f"\033[95m{eval_results['summary']}\033[0m")
 
@@ -364,7 +376,8 @@ Provide your analysis following the specified output format."""
                 'VER': False,
                 'SR': False,
                 'CBS': 0.0,
-                'eval_error': str(eval_error)
+                'eval_error': str(eval_error),
+                'runs': runs
             })
 
         return execution_data

@@ -281,18 +281,7 @@ class DarwinMachine:
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
-
-        if self.process_id is None and max_iteration > 1:
-            print("Setup reward visualization.")
-            self.viz_utils.create_rewards_curve_plot(goal)
-        elif scenario_rubric and judge:
-            print("Setup scenario visualization.")
-            scenario = ScenarioLoader().load_scenario(scenario_rubric)
-            if scenario:
-                total_assertions = len(scenario.get("assertions", []))
-                self.viz_utils.create_assertion_progress_plot(
-                    scenario_rubric, total_assertions
-                )
+        self.viz_utils.create_rewards_curve_plot(goal)
 
         run0 = IndividualRun(
             goal=goal,
@@ -499,9 +488,7 @@ class DarwinMachine:
         if judge and uuid:
             answer = answer if executed else "workflow failed to execute."
             eval_type = await self._evaluate_workflow(uuid, answer, scenario_rubric, assertion_history)
-
         # Calculate cost regardless of execution success
-        # This includes workflow generation LLM costs even when execution fails
         cost_start = time.time()
         exec_cost = self.pricing.calculate_cost(uuid)
         cost_time = time.time() - cost_start
@@ -534,8 +521,8 @@ class DarwinMachine:
 
     def _update_assertion_history(self, eval_result: dict, assertion_history: list):
         """Update assertion history with evaluation results."""
-        passed = eval_result.get('passed_assertions', 0)
-        total = eval_result.get('total_assertions', 0)
+        passed = eval_result.get('passed_assertions', eval_result.get('earned_points', 0))
+        total = eval_result.get('total_assertions', eval_result.get('total_points', 100))
         assertion_history.append([passed, total])
         print(f"\033[94m📊 Assertions Progress: {passed}/{total} "
               f"({passed/total*100 if total > 0 else 0:.0f}%)\033[0m")

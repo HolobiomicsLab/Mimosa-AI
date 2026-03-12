@@ -1,6 +1,26 @@
 {
-  "timestamp": "2026-03-09T15:48:31.473480",
+  "timestamp": "2026-03-12T10:02:59.367821",
   "pricing": {
+    "openrouter/hunter-alpha": {
+      "input": 0.0,
+      "output": 0.0
+    },
+    "openrouter/healer-alpha": {
+      "input": 0.0,
+      "output": 0.0
+    },
+    "nvidia/nemotron-3-super-120b-a12b:free": {
+      "input": 0.0,
+      "output": 0.0
+    },
+    "bytedance-seed/seed-2.0-lite": {
+      "input": 0.25,
+      "output": 2.0
+    },
+    "qwen/qwen3.5-9b": {
+      "input": 0.09999999999999999,
+      "output": 0.15
+    },
     "openai/gpt-5.4-pro": {
       "input": 30.0,
       "output": 180.0
@@ -78,12 +98,12 @@
       "output": 2.34
     },
     "minimax/minimax-m2.5": {
-      "input": 0.295,
-      "output": 1.2
+      "input": 0.27,
+      "output": 0.95
     },
     "z-ai/glm-5": {
-      "input": 0.7999999999999999,
-      "output": 2.56
+      "input": 0.72,
+      "output": 2.3
     },
     "qwen/qwen3-max-thinking": {
       "input": 0.78,
@@ -274,8 +294,8 @@
       "output": 1.2
     },
     "deepseek/deepseek-v3.2": {
-      "input": 0.25,
-      "output": 0.39999999999999997
+      "input": 0.26,
+      "output": 0.38
     },
     "prime-intellect/intellect-3": {
       "input": 0.19999999999999998,
@@ -422,8 +442,8 @@
       "output": 2.5
     },
     "qwen/qwen3-vl-30b-a3b-thinking": {
-      "input": 0.0,
-      "output": 0.0
+      "input": 0.13,
+      "output": 1.56
     },
     "qwen/qwen3-vl-30b-a3b-instruct": {
       "input": 0.13,
@@ -436,10 +456,6 @@
     "z-ai/glm-4.6": {
       "input": 0.39,
       "output": 1.9
-    },
-    "z-ai/glm-4.6:exacto": {
-      "input": 0.44,
-      "output": 1.76
     },
     "anthropic/claude-sonnet-4.5": {
       "input": 3.0,
@@ -462,8 +478,8 @@
       "output": 0.39999999999999997
     },
     "qwen/qwen3-vl-235b-a22b-thinking": {
-      "input": 0.0,
-      "output": 0.0
+      "input": 0.26,
+      "output": 2.6
     },
     "qwen/qwen3-vl-235b-a22b-instruct": {
       "input": 0.19999999999999998,
@@ -480,10 +496,6 @@
     "openai/gpt-5-codex": {
       "input": 1.25,
       "output": 10.0
-    },
-    "deepseek/deepseek-v3.1-terminus:exacto": {
-      "input": 0.21,
-      "output": 0.7899999999999999
     },
     "deepseek/deepseek-v3.1-terminus": {
       "input": 0.21,
@@ -502,8 +514,8 @@
       "output": 0.975
     },
     "qwen/qwen3-next-80b-a3b-thinking": {
-      "input": 0.15,
-      "output": 1.2
+      "input": 0.0975,
+      "output": 0.78
     },
     "qwen/qwen3-next-80b-a3b-instruct:free": {
       "input": 0.0,
@@ -536,10 +548,6 @@
     "moonshotai/kimi-k2-0905": {
       "input": 0.39999999999999997,
       "output": 2.0
-    },
-    "moonshotai/kimi-k2-0905:exacto": {
-      "input": 0.6,
-      "output": 2.5
     },
     "qwen/qwen3-30b-a3b-thinking-2507": {
       "input": 0.051,
@@ -609,10 +617,6 @@
       "input": 0.039,
       "output": 0.19
     },
-    "openai/gpt-oss-120b:exacto": {
-      "input": 0.039,
-      "output": 0.19
-    },
     "openai/gpt-oss-20b:free": {
       "input": 0.0,
       "output": 0.0
@@ -664,10 +668,6 @@
     "qwen/qwen3-coder": {
       "input": 0.22,
       "output": 1.0
-    },
-    "qwen/qwen3-coder:exacto": {
-      "input": 0.22,
-      "output": 1.7999999999999998
     },
     "bytedance/ui-tars-1.5-7b": {
       "input": 0.09999999999999999,
@@ -1133,10 +1133,6 @@
       "input": 0.2,
       "output": 0.2
     },
-    "raifle/sorcererlm-8x22b": {
-      "input": 4.5,
-      "output": 4.5
-    },
     "thedrummer/unslopnemo-12b": {
       "input": 0.39999999999999997,
       "output": 0.39999999999999997
@@ -1193,10 +1189,6 @@
       "input": 0.12,
       "output": 0.39
     },
-    "neversleep/llama-3.1-lumimaid-8b": {
-      "input": 0.09,
-      "output": 0.6
-    },
     "cohere/command-r-08-2024": {
       "input": 0.15,
       "output": 0.6
@@ -1206,8 +1198,8 @@
       "output": 10.0
     },
     "sao10k/l3.1-euryale-70b": {
-      "input": 0.65,
-      "output": 0.75
+      "input": 0.85,
+      "output": 0.85
     },
     "qwen/qwen-2.5-vl-7b-instruct": {
       "input": 0.2,
@@ -1277,10 +1269,6 @@
       "input": 0.14,
       "output": 0.14
     },
-    "meta-llama/llama-guard-2-8b": {
-      "input": 0.19999999999999998,
-      "output": 0.19999999999999998
-    },
     "openai/gpt-4o-2024-05-13": {
       "input": 5.0,
       "output": 15.0
@@ -1332,10 +1320,6 @@
     "mistralai/mixtral-8x7b-instruct": {
       "input": 0.54,
       "output": 0.54
-    },
-    "neversleep/noromaid-20b": {
-      "input": 1.0,
-      "output": 1.75
     },
     "alpindale/goliath-120b": {
       "input": 3.75,
