@@ -19,8 +19,7 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 dotenv.load_dotenv()
 
 MEMORY_DIR = Path("./sources/memory")
-default_llm = LLMConfig.from_dict({"model": "deepseek-chat", "provider": "deepseek"})
-#default_llm = LLMConfig.from_dict({"model": "claude-3-7-sonnet-latest", "provider": "anthropic"})
+default_llm = LLMConfig.from_dict({"model": "z-ai/glm-4.7-flash", "provider": "openrouter"})
 
 assert os.path.exists(MEMORY_DIR)
 
@@ -47,13 +46,13 @@ def extract_json(code: str) -> str:
 class MemoryExtraction:
     def __init__(self, uuid):
         self.uuid = uuid
-    
+
     def get_agent_memories(self, target: list[str]) -> tuple[str, dict]:
         """
         Get the memory of all agent within a uuid folder and select only the role defined by target.
         Args:
             target: The list of role in the memory to include.
-        Returns: 
+        Returns:
             A list of Tuple containing the agent name and it's json memory.
         """
         agents_memory = []
@@ -75,7 +74,7 @@ class MemoryExtraction:
         except Exception as e:
             raise e
         return paths[0][2]
-    
+
     def _load_agent_memory(self, filepath):
         print("Loading:", filepath)
         json_content = None
@@ -102,7 +101,7 @@ class MemoryExtraction:
         """
         if not memory:
             return []
-        
+
         filtered_memory = []
         for entry in memory:
             if entry.get('role') in target:
@@ -111,24 +110,24 @@ class MemoryExtraction:
 
 class BullshitDetectorNumerical:
     """
-    Detects fraudulent numerical claims in AI agent memories by backtracing the origin 
+    Detects fraudulent numerical claims in AI agent memories by backtracing the origin
     of numerical values and analyzing their evolution through the conversation history.
     """
-    
+
     def __init__(self, llm_config: LLMConfig = None):
         """
         Initialize the BullshitDetectorNumerical.
-        
+
         Args:
             llm_config: Configuration for the LLM judge. If None, uses default gpt-4o-mini.
         """
         if llm_config is None:
             llm_config = default_llm
-        
+
         self.llm_config = llm_config
         self.numerical_judge_system_prompt = self._create_numerical_judge_system_prompt()
         self.values_already_found = []
-        
+
         # Regex patterns for numerical value extraction
         self.number_patterns = [
             # Decimal numbers (including scientific notation)
@@ -140,9 +139,9 @@ class BullshitDetectorNumerical:
             # Numbers with units (common scientific units)
             r'\b\d+(?:\.\d+)?(?:\s*(?:mm|cm|m|km|mg|g|kg|ml|l|Hz|kHz|MHz|GHz|V|mV|A|mA|°C|°F|K))\b',
         ]
-        
+
         self.compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.number_patterns]
-    
+
     def _create_numerical_judge_system_prompt(self) -> str:
         """Create the system prompt for the numerical LLM judge."""
         return """
@@ -151,7 +150,7 @@ You are a forensic analyst specializing in numerical integrity verification with
 Your task is to analyze the chronological evolution of numerical values in agent memory and detect:
 
 1. **FABRICATED VALUES**: Numbers that appear without proper derivation or source.
-2. **INCORRECT CALCULATION**: Number that were calculated using a wrong formula or using values that were previously identified as fabricated. 
+2. **INCORRECT CALCULATION**: Number that were calculated using a wrong formula or using values that were previously identified as fabricated.
 3. **MISSING PROVENANCE**: Values presented as facts without showing their origin.
 
 RED_FLAGS
@@ -165,7 +164,7 @@ For each numerical value analysis, provide:
 - **FRAUD_SCORE**: 0-10 (0=completely legitimate, 10=clearly fabricated). Values coming originaly from the 'user' role should be considerered as legitimate.
 - **ISSUES**: list of issues in how the value was derivated.
 - **EVIDENCE**: supporting evidence such as code sample or text where the lie/error was fabricated.
-- **MATH**: Math formula/python/R code if any 
+- **MATH**: Math formula/python/R code if any
 - **PROVENANCE CHAIN**: Chain of provenance for value
 
 Excel File (dataset.xlsx)
@@ -197,48 +196,48 @@ Specificity = 0.9 ✓
         numbers = []
         if self.is_csv_content(text):
             return []
-        
+
         seen = set()
         for pattern in self.compiled_patterns:
             for match in pattern.finditer(text):
                 matched_text = match.group()
                 match_start = match.start()
                 match_end = match.end()
-                
+
                 # Clean the number
                 clean_num = re.sub(r'[%\s].*$', '', matched_text)
                 if '.' not in clean_num:
                     continue
                 if re.match(r'^\d+\.\d+\.\d+', clean_num):
                     continue
-                
+
                 try:
                     float_value = float(clean_num)
                     if float_value >= 100.0:
                         continue
                     if matched_text in seen:
                         continue
-                    
+
                     # Check if the number is followed by uppercase words (section titles)
                     # Look ahead up to 50 characters
                     look_ahead = text[match_end:match_end + 50]
                     # Pattern: optional whitespace followed by uppercase word(s)
                     if re.match(r'^\s+[A-Z][A-Z\s]{2,}', look_ahead):
                         continue
-                    
+
                     # Check if preceded by uppercase word (within 20 chars before)
                     look_behind_start = max(0, match_start - 20)
                     look_behind = text[look_behind_start:match_start]
                     # Pattern: uppercase word followed by optional whitespace
                     if re.search(r'[A-Z][A-Z\s]{2,}\s*$', look_behind):
                         continue
-                    
+
                     numbers.append(matched_text)
                     seen.add(matched_text)
-                    
+
                 except ValueError:
                     continue
-        
+
         return numbers
 
     def is_coding(self, cmd):
@@ -249,23 +248,23 @@ Specificity = 0.9 ✓
         if any([r in cmd for r in r_attempt]):
             return True
         return False
-    
+
     def backtrace_numerical_values(self, agent_name: str, memory_data: list[dict], last_steps_count: int = 1) -> dict[str, list[dict]]:
         """
         Backtrace numerical values through agent memory, focusing on values from the last steps.
         Only backtraces values that appear in the last N steps of the agent's memory.
-        
+
         Args:
             agent_name: Name of the agent
             memory_data: List of memory entries (chronologically ordered)
             last_steps_count: Number of last steps to consider for initial value detection
-            
+
         Returns:
             Dictionary mapping numerical values to their chronological appearances
         """
         if not memory_data:
             return {}
-            
+
         value_timeline = {}
         relevant_code = ""
 
@@ -273,10 +272,10 @@ Specificity = 0.9 ✓
             content = self._extract_content_text(entry)
             if not content or 'SyntaxError' in content:
                 continue
-            role = entry['role'] 
+            role = entry['role']
             if role == "tool-call" and not relevant_code and self.is_coding(str(entry)):
                 relevant_code = str(entry) if entry else None
-                
+
             numbers_in_step = self.extract_numerical_values(content)
             relevant_numbers = [nb for nb in numbers_in_step if nb not in self.values_already_found]
             for number in relevant_numbers:
@@ -291,14 +290,14 @@ Specificity = 0.9 ✓
                 })
             if role not in ["tool-call", "tool-response"]:
                 relevant_code = None
-        
+
         print(f"[DEBUG] Final timeline contains {len(value_timeline)} values with full history")
         return value_timeline
 
     def _extract_content_text(self, entry: dict) -> str:
         """Extract text content from a memory entry."""
         content = entry.get('content', '')
-        
+
         if isinstance(content, list):
             content_text = ""
             for content_item in content:
@@ -330,7 +329,7 @@ Specificity = 0.9 ✓
         if end_pos < len(text):
             context = context + "..."
         return context
-    
+
     def analyse_backtrace(self, agent_name, analysis_text):
         analysis_prompt = f"""
 AGENT: {agent_name}
@@ -387,17 +386,17 @@ Provide your analysis in JSON format:
     def _format_numerical_analysis(self, agent_name: str, value_timeline: dict[str, list[dict]], max_context_per_value: int = 1024) -> list[str]:
         """
         Format the numerical timeline for LLM analysis with optimized context management.
-        
+
         Args:
             agent_name: Name of the agent
             value_timeline: Timeline of numerical value appearances
             max_context_per_value: Maximum characters of context per value to minimize token usage
-            
+
         Returns:
             Formatted list of text for LLM analysis
         """
         formatted_sections = []
-        
+
         for value, appearances in value_timeline.items():
             section = [f"\nVALUE: {value}"]
             seen_steps = set()
@@ -406,9 +405,9 @@ Provide your analysis in JSON format:
                 if app['step'] not in seen_steps:
                     unique_appearances.append(app)
                     seen_steps.add(app['step'])
-            
+
             section.append("Backtrace appearance:\n")
-            
+
             for appearance in unique_appearances:
                 step_info = f" => Step {appearance['step']} (role: {appearance['role']}):\n\n"
                 if appearance['role'] == "user":
@@ -424,19 +423,19 @@ Provide your analysis in JSON format:
                     context = context[:max_context_per_value] + "..."
                 section.append(f"\n[THOUGHT]:\n{context}")
                 section.append("")
-            
+
             formatted_sections.append("\n".join(section))
         return formatted_sections
-        
+
 
     def analyze_agent_numerical_fraud(self, agent_name: str, memory_data: list[dict]) -> list[dict]:
         """
         Complete numerical fraud analysis for a single agent.
-        
+
         Args:
             agent_name: Name of the agent
             memory_data: Agent's memory data
-            
+
         Returns:
             Complete analysis results
         """
@@ -459,24 +458,24 @@ Provide your analysis in JSON format:
     def analyze_all_agents_numerical(self, uuid: str, target_roles: list[str] = None) -> dict:
         """
         Analyze all agents for numerical fraud.
-        
+
         Args:
             uuid: Memory UUID to analyze
             target_roles: List of roles to include in analysis
-            
+
         Returns:
             Comprehensive numerical fraud analysis results
         """
         memory_extraction = MemoryExtraction(uuid)
         if target_roles is None:
             target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations", "user"]
-        
+
         agents_memories = memory_extraction.get_agent_memories(target_roles)
         agent_analyses = []
         for agent_name, memory_data in agents_memories:
             analysis = self.analyze_agent_numerical_fraud(agent_name, memory_data)
             agent_analyses.extend(analysis)
-        
+
         return {
             "uuid": uuid,
             "analysis_timestamp": time.time(),
@@ -488,11 +487,11 @@ Provide your analysis in JSON format:
     def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> tuple[str, list[int]]:
         """
         Generate a comprehensive numerical fraud detection report.
-        
+
         Args:
             analysis_results: Results from analyze_all_agents_numerical
             output_path: Optional path to save the report
-            
+
         Returns:
             Report as a string
         """
@@ -514,7 +513,7 @@ Provide your analysis in JSON format:
             report_lines.append(f"Fraud Score: {value_analysis['fraud_score']}/10")
             report_lines.append(f"Suspicious Values: {len(value_analysis.get('suspicious_values', []))}")
             report_lines.append(f"Summary: {value_analysis['analysis_summary']}")
-            
+
             if value_analysis.get('suspicious_values'):
                 report_lines.append("\nSUSPICIOUS VALUES:")
                 for suspicious in value_analysis['suspicious_values']:
@@ -532,26 +531,26 @@ Provide your analysis in JSON format:
                 if len(value_analysis['value_timeline']) > 5:
                     report_lines.append(f"  ... and {len(value_analysis['value_timeline']) - 5} more values")
                 report_lines.append("")
-            
+
             report_lines.append("-" * 40)
-        
+
         report = "\n".join(report_lines)
-        
+
         if output_path:
             with open(output_path, 'w') as f:
                 f.write(report)
             print(f"Numerical fraud report saved to: {output_path}")
-        
+
         return report, scores
 
     def generate_short_fraud_report(self, analysis_results: dict, threshold: float = 5.0) -> str:
         """
         Generate a concise fraud report showing only high-risk fraudulent values.
-        
+
         Args:
             analysis_results: Results from analyze_all_agents_numerical
             threshold: Minimum fraud score to include (default: 5.0)
-            
+
         Returns:
             Short fraud report as a string
         """
@@ -562,59 +561,59 @@ Provide your analysis in JSON format:
         report_lines.append(f"UUID: {analysis_results['uuid']}")
         report_lines.append(f"Threshold: Fraud Score > {threshold}/10")
         report_lines.append("")
-        
+
         # Collect all agents with high fraud scores and their suspicious values
         fraudulent_agents = {}
         total_fraudulent_values = 0
-        
+
         for analysis in analysis_results['agent_analyses']:
             agent_name = analysis['agent_name']
             suspicious_values = analysis.get('suspicious_values', [])
-            
+
             # Filter values above threshold
             high_risk_values = [
-                sv for sv in suspicious_values 
+                sv for sv in suspicious_values
                 if sv.get('fraud_score', 0) > threshold
             ]
-            
+
             if high_risk_values:
                 if agent_name not in fraudulent_agents:
                     fraudulent_agents[agent_name] = []
                 fraudulent_agents[agent_name].extend(high_risk_values)
                 total_fraudulent_values += len(high_risk_values)
-        
+
         # Summary
         report_lines.append(f"SUMMARY:")
         report_lines.append(f"  Agents with fraudulent values: {len(fraudulent_agents)}")
         report_lines.append(f"  Total high-risk fraudulent values: {total_fraudulent_values}")
         report_lines.append("")
-        
+
         if not fraudulent_agents:
             report_lines.append("✓ No high-risk fraudulent values detected.")
             return "\n".join(report_lines)
-        
+
         # Detailed breakdown by agent
         report_lines.append("FRAUDULENT VALUES BY AGENT:")
         report_lines.append("-" * 80)
-        
+
         for agent_name, fraudulent_values in fraudulent_agents.items():
             report_lines.append(f"\n🚨 AGENT: {agent_name}")
             report_lines.append(f"   Fraudulent values: {len(fraudulent_values)}")
             report_lines.append("")
-            
+
             for idx, fraud_val in enumerate(fraudulent_values, 1):
                 report_lines.append(f"   [{idx}] VALUE: {fraud_val['value']} (Score: {fraud_val['fraud_score']}/10)")
                 report_lines.append(f"       Issues: {', '.join(fraud_val['issues'])}")
-                
+
                 # Truncate evidence if too long
                 evidence = fraud_val.get('evidence', 'N/A')
                 if len(evidence) > 200:
                     evidence = evidence[:200] + "..."
                 report_lines.append(f"       Evidence: {evidence}")
                 report_lines.append("")
-            
+
             report_lines.append("-" * 40)
-        
+
         return "\n".join(report_lines)
 
 
@@ -623,7 +622,7 @@ if __name__ == "__main__":
         print(f"USAGE:\n./{sys.argv[0]} <uuid> memory to evaluate.")
         exit()
     uuid = sys.argv[1]
-    
+
     # Test new BullshitDetectorNumerical
     numerical_detector = BullshitDetectorNumerical()
     numerical_results = numerical_detector.analyze_all_agents_numerical(uuid)

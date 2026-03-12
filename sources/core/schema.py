@@ -1,5 +1,5 @@
 """
-Schema for for storing and managing data in the Mimosa AI system. 
+Schema for for storing and managing data in the Mimosa AI system.
 """
 
 from dataclasses import dataclass, field
@@ -31,7 +31,7 @@ class ImprovementLog:
     is_validated: bool
     confidence: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
-    
+
     def __str__(self) -> str:
         status = "✅ VALIDATED" if self.is_validated else "⚠️ NOT VALIDATED"
         return (f"ImprovementLog({status}, type={self.improvement_type}, "
@@ -50,7 +50,7 @@ class IndividualRun:
     current_uuid: str | None = None
     template_uuid: str | None = None
     workflow_template: str | None = None
-    scenario_id: str | None = None
+    scenario_rubric: str | None = None
     eval_type: str | None = None
     answers: list[str] | None = None
     state_result: dict | None = None
@@ -78,7 +78,7 @@ class PlanStep:
     expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     status: TaskStatus = TaskStatus.PENDING
-    
+
     def __post_init__(self):
         """Validate the plan step after initialization."""
         if not self.name:
@@ -93,19 +93,19 @@ class Plan:
     """Represents a complete execution plan with multiple steps."""
     goal: str
     steps: list[PlanStep] = field(default_factory=list)
-    
+
     def __post_init__(self):
         """Validate the plan after initialization."""
         if not self.goal:
             raise ValueError("Plan goal cannot be empty")
         if not self.steps:
             raise ValueError("Plan must contain at least one step")
-        
+
         # Validate step names are unique
         step_names = [step.name for step in self.steps]
         if len(step_names) != len(set(step_names)):
             raise ValueError("Plan step names must be unique")
-        
+
         # Validate dependencies exist
         for step in self.steps:
             for dep in step.depends_on:

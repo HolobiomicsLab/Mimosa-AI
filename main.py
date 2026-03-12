@@ -19,8 +19,9 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.csv_mode import CsvEvaluationMode
+from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
@@ -117,13 +118,20 @@ async def science_bench_papers_mode(args, config):
                                   single_agent_mode=args.single_agent
                                  )
 
+async def workflow_generation_evals(args, config):
+    evaluator = WorkflowEval(config, csv_runs_limit=args.csv_runs_limit)
+    await evaluator.run_workflow_eval_loop(
+        dataset_type="science_agent_bench",
+        dataset_path="datasets/ScienceAgentBench.csv",
+    )
+
 def load_goal_from_file_or_string(goal_input: str) -> str:
     """
     Load goal from file if the input is a file path, otherwise return the string as-is.
-    
+
     Args:
         goal_input: Either a file path or a goal string
-        
+
     Returns:
         The goal content (either loaded from file or the original string)
     """
@@ -152,7 +160,7 @@ async def normal_execution_mode(args, config):
             print(f"⚠️ Starting in single agent mode")
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
-                            scenario_id=args.scenario,
+                            scenario_rubric=args.scenario,
                             max_iteration=args.max_evolve_iterations,
                             learning_mode=args.learn,
                             single_agent_mode=args.single_agent
@@ -168,6 +176,8 @@ async def normal_execution_mode(args, config):
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
     else:
         raise ValueError("No goal provided. Use --task, --goal to start.")
+
+
 
 async def main():
     """Main execution function"""
@@ -194,6 +204,9 @@ async def main():
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
+    )
+    parser.add_argument(
+        "--workflow_eval_mode", action="store_true", help="Workflow generation evaluation."
     )
     parser.add_argument(
         "--papers", type=str, help="Papers evaluation mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
@@ -247,6 +260,8 @@ async def main():
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
+        elif args.workflow_eval_mode:
+            await workflow_generation_evals(args, config)
         else:
             raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:

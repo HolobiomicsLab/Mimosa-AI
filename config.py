@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -46,11 +46,11 @@ class Config:
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-opus-4-5"
-        self.prompts_llm_model: str = "anthropic/claude-sonnet-4-6"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-6"
-        self.smolagent_model_id: str = "openrouter/moonshotai/kimi-k2.5"
-        self.judge_model = "openrouter/moonshotai/kimi-k2.5"
+        self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
+        self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
+        self.workflow_llm_model: str = "openrouter/z-ai/glm-5"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.judge_model = "anthropic/claude-sonnet-4-5"
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
@@ -59,7 +59,7 @@ class Config:
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "high"
-        
+
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 64000
         self._pricing_client = OpenRouterPricingClient()

@@ -286,7 +286,7 @@ class VisualizationUtils:
     ) -> None:
         """
         Save a plot to file.
-        
+
         Forces y-axis scale to be between 0 and 1.0 for consistent visualization
         of normalized metrics (rewards, scores, etc.).
 
@@ -299,10 +299,10 @@ class VisualizationUtils:
             return
         fig = self.plot_data[0]
         ax = self.plot_data[1]
-        
+
         # Force y-axis scale to be between 0 and 1.0 for normalized metrics
         ax.set_ylim(0, 1.0)
-        
+
         fig.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
         print(f"Plot saved to {filename}")
 
@@ -361,7 +361,7 @@ class VisualizationUtils:
 
     def create_assertion_progress_plot(
         self,
-        scenario_id: str,
+        scenario_rubric: str,
         total_assertions: int,
         figsize: list[int, int] = (10, 6),
     ) -> list[Any, Any, Any]:
@@ -369,7 +369,7 @@ class VisualizationUtils:
         Create a plot for tracking assertion validation progress over Evolution iterations.
 
         Args:
-            scenario_id: The scenario identifier
+            scenario_rubric: The scenario identifier
             total_assertions: Total number of assertions in the scenario
             figsize: Figure size as (width, height)
 
@@ -377,7 +377,7 @@ class VisualizationUtils:
             list containing (figure, axis, line) objects
         """
         self.plot_data = self.create_real_time_curve_plot(
-            title=f"Assertion Validation Progress - {scenario_id}",
+            title=f"Assertion Validation Progress - {scenario_rubric}",
             xlabel="Evolution Iteration",
             ylabel="Assertions Passed",
             figsize=figsize,
@@ -413,7 +413,7 @@ class VisualizationUtils:
         self.update_curve_plot(iterations, passed_counts)
 
         # Add target line showing total assertions
-        ax.axhline(y=total_assertions, color='red', linestyle='--', 
+        ax.axhline(y=total_assertions, color='red', linestyle='--',
                   alpha=0.7, label=f'Target ({total_assertions})')
 
         # Set y-axis limits
@@ -423,7 +423,7 @@ class VisualizationUtils:
         if passed_counts:
             last_count = passed_counts[-1]
             percentage = (last_count / total_assertions) * 100 if total_assertions > 0 else 0
-            ax.annotate(f'{last_count}/{total_assertions} ({percentage:.0f}%)', 
+            ax.annotate(f'{last_count}/{total_assertions} ({percentage:.0f}%)',
                        xy=(iterations[-1], last_count),
                        xytext=(5, 5), textcoords='offset points',
                        fontsize=9, ha='left')
