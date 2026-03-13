@@ -233,6 +233,7 @@ Provide a structured analysis with:
         output_fname = (row.get('output_fname') or '').strip()
         scenario_id = (row.get('instance_id') or '').strip()
         scoring_rubric_file = (row.get('scoring_rubric_file') or '').strip()
+        eval_script_name = (row.get('eval_script_name') or '').strip()
 
         task_prompt = f"""
     DOMAIN KNOWLEDGE:
@@ -245,7 +246,8 @@ Provide a structured analysis with:
     {dataset_preview}
     EXPECTED OUTPUT:
     Save results to a formatted file named exactly: {output_fname}
-    Keep only one python script in the workspace (The best one that lead to success).
+    Keep only one final python script at the root named exactly: {eval_script_name}. This is the only script that will be evaluated, so make sure it is the best one and that it can run en
+d to end without error.
     """
         return task_prompt, scenario_id, scoring_rubric_file
 
