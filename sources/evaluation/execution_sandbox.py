@@ -51,7 +51,12 @@ class ExecutionSandbox:
         self.capsule_path = Path(capsule_path)
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Create virtual environment
+        # Create a single temporary directory for this sandbox instance
+        # This will be used for venv, dependency analysis, and code execution
+        self._temp_dir_context = tempfile.TemporaryDirectory(prefix="mimosa_sandbox_")
+        self.temp_dir = Path(self._temp_dir_context.name)
+
+        # Create virtual environment inside the temp directory
         self.venv_path = self._create_virtual_environment()
         self.python_exe = self.venv_path / "bin" / "python"
         self.pip_exe = self.venv_path / "bin" / "pip"
@@ -61,8 +66,7 @@ class ExecutionSandbox:
 
     def _create_virtual_environment(self) -> Path:
         """Create a virtual environment for isolated execution."""
-        temp_dir = Path(tempfile.mkdtemp(prefix="mimosa_sandbox_"))
-        venv_path = temp_dir / "venv"
+        venv_path = self.temp_dir / "venv"
 
         self.logger.info(f"[SANDBOX] Creating virtual environment at {venv_path}")
 
@@ -117,6 +121,33 @@ class ExecutionSandbox:
 
     def _install_capsule_dependencies(self) -> None:
         """Analyze capsule code with pipreqs and install dependencies using pip-tools."""
+        self.logger.info(f"[SANDBOX] Analyzing capsule {self.capsule_path.name}...")
+
+        # First, check if there's a requirements.txt in the capsule directory
+        # If so, install directly from it (this is more reliable than pipreqs)
+        requirements_txt = self.capsule_path / "requirements.txt"
+        if requirements_txt.exists():
+            self.logger.info("[SANDBOX] Found requirements.txt in capsule, installing dependencies...")
+            try:
+                cmd_install = [str(self.pip_exe), "install", "-r", str(requirements_txt)]
+                result = subprocess.run(
+                    cmd_install,
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                if result.returncode == 0:
+                    self.logger.info("[SANDBOX] Dependencies from requirements.txt installed successfully")
+                    return
+                else:
+                    self.logger.warning(f"[SANDBOX] Failed to install from requirements.txt: {result.stderr[:500]}")
+                    # Continue to try pipreqs as fallback
+            except subprocess.TimeoutExpired:
+                self.logger.error("[SANDBOX] requirements.txt installation timed out")
+            except Exception as e:
+                self.logger.error(f"[SANDBOX] requirements.txt installation failed: {e}")
+                # Continue to try pipreqs as fallback
+
         # Find Python files in capsule
         python_files = list(self.capsule_path.glob("*.py"))
         if not python_files:
@@ -125,76 +156,78 @@ class ExecutionSandbox:
 
         try:
             # Use pipreqs to analyze dependencies
+            # Use the sandbox's persistent temp directory for consistency
             self.logger.info("[SANDBOX] Analyzing code dependencies with pipreqs...")
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
+            temp_path = self.temp_dir / "deps_analysis"
+            temp_path.mkdir(exist_ok=True)
 
-                # Copy capsule files to temp directory for analysis
-                for file_path in python_files:
-                    shutil.copy2(file_path, temp_path / file_path.name)
+            # Copy capsule files to temp directory for analysis
+            for file_path in python_files:
+                shutil.copy2(file_path, temp_path / file_path.name)
 
-                # Run pipreqs
-                cmd_pipreqs = [
-                    str(self.python_exe), "-m", "pipreqs.pipreqs",
-                    "--savepath", str(temp_path / "requirements.in"),
-                    "--mode", "no-pin",
-                    str(temp_path)
-                ]
+            # Run pipreqs (installed as console script in venv)
+            pipreqs_exe = self.venv_path / "bin" / "pipreqs"
+            cmd_pipreqs = [
+                str(pipreqs_exe),
+                "--savepath", str(temp_path / "requirements.in"),
+                "--mode", "no-pin",
+                str(temp_path)
+            ]
 
-                result = subprocess.run(
-                    cmd_pipreqs,
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
+            result = subprocess.run(
+                cmd_pipreqs,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
 
-                if result.returncode != 0:
-                    self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:200]}")
-                    return
+            if result.returncode != 0:
+                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:200]}")
+                return
 
-                requirements_in = temp_path / "requirements.in"
-                if not requirements_in.exists():
-                    self.logger.info("[SANDBOX] No additional dependencies found")
-                    return
+            requirements_in = temp_path / "requirements.in"
+            if not requirements_in.exists():
+                self.logger.info("[SANDBOX] No additional dependencies found")
+                return
 
-                # Use pip-tools to compile requirements
-                self.logger.info("[SANDBOX] Compiling requirements with pip-tools...")
+            # Use pip-tools to compile requirements
+            self.logger.info("[SANDBOX] Compiling requirements with pip-tools...")
 
-                requirements_txt = temp_path / "requirements.txt"
-                cmd_compile = [
-                    str(self.python_exe), "-m", "piptools.compile",
-                    "--output-file", str(requirements_txt),
-                    str(requirements_in)
-                ]
+            requirements_txt = temp_path / "requirements.txt"
+            cmd_compile = [
+                str(self.python_exe), "-m", "piptools", "compile",
+                "--output-file", str(requirements_txt),
+                str(requirements_in)
+            ]
 
-                result = subprocess.run(
-                    cmd_compile,
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
+            result = subprocess.run(
+                cmd_compile,
+                capture_output=True,
+                text=True,
+                timeout=180
+            )
 
-                if result.returncode != 0:
-                    self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:200]}")
-                    # Fall back to direct installation from .in file
-                    requirements_txt = requirements_in
+            if result.returncode != 0:
+                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:200]}")
+                # Fall back to direct installation from .in file
+                requirements_txt = requirements_in
 
-                # Install the compiled requirements
-                self.logger.info("[SANDBOX] Installing additional dependencies...")
-                cmd_install = [str(self.pip_exe), "install", "-r", str(requirements_txt)]
+            # Install the compiled requirements
+            self.logger.info("[SANDBOX] Installing additional dependencies...")
+            cmd_install = [str(self.pip_exe), "install", "-r", str(requirements_txt)]
 
-                result = subprocess.run(
-                    cmd_install,
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
+            result = subprocess.run(
+                cmd_install,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
 
-                if result.returncode == 0:
-                    self.logger.info("[SANDBOX] Additional dependencies installed successfully")
-                else:
-                    self.logger.warning(f"[SANDBOX] Dependency installation warnings: {result.stderr[:500]}")
+            if result.returncode == 0:
+                self.logger.info("[SANDBOX] Additional dependencies installed successfully")
+            else:
+                self.logger.warning(f"[SANDBOX] Dependency installation warnings: {result.stderr[:500]}")
 
         except Exception as e:
             self.logger.error(f"[SANDBOX] Dependency analysis/installation failed: {e}")
@@ -202,7 +235,7 @@ class ExecutionSandbox:
 
     def run_generated_code(
         self,
-        eval_script_path: Path = None,
+        script_path: Path = None,
         expected_output: str = "",
         timeout: int = 300
     ) -> tuple[bool, str]:
@@ -224,52 +257,66 @@ class ExecutionSandbox:
             py_files = list(self.capsule_path.glob("*.py"))
             if not py_files:
                 return False, "No Python file found in capsule"
+            if script_path not in py_files:
+                self.logger.warning(f"[SANDBOX] Specified script {script_path.name} not found in capsule, using smart file selection")
 
             # Smart file selection based on eval_script_path
-            generated_script = self._select_best_matching_file(py_files, eval_script_path)
+            generated_script = self._select_best_matching_file(py_files, script_path)
             self.logger.info(f"[SANDBOX] Selected generated script: {generated_script.name}")
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                self._copy_capsule_contents_to_temp(temp_path)
+            # Use the sandbox's persistent temp directory for code execution
+            # This ensures dependencies are available in the same environment
+            temp_path = self.temp_dir / "execution"
+            # Clean up previous execution if any
+            if temp_path.exists():
+                shutil.rmtree(temp_path)
+            temp_path.mkdir(exist_ok=True)
 
-                # Run the generated script
-                cmd = [str(self.python_exe), generated_script.name]
+            self._copy_capsule_contents_to_temp(temp_path)
 
-                result = subprocess.run(
-                    cmd,
-                    cwd=str(temp_path),
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    env=os.environ.copy()
-                )
+            # Run the generated script
+            cmd = [str(self.python_exe), generated_script.name]
 
-                if result.returncode != 0:
-                    error_msg = f"Generated code failed with code {result.returncode}"
-                    if result.stderr:
-                        error_msg += f": {result.stderr[:2048]}"
-                    self.logger.error(f"[SANDBOX] {error_msg}")
-                    return False, error_msg
+            result = subprocess.run(
+                cmd,
+                cwd=str(temp_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=os.environ.copy()
+            )
 
-                # Check if expected output was created
-                if expected_output:
-                    expected_path = temp_path / "pred_results" / expected_output
-                    if not expected_path.exists():
-                        return False, f"Expected output file not created: {expected_output}"
+            if result.returncode != 0:
+                error_msg = f"Generated code failed with code {result.returncode}"
+                if result.stderr:
+                    error_msg += f": {result.stderr[:2048]}"
+                self.logger.error(f"[SANDBOX] {error_msg}")
+                return False, error_msg
 
-                # Copy results back to capsule if pred_results was created
-                pred_results_src = temp_path / "pred_results"
-                if pred_results_src.exists():
-                    pred_results_dst = self.capsule_path / "pred_results"
-                    if pred_results_dst.exists():
-                        shutil.rmtree(pred_results_dst)
-                    shutil.copytree(pred_results_src, pred_results_dst)
-                    self.logger.info("[SANDBOX] Copied pred_results back to capsule")
+            # Check if expected output was created
+            if expected_output:
+                # Handle case where expected_output already contains 'pred_results/' prefix
+                expected_output_clean = expected_output
+                if expected_output.startswith("pred_results/"):
+                    expected_output_clean = expected_output[len("pred_results/"):]
+                elif expected_output.startswith("pred_results\\"):
+                    expected_output_clean = expected_output[len("pred_results\\"):]
+                expected_path = temp_path / "pred_results" / expected_output_clean
+                if not expected_path.exists():
+                    return False, f"Expected output file not created: {expected_output}"
 
-                output = result.stdout.strip()
-                self.logger.info("[SANDBOX] Generated code executed successfully")
-                return True, f"Code executed successfully. Output: {output[:200]}"
+            # Copy results back to capsule if pred_results was created
+            pred_results_src = temp_path / "pred_results"
+            if pred_results_src.exists():
+                pred_results_dst = self.capsule_path / "pred_results"
+                if pred_results_dst.exists():
+                    shutil.rmtree(pred_results_dst)
+                shutil.copytree(pred_results_src, pred_results_dst)
+                self.logger.info("[SANDBOX] Copied pred_results back to capsule")
+
+            output = result.stdout.strip()
+            self.logger.info("[SANDBOX] Generated code executed successfully")
+            return True, f"Code executed successfully. Output: {output[:200]}"
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"[SANDBOX] Generated code timeout after {timeout}s")
@@ -278,42 +325,25 @@ class ExecutionSandbox:
             self.logger.error(f"[SANDBOX] Generated code error: {str(e)}")
             return False, f"Code execution error: {str(e)}"
 
-    def _select_best_matching_file(self, py_files: list[Path], eval_script_path: Path = None) -> Path:
+    def _select_best_matching_file(self, py_files: list[Path], script_path: Path = None) -> Path:
         """
         Select the best matching Python file from candidates based on eval script name.
 
         Uses simple string similarity without heavy models.
         """
-        if not eval_script_path or not py_files:
+        if not script_path or not py_files:
             return py_files[0] if py_files else None
-
-        # Extract base name from eval script (remove _eval.py and .py)
-        eval_name = eval_script_path.stem
-        if eval_name.endswith('_eval'):
-            eval_name = eval_name[:-5]  # Remove '_eval' suffix
-
-        # Normalize eval name (remove common separators, lowercase)
-        eval_normalized = eval_name.lower().replace('_', '').replace('-', '')
-
         best_match = None
         best_score = 0
 
         for py_file in py_files:
-            file_name = py_file.stem.lower().replace('_', '').replace('-', '')
-
-            # Calculate simple similarity score
-            score = self._calculate_similarity_score(eval_normalized, file_name)
-
+            file_name = py_file.name.lower()
+            score = self._calculate_similarity_score(script_path.name.lower(), file_name)
             if score > best_score:
                 best_score = score
                 best_match = py_file
-
-        # If no good match found (score < 0.3), fall back to first file
-        if best_score < 0.3:
-            self.logger.info(f"[SANDBOX] No good match found (best score: {best_score:.2f}), using first file")
+        if best_score < 0.2:
             return py_files[0]
-
-        self.logger.info(f"[SANDBOX] Best match score: {best_score:.2f} for {best_match.name}")
         return best_match
 
     def _calculate_similarity_score(self, str1: str, str2: str) -> float:
@@ -367,27 +397,52 @@ class ExecutionSandbox:
         Args:
             temp_path: Destination temporary directory path
         """
-        try:
-            self.logger.info("[SANDBOX] Copying all capsule contents to temp directory")
+        copied_files = []
+        copied_dirs = []
+        errors = []
+        total_bytes = 0
 
+        try:
+            self.logger.info("=" * 60)
+            self.logger.info("[SANDBOX] Starting capsule content copy operation")
+            self.logger.info(f"[SANDBOX] Source: {self.capsule_path}")
+            self.logger.info(f"[SANDBOX] Destination: {temp_path}")
             if not self.capsule_path.exists():
                 self.logger.warning(f"[SANDBOX] Capsule path does not exist: {self.capsule_path}")
                 return
 
-            for item in self.capsule_path.iterdir():
+            temp_path.mkdir(parents=True, exist_ok=True)
+
+            items = list(self.capsule_path.iterdir())
+            for idx, item in enumerate(items, 1):
                 dest = temp_path / item.name
-
-                if item.is_file():
-                    shutil.copy2(item, dest)
-                    self.logger.debug(f"[SANDBOX] Copied file: {item.name}")
-                elif item.is_dir():
-                    shutil.copytree(item, dest)
-                    self.logger.debug(f"[SANDBOX] Copied directory: {item.name}/")
-
-            self.logger.info("[SANDBOX] Successfully copied all capsule contents")
-
+                try:
+                    if item.is_file():
+                        size = item.stat().st_size
+                        shutil.copy2(item, dest)
+                        copied_files.append((item.name, size))
+                        total_bytes += size
+                    elif item.is_dir():
+                        dir_items = sum(1 for _ in item.rglob('*') if _.is_file())
+                        shutil.copytree(item, dest, dirs_exist_ok=True)
+                        copied_dirs.append((item.name, dir_items))
+                except (shutil.Error, OSError, PermissionError) as e:
+                    errors.append((item.name, str(e)))
+                    continue
+            if copied_files:
+                for name, size in copied_files:
+                    self.logger.info(f"  📄 {name:<30} {size:>12,} bytes")
+            if copied_dirs:
+                for name, count in copied_dirs:
+                    self.logger.info(f"  📁 {name}/ ({count} nested files)")
+            if errors:
+                self.logger.warning(f"[SANDBOX] Failed items ({len(errors)}):")
+                for name, err in errors:
+                    self.logger.warning(f"  ⚠️  {name}: {err}")
+            self.logger.info(f"[SANDBOX] Total Size: {total_bytes:,} bytes ({total_bytes / 1024 / 1024:.2f} MB)")
+            self.logger.info("=" * 60)
         except Exception as e:
-            self.logger.error(f"[SANDBOX] Error copying capsule contents: {str(e)}")
+            self.logger.error(f"[SANDBOX] Fatal error during copy: {str(e)}", exc_info=True)
             raise
 
     def run_eval_script(
@@ -413,48 +468,53 @@ class ExecutionSandbox:
         try:
             self.logger.info(f"[SANDBOX] Running eval script: {eval_script_path.name}")
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                self._copy_capsule_contents_to_temp(temp_path)
+            # Use the sandbox's persistent temp directory for eval script execution
+            temp_path = self.temp_dir / "eval"
+            # Clean up previous eval if any
+            if temp_path.exists():
+                shutil.rmtree(temp_path)
+            temp_path.mkdir(exist_ok=True)
 
-                benchmark_dir = temp_path / "benchmark" / "eval_programs"
-                benchmark_dir.mkdir(parents=True, exist_ok=True)
+            self._copy_capsule_contents_to_temp(temp_path)
 
-                gold_results_src = eval_script_path.parent / "gold_results"
-                if gold_results_src.exists():
-                    gold_results_dst = benchmark_dir / "gold_results"
-                    shutil.copytree(gold_results_src, gold_results_dst)
-                    self.logger.info("[SANDBOX] Copied gold_results for evaluation")
-                else:
-                    self.logger.warning("[SANDBOX] Could not find gold results.")
-                    return False, "Failed to find gold results folder."
+            benchmark_dir = temp_path / "benchmark" / "eval_programs"
+            benchmark_dir.mkdir(parents=True, exist_ok=True)
 
-                shutil.copy2(eval_script_path, temp_path / eval_script_path.name)
-                if visual_judge_path:
-                    shutil.copy2(visual_judge_path, temp_path / visual_judge_path.name)
+            gold_results_src = eval_script_path.parent / "gold_results"
+            if gold_results_src.exists():
+                gold_results_dst = benchmark_dir / "gold_results"
+                shutil.copytree(gold_results_src, gold_results_dst)
+                self.logger.info("[SANDBOX] Copied gold_results for evaluation")
+            else:
+                self.logger.warning("[SANDBOX] Could not find gold results.")
+                return False, "Failed to find gold results folder."
 
-                # Use virtual environment's Python executable
-                cmd = [str(self.python_exe), eval_script_path.name]
+            shutil.copy2(eval_script_path, temp_path / eval_script_path.name)
+            if visual_judge_path:
+                shutil.copy2(visual_judge_path, temp_path / visual_judge_path.name)
 
-                result = subprocess.run(
-                    cmd,
-                    cwd=str(temp_path),
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    env=os.environ.copy()
-                )
+            # Use virtual environment's Python executable
+            cmd = [str(self.python_exe), eval_script_path.name]
 
-                if result.returncode != 0:
-                    error_msg = f"Eval script failed with code {result.returncode}"
-                    if result.stderr:
-                        error_msg += f": {result.stderr[:4096]}"
-                    self.logger.error(f"[SANDBOX] {error_msg}")
-                    return False, error_msg
-                output = result.stdout.strip()
-                self.logger.debug(f"[SANDBOX] Eval output: {output}")
+            result = subprocess.run(
+                cmd,
+                cwd=str(temp_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=os.environ.copy()
+            )
 
-                return self._parse_eval_output(output)
+            if result.returncode != 0:
+                error_msg = f"Eval script failed with code {result.returncode}"
+                if result.stderr:
+                    error_msg += f": {result.stderr[:4096]}"
+                self.logger.error(f"[SANDBOX] {error_msg}")
+                return False, error_msg
+            output = result.stdout.strip()
+            self.logger.debug(f"[SANDBOX] Eval output: {output}")
+
+            return self._parse_eval_output(output)
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"[SANDBOX] Eval script timeout after {timeout}s")
@@ -462,6 +522,21 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Eval script error: {str(e)}")
             return False, f"Evaluation error: {str(e)}"
+
+    def cleanup(self) -> None:
+        """
+        Clean up the sandbox temporary directory.
+
+        This should be called when the sandbox is no longer needed to free up disk space.
+        """
+        if hasattr(self, '_temp_dir_context'):
+            self.logger.info(f"[SANDBOX] Cleaning up sandbox temp directory: {self.temp_dir}")
+            self._temp_dir_context.cleanup()
+            self.logger.info("[SANDBOX] Sandbox temp directory cleaned up successfully")
+
+    def __del__(self):
+        """Destructor to ensure cleanup is performed."""
+        self.cleanup()
 
     def _parse_eval_output(self, output: str) -> tuple[bool, str]:
         """Parse evaluation script output."""

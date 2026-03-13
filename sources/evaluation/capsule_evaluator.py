@@ -89,6 +89,10 @@ class CapsuleEvaluator:
         self.metrics['summary'] = self._generate_summary()
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")
         self.logger.info(f"[EVAL] Results: VER={ver_success}, SR={self.metrics['SR'][0]}, CBS={self.metrics['CBS']:.3f}, Cost=${self.api_cost:.4f}")
+        
+        # Clean up sandbox to free disk space
+        self.sandbox.cleanup()
+        
         return self.metrics
 
     def evaluate_success_rate(self) -> tuple[bool, str, bool]:
@@ -102,16 +106,12 @@ class CapsuleEvaluator:
             (sr_success: bool, message: str, ver_success: bool)
         """
         try:
-            if not self.eval_script_name:
-                return False, "No evaluation script specified for this task", False
-
-            # Get eval script path for smart file matching
-            eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
 
             # Step 1: VER - Run generated code
             self.logger.info("[EVAL] Running generated code for VER evaluation")
+            full_program_path = self.capsule_path / self.gold_program_name
             ver_success, ver_message = self.sandbox.run_generated_code(
-                eval_script_path=self.gold_program_name,  # Use generated program (same name as gold program) for execution to check if it runs without error
+                script_path=full_program_path,  # Use generated program (same name as gold program) for execution to check if it runs without error
                 expected_output=self.expected_output,
                 timeout=300
             )
@@ -122,10 +122,13 @@ class CapsuleEvaluator:
 
             self.logger.info("[EVAL] VER passed - code executed successfully")
 
+            if not self.eval_script_name:
+                return False, "No evaluation script specified for this task", ver_success
+            # Get eval script path for smart file matching
+            eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
             # Step 2: SR - Run evaluation script
             if not eval_script_path.exists():
                 return False, f"Evaluation script not found: {eval_script_path}", ver_success
-
             self.logger.info(f"[EVAL] Running evaluation script: {eval_script_path.name}")
 
             sr_success, sr_message = self.sandbox.run_eval_script(

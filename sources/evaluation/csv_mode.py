@@ -247,6 +247,7 @@ Provide a structured analysis with:
     EXPECTED OUTPUT:
     Save results to a formatted file named exactly: {output_fname}
     Keep only one final python script at the root named exactly: {script_name}. This is the only script that will be evaluated, so make sure it is the best one and that it can run end to end without error.
+    Make sure to include a requirement.txt file at the root with all the necessary dependencies to run the script.
     """
         return task_prompt, scenario_id, scoring_rubric_file
 
