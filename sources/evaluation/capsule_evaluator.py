@@ -111,7 +111,7 @@ class CapsuleEvaluator:
             # Step 1: VER - Run generated code
             self.logger.info("[EVAL] Running generated code for VER evaluation")
             ver_success, ver_message = self.sandbox.run_generated_code(
-                eval_script_path=eval_script_path,
+                eval_script_path=self.gold_program_name,  # Use generated program (same name as gold program) for execution to check if it runs without error
                 expected_output=self.expected_output,
                 timeout=300
             )
