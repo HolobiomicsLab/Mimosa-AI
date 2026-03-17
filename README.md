@@ -2,8 +2,6 @@
 
 <img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
 
-**An open, modular AI-scientist framework for AI-driven science**
-
 ***Mimosa-AI*** 🌾 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
 
 **Use case:**
