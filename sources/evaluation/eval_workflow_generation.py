@@ -114,8 +114,8 @@ class WorkflowEval:
                     execution_time = time.time() - iteration_start_time
                     execution_times.append(execution_time)
 
-                    print(f"\033[95mBenchmark task {i + 1} Generation {"success" if success else "failure"} \033[0m")
-                    print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
+                    status = "success" if success else "failure"
+                    print(f"Benchmark task {i + 1} Generation {status}")
 
                 except Exception as e:
                     success = False
