@@ -262,7 +262,7 @@ class HumanMode:
         addr = mcp.address
         port = mcp.port
         
-        print(f"🚀 Executing tool: {tool_name}...")
+        print(f"▶ Executing tool: {tool_name}...")
         print("⏳ Please wait...")
         
         try:
@@ -296,6 +296,7 @@ class HumanMode:
         tool_manager = ToolManager(config=self.config)
         print("\n🔍 Discovering MCP servers...")
         mcps = await tool_manager.discover_mcp_servers()
+        await tool_manager.verify_tools()
         
         if not mcps:
             self._print_error("No MCP servers found. Please check your configuration.")

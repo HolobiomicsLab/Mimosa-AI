@@ -1,0 +1,45 @@
+{
+  "workspace_dir": "/Users/cnrs/Documents/repository/toolomics/workspace",
+  "discovery_addresses": [
+    {
+      "ip": "0.0.0.0",
+      "port_min": 5000,
+      "port_max": 5200
+    }
+  ],
+  "planner_llm_model": "anthropic/claude-opus-4-5-20251101",
+  "prompts_llm_model": "anthropic/claude-opus-4-5-20251101",
+  "workflow_llm_model": "anthropic/claude-opus-4-5-20251101",
+  "smolagent_model_id": "deepseek/deepseek-chat",
+  "judge_model": "anthropic/claude-opus-4-5-20251101",
+  "engine_name": "litellm",
+  "prompt_planner": "sources/prompts/planner_paperbench_codedev.md",
+  "prompt_workflow_creator": "sources/prompts/workflow_v7.md",
+  "reasoning_effort": "high",
+  "learned_score_threshold": 0.8,
+  "max_learning_dgm_iterations": 10,
+  "schema_code_path": "sources/modules/state_schema.py",
+  "smolagent_factory_code_path": "sources/modules/smolagent_factory.py",
+  "runs_capsule_dir": "runs_capsule/",
+  "workflow_dir": "sources/workflows",
+  "memory_dir": "sources/memory",
+  "runner_default_python_version": "3.10",
+  "runner_default_timeout": 3600,
+  "runner_default_max_memory_mb": 1024,
+  "runner_default_max_cpu_percent": 100,
+  "runner_temp_dir": "./tmp",
+  "runner_requirements": [
+    "python-dotenv",
+    "fastmcp==2.8.1",
+    "requests>=2.31.0",
+    "smolagents[all]",
+    "langgraph>=0.4.7",
+    "matplotlib>=3.9.0",
+    "numpy>=2.0.0",
+    "python_a2a",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "openinference-instrumentation-smolagents",
+    "asyncio==3.4.3"
+  ]
+}

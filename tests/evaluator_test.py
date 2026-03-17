@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from config import Config
-from sources.core.dgm import GodelMachine
-from sources.post_processing.evaluator import WorkflowEvaluator
+from sources.core.dgm import DarwinMachine
+from sources.evaluation.evaluator import WorkflowEvaluator
 
 load_dotenv()
 
@@ -71,7 +71,7 @@ def main():
     else:
         eval_type = test_judge_evaluation(args.workflow_id, args.answer)
 
-    dgm = GodelMachine(config)
+    dgm = DarwinMachine(config)
 
     wf_state = dgm.load_wf_state_result(args.workflow_id)
     wf_rewards = dgm.get_total_rewards(wf_state, eval_type)

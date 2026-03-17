@@ -4,6 +4,7 @@ OpenRouter API client for real-time model pricing
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,11 +27,65 @@ class PricingCalculator:
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
 
+    # Common routing prefixes that should be stripped for matching
+    ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
+    
+    def _strip_routing_prefix(self, model_name: str) -> str:
+        """Strip common routing prefixes from model name.
+        
+        Handles cases like:
+        - openrouter/mistralai/mistral-large-2407 -> mistralai/mistral-large-2407
+        - litellm/anthropic/claude-3.5-sonnet -> anthropic/claude-3.5-sonnet
+        """
+        lower_name = model_name.lower()
+        for prefix in self.ROUTING_PREFIXES:
+            if lower_name.startswith(prefix):
+                return model_name[len(prefix):]
+        return model_name
+
+    def _normalize_model_name(self, model_name: str) -> str:
+        """Normalize model name for flexible matching.
+        
+        Handles variations like:
+        - claude-haiku-4-5 vs claude-haiku-4.5 (hyphen vs dot in versions)
+        - claude-haiku-4-5-20251001 (strips date suffixes)
+        - claude-3.5-sonnet vs claude-3-5-sonnet (version separators)
+        - openrouter/mistralai/... -> mistralai/... (routing prefixes)
+        """
+        # First strip any routing prefixes
+        normalized = self._strip_routing_prefix(model_name)
+        normalized = normalized.lower()
+        
+        # Remove common date/version suffixes (e.g., -20251001, -2024-11-20, -v1, -001)
+        # Match patterns like: -YYYYMMDD, -YYYY-MM-DD, -MMDD, -vX, -XXX (3+ digits at end)
+        normalized = re.sub(r'-\d{8}$', '', normalized)  # -20251001
+        normalized = re.sub(r'-\d{4}-\d{2}-\d{2}$', '', normalized)  # -2024-11-20
+        normalized = re.sub(r'-\d{4}$', '', normalized)  # -2501 (YYMM format)
+        normalized = re.sub(r'-\d{3}$', '', normalized)  # -001
+        
+        # Normalize version separators: replace dots and underscores with hyphens
+        # This makes "4.5" become "4-5" and "4_5" become "4-5"
+        normalized = normalized.replace('.', '-').replace('_', '-')
+        
+        # Collapse multiple consecutive hyphens into one
+        normalized = re.sub(r'-+', '-', normalized)
+        
+        return normalized.strip('-')
+
     def _find_model_by_substring(self, target_model: str) -> str | None:
+        """Find best matching model from pricing data using flexible matching.
+        
+        Uses a multi-strategy approach:
+        1. Direct substring match (original behavior)
+        2. Normalized name matching (handles version format variations)
+        3. Provider + base model matching (fallback for similar models)
+        """
         if '/' not in target_model:
             return None
 
         matches = []
+        
+        # Strategy 1: Direct substring match (original logic)
         for available_model in self.model_pricing:
             if available_model in target_model:
                 idx = target_model.find(available_model)
@@ -38,9 +93,59 @@ class PricingCalculator:
                 valid_start = idx == 0 or target_model[idx-1] in ['/', '-', ':']
                 valid_end = end_idx == len(target_model) or target_model[end_idx] in ['/', '-', ':']
                 if valid_start and valid_end:
-                    matches.append(available_model)
-
-        return max(matches, key=len) if matches else None
+                    matches.append((available_model, len(available_model), 1))  # priority 1 (best)
+        
+        # Strategy 2: Normalized name matching
+        normalized_target = self._normalize_model_name(target_model)
+        for available_model in self.model_pricing:
+            normalized_available = self._normalize_model_name(available_model)
+            
+            # Check if normalized available model is contained in normalized target
+            if normalized_available in normalized_target:
+                idx = normalized_target.find(normalized_available)
+                end_idx = idx + len(normalized_available)
+                valid_start = idx == 0 or normalized_target[idx-1] in ['/', '-', ':']
+                valid_end = end_idx == len(normalized_target) or normalized_target[end_idx] in ['/', '-', ':']
+                if valid_start and valid_end:
+                    # Avoid duplicates from strategy 1
+                    if not any(m[0] == available_model for m in matches):
+                        matches.append((available_model, len(normalized_available), 2))  # priority 2
+        
+        # Strategy 3: Provider + base model name matching (more lenient)
+        # Extract provider (e.g., "anthropic") and base model name
+        target_provider = target_model.split('/')[0]
+        target_base = target_model.split('/')[-1] if '/' in target_model else target_model
+        
+        for available_model in self.model_pricing:
+            if '/' not in available_model:
+                continue
+            available_provider = available_model.split('/')[0]
+            available_base = available_model.split('/')[-1]
+            
+            # Must match provider
+            if target_provider != available_provider:
+                continue
+            
+            # Normalize base names and check for significant overlap
+            norm_target_base = self._normalize_model_name(target_base)
+            norm_avail_base = self._normalize_model_name(available_base)
+            
+            # Check if one contains the other (after normalization)
+            if norm_avail_base in norm_target_base or norm_target_base in norm_avail_base:
+                # Avoid duplicates
+                if not any(m[0] == available_model for m in matches):
+                    # Calculate similarity based on common prefix length
+                    common_len = len(os.path.commonprefix([norm_target_base, norm_avail_base]))
+                    if common_len >= 5:  # Require at least 5 chars of common prefix
+                        matches.append((available_model, common_len, 3))  # priority 3 (lowest)
+        
+        if not matches:
+            return None
+        
+        # Sort by: priority (ascending), then length (descending)
+        # This prefers direct matches, then longer matches within same priority
+        matches.sort(key=lambda x: (x[2], -x[1]))
+        return matches[0][0]
     
     def _get_model_pricing_with_fallback(self, model_name: str) -> dict:
         """Get model pricing with intelligent fallback."""
@@ -49,15 +154,32 @@ class PricingCalculator:
         if model_name in self.model_pricing:
             return self.model_pricing[model_name]
         
-        # 2. Try substring matching
+        # 2. Try exact match after stripping routing prefix
+        stripped_name = self._strip_routing_prefix(model_name)
+        if stripped_name != model_name and stripped_name in self.model_pricing:
+            print(f"📊 Using pricing for {stripped_name} (stripped prefix from {model_name})")
+            return self.model_pricing[stripped_name]
+        
+        # 3. Try substring matching (includes normalization and prefix stripping)
         pattern_match = self._find_model_by_substring(model_name)
         if pattern_match:
             print(f"📊 Using pricing for {pattern_match} (pattern matched from {model_name})")
             return self.model_pricing[pattern_match]
         
-        # 3. Default fallback
-        print(f"⚠️  No match found for {model_name}, using default pricing")
-        return self.model_pricing.get("default", {"input": 3.00, "output": 15.00})
+        print(f"⚠️  No match found for {model_name}, please enter model cost manually:")
+        try:
+            input_str = input("Input cost per 1M tokens: ")
+            output_str = input("Output cost per 1M tokens: ")
+            input_cost = float(input_str)
+            output_cost = float(output_str)
+            self.model_pricing[model_name] = {
+                "input": input_cost,
+                "output": output_cost
+            }
+            return self.model_pricing[model_name]
+        except (ValueError, TypeError) as e:
+            print(f"❌ Invalid input: {e}. Using default pricing.")
+            return {"input": 3.0, "output": 15.0}
 
     def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
@@ -81,13 +203,13 @@ class PricingCalculator:
 
         llm_calls: list[TokenUsage] = []
 
-        # Orchestrator and Judge LLM calls
-
+        # Orchestrator and Judge LLM calls (multi-agent mode)
+        orchestrator_calls_found = False
         for call in ["workflow_creator", "judge"]:
             memory_file = memory_path / f"{call}.json"
             if not memory_file.exists():
                 continue
-
+            orchestrator_calls_found = True
             with open(memory_file) as f:
                 json_call = json.load(f)
                 llm_calls.append(
@@ -99,6 +221,10 @@ class PricingCalculator:
                         json_call["usage"]["total_tokens"],
                     )
                 )
+        
+        # Check for single agent mode (no orchestrator calls but has task files)
+        if not orchestrator_calls_found:
+            print("📊 Single agent mode detected - calculating agent execution costs only")
 
         workflow_path = Path(self.workflow_dir) / uuid
 
@@ -119,7 +245,7 @@ class PricingCalculator:
         if model_id:
             try:
                 for file in os.listdir(memory_path):
-                    if file.startswith("task_") and file.endswith(".json"):
+                    if (file.startswith("task_") or file.startswith("single_agent")) and file.endswith(".json"):
                         with open(memory_path / file) as f:
                             steps = json.load(f)
                             token_usage = {

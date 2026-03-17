@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from pathlib import Path
 from statistics import mean
 
@@ -11,6 +12,7 @@ class WorkflowInfo:
         self._state_result = None
         self._code = None
         self._overall_score = None
+        self._original_task = None
 
     @property
     def goal(self) -> str:
@@ -18,6 +20,49 @@ class WorkflowInfo:
             state_result = self.load_state_result()
             self._goal = state_result.get("goal", "") if state_result else ""
         return self._goal
+    
+    @property
+    def original_task(self) -> str:
+        """Load the original unwrapped task for similarity matching.
+        
+        Returns:
+            str: The original task without knowledge wrapper. Falls back to
+                 extracting from goal if original_task file doesn't exist.
+        """
+        if self._original_task is None:
+            # Try to load from original_task_{uuid}.txt file first
+            task_file = self.workflow_folder / f"original_task_{self.uuid}.txt"
+            if task_file.exists():
+                try:
+                    with open(task_file) as f:
+                        self._original_task = f.read().strip()
+                except Exception as e:
+                    print(f"⚠️ Could not load original_task_{self.uuid}.txt: {e}")
+                    self._original_task = self._extract_original_from_wrapped(self.goal)
+            else:
+                # Fallback: extract from goal if it has the wrapper pattern
+                self._original_task = self._extract_original_from_wrapped(self.goal)
+        return self._original_task
+    
+    def _extract_original_from_wrapped(self, text: str) -> str:
+        """Extract original task from knowledge-wrapped text.
+        
+        Args:
+            text: Potentially wrapped text
+            
+        Returns:
+            str: Extracted task or original text if not wrapped
+        """
+        if not text:
+            return ""
+        
+        # Pattern: "...complete the following task:\n<actual_task>"
+        match = re.search(r'complete the following task:\s*\n(.*)', text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        
+        # If not wrapped, return as-is
+        return text
 
     @property
     def state_result(self) -> dict:
@@ -36,6 +81,12 @@ class WorkflowInfo:
         return state_result.get('success', [])
 
     @property
+    def is_success(self) -> dict:
+        state_result = self.load_state_result()
+        success_list = state_result.get('success', [False]) if isinstance(state_result, dict) else [False]
+        return success_list[-1]
+
+    @property
     def code(self) -> str:
         if self._code is None:
             self._code = self.load_code()
@@ -46,6 +97,20 @@ class WorkflowInfo:
         if self._overall_score is None:
             self._overall_score = self.calculate_overall_score()
         return self._overall_score
+
+    @property
+    def judge_evaluation(self) -> dict:
+        """Load state_result.json file."""
+        eval_file = self.workflow_folder / "evaluation.txt"
+        if not eval_file.exists():
+            return {}
+        
+        try:
+            with open(eval_file) as f:
+                return f.read().strip()
+        except Exception as e:
+            print(f"❌ Can't read state_result.json for UUID {self.uuid}: {e}")
+            return "No evaluation. execution failed."
 
     def load_state_result(self) -> dict:
         """Load state_result.json file."""
@@ -67,9 +132,8 @@ class WorkflowInfo:
         """Load workflow code file."""
         code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
         if not code_file.exists():
-            raise ValueError(
-                f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}."
-            )
+            print(f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}.")
+            return ""
         
         try:
             with open(code_file) as f:
@@ -87,10 +151,13 @@ class WorkflowInfo:
         evaluation = state_result.get("evaluation", {})
         scores = []
         if evaluation:
-            if "generic" in evaluation:
-                scores.append(evaluation["generic"]["overall_score"])
-            elif "scenario" in evaluation:
-                scores.append(evaluation["scenario"]["score"])
+            try:
+                if "generic" in evaluation:
+                        scores.append(evaluation["generic"]["overall_score"])
+                elif "scenario" in evaluation:
+                    scores.append(evaluation["scenario"]["score"])
+            except Exception as _:
+                scores.append(0)
         return mean(scores) if scores else 0.0
 
     def is_valid(self) -> bool:

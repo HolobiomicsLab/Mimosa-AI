@@ -103,6 +103,9 @@ class WorkflowState(TypedDict):
     answers: List[str]
     success: List[bool]
 
+MAX_CONSECUTIVE_FALLBACKS = 3
+MAX_CONSECUTIVE_RETRY = 5
+
 def master_router(state: WorkflowState) -> str:
     raw_answer = state["answers"][-1]
     try:
@@ -117,9 +120,17 @@ def master_router(state: WorkflowState) -> str:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         return "next_node"
     elif "FALLBACK" in last_answer.status:
-         print(f"⏪ Insufficient data from '{current_agent}'. Retrying previous step.")
-         return "fallback_node"
+        retry_count = state["step_name"][-5:].count(current_agent)
+        if retry_count >= MAX_CONSECUTIVE_FALLBACKS:
+            print(f"❌ Detected fallback infinite loop: {retry_count} out of {MAX_CONSECUTIVE_FALLBACKS}. Aborting.")
+            return END
+        print(f"⏪ Fallback from '{current_agent}' to previous agent..")
+        return "fallback_node"
     elif "RETRY" in last_answer.status:
+        retry_count = state["step_name"][-5:].count(current_agent)
+        if retry_count >= MAX_CONSECUTIVE_RETRY:
+            print(f"❌ Detected retry infinite loop: {retry_count} out of {MAX_CONSECUTIVE_RETRY}. Aborting.")
+            return END
         return "retry_node"
     elif "FAILURE" in last_answer.status:
         print(f"❌ Failure from '{current_agent}'. Aborting.")
@@ -127,3 +138,14 @@ def master_router(state: WorkflowState) -> str:
     else :
         print(f"⛔ Protocol violation from '{current_agent}'. Agent must specify SUCCESS/RETRY/FALLBACK/FAILURE. Terminating.")
         return END
+
+def debate_router(state: WorkflowState) -> str:
+    recent_answers = state["answers"][-3:]  # Last 3 agents
+    votes = [json.loads(a).get("verdict") for a in recent_answers]
+    
+    if votes.count("APPROVE") >= 2:
+        return "next_node"
+    elif len(recent_answers) < 9:  # Max 3 debate rounds
+        return "another_round"
+    else:
+        return "fallback_node"

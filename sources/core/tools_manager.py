@@ -4,6 +4,7 @@ This class manages the discovery and interaction with MCP tools.
 
 import asyncio
 import json
+import time
 import subprocess
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -55,20 +56,17 @@ def normalize_mcp_endpoint(
             base_path = parsed.path.rstrip("/")
             path = f"{base_path}/mcp" if base_path else "/mcp"
             parsed = parsed._replace(path=path)
-        # Otherwise, keep the original path as-is (including trailing slash preference)
     else:
         raise ValueError(
             f"Unsupported transport: {transport}. Supported transports: 'sse', 'streamable-http'"
         )
 
     url = urlunparse(parsed)
-
     # Store container hint for logging/debugging
     if container:
         extras["container_hint"] = container
         print(
-            f"⚠️ ToolHive container fragment '{container}' detected but fragments are not sent over HTTP. "
-            f"Container selection may be ignored unless handled by the MCP server."
+            f"⚠️ ToolHive container fragment '{container}' detected but fragments are not sent over HTTP."
         )
 
     return url, t, extras
@@ -113,7 +111,11 @@ class MCP:
 
 
 class ToolManager:
-    """Manager for MCP tools discovery and management."""
+    """
+    Manager for MCP tools discovery and management.
+    This class manage provide method for discovery of MCPs either throught toolhive or on network (streamable-http MCP).
+    Due to some issue with latency/freezing of toolhive based MCPs we currently use network based MCPs only, but toolhive support is ready for possible future usage.
+    """
 
     def __init__(self, config=None, mcps: list[MCP] | None = None):
         self.mcps = mcps if mcps is not None else []
@@ -330,6 +332,10 @@ class ToolManager:
             print(f"❌ Error discovering ToolHive servers: {e}")
             return []
 
+   ###################################
+   #   METHODS FOR NETWORK BASED MCP #
+   ###################################
+    
     async def discover_mcp_at_address(
         self,
         address: str,
@@ -348,7 +354,7 @@ class ToolManager:
                     tools = await client.list_tools()
                     name = f"mcp_{port}"
                     if tools:
-                        print(f"✅ Found MCP server on port {port} with name {name}")
+                        print(f"✅ Found MCP server on {address} port {port} with name {name}")
                         print(f"📋 Available tools: {[tool.name for tool in tools]}")
                         mcps.append(
                             MCP(
@@ -377,9 +383,28 @@ class ToolManager:
                 print(f"❌ Failed to discover MCP servers on {addr}: {e}")
                 continue
         return mcps
+    
+    async def verify_tools(self) -> bool:
+        """Verify that at least a bash tool (execute_command) is available."""
+        bash_found = False
+        for mcp in self.mcps:
+            tools = '\n'.join(mcp.tool_names)
+            try:
+                if "execute_command" in tools:
+                    bash_found = True
+            except AttributeError as e:
+                return False
+        if not bash_found:
+            print("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
+            time.sleep(2)
+            return False
+        return True
 
     async def discover_mcp_servers(self) -> list[MCP]:
-        """Discover MCP servers using ToolHive only."""
+        """
+        Discover MCP servers on both toolhive and network only.
+        Due to freezing issue of toolhive based MCP we currently use only network based MCPs.
+        """
         try:
             print("🔍 Discovering MCP servers via ToolHive...")
             #mcps_thv = await self.discover_toolhive_servers()

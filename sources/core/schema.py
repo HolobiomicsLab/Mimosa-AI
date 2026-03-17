@@ -4,6 +4,7 @@ Schema for for storing and managing data in the Mimosa AI system.
 
 from dataclasses import dataclass, field
 from enum import Enum
+from datetime import datetime
 
 class TaskStatus(Enum):
     """Enumeration for task execution status."""
@@ -19,18 +20,33 @@ class TaskComplexity(Enum):
     MEDIUM = "medium"
     HIGH = "high"
 
-# GodelRun class used in the Darwin Godel Machine for tracking run iterations.
+# ImprovementLog class for tracking validated improvements in Darwin Gödel Machine
 @dataclass
-class GodelRun:
-    """Tracks information for a single Darwin Godel Machine run iteration."""
+class ImprovementLog:
+    """Tracks validated improvements in the Darwin Gödel Machine."""
+    from_iteration: int
+    to_iteration: int
+    improvement_type: str
+    delta_reward: float
+    is_validated: bool
+    confidence: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    def __str__(self) -> str:
+        status = "✅ VALIDATED" if self.is_validated else "⚠️ NOT VALIDATED"
+        return (f"ImprovementLog({status}, type={self.improvement_type}, "
+                f"delta={self.delta_reward:+.3f}, confidence={self.confidence:.0%})")
+
+@dataclass
+class IndividualRun:
+    """Tracks information for a single evolved workflow run."""
     goal: str
     prompt: str
     cost: float = 0.0
     reward: float = 0.0
-    max_depth: int = 5
+    max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False
-    need_human_validation: bool = False
     current_uuid: str | None = None
     template_uuid: str | None = None
     workflow_template: str | None = None
@@ -39,13 +55,13 @@ class GodelRun:
     answers: list[str] | None = None
     state_result: dict | None = None
     plot: str | None = ""
+    original_task: str | None = None  # Original unwrapped task for similarity matching
 
     def __str__(self) -> str:
-        return (f"GodelRun(goal='{self.goal}', prompt='{self.prompt}', "
+        return (f"IndividualRun(goal='{self.goal}', prompt='{self.prompt}', "
                 f"cost={self.cost}, reward={self.reward}, max_depth={self.max_depth}, "
                 f"iteration_count={self.iteration_count}, answers={self.answers}, "
                 f"state_result={self.state_result}, judge={self.judge}, "
-                f"need_human_validation={self.need_human_validation}, "
                 f"current_uuid={self.current_uuid}, template_uuid={self.template_uuid}, "
                 f"eval_type={self.eval_type})")
 
@@ -53,7 +69,10 @@ class GodelRun:
 class PlanStep:
     """Represents a single step in a plan with dependencies and I/O requirements."""
     name: str
+    goal_context: str
     task: str
+    cost: int
+    score: float
     depends_on: list[str] = field(default_factory=list)
     required_inputs: list[str] = field(default_factory=list)
     expected_outputs: list[str] = field(default_factory=list)
@@ -99,9 +118,10 @@ class Task:
     name: str
     description: str
     run_id: int = 0
-    dgm_runs: list[GodelRun] = field(default_factory=list) # godel run result for task
-    final_answers: list[str] = field(default_factory=list) # last godel run answers
-    final_uuid: str | None = None # last godel run uuid
+    evolve_runs: list[IndividualRun] = field(default_factory=list) # evolution run result for task
+    final_answers: list[str] = field(default_factory=list) # last evolution run answers
+    cost: float = 0
+    final_uuid: str | None = None # last evolution run uuid
     workflow_uuid: str | None = None # last workflow uuid
     status: TaskStatus = TaskStatus.PENDING
     depends_on: list[str] = field(default_factory=list)

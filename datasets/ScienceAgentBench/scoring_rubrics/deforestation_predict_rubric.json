@@ -1,0 +1,62 @@
+{
+  "data_loading": [
+    {
+      "name": "Load Roads Data",
+      "description": "Load 'benchmark/datasets/PredictDeforestation/roads.geojson'.",
+      "points": 5
+    },
+    {
+      "name": "Load Deforested Area Data",
+      "description": "Load 'benchmark/datasets/PredictDeforestation/deforestedArea.geojson'.",
+      "points": 5
+    },
+    {
+      "name": "Load Protected Forest Data",
+      "description": "Load protectedForest.geojson data from the correct directory path.",
+      "points": 5
+    },
+    {
+      "name": "Load Proposed Road Data",
+      "description": "Load 'benchmark/datasets/PredictDeforestation/planned_road.geojson'.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Convert Coordinate Reference System",
+      "description": "Convert the CRS of all GeoDataFrames to EPSG:32723 correctly.",
+      "points": 5
+    },
+    {
+      "name": "Buffer Proposed Road",
+      "description": "Create a buffer of 5500 units around the proposed road.",
+      "points": 5
+    },
+    {
+      "name": "Dissolve Buffered Areas",
+      "description": "Dissolve the buffered areas of the proposed road correctly.",
+      "points": 5
+    },
+    {
+      "name": "Calculate Risky Area",
+      "description": "Perform the correct spatial operation to find the risky area using 'difference' overlay between the dissolved buffer and deforested area.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Create Map Visualization",
+      "description": "Plot the protected forest, roads, risky area, and proposed road with correct colors and labels on the map.",
+      "points": 10
+    }
+  ],
+  "output_formatting": [],
+  "output_saving": [
+    {
+      "name": "Save Visualization",
+      "description": "Save the visualization as 'pred_results/predictedRiskyArea.png' in the correct directory.",
+      "points": 5
+    }
+  ],
+  "total_points": 55
+}

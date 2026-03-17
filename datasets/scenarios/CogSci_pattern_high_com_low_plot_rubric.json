@@ -1,0 +1,48 @@
+{
+  "data_loading": [
+    {
+      "name": "Load high pattern data",
+      "description": "Correctly load 'fit_result_conscientiousness_W_high.npy' using numpy.",
+      "points": 5
+    },
+    {
+      "name": "Load low pattern data",
+      "description": "Correctly load 'fit_result_conscientiousness_W_low.npy' using numpy.",
+      "points": 5
+    }
+  ],
+  "data_processing": [
+    {
+      "name": "Extract common pattern",
+      "description": "Correctly compute the common pattern as the average of the first columns of W_high and W_low.",
+      "points": 5
+    },
+    {
+      "name": "Extract discriminative patterns",
+      "description": "Correctly extract the second columns of W_high and W_low as high_pattern and low_pattern respectively.",
+      "points": 5
+    }
+  ],
+  "modeling_or_analysis_or_visualization": [
+    {
+      "name": "Heatmap visualization",
+      "description": "Correctly plot the heatmaps for all patterns, including high conscientiousness patterns, common patterns, and low conscientiousness patterns.",
+      "points": 15
+    }
+  ],
+  "output_formatting": [
+    {
+      "name": "Tighten layout",
+      "description": "Use tight_layout() to avoid clipping when saving the plot.",
+      "points": 5
+    }
+  ],
+  "output_saving": [
+    {
+      "name": "Save figure as PNG",
+      "description": "Correctly save the figure to 'pred_results/CogSci_pattern_high_com_low_plot_data_pred.png'.",
+      "points": 5
+    }
+  ],
+  "total_points": 45
+}

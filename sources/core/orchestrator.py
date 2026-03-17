@@ -33,7 +33,7 @@ class WorkflowOrchestrator:
             timeout=self.config.runner_default_timeout,
             max_memory_mb=self.config.runner_default_max_memory_mb,
         )
-        self.workflow_runner = WorkflowRunner(self.runner_config)
+        self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 
     async def workflow_requirements_install(self):
         deps = self.config.runner_requirements
@@ -49,7 +49,7 @@ class WorkflowOrchestrator:
         def progress_handler(line: str):
             print(line)
 
-        print("\033[96m🚀 Executing workflow in Python sandbox...\033[0m")
+        print("\033[96m▶ Executing workflow in Python sandbox...\033[0m")
         result = await self.workflow_runner.execute(
             workflow_code, progress_callback=progress_handler
         )
@@ -67,14 +67,16 @@ class WorkflowOrchestrator:
     async def orchestrate_workflow(
         self,
         goal: str,
-        craft_instructions: str
+        craft_instructions: str,
+        original_task: str = None,
+        single_agent_mode = False
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
         Args:
-            goal: The goal for the workflow
+            goal: The goal for the workflow (may be knowledge-wrapped)
             craft_instructions: Instructions for crafting the workflow, usually output from previous failed attempt
-            workflow_template: Optional workflow template code to use
+            original_task: Original unwrapped task for similarity matching
         Returns:
             tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
         """
@@ -90,11 +92,18 @@ class WorkflowOrchestrator:
         # Workflow generation timing
         generation_start = time.time()
         try:
-            complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
-                goal,
-                craft_instructions,
-                save_workflow=True,
-            )
+            if not single_agent_mode:
+                complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                    goal,
+                    craft_instructions,
+                    save_workflow=True,
+                    original_task=original_task
+                )
+            else:
+                complete_code, workflow_code, uuid = await self.workflow_factory.craft_single_agent(
+                    goal,
+                    original_task=original_task
+                )
         except Exception as e:
             generation_time = time.time() - generation_start
             # Extract UUID from exception message if available
@@ -102,26 +111,26 @@ class WorkflowOrchestrator:
             if error_msg.startswith("UUID:") and "|" in error_msg:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
-                logger.warning(f"[WORKFLOW GENERATION ERROR] {actual_error} - letting DGM handle retry")
+                logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{actual_error}\n")
                 
                 # Send notification for workflow generation error
                 self.notifier.send_message(
                     f"Workflow {workflow_uuid} generation failed after {generation_time:.1f}s\n"
                     f"Goal: {goal[:128]}...\n"
                     f"Error: {actual_error[:256]}",
-                    title=f"Workflow generation failed",
+                    title="Workflow generation failed",
                     priority=1
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
-                logger.warning(f"[WORKFLOW GENERATION ERROR] {error_msg} - letting DGM handle retry")
+                logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{error_msg}\n")
                 
                 # Send notification for workflow generation error
                 self.notifier.send_message(
                     f"Workflow generation failed after {generation_time:.1f}s\n"
                     f"Goal: {goal[:128]}...\n"
                     f"Error: {error_msg[:256]}",
-                    title=f"Workflow generation failed",
+                    title="Workflow generation failed",
                     priority=1
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
@@ -147,7 +156,7 @@ class WorkflowOrchestrator:
             )
 
             # Execution phase
-            print(f"\n\033[96m{'🚀 WORKFLOW EXECUTION PHASE':^80}\033[0m")
+            print(f"\n\033[96m{'▶ WORKFLOW EXECUTION PHASE':^80}\033[0m")
             print(f"\033[96m{'=' * 80}\033[0m")
             exec_start = time.time()
             execution_output = await self.workflow_sandbox_run(complete_code)

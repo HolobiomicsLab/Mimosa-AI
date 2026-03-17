@@ -1,213 +1,354 @@
+# Mimosa-AI
 
-# Mimosa-AI 🔬🤖
+<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
 
 **An open framework for autonomous AI-driven science**
 
-Mimosa is an automated AI scientist framework designed to reproduce scientific findings and enable autonomous research.
-Its mission is to provide a modular and open alternative to big tech initiatives, empowering academic researchers with next-generation AI tools for scientific discovery.
+Mimosa is an automated AI-scientist framework built to reproduce published findings and carry out end-to-end research autonomously. Its goal is to offer a modular, transparent alternative to closed corporate systems, giving academics powerful AI tooling for real scientific discovery.
 
-**Objectives**
+## Objectives
 
-- **Reproduce scientific research** with reliability and transparency
+- Faithfully reproduce scientific studies with traceability and rigor
+- Enable fully automated scientific pipelines: bioinformatics, docking, metabolomics, and more
 
-- **Enable autonomous research** by generating new hypotheses and insights
+## How does it work ?
+
+The user gives Mimosa a research goal.
+
+- Mimosa automatically discovers available MCP-based tools on the local network or via Toolhive (anything from data analysis utilities to web browsers or lab instruments like mass spectrometers).
+- Using the user’s objective and the discovered tools, Mimosa decomposes the problem, builds a tailored multi-agent workflow for each tasks.
+- Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
+- Mimosa generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
 ---
 
+## Installation & Run
 
-## Installation
+### Prerequisites
 
-## Prerequisites
 - Python 3.10 or higher
 - pip3 package manager
 
-## 🚀 Install & Run
-
 ### Step 1: Environment Setup
 
+Choose one of the following options:
+
 **Option A: Using pip**
-```sh
-# Create and activate virtual environment
+```bash
 python3 -m venv .venv
-source mimosa-env/bin/activate  # On Windows: mimosa-env\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
 **Option B: Using uv (faster alternative)**
-```sh
-# Install uv if not already installed
+```bash
 pip install uv
-
-# Create and activate virtual environment
 uv venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-Configure your `.env` file with the following API keys:
-- `HF_TOKEN`: Your Hugging Face token **OR** `DEEPSEEK_API_KEY` Your deepseek api key, depending on your provider.
-- `ANTHROPIC_API_KEY`: Your Anthropic API key
-- `LANGFUSE_PUBLIC_KEY` & `LANGFUSE_PRIVATE_KEY`: Optional, for [telemetry monitoring](https://huggingface.co/docs/smolagents/tutorials/inspect_runs)
+### Step 2: Configure Environment Variables
 
-### Step 2: Install Dependencies
+Create a `.env` file in the project root with your API keys:
 
-First go into the `mimosa` folder
-```sh
+```env
+HF_TOKEN=your_hugging_face_token          # OR use DEEPSEEK_API_KEY
+OPENROUTER_API_KEY=your_openrouter_key # if using openrouter
+LANGFUSE_PUBLIC_KEY=your_langfuse_public_key    # Optional
+LANGFUSE_PRIVATE_KEY=your_langfuse_private_key  # Optional
+```
+
+**Explanations:**
+- `HF_TOKEN`: Hugging Face token for LLM access
+- `OPENROUTER_API_KEY`: openrouter API key, if using openrouter to use any model (**see:** [Openrouter](https://openrouter.ai/))
+- `MISTRAL_API_KEY`: Mistral API key, if using Mistral.
+- `DEEPSEEK_API_KEY`: Deepseek API key, if using a Deepseek model.
+- `OPENAI_API_KEY`: OpenAI API key, if using GPT model such as GPT-5.2.
+- `ANTHROPIC_API_KEY`: Anthropic API key, if using Claude.
+- `LANGFUSE_*`: Totally telemetry keys for monitoring (see [Telemetry Setup](#telemetry-setup))
+
+### Step 3: Install Dependencies
+
+Navigate to the project directory and install dependencies:
+
+```bash
 cd mimosa
-```
-
-**Using pip:**
-```sh
 pip3 install -r requirements.txt
-```
-
-**Using uv (better):**
-```sh
+# OR with uv:
 uv pip install -r requirements.txt
 ```
 
-### Step 3: Start MCP Server
+### Step 4: Launch MCP Server
 
-Launch the toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)
+Start the Toolomics MCP server following the instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics).
 
-### Step 4: Run Mimosa-AI
+You could add your custom MCPs to toolomics, see [toolomics documentation](https://github.com/HolobiomicsLab/toolomics/README.md).
 
+Configure the server to run on a port range (e.g., 5000-5100).
+
+### Step 5: Configure Mimosa-AI
+
+Create your custom **config.json** file.
+
+1. copy default config:
 ```sh
-python3 main.py --goal "Your objective here"
-# or
-uv run main.py --goal "Your objective here" # better
+cp config_default.json my_config.json
 ```
 
-> **Note**: Remember to activate your virtual environment (`source mimosa-env/bin/activate`) before running Mimosa-AI in future sessions.
+2. edit the config:
+```sh
+vim my_config.json
+# or:
+code my_config.json
+# or: just open it in VS code the normal way
+```
 
-## 🛠️ Command Line Arguments
+**Alternative**: directly modify the config value in `config.py`
 
-Mimosa-AI supports various command line arguments to customize execution:
+**Mimosa Configuration Overview**
+
+| Parameter | Description |
+|---------|-------------|
+| `workspace_dir` | Path to the Toolomics workspace. All files created or modified by Mimosa appear here. Must point to the Toolomics project directory. |
+| `discovery_addresses` | Network ranges (IP + port range) used to discover MCP tool servers. |
+| `planner_llm_model` | LLM used to decompose tasks and build execution plans. |
+| `prompts_llm_model` | LLM used for workflow prompts generation.  |
+| `workflow_llm_model` | LLM used to generate and orchestrate multi-agent workflows.  (**Recommand:** anthropic/claude-opus-4-5-20251101)  |
+| `smolagent_model_id` | Model used for HuggingFace SmolAgents handling execution subtasks. |
+| `judge_model` | LLM used to evaluate Mimosa’s own outputs and assign performance scores. |
+| `engine_name` | Inference engine used to route and manage model calls (LiteLLM). |
+| `prompt_planner` | Prompt file used by the planner to decompose tasks. |
+| `prompt_workflow_creator` | Prompt used to create multi-agent workflows. **Do not modify.** |
+| `reasoning_effort` | Controls the depth of reasoning for **gpt5** only. |
+| `learned_score_threshold` | Score at which self-improvement stops and the result is accepted. |
+| `max_learning_evolve_iterations` | Maximum number of self-improvement iterations allowed. |
+| `schema_code_path` | Internal state schema definition. **Do not modify.** |
+| `smolagent_factory_code_path` | SmolAgent factory implementation. **Do not modify.** |
+| `runs_capsule_dir` | Directory where each run saves a full workspace snapshot in an auto-named capsule. |
+| `workflow_dir` | Directory containing predefined multi-agent workflows. |
+| `memory_dir` | Persistent storage for Mimosa’s long-term memory. |
+| `runner_*` | Execution, timeout, and resource settings. **Do not touch.** |
+
+
+### Step 6: Run Mimosa-AI
+
+```bash
+python3 main.py --goal "Your objective here" --config my_config.json
+# OR with uv:
+uv run main.py --goal "Your objective here" --config my_config.json
+```
+
+**Standard usage - accomplish a goal:**
+```bash
+uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." --config my_config.json
+```
+
+**Single task mode - no long-term planning:**
+```bash
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --config my_config.json
+```
+
+> **Note:** Remember to activate your virtual environment before running Mimosa-AI in future sessions.
+
+### Access output files
+
+Output files will appear in **toolomics** `workspace` folder, when the execution its content will be transfered inside a new folder in `runs_capsule/`
+
+---
+
+## Evaluation
+
+Mimosa can be evaluated either on [ScienceAgentBench](https://arxiv.org/abs/2410.05080) or [PaperBench](https://arxiv.org/pdf/2504.01848).
+
+⚠️ For unbiased evaluation it is advised to run `./cleanup.sh` first, this will prevent Mimosa from using existing or cached workflows.
+
+### ScienceAgentBench
+
+To evaluate on ScienceAgentBench you must:
+
+1. download the ScienceAgentBench full dataset:
+[dataset link](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
+2. unzip it with password: `scienceagentbench`
+3. copy content of `benchmark/benchmark/datasets` folder to  `Mimosa-AI/datasets/scienceagentbench/datasets`
+
+**Evaluation on ScienceAgentBench with learning**
+```sh
+uv run main.py --science_agent_bench --learn
+```
+
+**Evaluation on ScienceAgentBench limited to 10 tasks with learning limited to 4 learning iterations**
+
+```sh
+uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
+```
+
+### PaperBench
+
+**Evaluation on OpenAI PaperBench with learning mode**
+
+OpenAI PaperBench is a benchmark for evaluating the ability of AI agents to replicate AI research, from the paper `PaperBench: Evaluating AI’s Ability to Replicate AI Research`.
+
+```sh
+uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn
+```
+
+⚠️ This will save in runs_capsule/ folder the result of all paper's reproduction attempt, refer to [Paper Bench documentation](https://github.com/openai/frontier-evals/tree/main/project/paperbench) for complete evaluation.
+
+**Evaluation on custom benchmark of research paper**
+
+1. Place your benchmark CSV with the same format as `paper_bench.csv` in `datasets/<your_benchmark_name>.csv`.
+
+2. Run on your benchmark:
+
+```sh
+uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20  --learn
+```
+
+
+---
+
+## Command Line Arguments
 
 ### Execution Modes
-- `--goal GOAL`: Specify your research objective, research reproduction or scientific question (planner mode)
-- `--task TASK`: Run & learn how to do a single task (Litterature review, code installation, dataset download)
-- `--manual`: Interact & use Mimosa tools (from Toolomics MCPs) using a CLI interface. Allow to debug MCPs and put yourself in Mimosa shoes.
-- `--automated`: Automated evaluation mode. Will load a CSV dataset from `datasets/` containing a list of paper and prompt for Mimosa (such as reproduce the paper X ...), will automatically run Mimosa in goal mode for every papers in the csv dataset.
-- `--dataset DATASET_FOLDER`: Evaluate Mimosa workflow generation on a dataset, specify dataset folder (CSV format) and spawn multiple threads for faster evaluation
-- `--scenario`: Specify scenario to evaluate Mimosa on.
 
-### Evaluation & Performance
-- `--judge`: Enable llm-as-a-judge for workflow evaluation (default: disabled)
-- `--max_concurrent N`: Maximum number of concurrent tasks, only for `--multi_goal` and `--dataset` mode. (default: 16)
-- `--num_samples N`: Number of samples to use from dataset, only for `--dataset` mode (default: 16)
-- `--max_dgm_iterations N`: Maximum number of DGM retry to learn a task (default: 3 in task mode, 1 in goal mode).
+| Argument | Description |
+|----------|-------------|
+| `--goal GOAL` | Specify a high-level research objective, paper reproduction, or scientific question (planner mode) |
+| `--task TASK` | Execute a single task: literature review, datasets download, implement a machine learning model... |
+| `--manual` | Interactive CLI mode to debug MCPs and test Mimosa tools directly |
+| `--papers <CSV path>` | Evaluation on a CSV dataset containing research papers and prompts |
+| `--science_agent_bench` | Evaluation on ScienceAgentBench |
 
-**Example:**
+### Other parameters
+| Argument | Description |
+|----------|-------------|
+| `--learn` | Enable iterative-learning to optimize task performance |
+| `--max_evolve_iterations N` | Maximum learning iterations |
+| `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
+| `--scenario <scenario file name>` | Use specific scenario based assertions instead of LLM-as-a-judge for scoring execution  |
+| `--debug` | Enable debug mode for more verbose logging |
 
-Normal usage, try to accomplish a goal.
-```sh
-uv run main.py --goal "You are assigned the paper Dual Aggregation Transformer for Image Super-Resolution (https://arxiv.org/pdf/2306.00306) to replicate. Attempt to reproduce the experiments and compare the results."
+### Examples
+
+**Accomplish a goal:**
+```bash
+uv run main.py --goal "Reproduce the experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results."
 ```
 
-Single task mode, no long-term planning, simple task.
-```sh
- uv run main.py --task "search and install llama.cpp for this OS architecture" --judge 
+**Single task mode:**
+```bash
+uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status"
 ```
 
-Evaluation of workflow generation: evaluation on GSMK8.
-```sh
- uv run main.py --dataset datasets/GSMK8.jsonl --num_samples 16 --max_concurrent 4
-```
+> **Note:** Requires Toolomics to be installed and MCP servers to be running.
 
-> **Note**: Requires Toolomics to be installed and MCP servers to be running.
+---
 
-## 🧠 Core Architecture
+## Architecture
 
-Mimosa-AI uses a **polymorphic meta-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+![dgm](./docs/images/architecture.png)
 
-### Design Philosophy
+### System Overview
 
-The system operates on an "agent-within-agent" pattern:
+Mimosa-AI is a **self-evolving multi-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+
 - Goals decompose into learnable tasks
-- Each task triggers the synthesis of a specialized multi-agent workflow
+- Each task triggers synthesis of a specialized multi-agent workflow
 - Successful workflow patterns are retained and refined over time
-- The system continuously optimizes its own architecture through execution feedback
+- The system continuously optimizes task-specific multi-agent architectures through execution feedback
 
-## Task vs Goal philosophy
+### Goal vs Task Philosophy
 
-**Goal**: A high-level scientific objective requiring multiple distinct capabilities
-- Example: "Develop a machine learning model to predict protein-ligand binding affinity" or "Try to reproduce the research paper X and compare the experimental results".
+**Goal:** High-level scientific objective requiring multiple distinct complex tasks
+- *Example:* "Develop a machine learning model to predict protein-ligand binding affinity"
+- *Example:* "Reproduce research paper X and compare experimental results"
 
-**Task**: A granular, repeatable operation frequently encountered across different goals
-- Examples: "literature review on topic X", "download dataset from source Y", "implement algorithm Z"
+**Task:** Granular, repeatable operation frequently encountered across different goals
+- *Example:* "Conduct literature review on topic X"
+- *Example:* "Download dataset from source Y"
+- *Example:* "Implement algorithm Z"
 
-## System Architecture
+### Self-Improvement Mechanism 
 
-### Layer 0: Strategic Planning
-- Decomposes goals into executable task sequences
-- Maintains adaptive execution roadmap
-- Adjusts plans based on Layer 2 workflow performance
+The system implements a Darwinian-inspired evolution approach to workflow evolution:
 
-### Layer 1: Meta-Orchestration
-- **Dynamic Workflow Synthesis**: Advanced LLMs (e.g., claude-3.7) generate task-specific multi-agent architectures
-- **Architecture Search**: Designs custom agent topologies rather than applying generic pipelines
-- **Pattern Recognition**: Identifies structural similarities across tasks to better workflow generation over time
+1. **Task Recognition**: For each task, the system:
+   - Searches workflow library for similar historical tasks
+   - If found: Uses best-performing workflow as template, adapting for current context
+   - If novel: Synthesizes new workflow from scratch
 
-### Layer 2: Workflow Execution (LangGraph)
-- Implements workflows as directed graphs with heterogeneous nodes:
-  - **SmolAgent Nodes**: Autonomous code-generating agents for complex reasoning
-  - **Deterministic Nodes**: Validation, transformation, and control logic
-- **Graph Flexibility**: Supports arbitrary agent topologies (sequential, conditional, cyclical)
-- **State Management**: Maintains workflow context across distributed execution
-
-### Layer 3: Agent Runtime (SmolAgent)
-- Code-generating agents operating in action-observation loops
-- **Tool-as-Code Paradigm**: Agents generate Python to interact with tools
-- **Iterative Refinement**: Continues execution until success criteria met or failure threshold reached
-
-### Layer 4: Tool Ecosystem (MCP)
-- Extensible tool primitives built on Model Context Protocol
-- **Distributed Execution**: Tools run on HPC clusters, lab instruments, cloud infrastructure
-- **Protocol Standardization**: MCP enables seamless client-server tool interaction
-- **Horizontal Scalability**: Add new tools without modifying core system
-
-## (Experimental) Self-Improvement on task
-
-The system implements a **Darwinian workflow evolution** inspired by Gödel machine principles:
-
-1. **Goal Decomposition** (Layer 0): High-level scientific goal → ordered list of tasks
-   - "Develop binding affinity model" → [literature review, dataset acquisition, feature engineering, model implementation, validation]
-
-2. **Task Recognition** (Layer 1): For each task, the system:
-   - Searches its workflow library for similar historical tasks
-   - If found: Uses best-performing workflow as **template**, adapting for current context
-   - If novel: Synthesizes new workflow from scratch orchestrator
-
-3. **Evolutionary Optimization**: Over time, the system:
+2. **Evolutionary Optimization**: Over time, the system:
    - Maintains multiple workflow variants per task type
-   - Selects high-performing workflows based on success metrics (speed, accuracy, cost)
+   - Selects high-performing workflows based on success metrics
    - Mutates/recombines successful patterns to explore architecture space
 
-4. **Self-Improvement Mechanism**:
+3. **Self-Improvement**: 
    - The system can propose modifications to its own workflow generation logic
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
 
-## 📈 Telemetry Setup
 
-Monitor and debug your AI agents with real-time observability dashboards.
+**Progress visualization:**
+
+Reward progress plot will be saved under the `sources/workflows/<uuid>` folder under the filename `reward_progress.png`.
+
+***For example:***
+
+![dgm](./docs/images/evolve_example.png)
+
+---
+
+## Phone Notifications
+
+Receive real-time updates about Mimosa's status via Pushover notifications.
+
+### Setup Instructions
+
+1. **Create Pushover Account**
+   - Visit [pushover.net](https://pushover.net/)
+   - Register and note your **User Key**
+
+2. **Create Application**
+   - In Pushover dashboard, click "Create an Application/API Token"
+   - Name it "Mimosa" and copy the generated **API Token**
+
+3. **Configure Environment**
+   ```bash
+   export PUSHOVER_USER="your_user_key"
+   export PUSHOVER_TOKEN="your_api_token"
+   ```
+
+4. **Install Mobile App**
+   - Download Pushover from your device's app store
+   - Log in with your Pushover account
+
+---
+
+## Telemetry Setup
+
+Monitor and debug AI agents with real-time observability dashboards using Langfuse.
 
 ### Quick Start
 
-1. **Deploy Langfuse locally**:
-    ```sh
-    git clone https://github.com/langfuse/langfuse.git
-    cd langfuse
-    docker compose up -d
-    ```
+1. **Deploy Langfuse Locally**
+   ```bash
+   git clone https://github.com/langfuse/langfuse.git
+   cd langfuse
+   docker compose up -d
+   ```
 
-2. **Configure environment variables** in your `.env` file:
-    ```env
-    LANGFUSE_PUBLIC_KEY=your_public_key
-    LANGFUSE_PRIVATE_KEY=your_private_key
-    ```
+2. **Configure Environment Variables**
+   
+   Add to your `.env` file:
+   ```env
+   LANGFUSE_PUBLIC_KEY=your_public_key
+   LANGFUSE_PRIVATE_KEY=your_private_key
+   ```
 
-3. **Access the dashboard** at `http://localhost:3000` while Mimosa-AI is running
+3. **Access Dashboard**
+   
+   While Mimosa-AI is running, visit `http://localhost:3000`
 
-### What You'll See
+### Available Metrics
 
 The telemetry dashboard provides:
 - **Agent Execution Traces**: Step-by-step workflow visualization
@@ -215,6 +356,20 @@ The telemetry dashboard provides:
 - **Error Debugging**: Detailed failure analysis
 - **Resource Usage**: Token consumption and API calls
 
-![Telemetry Dashboard](https://langfuse.com/images/cookbook/integration-smolagents/smolagent_example_trace.png)
+**Example Dashboard:**
+![Langfuse Dashboard](https://langfuse.com/images/cookbook/integration-smolagents/smolagent_example_trace.png)
 
-> **Note**: Telemetry is optional but highly recommended for debugging.
+> **Note:** Telemetry is optional but recommended for debugging and performance optimization.
+
+---
+
+## License
+
+This repository is publicly distributed under the GNU Affero General Public License v3.0 (AGPLv3). A separate commercial licensing path may be available from the designated rights-holder.
+
+For contribution and licensing details, see:
+- `docs/licensing-notes.md`
+- `CLA/INDIVIDUAL_CLA.md`
+- `CLA/CORPORATE_CLA.md`
+
+---
