@@ -159,7 +159,7 @@ uv run main.py --task "Train a multitask model on the Clintox dataset to predict
 
 Output files will appear during execution in **toolomics** `workspace` folder, when the execution its content will be transfered inside a new folder in `Mimosa-AI/runs_capsule/`
 
-## Task Learning
+## Learning
 
 ***Mimosa-AI*** learns from failure. For any new task, start with learn mode to let it build competence before full autonomy.
 
@@ -178,6 +178,14 @@ The reward progress plot is saved under the `sources/workflows/<uuid>` folder un
 ***Example:***
 
 ![dgm](./docs/images/evolve_example.png)
+
+## Transparency
+
+We ship an interactive debugger, `memory_explorer.py`, that lets you step through any agent execution in granular detail.
+
+Start it with a workflow <uuid> (eg: `memory_explorer.py 20260115_113303_9bb63437`)
+
+This replays the full execution trace—thoughts, tool calls and outputs so you can inspect exactly how decisions unfolded.
 
 ---
 
@@ -200,8 +208,8 @@ The reward progress plot is saved under the `sources/workflows/<uuid>` folder un
 | `--max_evolve_iterations N` | Maximum learning iterations |
 | `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
 | `--scenario <scenario file name>` | Use specific scenario based assertions instead of LLM-as-a-judge for scoring execution  |
+| `--single_agent` | Single agent mode. fast, but can't improve throught learning |
 | `--debug` | Enable debug mode for more verbose logging |
-
 
 ---
 
