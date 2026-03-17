@@ -17,7 +17,7 @@ The user gives ***Mimosa-AI*** a research goal.
 - Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
 - ***Mimosa*** generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
-![dgm](./docs/images/architecture.png)
+![dgm](./docs/images/mimosa_overall.jpg)
 
 
 ## Installation & Run
