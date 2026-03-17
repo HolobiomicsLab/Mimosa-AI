@@ -17,7 +17,7 @@ The user gives ***Mimosa-AI*** a research goal.
 - Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
 - ***Mimosa*** generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
-![dgm](./docs/images/mimosa_overall.jpg)
+![schema](./docs/images/mimosa_overall.jpg)
 
 
 ## Installation & Run
@@ -214,92 +214,6 @@ The reward progress plot is saved under the `sources/workflows/<uuid>` folder un
 - Successful workflow patterns are retained and refined over time
 - The system continuously optimizes task-specific multi-agent architectures through execution feedback
 
-**Schema:**
-
-╔══════════════════════════════════════════════════════════════════════════════════════╗
-║                                    👤 USER / CLI                                     ║
-║                                      main.py                                         ║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
-         │                    │                    │
-         │ --goal             │ --task             │ --papers
-         │                    │                    │ --science_agent_bench
-         ▼                    ▼                    │ 
-┌─────────────────┐    ┌─────────────────┐         │
-│     PLANNER     │    │   DGM (CORE)    │◄────────┘
-│    Planning     │    │   Evolution     │
-│                 │    │     Engine      │
-│ Decomposes goal │    │ Iterative loop  │
-│ → ordered steps │    │                 │
-└────────┬────────┘    └────────┬────────┘ 
-         │                      │
-         │ LLM plan gen         │
-         ▼                      │
-┌─────────────────┐             │
-│  PLANNER LLM    │             │
-└─────────────────┘             │
-         │                      │
-         │ dispatch each task   │
-         └──────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ WORKFLOW        │    │  ORCHESTRATOR   │    │     JUDGE       │
-└────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-         │                      │                      │
-         │ load/rank            │ generate code        │ score
-         ▼                      ▼                      ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  📚 WORKFLOW    │    │ WORKFLOW FACTORY│    │   JUDGE LLM     │
-│    LIBRARY      │    │                 │    │                 │
-│                 │    │  🔨 LLM → Code  │    └─────────────────┘
-│ sources/work-   │    │                 │          ▲
-│ flows/uuid/     │    │ SmolAgents multi│          │
-│                 │    │ -agent codegen  │          │
-│ Past runs +     │    │                 │          │
-│   scores        │    └────────┬────────┘          │
-└────────▲────────┘             │                   │
-                                 │ LLM synthesis    │
-                        ┌────────┴────────┐         │
-                        │  WORKFLOW LLM   │         │
-                        └─────────────────┘         │
-                                 │                  │
-                        ┌────────┴────────┐         │
-                        │ WORKFLOW RUNNER │         │
-                        │                 │         │
-                        │ ▶️ Sandboxed    │         │
-                        │  Python exec    │         │
-                        └────────┬────────┘         │
-                                 │                  │
-                        ┌────────┼────────┐         │
-                        │        │        │         │
-                        ▼        ▼        ▼         │
-                ┌──────────┐ ┌──────────┐ │         │
-                │  AGENT   │ │   MCP    │ │         │
-                │   LLM    │ │  TOOLS   │ │         │
-                └──────────┘ │Toolomics │ │         │
-                             │/ToolHive │ │         │
-                             └──────────┘ │         │
-                                 │        │         │
-                                 └────────┘         │
-                                         │          │
-                        ┌────────────────┘          │
-                        │                           │
-                        ▼                           │
-              ┌─────────────────┐                   │
-              │  📦 OUTPUTS     │◄──────────────────┘
-              │  runs_capsule/  │
-              └─────────────────┘
-
-═══════════════════════════════════════════════════════════════════════════════════════
-                                    LEGEND
-═══════════════════════════════════════════════════════════════════════════════════════
-    ───►  Primary flow / command dispatch
-    ◄──►  Bidirectional data flow
-    ─ ─►  Feedback loop / improvement cycle
-    ─.─►  Side effects (logging, notifications)
-
 **Self-Improvement Mechanism**
 
 The system implements a Darwinian-inspired evolution approach to workflow evolution:
@@ -318,6 +232,8 @@ The system implements a Darwinian-inspired evolution approach to workflow evolut
    - The system can propose modifications to its own workflow generation logic
    - Performance improvements are validated before integration (Gödel machine principle)
    - Meta-learning: Learns how to generate better workflows from execution history
+
+![dgm](./docs/images/workflow_mutation.png)
 
 ---
 
