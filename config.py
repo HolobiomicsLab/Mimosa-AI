@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.workflow_llm_model: str = "openrouter/z-ai/glm-5"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.engine_name: str = "litellm" # for smolagent
 
