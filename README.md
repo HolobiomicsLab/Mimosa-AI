@@ -1,8 +1,8 @@
-# Mimosa-AI 🌾
+# Mimosa-AI 🌾🔬
 
 <img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
 
-***Mimosa-AI*** 🌾 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
+***Mimosa-AI*** 🌾🔬 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
 
 **Use case:**
 - Reproduce scientific studies with rigorous, auditable workflows
