@@ -160,15 +160,20 @@ Files are written to the Toolomics `workspace/` directory during execution. On c
 
 ---
 
-## Learning
+## Learning throught evolution of Multi-Agent Workflows
 
-***Mimosa-AI*** learns from failure. For any new task, start with learn mode to let it build competence before full autonomy.
+***Mimosa-AI*** dynamically synthesizes specialized workflows for scientific tasks and is capable of learning from failures throught **darwinian-inspired evolution of multi-agents workflows**: 
+Rather than forcing tasks through fixed pipelines, the system composes a custom multi-agent graph for each task, then refines it through single-incumbent local search, at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than scratch.
+
+For any new task, start with learn mode to let it build competence before full autonomy.
 
 **Start in Learning mode**
 
 ```bash
 uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --learn --config my_config.json
 ```
+
+![dgm](./docs/images/workflow_mutation.png)
 
 **Progress visualization:**
 
@@ -209,14 +214,6 @@ This replays the full execution trace—thoughts, tool calls and outputs so you 
 | `--scenario <scenario file name>` | Use specific scenario based assertions instead of LLM-as-a-judge for scoring execution  |
 | `--single_agent` | Single agent mode. fast, but can't improve throught learning |
 | `--debug` | Enable debug mode for more verbose logging |
-
----
-
-### Evolution of Multi-Agent Workflows
-
-***Mimosa-AI*** core innovation is at it's **self-evolution** of multi-agent system: It dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes a custom multi-agent graph for each task, then refines it through single-incumbent local search, at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than scratch.
-
-![dgm](./docs/images/workflow_mutation.png)
 
 ---
 
