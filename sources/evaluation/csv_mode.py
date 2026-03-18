@@ -248,6 +248,7 @@ Provide a structured analysis with:
     Save results to a formatted file named exactly: {output_fname}
     Keep only one final python script at the root named exactly: {script_name}. This is the only script that will be evaluated, so make sure it is the best one and that it can run end to end without error.
     Make sure to include a requirement.txt file at the root with all the necessary dependencies to run the script.
+    You need to understand that evaluation is extremely strict, columns name for output CSV should exactly match instructions or follow pattern from input files, and the script should run without error to be considered valid.
     """
         return task_prompt, scenario_id, scoring_rubric_file
 

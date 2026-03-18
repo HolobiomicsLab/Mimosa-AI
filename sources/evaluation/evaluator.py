@@ -156,15 +156,13 @@ class BaseEvaluator:
 
             result = workflow_info.answers
 
-            return f"""You are evaluating a scientific workflow execution.
-                   WORKFLOW GOAL:
+            return f"""
+                   You are evaluating AI agent(s) performance on a computational workflow. The workflow's goal is to achieve the following scientific/research objective:
+                   GOAL:
                    {goal}
-                   FULL WORKFLOW STATE RESULT (JSON):
+                   FINAL ANSWER FROM AGENT(S) EXECUTION:
                    {json.dumps(result, indent=2)}
-                   WORKFLOW CODE:
-                   ```python
-                   {workflow_code or "# No workflow code available"}
-                   ```"""
+                   """
         except Exception as e:
             raise e
 

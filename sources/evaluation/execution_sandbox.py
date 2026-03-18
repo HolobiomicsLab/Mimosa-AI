@@ -153,19 +153,13 @@ class ExecutionSandbox:
         if not python_files:
             self.logger.info("[SANDBOX] No Python files found in capsule")
             return
-
         try:
-            # Use pipreqs to analyze dependencies
-            # Use the sandbox's persistent temp directory for consistency
             self.logger.info("[SANDBOX] Analyzing code dependencies with pipreqs...")
-
             temp_path = self.temp_dir / "deps_analysis"
             temp_path.mkdir(exist_ok=True)
-
             # Copy capsule files to temp directory for analysis
             for file_path in python_files:
                 shutil.copy2(file_path, temp_path / file_path.name)
-
             # Run pipreqs (installed as console script in venv)
             pipreqs_exe = self.venv_path / "bin" / "pipreqs"
             cmd_pipreqs = [
@@ -190,17 +184,14 @@ class ExecutionSandbox:
             if not requirements_in.exists():
                 self.logger.info("[SANDBOX] No additional dependencies found")
                 return
-
             # Use pip-tools to compile requirements
             self.logger.info("[SANDBOX] Compiling requirements with pip-tools...")
-
             requirements_txt = temp_path / "requirements.txt"
             cmd_compile = [
                 str(self.python_exe), "-m", "piptools", "compile",
                 "--output-file", str(requirements_txt),
                 str(requirements_in)
             ]
-
             result = subprocess.run(
                 cmd_compile,
                 capture_output=True,
@@ -236,6 +227,7 @@ class ExecutionSandbox:
     def run_generated_code(
         self,
         script_path: Path = None,
+        script_name: str = None,
         expected_output: str = "",
         timeout: int = 300
     ) -> tuple[bool, str]:
@@ -259,13 +251,10 @@ class ExecutionSandbox:
                 return False, "No Python file found in capsule"
             if script_path not in py_files:
                 self.logger.warning(f"[SANDBOX] Specified script {script_path.name} not found in capsule, using smart file selection")
-
             # Smart file selection based on eval_script_path
-            generated_script = self._select_best_matching_file(py_files, script_path)
+            generated_script = self._select_best_matching_file(py_files, script_name)
             self.logger.info(f"[SANDBOX] Selected generated script: {generated_script.name}")
-
             # Use the sandbox's persistent temp directory for code execution
-            # This ensures dependencies are available in the same environment
             temp_path = self.temp_dir / "execution"
             # Clean up previous execution if any
             if temp_path.exists():
@@ -325,20 +314,20 @@ class ExecutionSandbox:
             self.logger.error(f"[SANDBOX] Generated code error: {str(e)}")
             return False, f"Code execution error: {str(e)}"
 
-    def _select_best_matching_file(self, py_files: list[Path], script_path: Path = None) -> Path:
+    def _select_best_matching_file(self, py_files: list[Path], script_name: str = None) -> Path:
         """
         Select the best matching Python file from candidates based on eval script name.
 
         Uses simple string similarity without heavy models.
         """
-        if not script_path or not py_files:
+        if not script_name or not py_files:
             return py_files[0] if py_files else None
         best_match = None
         best_score = 0
 
         for py_file in py_files:
             file_name = py_file.name.lower()
-            score = self._calculate_similarity_score(script_path.name.lower(), file_name)
+            score = self._calculate_similarity_score(script_name.lower(), file_name)
             if score > best_score:
                 best_score = score
                 best_match = py_file

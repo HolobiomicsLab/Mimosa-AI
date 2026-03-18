@@ -73,8 +73,8 @@ class CapsuleEvaluator:
         """
         self.logger.info(f"[EVAL] Starting evaluation for task {self.instance_id}")
         # 1. VER + Evaluate Success Rate
-        sr_success, sr_msg, ver_success = self.evaluate_success_rate()
-        self.metrics['VER'] = (ver_success, sr_msg)
+        sr_success, sr_msg, ver_success, ver_msg = self.evaluate_success_rate()
+        self.metrics['VER'] = (ver_success, ver_msg)
         if ver_success:
             self.metrics['SR'] = (sr_success, sr_msg)
         else:
@@ -89,10 +89,10 @@ class CapsuleEvaluator:
         self.metrics['summary'] = self._generate_summary()
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")
         self.logger.info(f"[EVAL] Results: VER={ver_success}, SR={self.metrics['SR'][0]}, CBS={self.metrics['CBS']:.3f}, Cost=${self.api_cost:.4f}")
-        
+
         # Clean up sandbox to free disk space
         self.sandbox.cleanup()
-        
+
         return self.metrics
 
     def evaluate_success_rate(self) -> tuple[bool, str, bool]:
@@ -112,13 +112,14 @@ class CapsuleEvaluator:
             full_program_path = self.capsule_path / self.gold_program_name
             ver_success, ver_message = self.sandbox.run_generated_code(
                 script_path=full_program_path,  # Use generated program (same name as gold program) for execution to check if it runs without error
+                script_name=self.gold_program_name,
                 expected_output=self.expected_output,
                 timeout=300
             )
 
             if not ver_success:
                 self.logger.error(f"[EVAL] VER failed: {ver_message}")
-                return False, ver_message, False
+                #return False, ver_message, False
 
             self.logger.info("[EVAL] VER passed - code executed successfully")
 
@@ -137,8 +138,7 @@ class CapsuleEvaluator:
                 timeout=180
             )
 
-            combined_message = f"VER: {ver_message}; SR: {sr_message}"
-            return sr_success, combined_message, ver_success
+            return sr_success, sr_message, ver_success, ver_message
 
         except Exception as e:
             self.logger.error(f"[EVAL] Error in evaluation: {str(e)}")
