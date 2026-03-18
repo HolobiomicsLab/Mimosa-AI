@@ -27,7 +27,7 @@ Mimosa-AI was given the paper, the raw data, and a set of domain-specific skills
 
 **Execution Timelapse**
 
-> TODO: add video
+https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 **Output**
 
