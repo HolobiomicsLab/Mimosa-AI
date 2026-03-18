@@ -73,10 +73,10 @@ Create a `.env` file at the project root. Include only the keys for the LLM prov
  
 ```env
 ANTHROPIC_API_KEY=...       # Claude — recommended for workflow orchestration
-OPENAI_API_KEY=...          # GPT models
-MISTRAL_API_KEY=...
-DEEPSEEK_API_KEY=...
-HF_TOKEN=...                # HuggingFace (required for SmolAgents)
+OPENAI_API_KEY=...          # OpenAI models - Optional
+MISTRAL_API_KEY=...         # Mistral models - Optional
+DEEPSEEK_API_KEY=...        # Deepseek - Optional
+HF_TOKEN=...                # HuggingFace provider, Optional
 OPENROUTER_API_KEY=...      # Any model via OpenRouter
  
 # Optional — observability via Langfuse
@@ -104,7 +104,7 @@ Edit `my_config.json`. Key parameters:
 | `discovery_addresses` | IP + port ranges for MCP server discovery |
 | `planner_llm_model` | LLM for task decomposition and planning |
 | `prompts_llm_model` | LLM for workflow prompt generation |
-| `workflow_llm_model` | LLM for multi-agent orchestration (recommended: `anthropic/claude-opus-4-5`) |
+| `workflow_llm_model` | LLM for multi-agent orchestration (recommended: anthropic/claude-opus-4-5 or z-ai/glm-5) |
 | `smolagent_model_id` | Model for SmolAgents execution subtasks |
 | `judge_model` | LLM for output self-evaluation and scoring |
 | `learned_score_threshold` | Minimum score to accept a result and stop iterating |
