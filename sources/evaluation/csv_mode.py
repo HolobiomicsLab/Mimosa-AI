@@ -252,6 +252,8 @@ DATASET PREVIEW:
 EXPECTED OUTPUT:
 Save results to a formatted file named exactly: {output_fname}
 Keep only one final python script at the root named exactly: {script_name}.
+You need to respect stricly the output format, otherwise the evaluation will fail.
+For example if a input data CSV is named FDA_APPROVED then the column in the output file is also named FDA_APPROVED. No modified pattern such as FDA_APPROVED_prob will be tolerated, otherwise the evaluation will fail.
 """
         return task_prompt, scenario_id, scoring_rubric_file
 
@@ -413,6 +415,7 @@ Provide your analysis following the specified output format."""
             self.logger.info("[PAPERS DATASET MODE] ScienceAgentBench mode activated")
 
         file_transfer = LocalTransfer(
+            config=self.config,
             workspace_path=self.config.workspace_dir,
             runs_capsule_dir=self.config.runs_capsule_dir
         )
@@ -455,7 +458,7 @@ Provide your analysis following the specified output format."""
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
                     print("\033[95m📊 Transfering results files...\033[0m")
-                    trs = LocalTransfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
+                    trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
                     capsule_name = trs.transfer_workspace_files_to_capsule(goal)
                     print("\033[95m📊 Analyzing results...\033[0m")
                     execution_time = time.time() - iteration_start_time

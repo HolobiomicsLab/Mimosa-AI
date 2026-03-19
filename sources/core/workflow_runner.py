@@ -84,16 +84,27 @@ class WorkflowRunner:
         import subprocess
 
         try:
-            subprocess.run(
-                [f"python{self.config.python_version}", "-m", "ensurepip"],
-                check=True,
+            # Try to ensure pip is available using ensurepip module
+            # This works for Python installations that include ensurepip
+            result = subprocess.run(
+                [f"python{self.config.python_version}", "-m", "pip", "--version"],
+                capture_output=True,
+                timeout=10,
             )
+            if result.returncode == 0:
+                # pip is already available
+                return
+            
+            # Try to bootstrap pip using ensurepip
             subprocess.run(
-                ["apt", "install", "-y", f"python{self.config.python_version}-venv", f"python{self.config.python_version}-distutils"],
+                [f"python{self.config.python_version}", "-m", "ensurepip", "--upgrade"],
                 check=True,
+                capture_output=True,
+                timeout=30,
             )
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to ensure pip: {e}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            # Log warning but don't fail - pip might already be available via other means
+            self.logger.warning(f"Could not ensure pip via ensurepip: {e}. Assuming pip is available.")
 
     async def install_dependencies(
         self, requirements: list[str] | None = None

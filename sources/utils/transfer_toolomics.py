@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Union
 from pathlib import Path
-from sources.core.llm_provider import LLMProvider, LLMConfig
+from sources.core.llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 import re
 import os
 
@@ -12,10 +12,11 @@ class LocalTransfer:
     Class transfer results of run between workspace folder and a capsule folder to cnetralize run results.
     """
 
-    def __init__(self, workspace_path, runs_capsule_dir = "runs_capsule"):
+    def __init__(self, config, workspace_path, runs_capsule_dir = "runs_capsule"):
         self.workspace_path = workspace_path
         self.runs_capsule_dir = runs_capsule_dir
-        self.config_llm = LLMConfig.from_dict({"model": "claude-sonnet-4-6", "provider": "anthropic"})
+        provider, model = extract_model_pattern(config.capsule_namer_model)
+        self.config_llm = LLMConfig.from_dict({"model": model, "provider": provider})
 
     def create_capsule_name(self, goal: str) -> str:
         """

@@ -74,11 +74,23 @@ class ExecutionSandbox:
 
         try:
             venv.create(venv_path, with_pip=True)
-            self.logger.info("[SANDBOX] Virtual environment created successfully")
-            return venv_path
         except Exception as e:
-            self.logger.error(f"[SANDBOX] Failed to create virtual environment: {e}")
-            raise
+            raise RuntimeError(f"Failed to create virtual environment at {venv_path}: {e}")
+        
+        # Verify the venv was created successfully
+        if sys.platform == "win32":
+            python_exe = venv_path / "Scripts" / "python.exe"
+        else:
+            python_exe = venv_path / "bin" / "python"
+        
+        if not python_exe.exists():
+            raise RuntimeError(
+                f"Virtual environment created but Python executable not found at {python_exe}. "
+                f"This may indicate a problem with the Python installation or venv module."
+            )
+        
+        self.logger.info(f"[SANDBOX] Virtual environment created successfully at {venv_path}")
+        return venv_path
 
     def _setup_environment(self) -> None:
         """Set up the virtual environment with basic packages and capsule dependencies."""

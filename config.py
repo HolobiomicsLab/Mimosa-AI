@@ -49,8 +49,9 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.judge_model = "anthropic/claude-sonnet-4-5"
+        self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
         # prompts for planner / workflow generator
@@ -61,7 +62,7 @@ class Config:
         self.reasoning_effort: str = "high"
 
         # max_tokens: Maximum number of tokens to generate for LLM responses
-        self.max_tokens: int = 64000
+        self.max_tokens: int = 8192
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 
