@@ -29,16 +29,18 @@ class ExecutionSandbox:
     - Uses pip-tools for dependency resolution and installation
     """
 
-    # Basic packages to install in every environment (matching ScienceAgentBench)
+    # Basic packages to install in every environment (for ScienceAgentBench)
     BASIC_PACKAGES = [
         "numpy",
         "pandas",
         "matplotlib",
+        "sklearn",
         "torch",  # pytorch
         "tensorflow",
         "rdkit",  # rdkit
         "pipreqs",  # for dependency analysis
-        "pip-tools"  # for dependency resolution
+        "pip-tools",  # for dependency resolution
+        "openai"
     ]
 
     def __init__(self, capsule_path: Path):
@@ -124,7 +126,6 @@ class ExecutionSandbox:
         self.logger.info(f"[SANDBOX] Analyzing capsule {self.capsule_path.name}...")
 
         # First, check if there's a requirements.txt in the capsule directory
-        # If so, install directly from it (this is more reliable than pipreqs)
         requirements_txt = self.capsule_path / "requirements.txt"
         if requirements_txt.exists():
             self.logger.info("[SANDBOX] Found requirements.txt in capsule, installing dependencies...")

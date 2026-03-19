@@ -16,6 +16,7 @@ from sources.core.schema import Task, IndividualRun
 from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.list_files import list_files
 
 class CsvEvaluationMode:
     """
@@ -236,20 +237,22 @@ Provide a structured analysis with:
         script_name = (row.get('gold_program_name') or '').strip()
 
         task_prompt = f"""
-    DOMAIN KNOWLEDGE:
-    {domain_knowledge}
-    INSTRUCTIONS:
-    {task_inst}
-    DATASET STRUCTURE:
-    {dataset_folder_tree}
-    DATASET PREVIEW:
-    {dataset_preview}
-    EXPECTED OUTPUT:
-    Save results to a formatted file named exactly: {output_fname}
-    Keep only one final python script at the root named exactly: {script_name}. This is the only script that will be evaluated, so make sure it is the best one and that it can run end to end without error.
-    Make sure to include a requirement.txt file at the root with all the necessary dependencies to run the script.
-    You need to understand that evaluation is extremely strict, columns name for output CSV should exactly match instructions or follow pattern from input files, and the script should run without error to be considered valid.
-    """
+DOMAIN KNOWLEDGE:
+{domain_knowledge}
+
+INSTRUCTIONS:
+{task_inst}
+
+DATASET STRUCTURE:
+{dataset_folder_tree}
+
+DATASET PREVIEW:
+{dataset_preview}
+
+EXPECTED OUTPUT:
+Save results to a formatted file named exactly: {output_fname}
+Keep only one final python script at the root named exactly: {script_name}.
+"""
         return task_prompt, scenario_id, scoring_rubric_file
 
     def _generate_next_task(self, row, dataset_type: str) -> str:
@@ -284,9 +287,12 @@ Provide a structured analysis with:
 
     def _analyze_results(self, goal: str, results_str: str, execution_time: float) -> dict[str, str]:
         """Analyze execution results using LLM."""
+        files = list_files(self.config.workspace_dir, max_depth=3)
         prompt = f"""Analyze the following Mimosa-AI execution:
 TASK: {goal}
 EXECUTION TIME: {execution_time:.2f} seconds
+FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
+{files}
 EXECUTION RESULTS:
 {results_str}
 Provide your analysis following the specified output format."""
