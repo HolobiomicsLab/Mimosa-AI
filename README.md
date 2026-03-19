@@ -1,6 +1,8 @@
 # Mimosa-AI 🌾🔬
 
-<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
+<p align="center">
+<img align="center" src="./docs/images/logo_mimosa.png" width="256" height="256" alt="Mimosa-AI Logo">
+<p>
 
 ***Mimosa-AI*** 🌾🔬 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
 
@@ -17,10 +19,7 @@ The user gives ***Mimosa-AI*** a research goal.
 - Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
 - ***Mimosa*** generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
-![schema](./docs/images/mimosa_logo.jpg)
-<p align="center">
-<img align="center" src="./docs/images/logo_mimosa.png" width="256" height="256" alt="Mimosa-AI Logo">
-<p>
+![schema](./docs/images/mimosa_overall.jpg)
 
 ## Example: Reproducing a Bioactive Molecular Networking Paper
 
