@@ -1,7 +1,7 @@
 # Mimosa-AI 🌾🔬
 
 <p align="center">
-<img align="center" src="./docs/images/logo_mimosa.png" width="256" height="256" alt="Mimosa-AI Logo">
+<img align="center" src="./docs/images/logo_mimosa.png" width="512" height="512" alt="Mimosa-AI Logo">
 <p>
 
 ***Mimosa-AI*** 🌾🔬 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
