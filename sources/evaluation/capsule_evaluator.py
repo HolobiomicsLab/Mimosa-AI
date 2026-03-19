@@ -95,7 +95,7 @@ class CapsuleEvaluator:
 
         return self.metrics
 
-    def evaluate_success_rate(self) -> tuple[bool, str, bool]:
+    def evaluate_success_rate(self) -> tuple[bool, str, bool, str]:
         """
         Evaluate Success Rate (SR) and Valid Execution Rate (VER).
 
@@ -119,17 +119,17 @@ class CapsuleEvaluator:
 
             if not ver_success:
                 self.logger.error(f"[EVAL] VER failed: {ver_message}")
-                #return False, ver_message, False
+                return False, ver_message, False, "SR cannot be evaluated if VER fails"
 
             self.logger.info("[EVAL] VER passed - code executed successfully")
 
             if not self.eval_script_name:
-                return False, "No evaluation script specified for this task", ver_success
+                return False, "No evaluation script specified for this task", ver_success, "No SR evaluation possible without eval script"
             # Get eval script path for smart file matching
             eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
             # Step 2: SR - Run evaluation script
             if not eval_script_path.exists():
-                return False, f"Evaluation script not found: {eval_script_path}", ver_success
+                return False, f"Evaluation script not found: {eval_script_path}", ver_success, "SR cannot be evaluated if eval script is not found"
             self.logger.info(f"[EVAL] Running evaluation script: {eval_script_path.name}")
 
             sr_success, sr_message = self.sandbox.run_eval_script(

@@ -16,10 +16,6 @@ class ScenarioLoader:
         self.scenarios_dir = Path(scenarios_dir)
         self._scenario_cache = {}
 
-    @property
-    def scenario_dir(self):
-        return self.scenario_dir
-
     def load_scenario(self, scenario_rubric: str) -> dict[str, Any] | None:
         """
         Load a scenario definition by ID.

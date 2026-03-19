@@ -34,7 +34,7 @@ class ExecutionSandbox:
         "numpy",
         "pandas",
         "matplotlib",
-        "sklearn",
+        "scikit-learn",  # sklearn
         "torch",  # pytorch
         "tensorflow",
         "rdkit",  # rdkit
@@ -163,6 +163,12 @@ class ExecutionSandbox:
                 shutil.copy2(file_path, temp_path / file_path.name)
             # Run pipreqs (installed as console script in venv)
             pipreqs_exe = self.venv_path / "bin" / "pipreqs"
+            
+            # Check if pipreqs is available (may not be if basic package installation failed)
+            if not pipreqs_exe.exists():
+                self.logger.warning("[SANDBOX] pipreqs not found in venv, skipping dependency analysis")
+                return
+            
             cmd_pipreqs = [
                 str(pipreqs_exe),
                 "--savepath", str(temp_path / "requirements.in"),
@@ -230,7 +236,7 @@ class ExecutionSandbox:
         script_path: Path = None,
         script_name: str = None,
         expected_output: str = "",
-        timeout: int = 300
+        timeout: int = 1000
     ) -> tuple[bool, str]:
         """
         Run the generated code in the capsule to produce output.

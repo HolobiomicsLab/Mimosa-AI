@@ -148,7 +148,7 @@ class ScienceAgentBenchLoader:
 
         if not eval_path.exists():
             raise FileNotFoundError(f"Evaluation script not found: {eval_path}")
-        if not eval_path.exists():
+        if not judge_path.exists():
             raise FileNotFoundError(f"Visual judge script not found: {judge_path}")
 
         return eval_path, judge_path

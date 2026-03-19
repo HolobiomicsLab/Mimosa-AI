@@ -82,7 +82,7 @@ class WorkflowFactory:
             raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
         if not mcps:
             raise ValueError(
-                "\n" + "=" * 80 + 
+                "\n" + "=" * 80 +
                 "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
                 "\n" + "-" * 80 +
                 "\nPlease ensure at least one MCP instance is running on Toolomics."
@@ -502,25 +502,25 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Memory path: {memory_path}")
 
         return complete_code, workflow_code, uuid_str
-    
+
     def _extract_original_from_goal(self, goal: str) -> str:
         """Extract original task from knowledge-wrapped goal.
-        
+
         Args:
             goal: Goal text that may be wrapped with knowledge context
-            
+
         Returns:
             str: Extracted original task or goal if not wrapped
         """
         if not goal:
             return ""
-        
+
         # Pattern: "...Now, use this knowledge to complete:\n<actual_task>"
         # This is the pattern used by planner._build_knowledge_aware_task()
         match = re.search(r'Now, use this knowledge to complete:\s*\n(.*)', goal, re.DOTALL)
         if match:
             return match.group(1).strip()
-        
+
         # If no wrapper pattern found, return goal as-is
         return goal
 
@@ -528,7 +528,7 @@ if WORKFLOW_PATH:
         self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
     ) -> None:
         """Save workflow code and metadata to files.
-        
+
         Args:
             path: Directory path to save files
             uuid_str: Unique workflow identifier
@@ -560,7 +560,7 @@ if WORKFLOW_PATH:
             self.logger.info(f"Saved goal to: {path}/goal_{uuid_str}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save goal: {str(e)}")
-        
+
         # Save original task for better similarity matching
         # Extract from goal if not provided explicitly
         task_to_save = original_task if original_task else self._extract_original_from_goal(goal)
@@ -572,30 +572,75 @@ if WORKFLOW_PATH:
             except Exception as e:
                 self.logger.error(f"Failed to save original task: {str(e)}")
 
+    def get_engine_code(self) -> str:
+        """Get code snippet for initializing the LLM engine for single agent mode."""
+        model_id = self.config.smolagent_model_id
+        max_tokens = getattr(self.config, 'max_tokens', 8192)
+        provider, _ = extract_model_pattern(self.config.smolagent_model_id)
+        token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
+        return f"""
+model_id = {model_id!r}
+max_tokens = {max_tokens}
+provider = {provider!r}
+token = {token!r}
+engine_name = {self.config.engine_name!r}
+engine = None
+if engine_name == "mlx":
+    print("Using MLXModel for local execution.")
+    engine = MLXModel(
+        model_id=model_id,
+        max_tokens=max_tokens,
+    )
+elif engine_name == "inference_client":
+    print("Using InferenceClientModel for inference client execution.")
+    if not token:
+        raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
+    engine = InferenceClientModel(
+        model_id=model_id,
+        provider=provider,
+        token=token,
+        max_tokens=max_tokens,
+    )
+elif engine_name == "litellm":
+    engine = LiteLLMModel(
+        model_id=model_id,
+        temperature=1.0,
+        max_tokens=max_tokens,
+    )
+elif engine_name == "openai":
+    engine = InferenceClientModel(
+        model_id=model_id,
+        provider=provider,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+else:
+    raise ValueError(f"Unknown engine name.. Supported engines are: mlx, hf_api, inference_client and litellm.")
+        """.strip()
+
     async def craft_single_agent(self, goal: str, original_task: str = None):
         """
         For crafting single agent with cost tracking support.
-        
+
         Args:
             goal: The goal description (may be knowledge-wrapped)
             original_task: The original unwrapped task for similarity matching
-            
+
         Returns:
             tuple[str, str, str]: (complete_code, workflow_code, uuid)
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"single_agent_{timestamp}_{short_uuid}"
-        
+
         try:
             tools_code, existing_tool_prompt = await self.load_tools_code()
         except Exception as e:
             self.logger.error(f"craft_single_agent: Failed to load tools code: {str(e)}")
             raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
-        
+
         # Create folder structure for cost tracking (like multi-agent mode)
         workflow_path, memory_path = self.create_folder_structure(uuid_str)
-        
+
         INSTRUCTIONS = ". ".join([
             "TASK:",
             goal,
@@ -615,7 +660,7 @@ if WORKFLOW_PATH:
             "INITIAL STEP:",
             "- Assess the workspace by running: ls -la"
         ])
-        
+
         # Resolve absolute paths (like craft_workflow does)
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
@@ -626,7 +671,8 @@ if WORKFLOW_PATH:
             re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
         ))
         mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
-        
+        engine_code = self.get_engine_code()
+
         code = f"""
 import os
 import json
@@ -634,7 +680,7 @@ from dataclasses import asdict
 from typing import List
 
 import smolagents
-from smolagents import CodeAgent, LiteLLMModel, ActionStep
+from smolagents import CodeAgent, LiteLLMModel, ActionStep, InferenceClientModel, MLXModel
 from smolagents.models import get_dict_from_nested_dataclasses
 from dotenv import load_dotenv
 
@@ -646,12 +692,7 @@ INSTRUCTIONS = {INSTRUCTIONS!r}
 MEMORY_PATH = {memory_path_abs!r}
 WORKFLOW_PATH = {workflow_path_abs!r}
 
-engine = LiteLLMModel(
-    model_id=MODEL_ID,
-    temperature=1.0,
-    max_tokens=8096,
-)
-
+{engine_code}
 {tools_code}
 {mcps_string}
 
@@ -676,7 +717,7 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                 action_step = step.dict()
                 action_step["model_input_messages"] = (
                     get_dict_from_nested_dataclasses(
-                        [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], 
+                        [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages],
                         ignore_key="raw"
                     )
                     if step.model_input_messages
@@ -690,7 +731,7 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                     else None
                 )
                 memories.append(action_step)
-        
+
         os.makedirs(memory_path, exist_ok=True)
         agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
         with open(agent_task_path, "w") as f:
@@ -723,14 +764,14 @@ try:
 except Exception as e:
     print(f"❌ Failed to save state_result.json: {{e}}")
         """
-        
+
         # Save metadata files (like multi-agent mode)
         self.save_workflow_files(
-            workflow_path, 
-            uuid_str, 
+            workflow_path,
+            uuid_str,
             code,  # Save the single agent code
-            goal, 
+            goal,
             original_task
         )
-        
+
         return code, code, uuid_str

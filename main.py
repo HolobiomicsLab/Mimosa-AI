@@ -30,17 +30,15 @@ dotenv.load_dotenv()
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
-    if not os.getenv("HF_TOKEN"):
+    key_found = False
+    envs_key = ['ANTHROPIC_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'HF_TOKEN', 'OPENROUTER_API_KEY']
+    for key in envs_key:
+        if os.getenv(key):
+            print(f"✅ Found environment variable: {key}")
+            key_found = True
+    if not key_found:
         raise ValueError(
-            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token. "
-        )
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise ValueError(
-            "⚠️ ANTHROPIC_API_KEY environment variable is not set. Please set it to your OpenAI API key."
-        )
-    if not os.getenv("PUSHOVER_USER") or not os.getenv("PUSHOVER_TOKEN"):
-        print(
-            "⚠️ PUSHOVER_USER/PUSHOVER_TOKEN not set. We advice using pushover for getting notifications upon task completion. "
+            "⚠️ No valid API key environment variable found. Please set one of the supported API keys. Supported keys: " + ", ".join(envs_key)
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
