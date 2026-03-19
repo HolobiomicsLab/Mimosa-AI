@@ -17,7 +17,10 @@ The user gives ***Mimosa-AI*** a research goal.
 - Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
 - ***Mimosa*** generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
 
-![schema](./docs/images/mimosa_overall.jpg)
+![schema](./docs/images/mimosa_logo.jpg)
+<p align="center">
+<img align="center" src="./docs/images/logo_mimosa.png" width="256" height="256" alt="Mimosa-AI Logo">
+<p>
 
 ## Example: Reproducing a Bioactive Molecular Networking Paper
 
