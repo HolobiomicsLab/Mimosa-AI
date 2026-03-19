@@ -308,11 +308,11 @@ class GenericEvaluator(BaseEvaluator):
     Is the output complete?
     Is the output well-formatted?
 
-    """ + (f"""4. ANSWER CORRECTNESS
+    """ + (f"""4. ANSWER PLAUSIBILITY
     Answer should be : {answer}
-    Is the answer factually correct?
+    Does the answer appear plausible given the workflow trace and available evidence?
     Is the answer logically consistent?
-    Is the answer precise?
+    Is the answer appropriately qualified rather than overstated?
     """ if answer else "") + """
 
     Respond in this exact format:
@@ -333,9 +333,9 @@ class GenericEvaluator(BaseEvaluator):
             "evidence": "[Output validation errors or missing fields]"
         }""" + ("""
         ,{
-            "category": "answer_correctness",
+            "category": "answer_plausibility",
             "score": [0.0-1.0],
-            "evidence": "[Factual accuracy verification]"
+            "evidence": "[Why the answer seems plausible or implausible from the available evidence]"
         }""" if answer else "") + """
     ]
     """
@@ -425,7 +425,9 @@ class GenericEvaluator(BaseEvaluator):
                 'goal_alignment',
                 'agent_collaboration',
                 'output_quality',
-                'answer_correctness'
+                'answer_plausibility',
+                # Backward compatibility with older saved judge outputs.
+                'answer_correctness',
             }
 
             # Convert list of evaluations to a dictionary
@@ -443,6 +445,8 @@ class GenericEvaluator(BaseEvaluator):
                     raise ScoreExtractionError(f"Category must be a string, got {type(category)} in entry {i}")
                 if category not in valid_categories:
                     raise ScoreExtractionError(f"Invalid category '{category}' in entry {i}")
+                if category == 'answer_correctness':
+                    category = 'answer_plausibility'
                 # Validate score
                 try:
                     score = float(eval_dict['score'])

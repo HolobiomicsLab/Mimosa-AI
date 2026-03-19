@@ -103,11 +103,14 @@ def calculate_good_answer_average(
                 with open(state_result_path, encoding="utf-8") as f:
                     state_result = json.load(f)
 
-                    if "answer_correctness" in state_result["evaluation_scores"]:
-                        answer_correctness = state_result["evaluation_scores"][
-                            "answer_correctness"
-                        ]
-                        is_good_answer = answer_correctness >= threshold
+                    evaluation_scores = state_result.get("evaluation_scores", {})
+                    answer_plausibility = evaluation_scores.get(
+                        "answer_plausibility",
+                        evaluation_scores.get("answer_correctness"),
+                    )
+
+                    if answer_plausibility is not None:
+                        is_good_answer = answer_plausibility >= threshold
                         if is_good_answer:
                             good_answer_count += 1
 
@@ -115,7 +118,7 @@ def calculate_good_answer_average(
                         csv_data.append(
                             {
                                 "uuid": uuid,
-                                "answer_correctness": answer_correctness,
+                                "answer_plausibility": answer_plausibility,
                                 "is_good_answer": is_good_answer,
                                 "question": question,
                                 "answer": answer,
@@ -123,7 +126,7 @@ def calculate_good_answer_average(
                         )
                     else:
                         print(
-                            f"⚠️ No 'answer_correctness' key found in state_result for UUID: {uuid}"
+                            f"⚠️ No 'answer_plausibility' or legacy 'answer_correctness' key found in state_result for UUID: {uuid}"
                         )
             else:
                 print(f"⚠️ State result file not found for UUID: {uuid}")
