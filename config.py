@@ -62,7 +62,7 @@ class Config:
         self.reasoning_effort: str = "high"
 
         # max_tokens: Maximum number of tokens to generate for LLM responses
-        self.max_tokens: int = 8192
+        self.max_tokens: int = 8190
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 

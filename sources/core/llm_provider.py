@@ -28,9 +28,9 @@ class LLMConfig:
     temperature: float = 1.0
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     reasoning_effort: str = "medium"
-    max_tokens = 64000
+    max_tokens = 8192
 
-    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 64000):
+    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 8192):
         self.model = model
         self.provider = provider.lower()
         self.temperature = temperature
@@ -81,7 +81,7 @@ class LLMConfig:
             temperature=config.get("temperature", 1.0),
             key=config.get("key", ""),
             reasoning_effort=config.get("reasoning_effort", "medium"),
-            max_tokens=config.get("max_tokens", 64000),
+            max_tokens=config.get("max_tokens", 8192),
         )
 
 
@@ -105,7 +105,7 @@ class LLMProvider:
         use_flat_cache: bool = False,
     ) -> None:
         """Initialize the LLM provider with API clients.
-        
+
         Args:
             agent_name: Name of the agent for cache identification
             memory_path: Path to memory directory
@@ -170,7 +170,7 @@ class LLMProvider:
                         return cached_data.get('response', '')
                 except OSError as e:
                     self.logger.warning(f"Error reading cache file {agent_file}: {e}")
-            
+
             self.logger.info(f"Cache miss (flat) for agent '{self.agent_name}'")
             return None
 
@@ -216,20 +216,20 @@ class LLMProvider:
 
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
-        
+
         Args:
             error: The exception to check
-            
+
         Returns:
             True if the error is retryable, False otherwise
         """
         error_type_name = type(error).__name__.lower()
         error_str = str(error).lower()
-        
+
         # Check for specific error types (including context window exceeded)
         if "contextwindowexceeded" in error_type_name:
             return True
-        
+
         # Check for specific retryable error patterns
         retryable_patterns = [
             "overload",  # Overloaded error
@@ -244,16 +244,16 @@ class LLMProvider:
             "context",  # Context window errors
             "token limit",  # Token limit errors
         ]
-        
+
         return any(pattern in error_str for pattern in retryable_patterns)
 
     def _calculate_backoff_wait(self, attempt: int, max_wait: int = 500) -> float:
         """Calculate exponential backoff with jitter.
-        
+
         Args:
             attempt: The attempt number (0-indexed)
             max_wait: Maximum wait time in seconds (default 500s)
-            
+
         Returns:
             Number of seconds to wait before the next attempt
         """
@@ -279,7 +279,7 @@ class LLMProvider:
         attempt = 0
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
-        
+
         while True:  # Infinite retry loop
             try:
                 completion_params = {
@@ -296,10 +296,10 @@ class LLMProvider:
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
 
                 response = litellm.completion(**completion_params)
-                
+
                 # Success - break out of retry loop
                 break
-                
+
             except TimeoutError as e:
                 # Timeout is retryable
                 wait_time = self._calculate_backoff_wait(attempt, max_wait)
@@ -308,18 +308,18 @@ class LLMProvider:
                 )
                 time.sleep(wait_time)
                 attempt += 1
-                
+
             except Exception as e:
                 # Check if this is a retryable error
                 if self._is_retryable_error(e):
                     error_type = type(e).__name__.lower()
                     is_context_error = "contextwindowexceeded" in error_type or "context" in str(e).lower()
-                    
+
                     if is_context_error and context_window_retry_count < 3:
                         # For context window errors, reduce the prompt and retry
                         context_window_retry_count += 1
                         reduction_factor = 0.5 ** context_window_retry_count  # 0.5, 0.25, 0.125
-                        
+
                         # Reduce the user prompt content
                         if len(message) > 0 and message[-1].get("role") == "user":
                             original_length = len(message[-1]["content"])
@@ -344,7 +344,7 @@ class LLMProvider:
                     raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
-        
+
         # Log token usage for debugging
         usage = getattr(response, 'usage', None)
         if usage:
@@ -355,7 +355,7 @@ class LLMProvider:
                 f"📊 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, "
                 f"Total: {total_tokens} (max_tokens: {self.config.max_tokens})"
             )
-        
+
         # Check for truncation due to max_tokens limit
         stop_reason = getattr(response.choices[0], 'stop_reason', None) or \
                       getattr(response.choices[0], 'finish_reason', None)
@@ -364,7 +364,7 @@ class LLMProvider:
                 f"⚠️  LLM response was truncated due to max_tokens limit ({self.config.max_tokens}). "
                 f"Consider increasing max_tokens in config for longer outputs."
             )
-        
+
         json_res = {
             **response.json(),
             "response": res,
