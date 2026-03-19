@@ -103,7 +103,7 @@ class CapsuleEvaluator:
         then runs the task-specific evaluation script for SR.
 
         Returns:
-            (sr_success: bool, message: str, ver_success: bool)
+            Tuple of (SR_success, SR_message, VER_success, VER_message)
         """
         try:
 
@@ -119,17 +119,17 @@ class CapsuleEvaluator:
 
             if not ver_success:
                 self.logger.error(f"[EVAL] VER failed: {ver_message}")
-                return False, ver_message, False, "SR cannot be evaluated if VER fails"
+                return False, "VER Failed, therefore SR is false", False, ver_message
 
             self.logger.info("[EVAL] VER passed - code executed successfully")
 
             if not self.eval_script_name:
-                return False, "No evaluation script specified for this task", ver_success, "No SR evaluation possible without eval script"
+                return False, "No evaluation script specified for this task", ver_success, ver_message
             # Get eval script path for smart file matching
             eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
             # Step 2: SR - Run evaluation script
             if not eval_script_path.exists():
-                return False, f"Evaluation script not found: {eval_script_path}", ver_success, "SR cannot be evaluated if eval script is not found"
+                return False, f"Evaluation script not found: {eval_script_path}", ver_success, ver_message
             self.logger.info(f"[EVAL] Running evaluation script: {eval_script_path.name}")
 
             sr_success, sr_message = self.sandbox.run_eval_script(
