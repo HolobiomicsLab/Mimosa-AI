@@ -3,6 +3,7 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 """
 
 import logging
+import random
 import os
 import re
 import time
@@ -30,6 +31,79 @@ class WorkflowFactory:
         self.config = config
         self.logger = logging.getLogger(__name__)
 
+        # hints to provide diversity in generated workflows, we sample 3 of them at random for each workflow generation
+        # provide an approximate search direction to the LLM to improve workflow quality and diversity
+
+        self.hints = [
+            # === TOPOLOGY & ORCHESTRATION ===
+            ("parallel_fanout", "Explore a parallel fan-out topology where independent subtasks run concurrently (or divide tasks sequentially) before a merge agent consolidates."),
+            ("debate_topology", "Consider a debate topology: two agents independently produce outputs, a third arbitrates and synthesizes the best elements."),
+            ("map_reduce", "Explore a map-reduce pattern where a splitter agent decomposes the input, workers process chunks, a reducer assembles the final result."),
+            ("dynamic_routing", "Add adaptive routing that selects the next agent based on intermediate uncertainty signals rather than fixed paths."),
+            ("hierarchical_decomposition", "Use hierarchical decomposition: high-level agents break complex goals into subtasks and delegate to specialized workers."),
+
+            # === QUALITY / VALIDATION ===
+            ("adversarial_agent", "Add a dedicated adversarial agent whose only job is to find flaws, edge cases, and failure modes in prior agents' outputs."),
+            ("confidence_scoring", "Include a confidence-scoring step where agents explicitly rate their own output certainty before passing downstream."),
+            ("peer_review_loop", "Consider a peer-review loop: the second agent critiques the first's output before a third agent makes the final call."),
+            ("cross_verification", "Implement cross-verification where agents check each other's work using different reasoning paths to catch blind spots."),
+            ("structured_metadata_passing", "Require agents to pass uncertainty bounds, assumptions, and limitations as explicit metadata—not just outputs."),
+
+            # === FALLBACK / RESILIENCE ===
+            ("heuristic_fallback", "Design fallback paths that skip expensive agents and use a cheaper heuristic when upstream confidence is low."),
+            ("circuit_breaker", "Consider circuit-breaker logic: if an agent fails twice on the same input, escalate to a more capable model instead of retrying."),
+            ("triage_routing", "Add a triage agent at entry that classifies input complexity and routes to a fast-path or deep-analysis path accordingly."),
+            ("budget_enforcement", "Enforce explicit token/call budgets per agent to prevent resource grabbing races that starve the system."),
+            ("checkpoint_resume", "Design checkpointing into long workflows so partial states can resume after failure without full restart."),
+
+            # === SPECIALIZATION & CONTEXT ===
+            ("orthogonal_specialization", "Consider decomposing the problem domain into orthogonal concerns, each owned by a hyper-specialized agent."),
+            ("normalization_first", "Explore using one agent purely for data extraction/normalization before any reasoning agents touch the content."),
+            ("explicit_planning", "Add a planning agent that produces an explicit step-by-step execution plan that downstream agents must follow and can annotate."),
+            ("context_scoping", "Scope context intentionally—execution agents get narrow, relevant context rather than full conversation history to prevent drift."),
+            ("role_boundary_guardrails", "Enforce strict role boundaries so agents don't silently assume each other's responsibilities."),
+
+            # === OUTPUT QUALITY ===
+            ("refinement_loop", "Consider a multi-pass refinement loop where the final agent can send output back for one revision cycle if quality threshold isn't met."),
+            ("audience_rewrite", "Add an agent that rewrites the final output for the target audience's format and vocabulary before delivery."),
+            ("deduplication", "Include a deduplication/consolidation agent to merge redundant findings when multiple agents explore overlapping territory."),
+            ("synthesis_failure_guard", "Watch for synthesis failure: when parallel agents return contradictory or uneven outputs, trigger a reconciliation sub-workflow."),
+
+            # === EFFICIENCY ===
+            ("gating_agent", "Consider a gating agent that decides whether the full workflow is needed or if a cached/simple answer suffices."),
+            ("early_termination", "Add explicit termination conditions with verification—prevent premature exits before objectives are actually met."),
+            ("redundancy_deduplication", "Track which experimental configurations have already been explored to prevent redundant computation across agents."),
+
+            # === SCIENTIFIC-SPECIFIC ===
+            ("hypothesis_tracking", "Maintain a shared hypothesis registry so agents know what has been tested and what remains open—prevents redundant exploration."),
+            ("provenance_logging", "Require every output to include provenance: which data sources, which assumptions, which agent chain produced it."),
+            ("uncertainty_quantification", "Add explicit uncertainty propagation—when agents combine findings, they must aggregate uncertainty, not just point estimates."),
+            ("reproducibility_bundle", "Bundle code, data references, and random seeds with every result so downstream agents can verify or reproduce."),
+            ("domain_validator", "Include a domain-specific validator agent that checks outputs against scientific conventions (units, significant figures, citation formats)."),
+            ("instrumental_alignment_check", "Watch for instrumental goal alignment failure—agents hiding information to appear better than they are."),
+            ("world_model_sync", "Periodically force agents to synchronize their internal world models to prevent competing assumptions from diverging."),
+            ("error_propagation_barrier", "Design error propagation barriers—one agent's bad assumption shouldn't cascade through the entire system unchecked."),
+            ("convergence_budget", "Set a maximum iteration budget for consensus-building to prevent infinite negotiation loops between agents."),
+            ("silent_deadlock_detector", "Monitor for silent deadlocks where agents all wait for someone else to act—implement timeout escalation."),
+            # === SEARCH DIRECTION & EXPLORATION ===
+            ("simulated_annealing_search", "Treat exploration like simulated annealing: start with high-temperature, highly divergent agent prompts for brainstorming, then systematically lower temperature for convergent refinement."),
+            ("dead_end_backtracking", "Implement an explicit 'negative memory' cache. When agents hit a dead end in a research path, log the failure so parallel/future agents don't retread the same useless search space."),
+            ("diversity_forcing", "Combat agent echo chambers by injecting explicit orthogonal biases into parallel search agents (e.g., 'Agent A favors biological explanations, Agent B favors chemical ones') to fully map the hypothesis space."),
+
+            # === AVOIDING UNNECESSARY COMPLEXITY ===
+            ("single_agent_baseline", "Always establish a single-agent baseline first. Only introduce multi-agent orchestration when the single agent demonstrably fails due to context limits or competing objectives."),
+            ("agent_consolidation", "Avoid 'micro-service' bloat. If two agents always operate sequentially without conditional branching, human-in-the-loop, or distinct tool needs, combine them into one prompt."),
+            ("communication_overhead_tax", "Monitor the token-ratio of formatting/handshakes versus actual scientific reasoning. If agents spend more tokens packing/unpacking JSON than thinking, simplify the workflow."),
+            ("avoid_premature_abstraction", "Don't build generalized hierarchical frameworks for a specific scientific pipeline until you've successfully hardcoded the exact path at least once."),
+
+            # === SMOOTH MANIFOLD TRANSITIONS (AGENT HANDOFFS) ===
+            ("semantic_impedance_matching", "Ensure smooth transitions by defining strict, validated schema contracts (e.g., Pydantic) between agents. Don't rely on unstructured natural language for critical data handoffs."),
+            ("sliding_context_window", "Create a smooth cognitive transition by passing the previous agent's summarized 'train of thought' alongside the final output, preventing abrupt context shifts downstream."),
+            ("shared_ontology_sync", "Initialize the entire agent swarm with a shared scientific ontology/glossary. This prevents downstream agents from hallucinating or misinterpreting specialized terminology used by upstream agents."),
+            ("state_dictionary_continuity", "Maintain a continuous, system-level 'experiment state' dictionary (JSON/YAML) independent of the conversational thread. Update it mutably across agent transitions so quantitative data doesn't degrade in natural language translation."),
+            ("lossless_data_pointers", "Never force agents to copy-paste large datasets or matrices in their text outputs. Pass file paths or database pointers during handoffs to maintain data fidelity and smooth the transition manifold.")
+        ]
+
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
         Returns:
@@ -40,7 +114,6 @@ class WorkflowFactory:
                 return f.read()
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}") from e
-
 
     @staticmethod
     def extract_python_code(code: str) -> str:
@@ -97,6 +170,17 @@ class WorkflowFactory:
         print(f"🔧 Discovered {len(mcps)} MCP servers capabilities. Workflow generation can start.")
         return tools_code, existing_tool_prompt
 
+    async def load_single_agent_system_prompt(self) -> str:
+        """Load the system prompt for single agent mode.
+        Returns:
+            str: The system prompt content
+        """
+        try:
+            with open(self.config.prompt_smolagent) as f:
+                return f.read()
+        except Exception as e:
+            raise ValueError(f"Failed to load single agent system prompt: {str(e)}") from e
+
     def remove_imports(self, code: str) -> str:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
@@ -108,67 +192,20 @@ class WorkflowFactory:
             )
         )
 
-    def llm_make_prompts(
-        self,
-        system_prompt: str,
-        craft_instructions: str,
-        existing_tool_prompt: str,
-        path: str,
-        allow_cache: bool
-    ) -> str:
-        """Generate prompts code using the LLM."""
-        prompt = f"""
-You must generate Python code that defines prompt templates for the LangGraph-SmolAgent workflow.
-
-# AVAILABLE TOOLS:
-
-The following tools packages are available for agents:
-{existing_tool_prompt}
-
-# INSTRUCTIONS/GOAL:
-{craft_instructions}
-
-You must first comment about the overall strategy to accomplish the task using the available tools.
-Decide what agent you need and which tools package they should each use.
-Then, generate Python code that defines prompt templates for each agent.
-Do not generate the whole workflow, just the prompts as Python code.
-Generate the prompt within python blocks ```python<code with prompt>```
-Previous workflow failed due to python error ? You don't need to change prompts.
-Keep the prompt short and efficient. Agents are smart domains expert, not children.
-document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-        """
-
-        provider, model = extract_model_pattern(self.config.prompts_llm_model)
-        llm_config = LLMConfig(
-            model=model,
-            provider=provider,
-            reasoning_effort=self.config.reasoning_effort,
-            max_tokens=getattr(self.config, 'max_tokens', 8192)
-        )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
-
     def llm_make_workflow(
         self,
         system_prompt: str,
         craft_instructions: str,
         existing_tool_prompt: str,
+        hints: list[tuple[str, str]],
         path: str,
-        prompts_code: str,
         allow_cache: bool
     ) -> str:
         """Generate a workflow using the LLM."""
+
         prompt = f"""
-# EXISTING PROMPTS:
+# INSTRUCTIONS:
 
-The prompts have already been generated for you as Python code:
-
-{prompts_code}
-
-You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not EVER rewrite prompt you wish to keep, they will be automatically part of the context. You may add a prompt by including it in the workflow code you write but do NOT rewrite existing prompt.
-
-# INSTRUCTIONS/GOAL:
-
-Generate a workflow for this goal:
 {craft_instructions}
 
 # AVAILABLE TOOLS:
@@ -176,15 +213,11 @@ Generate a workflow for this goal:
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-# CONSTRAINT:
+# ADVICES/SEARCH DIRECTION:
+{hints}
+You may or may not consider these hints, but they are provided to inspire diverse and creative workflow structures that go beyond common patterns.
 
-1. Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST clearly state that the task cannot be completed and give up.
-2. Use smart routing, fallback could go all the way back to first agent, not the previous agent.
-3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
-4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
-5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organize files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
-7. Agent should always be provided with tool to use shell, take notes and retrieve their own memory in addition to a primary tool.
+Proceed to generate the workflow in Python code using the LangGraph library. Follow the instructions and constraints carefully.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
@@ -195,6 +228,19 @@ The following tools packages are available for agents:
             max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
+
+
+    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> str:
+        rng = random.Random(seed)
+        sampled = rng.sample(hints, min(n, len(hints)))
+        return sampled
+
+    def get_hints(self) -> str:
+        rn_seed = int(time.time() * 1000) % 2**32
+        sampled_hints = self.sample_workflow_hints(self.hints, n=3, seed=rn_seed)
+        hints_names = [hint[0] for hint in sampled_hints]
+        hints = "\n".join(f"{i+1}. {hint[1]}" for i, hint in enumerate(sampled_hints))
+        return hints, hints_names
 
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
@@ -209,25 +255,18 @@ The following tools packages are available for agents:
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
         try:
-            print("📝 Step 1/2: Generating prompts code...")
-            llm_output = self.llm_make_prompts(
-                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
-            )
-            prompts_code = self.extract_python_code(llm_output)
-            commentary = llm_output.replace(prompts_code, "").split("```python")[0]
-            print("💬 LLM commentary on prompt:")
-            print(commentary)
-
-            print("🔧 Step 2/2: Generating workflow code...")
+            hints, hints_names = self.get_hints()
+            print(f"🎲 Sampled workflow hints for this generation: {', '.join(hints_names)}")
+            print("🔧 Generating workflow code...")
             llm_output = self.llm_make_workflow(
-                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code, allow_cache
+                system_prompt, craft_instructions, existing_tool_prompt, hints, path, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
             print("💬 LLM commentary on workflow:")
             print(commentary)
 
-            workflow_code = prompts_code + "\n\n" + workflow_code
+            workflow_code = f'# {", ".join(hints_names)} ' + "\n\n" + workflow_code
             workflow_code = self.remove_imports(workflow_code)
             if not workflow_code.strip():
                 raise ValueError("LLM did not return valid workflow code")
@@ -324,6 +363,7 @@ The following tools packages are available for agents:
         memory_path: str,
         uuid_str: str,
         goal: str,
+        smolagent_system_prompt: str = None
     ) -> str:
         """Assemble the complete workflow code.
         Args:
@@ -362,13 +402,13 @@ import json
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
 from pydantic import BaseModel
-from typing import Annotated
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
 GOAL = {goal!r}
+SYSTEM_PROMPT = {smolagent_system_prompt!r}
 
 # Load tools
 {tools_code}
@@ -485,6 +525,7 @@ if WORKFLOW_PATH:
             self.logger.error(f"craft_workflow: Workflow structure validation failed: {str(e)}")
             raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
 
+        smolagent_system_prompt = await self.load_single_agent_system_prompt()
         # Assemble complete workflow
         complete_code = self.assemble_workflow(
             tools_code,
@@ -495,6 +536,7 @@ if WORKFLOW_PATH:
             memory_path,
             uuid_str,
             goal,
+            smolagent_system_prompt
         )
 
         self.logger.info("Workflow generation completed")
@@ -638,6 +680,11 @@ else:
         except Exception as e:
             self.logger.error(f"craft_single_agent: Failed to load tools code: {str(e)}")
             raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
+        try:
+            SYSTEM_PROMPT = await self.load_single_agent_system_prompt()
+        except Exception as e:
+            self.logger.error(f"craft_single_agent: Failed to load system prompt: {str(e)}")
+            raise RuntimeError(f"Failed to load system prompt: {str(e)}") from e
 
         # Create folder structure for cost tracking (like multi-agent mode)
         workflow_path, memory_path = self.create_folder_structure(uuid_str)
@@ -646,28 +693,21 @@ else:
             "TASK:",
             goal,
             "",
-            "Address complaints from the last agent informations if any.",
-            "",
             "CONSTRAINTS:",
-            "- No placeholder or example values.",
-            "- No assumptions about missing data. Investigate first using available workspace data.",
             "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
             "- Save outputs instead of plotting.",
             "- Only use execute_command to install packages.",
-            "- You are only allowed to use tools to create and execute the code required to accomplish the goal.",
-            "- Use python/code editing tools when available.",
             "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
             "",
             "INITIAL STEP:",
             "- Assess the workspace by running: ls -la"
         ])
-
         # Resolve absolute paths (like craft_workflow does)
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path_abs = str((script_dir / memory_path).resolve())
         workflow_path_abs = str((script_dir / workflow_path).resolve())
-
+        # create MCPs
         mcp_vars = sorted(set(
             re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
         ))
@@ -689,6 +729,7 @@ load_dotenv()
 
 MODEL_ID = {self.config.smolagent_model_id!r}
 GOAL = {goal!r}
+SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
 INSTRUCTIONS = {INSTRUCTIONS!r}
 MEMORY_PATH = {memory_path_abs!r}
 WORKFLOW_PATH = {workflow_path_abs!r}
@@ -706,8 +747,25 @@ agent = CodeAgent(
     model=engine,
     name="single_agent",
     max_steps=256,
-    additional_authorized_imports=["requests", "bs4", "json"],
+    additional_authorized_imports = [
+        'requests', 'bs4', 'json', 'requests.exceptions',
+        'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
+        'configparser', 'logging',
+        'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue',
+        'dataclasses', 'enum', 'types',
+        're', 'string', 'textwrap', 'difflib', 'unicodedata',
+        'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64',
+        'html', 'html.parser',
+        'datetime', 'time', 'calendar',
+        'urllib', 'urllib.parse', 'urllib.request', 'urllib.error', 'http',
+        'http.client', 'socket', 'email', 'mimetypes',
+        'hashlib', 'hmac', 'secrets', 'uuid',
+        'math', 'random', 'statistics', 'decimal', 'fractions',
+        'traceback', 'inspect', 'gc', 'warnings', 'io',
+        'gzip', 'zipfile', 'tarfile', 'zlib',
+    ]
 )
+agent.prompt_templates["system_prompt"] = SYSTEM_PROMPT
 
 def save_agent_memories(agent, memory_path: str, agent_name: str):
     print(f"Saving agent memory to: {{{{memory_path}}}}")

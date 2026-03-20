@@ -57,78 +57,6 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
-ADDED_SYSTEM_PROMPT = """
-# CODE GENERATION CONSTRAINTS
-
-## GOLDEN RULE: TOOLS ARE YOUR ONLY EXECUTION INTERFACE
-You have ZERO direct access to:
-- `import` for packages not in base Python
-- `subprocess`, `os.system`, or any shell execution
-- `exec()`, `eval()`, or dynamic code execution
-- File I/O beyond reading provided data
-
-The ONLY way to:
-- Install/use external packages → `execute_command()`
-- Write files to disk → `create_python_file()`
-- Run scripts → `execute_command("python3 <filename>")`
-- Test code locally → `execute_command()`
-
-**Any attempt to use subprocess, import external packages directly, or execute code without tools WILL FAIL.**
-
-## 1. MANDATORY TOOL WORKFLOW FOR EXTERNAL OPERATIONS
-
-When you need to use a package like `deepchem`:
-1. **Never** try `import deepchem` directly in your code block
-2. **Always** use: `execute_command(cmd="python3 -m pip install deepchem")`
-3. **Confirm** installation with the tool output
-4. **Then** create a separate Python file via `create_python_file()` that imports and uses it
-5. **Execute** that file via `execute_command(cmd="python3 <filename>")`
-
-## 2. ERROR PREVENTION WITH TOOL-FIRST MINDSET
-- **Try-Except around tool calls**: Wrap every tool invocation in try-except
-- **Print tool output**: Always inspect what tools returned before proceeding
-```python
-try:
-    output = execute_command(cmd="python3 -m pip install package_name")
-    # print or process
-except Exception as e:
-    print("Tool failed:", str(e)[-512:])
-```
-
-## 3. CONTEXT MANAGEMENT
-- **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
-- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing (eg: output[:1024])
-- **Print raw len:** Print len of tool output. Be aware: Your maximum context is 8096.
-- **Rationale**: Prevents context saturation, reduces memory usage, and improves performance
-
-## 4. TOOL USAGE GUIDELINES
-- **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
-- **Tool first**: Always favor tool over your base coding abilities (have python editing tool or bash ? then use them). Tools are more efficient. You will be rewarded 1000$ everytime you comply.
-- **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
-
-ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
-
-## 5. FINAL ANSWER FORMAT
-- **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
-  ```json
-  {
-      "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
-      "answer": "Complete response to the original task"
-  }
-  ```
-- **Usage Rules**:
-  - Call `final_answer` only after inspecting and processing all relevant data
-  - Never nest `final_answer` in conditionals or loops
-  - Ensure JSON is valid and properly formatted
-  - final_answer should ALWAYS return a json as a string.
-- **Examples**:
-  ```python
-  final_answer('{"status": "SUCCESS", "message": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
-  final_answer('{"status": "RETRY", "message": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
-  ```
-- **Rationale**: Standardizes output for consistency and downstream processing
-"""
-
 class SmolAgentFactory:
 
     def __init__(self,
@@ -144,6 +72,7 @@ class SmolAgentFactory:
         self.model_id = MODEL_ID
         self.memory_folder = MEMORY_PATH
         self.engine_name = ENGINE_NAME
+        self.system_prompt = SYSTEM_PROMPT
         # additional engine parameters
         self.engine = None
         self.provider = "auto"
@@ -193,15 +122,15 @@ class SmolAgentFactory:
                 ]
 
             )
-            self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
+            self.override_system_prompt(self.system_prompt)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
 
-    def extend_system_prompt(self, added_prompt: str):
+    def override_system_prompt(self, sys_prompt: str):
         """Override the system prompt for the agent."""
-        if not added_prompt or not added_prompt.strip():
-            raise ValueError("System prompt cannot be empty.")
-        self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
+        if not sys_prompt or not sys_prompt.strip():
+            return # use original system prompt by smolagents
+        self.agent.prompt_templates["system_prompt"] = sys_prompt
 
     def get_engine(self):
         if self.engine_name == "mlx":
@@ -470,4 +399,3 @@ class WorkflowNodeFactory:
         def node_function(state: WorkflowState) -> dict:
             return agent_factory.run(state)
         return node_function
-

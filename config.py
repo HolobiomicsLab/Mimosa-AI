@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
+        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
@@ -57,6 +57,7 @@ class Config:
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
+        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "high"
