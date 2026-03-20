@@ -24,7 +24,7 @@ from sources.evaluation.codebert_scorer import calculate_codebert_score
 
 class CapsuleEvaluator:
     """Evaluates Mimosa-AI execution results against ScienceAgentBench metrics."""
-    
+
     def __init__(
         self,
         capsule_path: Path,
@@ -34,7 +34,7 @@ class CapsuleEvaluator:
     ):
         """
         Initialize CapsuleEvaluator.
-        
+
         Args:
             capsule_path: Path to the runs_capsule directory with generated files
             task_data: Dictionary containing task information from CSV row
@@ -47,20 +47,20 @@ class CapsuleEvaluator:
         self.api_cost = api_cost
         self.logger = logging.getLogger(__name__)
         self.sandbox = ExecutionSandbox(self.capsule_path)
-        
+
         # Extract key task information
         self.instance_id = task_data.get('instance_id', 'unknown')
         self.expected_output = task_data.get('output_fname', '')
         self.eval_script_name = task_data.get('eval_script_name', '')
         self.gold_program_name = task_data.get('gold_program_name', '')
-        
+
         # Results storage
         self.metrics: dict[str, any] = {}
-        
+
     def evaluate_all(self) -> dict[str, any]:
         """
         Run all evaluation metrics.
-        
+
         Returns:
             Dictionary with all metrics:
             {
@@ -72,9 +72,9 @@ class CapsuleEvaluator:
             }
         """
         self.logger.info(f"[EVAL] Starting evaluation for task {self.instance_id}")
-        # 1. VER + Evaluate Success Rate 
-        sr_success, sr_msg, ver_success = self.evaluate_success_rate()
-        self.metrics['VER'] = (ver_success, sr_msg)
+        # 1. VER + Evaluate Success Rate
+        sr_success, sr_msg, ver_success, ver_msg = self.evaluate_success_rate()
+        self.metrics['VER'] = (ver_success, ver_msg)
         if ver_success:
             self.metrics['SR'] = (sr_success, sr_msg)
         else:
@@ -89,50 +89,70 @@ class CapsuleEvaluator:
         self.metrics['summary'] = self._generate_summary()
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")
         self.logger.info(f"[EVAL] Results: VER={ver_success}, SR={self.metrics['SR'][0]}, CBS={self.metrics['CBS']:.3f}, Cost=${self.api_cost:.4f}")
+
+        # Clean up sandbox to free disk space
+        self.sandbox.cleanup()
+
         return self.metrics
-    
-    def evaluate_success_rate(self) -> tuple[bool, str, bool]:
+
+    def evaluate_success_rate(self) -> tuple[bool, str, bool, str]:
         """
-        Evaluate Success Rate (SR).
-        
-        Runs the task-specific evaluation script which checks if the
-        output meets the task's success criteria (e.g., accuracy threshold).
-        
+        Evaluate Success Rate (SR) and Valid Execution Rate (VER).
+
+        First runs the generated code to check VER (produces expected output),
+        then runs the task-specific evaluation script for SR.
+
         Returns:
-            (success: bool, message: str)
+            Tuple of (SR_success, SR_message, VER_success, VER_message)
         """
         try:
+
+            # Step 1: VER - Run generated code
+            self.logger.info("[EVAL] Running generated code for VER evaluation")
+            full_program_path = self.capsule_path / self.gold_program_name
+            ver_success, ver_message = self.sandbox.run_generated_code(
+                script_path=full_program_path,  # Use generated program (same name as gold program) for execution to check if it runs without error
+                script_name=self.gold_program_name,
+                expected_output=self.expected_output,
+                timeout=300
+            )
+
+            if not ver_success:
+                self.logger.error(f"[EVAL] VER failed: {ver_message}")
+                return False, "VER Failed, therefore SR is false", False, ver_message
+
+            self.logger.info("[EVAL] VER passed - code executed successfully")
+
             if not self.eval_script_name:
-                return False, "No evaluation script specified for this task", False
-            
+                return False, "No evaluation script specified for this task", ver_success, ver_message
+            # Get eval script path for smart file matching
             eval_script_path, judge_path = self.sab_loader.get_eval_script_path(self.task_data)
-            
+            # Step 2: SR - Run evaluation script
             if not eval_script_path.exists():
-                return False, f"Evaluation script not found: {eval_script_path}", False
-            
+                return False, f"Evaluation script not found: {eval_script_path}", ver_success, ver_message
             self.logger.info(f"[EVAL] Running evaluation script: {eval_script_path.name}")
-            
-            success, message = self.sandbox.run_eval_script(
+
+            sr_success, sr_message = self.sandbox.run_eval_script(
                 eval_script_path=eval_script_path,
                 visual_judge_path=judge_path,
                 timeout=180
             )
-            
-            return success, message, success
-            
+
+            return sr_success, sr_message, ver_success, ver_message
+
         except Exception as e:
-            self.logger.error(f"[EVAL] Error in SR evaluation: {str(e)}")
+            self.logger.error(f"[EVAL] Error in evaluation: {str(e)}")
             return False, f"Evaluation error: {str(e)}", False
-    
+
     def calculate_codebert_score(self) -> float:
         """
         Calculate CodeBERTScore (CBS).
-        
+
         Compares generated code with gold program using CodeBERT embeddings.
         Returns F1 score of matched token embeddings.
-        
+
         Note: If SR=1, this should return 1.0 automatically (handled in evaluate_all).
-        
+
         Returns:
             CodeBERT F1 score (0.0-1.0)
         """
@@ -140,14 +160,14 @@ class CapsuleEvaluator:
             if not self.gold_program_name:
                 self.logger.warning("[EVAL] No gold program specified, CBS=0.0")
                 return 0.0
-            
+
             # Find generated Python file
             py_files = list(self.capsule_path.glob("*.py"))
             if not py_files:
                 self.logger.warning("[EVAL] No Python file in capsule, CBS=0.0")
                 return 0.0
             generated_code_path = py_files[0]
-            
+
             # Get gold program path
             gold_program_path = self.sab_loader.get_gold_program_path(self.task_data)
             if not gold_program_path.exists():
@@ -160,20 +180,20 @@ class CapsuleEvaluator:
                 generated_code_path=generated_code_path,
                 gold_code_path=gold_program_path
             )
-            
+
             self.logger.info(f"[EVAL] CodeBERT score: {score:.3f}")
             return score
-            
+
         except Exception as e:
             self.logger.error(f"[EVAL] Error calculating CodeBERT score: {str(e)}")
             return 0.0
-    
+
     def _generate_summary(self) -> str:
         """Generate a human-readable summary of evaluation results."""
         ver_status = "✓" if self.metrics['VER'][0] else "✗"
         sr_status = "✓" if self.metrics['SR'][0] else "✗"
         cbs_value = self.metrics['CBS']
-        
+
         summary = f"""
 Task {self.instance_id} Evaluation Results:
   VER (Valid Execution): {ver_status}
@@ -182,21 +202,21 @@ Task {self.instance_id} Evaluation Results:
   API Cost: ${self.metrics['cost']:.4f}
 """
         return summary.strip()
-    
+
     def save_results(self, output_path = None) -> Path:
         """
         Save evaluation results to JSON file.
-        
+
         Args:
             output_path: Optional path for output file
-            
+
         Returns:
             Path to saved results file
         """
-        
+
         if output_path is None:
             output_path = self.capsule_path / "evaluation_results.json"
-        
+
         results = {
             "task_id": self.instance_id,
             "timestamp": datetime.now().isoformat(),
@@ -208,10 +228,10 @@ Task {self.instance_id} Evaluation Results:
             "cost_usd": self.metrics['cost'],
             "summary": self.metrics['summary']
         }
-        
+
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
-        
+
         self.logger.info(f"[EVAL] Results saved to {output_path}")
         return output_path
 

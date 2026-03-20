@@ -1,6 +1,6 @@
 # Contributing to Mimosa-AI
 
-> Note: This file is the technical contribution guide. For licensing/CLA policy (including the required `CLA Check` status before merge), use the repository-root `CONTRIBUTING.md`.  
+> Note: This file is the technical contribution guide. For licensing/CLA policy (including the required `CLA Check` status before merge), use the repository-root `CONTRIBUTING.md`.
 > CLA contact: dr20.spv@listes.cnrs.fr
 
 ## Table of Contents
@@ -95,7 +95,7 @@ mimosa-ai/
 │   ├── extensibility/                  # Alternative execution modes
 │   │   ├── csv_mode.py                 # Batch evaluation on CSV datasets
 │   │   ├── human_mode.py               # Interactive manual CLI
-│   │   └── text_to_speech.py           # Text to speech 
+│   │   └── text_to_speech.py           # Text to speech
 │   │
 │   ├── modules/                        # Reusable code snippets as pre-fabricated part of workflow
 │   │   ├── state_schema.py             # Workflow state template
@@ -246,7 +246,7 @@ mimosa-ai/
 - OpenAI (via LiteLLM)
 - DeepSeek (via LiteLLM)
 - Hugging Face
-- Local models via OpenRouter
+- Local models via MLX
 
 **Key Features**:
 - Unified interface across providers

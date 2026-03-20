@@ -33,7 +33,7 @@ class TestConfig:
 def test_generic_evaluation(workflow_id, answer=None):
     """
     Test the generic evaluation (judge) functionality.
-    
+
     Args:
         workflow_id: UUID of the workflow to evaluate
         answer: Optional expected answer for evaluation
@@ -41,44 +41,44 @@ def test_generic_evaluation(workflow_id, answer=None):
     print(f"\n=== Testing Generic Evaluation for Workflow {workflow_id} ===")
     if answer:
         print(f"With expected answer: {answer}")
-    
+
     config = TestConfig()
     evaluator = WorkflowEvaluator(config)
-    
+
     try:
         result_type = evaluator.evaluate(workflow_id, answer=answer)
         print(f"Evaluation completed successfully. Type: {result_type}")
-        
+
         # Load and display the evaluation results
         display_evaluation_results(config.workflow_dir, workflow_id, "generic")
-        
+
         return True
     except Exception as e:
         print(f"Error during generic evaluation: {str(e)}")
         return False
 
 
-def test_scenario_evaluation(workflow_id, scenario_id):
+def test_scenario_evaluation(workflow_id, scenario_rubric):
     """
     Test the scenario-based evaluation functionality.
-    
+
     Args:
         workflow_id: UUID of the workflow to evaluate
-        scenario_id: ID of the scenario to evaluate against
+        scenario_rubric: ID of the scenario to evaluate against
     """
     print(f"\n=== Testing Scenario Evaluation for Workflow {workflow_id} ===")
-    print(f"With scenario: {scenario_id}")
-    
+    print(f"With scenario: {scenario_rubric}")
+
     config = TestConfig()
     evaluator = WorkflowEvaluator(config)
-    
+
     try:
-        result_type = evaluator.evaluate(workflow_id, scenario_id=scenario_id)
+        result_type = evaluator.evaluate(workflow_id, scenario_rubric=scenario_rubric)
         print(f"Evaluation completed successfully. Type: {result_type}")
-        
+
         # Load and display the evaluation results
         display_evaluation_results(config.workflow_dir, workflow_id, "scenario")
-        
+
         return True
     except Exception as e:
         print(f"Error during scenario evaluation: {str(e)}")
@@ -88,7 +88,7 @@ def test_scenario_evaluation(workflow_id, scenario_id):
 def display_evaluation_results(workflow_dir, workflow_id, eval_type):
     """
     Display the evaluation results from the state_result.json file.
-    
+
     Args:
         workflow_dir: Directory containing workflow data
         workflow_id: UUID of the workflow
@@ -96,11 +96,11 @@ def display_evaluation_results(workflow_dir, workflow_id, eval_type):
     """
     workflow_path = Path(workflow_dir) / workflow_id
     state_result_path = workflow_path / "state_result.json"
-    
+
     try:
         with open(state_result_path) as f:
             state_result = json.load(f)
-        
+
         if "evaluation" in state_result and eval_type in state_result["evaluation"]:
             print("\nEvaluation Results:")
             print(json.dumps(state_result["evaluation"][eval_type], indent=2))
@@ -117,38 +117,38 @@ def main():
         "--workflow_id", required=True, help="UUID of workflow to evaluate"
     )
     parser.add_argument(
-        "--scenario_id", help="Optional scenario ID for scenario-based evaluation"
+        "--scenario_rubric", help="Optional scenario ID for scenario-based evaluation"
     )
     parser.add_argument(
         "--answer", help="Optional expected answer for generic evaluation"
     )
     parser.add_argument(
-        "--test_all", action="store_true", 
+        "--test_all", action="store_true",
         help="Test both generic (with and without answer) and scenario evaluation"
     )
 
     args = parser.parse_args()
-    
+
     success = True
-    
+
     if args.test_all:
         # Test generic evaluation without answer
         success = test_generic_evaluation(args.workflow_id) and success
-        
+
         # Test generic evaluation with answer (if provided)
         if args.answer:
             success = test_generic_evaluation(args.workflow_id, args.answer) and success
-        
-        # Test scenario evaluation (if scenario_id provided)
-        if args.scenario_id:
-            success = test_scenario_evaluation(args.workflow_id, args.scenario_id) and success
+
+        # Test scenario evaluation (if scenario_rubric provided)
+        if args.scenario_rubric:
+            success = test_scenario_evaluation(args.workflow_id, args.scenario_rubric) and success
     else:
         # Test based on provided arguments
-        if args.scenario_id:
-            success = test_scenario_evaluation(args.workflow_id, args.scenario_id)
+        if args.scenario_rubric:
+            success = test_scenario_evaluation(args.workflow_id, args.scenario_rubric)
         else:
             success = test_generic_evaluation(args.workflow_id, args.answer)
-    
+
     return 0 if success else 1
 
 

@@ -1,6 +1,8 @@
 # Mimosa-AI 🌾🔬
 
-<img src="./docs/images/mimosa_illustration.png" alt="Mimosa" height="650"/>
+<p align="center">
+<img align="center" src="./docs/images/logo_mimosa.png" width="312" height="312" alt="Mimosa-AI Logo">
+<p>
 
 ***Mimosa-AI*** 🌾🔬 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
 
@@ -38,39 +40,39 @@ The resulting molecular network matches the topology reported in the original pa
 ---
 
 ## Prerequisites
- 
+
 - Python 3.10+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - A running [Toolomics MCP server](https://github.com/HolobiomicsLab/toolomics)
- 
+
 ---
- 
+
 ## Installation
- 
+
 ### 1. Clone and create virtual environment
- 
+
 ```bash
 # Using uv (recommended)
 pip install uv
 uv venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
- 
+
 # Or with pip
 python3 -m venv .venv
 source .venv/bin/activate
 ```
- 
+
 ### 2. Install dependencies
- 
+
 ```bash
 cd mimosa
 uv pip install -r requirements.txt
 ```
- 
+
 ### 3. Set API keys
- 
+
 Create a `.env` file at the project root. Include only the keys for the LLM providers you plan to use:
- 
+
 ```env
 ANTHROPIC_API_KEY=...       # Claude — recommended for workflow orchestration
 OPENAI_API_KEY=...          # OpenAI models - Optional
@@ -78,26 +80,26 @@ MISTRAL_API_KEY=...         # Mistral models - Optional
 DEEPSEEK_API_KEY=...        # Deepseek - Optional
 HF_TOKEN=...                # HuggingFace provider, Optional
 OPENROUTER_API_KEY=...      # Any model via OpenRouter
- 
+
 # Optional — observability via Langfuse
 LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
- 
+
 ### 4. Start the MCP server
- 
+
 Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`). Custom MCP tools can be added via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics/README.md).
 
 ---
- 
+
 ## Configuration
- 
+
 ```bash
 cp config_default.json my_config.json
 ```
- 
+
 Edit `my_config.json`. Key parameters:
- 
+
 | Parameter | Description |
 |-----------|-------------|
 | `workspace_dir` | Path to the Toolomics workspace — all generated files appear here |
@@ -111,58 +113,58 @@ Edit `my_config.json`. Key parameters:
 | `max_learning_evolve_iterations` | Maximum self-improvement iterations before accepting the result |
 
 ---
- 
+
 ## Running Mimosa
- 
+
 Mimosa supports two execution modes: **Goal** and **Task**.
- 
+
 ### Goal mode — multi-step scientific objective
- 
+
 Use this when your objective requires planning across multiple distinct operations (e.g., reproducing a paper, building an ML pipeline).
- 
+
 ```bash
 uv run main.py --goal "Your scientific objective" --config my_config.json
 ```
- 
+
 **Examples:**
 ```bash
 uv run main.py \
   --goal "Reproduce experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." \
   --config my_config.json
- 
+
 uv run main.py \
   --goal "Develop a machine learning model to predict protein-ligand binding affinity." \
   --config my_config.json
 ```
- 
+
 ### Task mode — single granular operation
- 
+
 Use this for a focused, self-contained operation without long-term planning.
- 
+
 ```bash
 uv run main.py --task "Your task description" --config my_config.json
 ```
- 
+
 **Examples:**
 ```bash
 uv run main.py \
   --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status." \
   --config my_config.json
- 
+
 uv run main.py --task "Conduct a literature review on graph neural networks for drug discovery." --config my_config.json
 ```
- 
+
 > **Note:** Toolomics must be installed and the MCP server must be running before executing any mode.
- 
+
 ## Output
- 
+
 Files are written to the Toolomics `workspace/` directory during execution. On completion, a full snapshot is saved to a timestamped capsule in `runs_capsule/`.
 
 ---
 
 ## Learning throught evolution of Multi-Agent Workflows
 
-***Mimosa-AI*** dynamically synthesizes specialized workflows for scientific tasks and is capable of learning from failures throught **darwinian-inspired evolution of multi-agents workflows**: 
+***Mimosa-AI*** dynamically synthesizes specialized workflows for scientific tasks and is capable of learning from failures throught **darwinian-inspired evolution of multi-agents workflows**:
 Rather than forcing tasks through fixed pipelines, the system composes a custom multi-agent graph for each task, then refines it through single-incumbent local search, at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than scratch.
 
 For any new task, start with learn mode to let it build competence before full autonomy.
