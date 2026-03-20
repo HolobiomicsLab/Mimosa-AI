@@ -445,7 +445,7 @@ Provide your analysis following the specified output format."""
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
-                                                        scenario_rubric=scenario_rubric_filename,
+                                                        scenario_rubric=None, # Don't pass scenario rubric to use generic evaluator (file based scenario doesn't give mearningful feedback signal for workflow iterative refinements as for now)
                                                         max_iteration=self.config.max_learning_evolve_iterations,
                                                         single_agent_mode=single_agent_mode
                                                        )
