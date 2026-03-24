@@ -105,7 +105,7 @@ class SmolAgentFactory:
                     're', 'string', 'textwrap', 'difflib', 'unicodedata',
                     # Data Formats
                     'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64',
-                    'html', 'html.parser',
+                    'html', 'html.parser', 'pandas', 'numpy', 'json', 'yaml',
                     # Date & Time
                     'datetime', 'time', 'calendar',
                     # Networking & Web
@@ -188,14 +188,6 @@ OPERATIONAL CONTEXT:
 TASK:
 {self.instruct_prompt}
 Address complain from the last agent informations if any.
-
-CONSTRAINTS:
-- No placeholder/example values.
-- No assumptions about missing data - investigate first available data in workspace
-- Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
-- only use execute_command to install package.
-- You are only allowed to use tools to create and execute the code used to accomplish the goal. Use python/code editing tools when availabl.
-- wrap command that might take significant time (>5min) in a timeout
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """

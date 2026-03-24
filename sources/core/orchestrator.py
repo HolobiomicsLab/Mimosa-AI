@@ -7,6 +7,7 @@ import time
 
 from sources.utils.notify import PushNotifier
 from .workflow_factory import WorkflowFactory
+from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
 
@@ -24,8 +25,9 @@ class WorkflowOrchestrator:
             config: Configuration object containing paths and settings
         """
         self.config = config
-        self.workflow_dir = config.workflow_dir
+        self.single_agent_factory = SingleAgentFactory(config)
         self.workflow_factory = WorkflowFactory(config)
+        self.workflow_dir = config.workflow_dir
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
 
         self.runner_config = RuntimeConfig(
@@ -101,7 +103,7 @@ class WorkflowOrchestrator:
                     original_task=original_task
                 )
             else:
-                complete_code, workflow_code, uuid = await self.workflow_factory.craft_single_agent(
+                complete_code, workflow_code, uuid = await self.single_agent_factory.craft_single_agent(
                     goal,
                     original_task=original_task
                 )
@@ -113,7 +115,7 @@ class WorkflowOrchestrator:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
                 logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{actual_error}\n")
-                
+
                 # Send notification for workflow generation error
                 self.notifier.send_message(
                     f"Workflow {workflow_uuid} generation failed after {generation_time:.1f}s\n"
@@ -125,7 +127,7 @@ class WorkflowOrchestrator:
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
                 logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{error_msg}\n")
-                
+
                 # Send notification for workflow generation error
                 self.notifier.send_message(
                     f"Workflow generation failed after {generation_time:.1f}s\n"
@@ -135,7 +137,7 @@ class WorkflowOrchestrator:
                     priority=1
                 )
                 return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
-        
+
         generation_time = time.time() - generation_start
         logger.info(f"[WORKFLOW GENERATION] {uuid} generated in {generation_time:.3f}s")
         print(
@@ -178,7 +180,7 @@ class WorkflowOrchestrator:
             import traceback
 
             traceback.print_exc()
-            
+
             # Send notification for workflow execution failure
             self.notifier.send_message(
                 f"Workflow {uuid} execution failed after {workflow_time:.1f}s\n"

@@ -1,5 +1,5 @@
 {
-  "workspace_dir": "/Users/cnrs/Documents/repository/toolomics/workspace",
+  "workspace_dir": "/home/martin/Projects/CNRS/toolomics/workspace",
   "discovery_addresses": [
     {
       "ip": "0.0.0.0",
@@ -7,17 +7,18 @@
       "port_max": 5200
     }
   ],
-  "planner_llm_model": "anthropic/claude-opus-4-5-20251101",
-  "prompts_llm_model": "anthropic/claude-opus-4-5-20251101",
-  "workflow_llm_model": "anthropic/claude-opus-4-5-20251101",
+  "planner_llm_model": "anthropic/claude-sonnet-4-5",
+  "prompts_llm_model": "anthropic/claude-sonnet-4-5",
+  "workflow_llm_model": "anthropic/claude-opus-4-5",
   "smolagent_model_id": "deepseek/deepseek-chat",
-  "judge_model": "anthropic/claude-opus-4-5-20251101",
+  "judge_model": "anthropic/claude-sonnet-4-5",
   "engine_name": "litellm",
-  "prompt_planner": "sources/prompts/planner_paperbench_codedev.md",
-  "prompt_workflow_creator": "sources/prompts/workflow_v7.md",
+  "prompt_planner": "sources/prompts/planner_reproduction.md",
+  "prompt_workflow_creator": "sources/prompts/workflow_v8.md",
   "reasoning_effort": "high",
+  "max_tokens": 8190,
   "learned_score_threshold": 0.8,
-  "max_learning_dgm_iterations": 10,
+  "max_learning_evolve_iterations": 10,
   "schema_code_path": "sources/modules/state_schema.py",
   "smolagent_factory_code_path": "sources/modules/smolagent_factory.py",
   "runs_capsule_dir": "runs_capsule/",
@@ -32,14 +33,14 @@
     "python-dotenv",
     "fastmcp==2.8.1",
     "requests>=2.31.0",
-    "smolagents[all]",
+    "pillow>=12.1.0",
+    "smolagents[litellm,mlx-lm,telemetry,mcp]",
     "langgraph>=0.4.7",
-    "matplotlib>=3.9.0",
+    "pandas==2.3.2",
     "numpy>=2.0.0",
-    "python_a2a",
+    "python-a2a",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp",
-    "openinference-instrumentation-smolagents",
-    "asyncio==3.4.3"
+    "openinference-instrumentation-smolagents"
   ]
 }

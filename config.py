@@ -49,7 +49,7 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
-        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
@@ -81,7 +81,7 @@ class Config:
 
         # runner settings
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 3600*2
+        self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
@@ -93,7 +93,8 @@ class Config:
             "pillow>=12.1.0",
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
             "langgraph>=0.4.7",
-            "matplotlib>=3.9.0",
+            #"matplotlib>=3.9.0",
+            "pandas==2.3.2",
             "numpy>=2.0.0",
             # correct PyPI package name
             "python-a2a",
@@ -266,3 +267,7 @@ class Config:
             f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
             f"runner_temp_dir={self.runner_temp_dir})\n"
         )
+
+if __name__ == "__main__":
+    config = Config()
+    config.dump("config_default.json")

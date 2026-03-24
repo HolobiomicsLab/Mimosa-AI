@@ -401,5 +401,7 @@ final_answer(json.dumps({
 8. For likely large outputs: Check len: `print(len(result))`, then `print(json.loads(result)["stdout"][:2048])`. Explore large tools output (eg: a webpage) step by step.
 9. Wrap fallible tool calls in `try/except`; print `str(e)[-256:]` and recover.
 10. `final_answer` is always a `json.dumps({...})` string with `status` and `answer`. Called exactly once, never in a loop.
+11. **No placeholder or example value.** Never ever use example or default value. If unsure fallback, another agent or higher level orchestrator will take charge.
+12. - **Save plot, don't show** Prefer using matplotlib backend and using non-interactive backends in headless environments and save plot, do not show plot to user.
 
 Now Begin!
