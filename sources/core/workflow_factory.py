@@ -105,6 +105,18 @@ class WorkflowFactory(Factory):
             ("lossless_data_pointers", "Never force agents to copy-paste large datasets or matrices in their text outputs. Pass file paths or database pointers during handoffs to maintain data fidelity and smooth the transition manifold.")
         ]
 
+    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> str:
+        rng = random.Random(seed)
+        sampled = rng.sample(hints, min(n, len(hints)))
+        return sampled
+
+    def get_hints(self) -> str:
+        rn_seed = int(time.time() * 1000) % 2**32
+        sampled_hints = self.sample_workflow_hints(self.hints, n=3, seed=rn_seed)
+        hints_names = [hint[0] for hint in sampled_hints]
+        hints = "\n".join(f"{i+1}. {hint[1]}" for i, hint in enumerate(sampled_hints))
+        return hints, hints_names
+
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.
         Returns:
@@ -153,7 +165,6 @@ class WorkflowFactory(Factory):
         system_prompt: str,
         craft_instructions: str,
         existing_tool_prompt: str,
-        hints: list[tuple[str, str]],
         path: str,
         allow_cache: bool
     ) -> str:
@@ -169,10 +180,6 @@ class WorkflowFactory(Factory):
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-# ADVICES/SEARCH DIRECTION:
-{hints}
-You may or may not consider these hints, but they are provided to inspire diverse and creative workflow structures that go beyond common patterns.
-
 Proceed to generate the workflow in Python code using the LangGraph library. Follow the instructions and constraints carefully.
         """
 
@@ -184,19 +191,6 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             max_tokens=getattr(self.config, 'max_tokens', 8192)
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
-
-
-    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> str:
-        rng = random.Random(seed)
-        sampled = rng.sample(hints, min(n, len(hints)))
-        return sampled
-
-    def get_hints(self) -> str:
-        rn_seed = int(time.time() * 1000) % 2**32
-        sampled_hints = self.sample_workflow_hints(self.hints, n=3, seed=rn_seed)
-        hints_names = [hint[0] for hint in sampled_hints]
-        hints = "\n".join(f"{i+1}. {hint[1]}" for i, hint in enumerate(sampled_hints))
-        return hints, hints_names
 
     def create_workflow_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
@@ -211,18 +205,15 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
         try:
-            hints, hints_names = self.get_hints()
-            print(f"🎲 Sampled workflow hints for this generation: {', '.join(hints_names)}")
             print("🔧 Generating workflow code...")
             llm_output = self.llm_make_workflow(
-                system_prompt, craft_instructions, existing_tool_prompt, hints, path, allow_cache
+                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
             print("💬 LLM commentary on workflow:")
             print(commentary)
 
-            workflow_code = f'# {", ".join(hints_names)} ' + "\n\n" + workflow_code
             workflow_code = self.remove_imports(workflow_code)
             if not workflow_code.strip():
                 raise ValueError("LLM did not return valid workflow code")
@@ -284,13 +275,13 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         nodes = set(re.findall(patterns["nodes"], workflow_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
-        self.logger.debug(f"📋 Workflow nodes discovered: {', '.join(sorted(nodes))}")
+        self.logger.debug(f"Workflow nodes discovered: {', '.join(sorted(nodes))}")
 
         # Validate START edge target exists
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
-        self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
+        self.logger.debug(f"Workflow entry point: START → {entry_node}")
 
         self.logger.info("✅ Workflow structure validation passed")
 
@@ -486,223 +477,3 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Memory path: {memory_path}")
 
         return complete_code, workflow_code, uuid_str
-
-    def get_engine_code(self) -> str:
-        """Get code snippet for initializing the LLM engine for single agent mode."""
-        model_id = self.config.smolagent_model_id
-        max_tokens = getattr(self.config, 'max_tokens', 8192)
-        provider, _ = extract_model_pattern(self.config.smolagent_model_id)
-        token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
-        return f"""
-model_id = {model_id!r}
-max_tokens = {max_tokens}
-provider = {provider!r}
-token = {token!r}
-engine_name = {self.config.engine_name!r}
-engine = None
-if engine_name == "mlx":
-    print("Using MLXModel for local execution.")
-    engine = MLXModel(
-        model_id=model_id,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "inference_client":
-    print("Using InferenceClientModel for inference client execution.")
-    if not token:
-        raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
-    engine = InferenceClientModel(
-        model_id=model_id,
-        provider=provider,
-        token=token,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "litellm":
-    engine = LiteLLMModel(
-        model_id=model_id,
-        temperature=1.0,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "openai":
-    engine = InferenceClientModel(
-        model_id=model_id,
-        provider=provider,
-        api_key=os.getenv("OPENAI_API_KEY")
-    )
-else:
-    raise ValueError(f"Unknown engine name.. Supported engines are: mlx, hf_api, inference_client and litellm.")
-        """.strip()
-
-    async def craft_single_agent(self, goal: str, original_task: str = None):
-        """
-        For crafting single agent with cost tracking support.
-
-        Args:
-            goal: The goal description (may be knowledge-wrapped)
-            original_task: The original unwrapped task for similarity matching
-
-        Returns:
-            tuple[str, str, str]: (complete_code, workflow_code, uuid)
-        """
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        short_uuid = str(uuid.uuid4())[:8]
-        uuid_str = f"single_agent_{timestamp}_{short_uuid}"
-
-        try:
-            tools_code, existing_tool_prompt = await self.load_tools_code()
-        except Exception as e:
-            self.logger.error(f"craft_single_agent: Failed to load tools code: {str(e)}")
-            raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
-        try:
-            SYSTEM_PROMPT = await self.load_single_agent_system_prompt()
-        except Exception as e:
-            self.logger.error(f"craft_single_agent: Failed to load system prompt: {str(e)}")
-            raise RuntimeError(f"Failed to load system prompt: {str(e)}") from e
-
-        # Create folder structure for cost tracking (like multi-agent mode)
-        workflow_path, memory_path = self.create_folder_structure(uuid_str)
-
-        INSTRUCTIONS = ". ".join([
-            "TASK:",
-            goal,
-            "",
-            "CONSTRAINTS:",
-            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
-            "- Save outputs instead of plotting.",
-            "- Only use execute_command to install packages.",
-            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
-            "",
-            "INITIAL STEP:",
-            "- Assess the workspace by running: ls -la"
-        ])
-        # Resolve absolute paths (like craft_workflow does)
-        from pathlib import Path
-        script_dir = Path(__file__).resolve().parent.parent.parent
-        memory_path_abs = str((script_dir / memory_path).resolve())
-        workflow_path_abs = str((script_dir / workflow_path).resolve())
-        # create MCPs
-        mcp_vars = sorted(set(
-            re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
-        ))
-        mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
-        engine_code = self.get_engine_code()
-
-        code = f"""
-import os
-import json
-from dataclasses import asdict
-from typing import List
-
-import smolagents
-from smolagents import CodeAgent, LiteLLMModel, ActionStep, InferenceClientModel, MLXModel
-from smolagents.models import get_dict_from_nested_dataclasses
-from dotenv import load_dotenv
-
-load_dotenv()
-
-MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = {goal!r}
-SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
-INSTRUCTIONS = {INSTRUCTIONS!r}
-MEMORY_PATH = {memory_path_abs!r}
-WORKFLOW_PATH = {workflow_path_abs!r}
-
-{engine_code}
-{tools_code}
-{mcps_string}
-
-all_tools = []
-for mcp_tools in MCPS:
-    all_tools.extend(mcp_tools)
-
-agent = CodeAgent(
-    tools=all_tools,
-    model=engine,
-    name="single_agent",
-    max_steps=256,
-    additional_authorized_imports = [
-        'requests', 'bs4', 'json', 'requests.exceptions',
-        'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
-        'configparser', 'logging',
-        'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue',
-        'dataclasses', 'enum', 'types',
-        're', 'string', 'textwrap', 'difflib', 'unicodedata',
-        'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64',
-        'html', 'html.parser', 'pandas', 'numpy', 'json', 'yaml',
-        'datetime', 'time', 'calendar',
-        'urllib', 'urllib.parse', 'urllib.request', 'urllib.error', 'http',
-        'http.client', 'socket', 'email', 'mimetypes',
-        'hashlib', 'hmac', 'secrets', 'uuid',
-        'math', 'random', 'statistics', 'decimal', 'fractions',
-        'traceback', 'inspect', 'gc', 'warnings', 'io',
-        'gzip', 'zipfile', 'tarfile', 'zlib',
-    ]
-)
-agent.prompt_templates["system_prompt"] = SYSTEM_PROMPT
-
-def save_agent_memories(agent, memory_path: str, agent_name: str):
-    print(f"Saving agent memory to: {{{{memory_path}}}}")
-    try:
-        memories = []
-        for idx, step in enumerate(agent.memory.steps):
-            if isinstance(step, ActionStep):
-                action_step = step.dict()
-                action_step["model_input_messages"] = (
-                    get_dict_from_nested_dataclasses(
-                        [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages],
-                        ignore_key="raw"
-                    )
-                    if step.model_input_messages
-                    else None
-                )
-                action_step["model_output_message"] = (
-                    get_dict_from_nested_dataclasses(
-                        step.model_output_message, ignore_key="raw"
-                    )
-                    if step.model_output_message
-                    else None
-                )
-                memories.append(action_step)
-
-        os.makedirs(memory_path, exist_ok=True)
-        agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
-        with open(agent_task_path, "w") as f:
-            json.dump(memories, f, indent=2)
-        print(f"✅ Agent memories saved successfully to {{{{agent_task_path}}}}")
-    except Exception as e:
-        print(f"⚠️  Failed to save memory: {{{{str(e)}}}}")
-
-# Run agent
-result = agent.run(INSTRUCTIONS)
-
-# Save agent memories for cost tracking
-save_agent_memories(agent, MEMORY_PATH, "single_agent")
-
-# Save state_result.json for cost tracking and evaluation
-state_result = {{
-    "model_id": MODEL_ID,
-    "goal": GOAL,
-    "workflow_uuid": "{uuid_str}",
-    "single_agent_mode": True,
-    "step_name": ["single_agent"],
-    "answers": [str(result)],
-    "success": [True]  # Assume success if no exception
-}}
-
-try:
-    with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
-        json.dump(state_result, f, indent=2)
-    print(f"✅ Saved state_result.json to {{WORKFLOW_PATH}}")
-except Exception as e:
-    print(f"❌ Failed to save state_result.json: {{e}}")
-        """
-
-        # Save metadata files (like multi-agent mode)
-        self.save_workflow_files(
-            workflow_path,
-            uuid_str,
-            code,  # Save the single agent code
-            goal,
-            original_task
-        )
-
-        return code, code, uuid_str
