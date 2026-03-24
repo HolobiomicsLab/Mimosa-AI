@@ -192,7 +192,7 @@ class PromptGradient:
                 "## EXECUTION RESULTS::",
                 "This is the answer from each agent during the last execution.",
                 "<agents_answers>",
-                agents_answers if exec_result else "No agent answers captured.",
+                agents_answers if wf_state else "No agent answers captured.",
                 "</agents_answers>",
                 "This is the judge evaluation if available, otherwise this is the execution error or stderr output.",
                 "<results>",
