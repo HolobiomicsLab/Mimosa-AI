@@ -24,16 +24,6 @@ class SingleAgentFactory(Factory):
         self.config = config
         self.logger = logging.getLogger(__name__)
 
-    async def load_single_agent_system_prompt(self) -> str:
-        """Load the system prompt for single agent mode.
-        Returns:
-            str: The system prompt content
-        """
-        try:
-            with open(self.config.prompt_smolagent) as f:
-                return f.read()
-        except Exception as e:
-            raise ValueError(f"Failed to load single agent system prompt: {str(e)}") from e
 
     async def craft_single_agent(self, goal: str, original_task: str = None):
         """
