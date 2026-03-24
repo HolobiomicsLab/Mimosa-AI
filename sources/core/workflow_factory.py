@@ -3,11 +3,11 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 """
 
 import logging
-import random
 import os
 import re
 import time
 import uuid
+import numpy as np
 
 from sources.modules import state_schema
 
@@ -31,91 +31,6 @@ class WorkflowFactory(Factory):
         self.prompt_workflow_creator = config.prompt_workflow_creator
         self.config = config
         self.logger = logging.getLogger(__name__)
-
-        # hints to provide diversity in generated workflows, we sample 3 of them at random for each workflow generation
-        # provide an approximate search direction to the LLM to improve workflow quality and diversity
-
-        self.hints = [
-            # === TOPOLOGY & ORCHESTRATION ===
-            ("parallel_fanout", "Explore a parallel fan-out topology where independent subtasks run concurrently (or divide tasks sequentially) before a merge agent consolidates."),
-            ("debate_topology", "Consider a debate topology: two agents independently produce outputs, a third arbitrates and synthesizes the best elements."),
-            ("map_reduce", "Explore a map-reduce pattern where a splitter agent decomposes the input, workers process chunks, a reducer assembles the final result."),
-            ("dynamic_routing", "Add adaptive routing that selects the next agent based on intermediate uncertainty signals rather than fixed paths."),
-            ("hierarchical_decomposition", "Use hierarchical decomposition: high-level agents break complex goals into subtasks and delegate to specialized workers."),
-
-            # === QUALITY / VALIDATION ===
-            ("adversarial_agent", "Add a dedicated adversarial agent whose only job is to find flaws, edge cases, and failure modes in prior agents' outputs."),
-            ("confidence_scoring", "Include a confidence-scoring step where agents explicitly rate their own output certainty before passing downstream."),
-            ("peer_review_loop", "Consider a peer-review loop: the second agent critiques the first's output before a third agent makes the final call."),
-            ("cross_verification", "Implement cross-verification where agents check each other's work using different reasoning paths to catch blind spots."),
-            ("structured_metadata_passing", "Require agents to pass uncertainty bounds, assumptions, and limitations as explicit metadata—not just outputs."),
-
-            # === FALLBACK / RESILIENCE ===
-            ("heuristic_fallback", "Design fallback paths that skip expensive agents and use a cheaper heuristic when upstream confidence is low."),
-            ("circuit_breaker", "Consider circuit-breaker logic: if an agent fails twice on the same input, escalate to a more capable model instead of retrying."),
-            ("triage_routing", "Add a triage agent at entry that classifies input complexity and routes to a fast-path or deep-analysis path accordingly."),
-            ("budget_enforcement", "Enforce explicit token/call budgets per agent to prevent resource grabbing races that starve the system."),
-            ("checkpoint_resume", "Design checkpointing into long workflows so partial states can resume after failure without full restart."),
-
-            # === SPECIALIZATION & CONTEXT ===
-            ("orthogonal_specialization", "Consider decomposing the problem domain into orthogonal concerns, each owned by a hyper-specialized agent."),
-            ("normalization_first", "Explore using one agent purely for data extraction/normalization before any reasoning agents touch the content."),
-            ("explicit_planning", "Add a planning agent that produces an explicit step-by-step execution plan that downstream agents must follow and can annotate."),
-            ("context_scoping", "Scope context intentionally—execution agents get narrow, relevant context rather than full conversation history to prevent drift."),
-            ("role_boundary_guardrails", "Enforce strict role boundaries so agents don't silently assume each other's responsibilities."),
-
-            # === OUTPUT QUALITY ===
-            ("refinement_loop", "Consider a multi-pass refinement loop where the final agent can send output back for one revision cycle if quality threshold isn't met."),
-            ("audience_rewrite", "Add an agent that rewrites the final output for the target audience's format and vocabulary before delivery."),
-            ("deduplication", "Include a deduplication/consolidation agent to merge redundant findings when multiple agents explore overlapping territory."),
-            ("synthesis_failure_guard", "Watch for synthesis failure: when parallel agents return contradictory or uneven outputs, trigger a reconciliation sub-workflow."),
-
-            # === EFFICIENCY ===
-            ("gating_agent", "Consider a gating agent that decides whether the full workflow is needed or if a cached/simple answer suffices."),
-            ("early_termination", "Add explicit termination conditions with verification—prevent premature exits before objectives are actually met."),
-            ("redundancy_deduplication", "Track which experimental configurations have already been explored to prevent redundant computation across agents."),
-
-            # === SCIENTIFIC-SPECIFIC ===
-            ("hypothesis_tracking", "Maintain a shared hypothesis registry so agents know what has been tested and what remains open—prevents redundant exploration."),
-            ("provenance_logging", "Require every output to include provenance: which data sources, which assumptions, which agent chain produced it."),
-            ("uncertainty_quantification", "Add explicit uncertainty propagation—when agents combine findings, they must aggregate uncertainty, not just point estimates."),
-            ("reproducibility_bundle", "Bundle code, data references, and random seeds with every result so downstream agents can verify or reproduce."),
-            ("domain_validator", "Include a domain-specific validator agent that checks outputs against scientific conventions (units, significant figures, citation formats)."),
-            ("instrumental_alignment_check", "Watch for instrumental goal alignment failure—agents hiding information to appear better than they are."),
-            ("world_model_sync", "Periodically force agents to synchronize their internal world models to prevent competing assumptions from diverging."),
-            ("error_propagation_barrier", "Design error propagation barriers—one agent's bad assumption shouldn't cascade through the entire system unchecked."),
-            ("convergence_budget", "Set a maximum iteration budget for consensus-building to prevent infinite negotiation loops between agents."),
-            ("silent_deadlock_detector", "Monitor for silent deadlocks where agents all wait for someone else to act—implement timeout escalation."),
-            # === SEARCH DIRECTION & EXPLORATION ===
-            ("simulated_annealing_search", "Treat exploration like simulated annealing: start with high-temperature, highly divergent agent prompts for brainstorming, then systematically lower temperature for convergent refinement."),
-            ("dead_end_backtracking", "Implement an explicit 'negative memory' cache. When agents hit a dead end in a research path, log the failure so parallel/future agents don't retread the same useless search space."),
-            ("diversity_forcing", "Combat agent echo chambers by injecting explicit orthogonal biases into parallel search agents (e.g., 'Agent A favors biological explanations, Agent B favors chemical ones') to fully map the hypothesis space."),
-
-            # === AVOIDING UNNECESSARY COMPLEXITY ===
-            ("single_agent_baseline", "Always establish a single-agent baseline first. Only introduce multi-agent orchestration when the single agent demonstrably fails due to context limits or competing objectives."),
-            ("agent_consolidation", "Avoid 'micro-service' bloat. If two agents always operate sequentially without conditional branching, human-in-the-loop, or distinct tool needs, combine them into one prompt."),
-            ("communication_overhead_tax", "Monitor the token-ratio of formatting/handshakes versus actual scientific reasoning. If agents spend more tokens packing/unpacking JSON than thinking, simplify the workflow."),
-            ("avoid_premature_abstraction", "Don't build generalized hierarchical frameworks for a specific scientific pipeline until you've successfully hardcoded the exact path at least once."),
-
-            # === SMOOTH MANIFOLD TRANSITIONS (AGENT HANDOFFS) ===
-            ("semantic_impedance_matching", "Ensure smooth transitions by defining strict, validated schema contracts (e.g., Pydantic) between agents. Don't rely on unstructured natural language for critical data handoffs."),
-            ("sliding_context_window", "Create a smooth cognitive transition by passing the previous agent's summarized 'train of thought' alongside the final output, preventing abrupt context shifts downstream."),
-            ("shared_ontology_sync", "Initialize the entire agent swarm with a shared scientific ontology/glossary. This prevents downstream agents from hallucinating or misinterpreting specialized terminology used by upstream agents."),
-            ("state_dictionary_continuity", "Maintain a continuous, system-level 'experiment state' dictionary (JSON/YAML) independent of the conversational thread. Update it mutably across agent transitions so quantitative data doesn't degrade in natural language translation."),
-            ("lossless_data_pointers", "Never force agents to copy-paste large datasets or matrices in their text outputs. Pass file paths or database pointers during handoffs to maintain data fidelity and smooth the transition manifold.")
-        ]
-
-    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> str:
-        rng = random.Random(seed)
-        sampled = rng.sample(hints, min(n, len(hints)))
-        return sampled
-
-    def get_hints(self) -> str:
-        rn_seed = int(time.time() * 1000) % 2**32
-        sampled_hints = self.sample_workflow_hints(self.hints, n=3, seed=rn_seed)
-        hints_names = [hint[0] for hint in sampled_hints]
-        hints = "\n".join(f"{i+1}. {hint[1]}" for i, hint in enumerate(sampled_hints))
-        return hints, hints_names
 
     def get_system_prompt(self) -> str:
         """Load the system prompt for workflow generation.

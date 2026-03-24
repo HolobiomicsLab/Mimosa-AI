@@ -399,8 +399,16 @@ Provide your analysis following the specified output format."""
         Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
-        user_input = input("Enter starting row ([Enter] 0 by default): ")
-        start_row = int(user_input)-1 if user_input.strip() else 0
+        while True:
+            user_input = input("Enter starting row ([Enter] 0 by default): ")
+            if not user_input.strip():
+                start_row = 0
+                break
+            try:
+                start_row = int(user_input) - 1
+                break
+            except ValueError:
+                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -492,7 +500,7 @@ Provide your analysis following the specified output format."""
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    continue
+                    raise e
 
         self._print_final_summary()
 
