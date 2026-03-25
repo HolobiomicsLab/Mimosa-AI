@@ -12,50 +12,6 @@ import sys
 
 import dotenv
 
-# ============================================================================
-# SECURITY CHECK — CVE litellm 1.82.8 supply-chain attack
-# litellm 1.82.8 (published to PyPI on 2026-03-24) contains a malicious .pth file (litellm_init.pth)
-# ============================================================================
-def _check_litellm_version() -> None:
-    """Exit early if a known-malicious version of litellm is installed."""
-    try:
-        from importlib.metadata import version as pkg_version, PackageNotFoundError
-        try:
-            import packaging.version as _pv
-        except ImportError:  # packaging may not be present; fall back to a simple parse
-            class _pv:  # type: ignore[no-redef]
-                @staticmethod
-                def parse(v: str):
-                    return tuple(int(x) for x in v.split(".")[:3])
-                Version = parse  # alias so the comparison below works uniformly
-        try:
-            installed = pkg_version("litellm")
-        except PackageNotFoundError:
-            return  # litellm is not installed — nothing to check
-        parsed = _pv.parse(installed)
-        threshold = _pv.parse("1.82.8")
-        if parsed >= threshold:
-            print(
-                "\n"
-                "╔══════════════════════════════════════════════════════════════╗\n"
-                "║  🚨  SECURITY WARNING — MIMOSA STARTUP ABORTED               ║\n"
-                "╠══════════════════════════════════════════════════════════════╣\n"
-                f"║  Installed litellm version : {installed:<33}║\n"
-                "║  Blocked version range     : >= 1.82.8                       ║\n"
-                "║                                                              ║\n"
-                "║  litellm 1.82.8 contains a malicious .pth file               ║\n"
-                "║                                                              ║\n"
-                "║  To fix:                                                     ║\n"
-                "║    pip install 'litellm<1.82.8'                              ║\n"
-                "║                                                              ║\n"
-                "║  DO NOT run Mimosa until litellm has been downgraded.        ║\n"
-                "╚══════════════════════════════════════════════════════════════╝\n"
-            )
-            sys.exit(1)
-    except Exception as exc:  # never let the guard itself crash the program
-        print(f"⚠️  litellm version check failed unexpectedly: {exc}")
-
-_check_litellm_version()
 
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -70,6 +26,7 @@ from sources.evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
+from sources.security.check_package import PackageCheck
 
 dotenv.load_dotenv()
 
@@ -281,6 +238,9 @@ async def main():
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
 
+
+    # security check
+    PackageCheck().run()
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
