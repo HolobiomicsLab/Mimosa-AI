@@ -25,6 +25,7 @@ from sources.evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
+from sources.security.check_package import PackageCheck
 
 dotenv.load_dotenv()
 
@@ -236,6 +237,8 @@ async def main():
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
 
+    # security check
+    PackageCheck().run()
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
