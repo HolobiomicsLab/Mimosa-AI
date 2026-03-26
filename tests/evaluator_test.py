@@ -34,21 +34,21 @@ config = Config()
 
 def test_judge_evaluation(workflow_id, answer):
     """Test the judge-based evaluation."""
-    
+
     evaluator = WorkflowEvaluator(config)
 
     print(f"Testing judge evaluation for workflow {workflow_id}")
     return evaluator.evaluate(workflow_id, answer=answer)
 
 
-def test_scenario_evaluation(workflow_id, scenario_id):
+def test_scenario_evaluation(workflow_id, scenario_rubric):
     """Test the scenario-based evaluation."""
     evaluator = WorkflowEvaluator(config)
 
     print(
-        f"Testing scenario evaluation for workflow {workflow_id} with scenario {scenario_id}"
+        f"Testing scenario evaluation for workflow {workflow_id} with scenario {scenario_rubric}"
     )
-    return evaluator.evaluate(workflow_id, scenario_id=scenario_id)
+    return evaluator.evaluate(workflow_id, scenario_rubric=scenario_rubric)
 
 
 def main():
@@ -58,7 +58,7 @@ def main():
         "--workflow_id", required=True, help="UUID of workflow to evaluate"
     )
     parser.add_argument(
-        "--scenario_id", help="Optional scenario ID for scenario-based evaluation"
+        "--scenario_rubric", help="Optional scenario ID for scenario-based evaluation"
     )
     parser.add_argument(
         "--answer", help="Optional expected answer for judge evaluation"
@@ -66,8 +66,8 @@ def main():
 
     args = parser.parse_args()
 
-    if args.scenario_id:
-        eval_type = test_scenario_evaluation(args.workflow_id, args.scenario_id)
+    if args.scenario_rubric:
+        eval_type = test_scenario_evaluation(args.workflow_id, args.scenario_rubric)
     else:
         eval_type = test_judge_evaluation(args.workflow_id, args.answer)
 

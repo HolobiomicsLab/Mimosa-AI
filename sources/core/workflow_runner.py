@@ -54,6 +54,7 @@ class WorkflowRunner:
         self.execution_dir = execution_dir
         self.logger = logging.getLogger(__name__)
         self._active_processes: dict[str, asyncio.subprocess.Process] = {}
+        self._python_cmd: list[str] = []  # resolved by _setup_environment
         self._setup_environment()
 
     def _setup_environment(self) -> None:
@@ -61,39 +62,101 @@ class WorkflowRunner:
         # Convert temp_dir to absolute path to ensure it's created in the right location
         self.config.temp_dir = os.path.abspath(self.config.temp_dir)
         os.makedirs(self.config.temp_dir, exist_ok=True)
-        # Validate python version availability
+        # Validate python version availability and resolve the executable
         if not self._check_python_version():
             raise RuntimeError(f"Python {self.config.python_version} not available")
 
-    def _check_python_version(self) -> bool:
-        """Check if the specified Python version is available."""
-        import subprocess
+    def _resolve_python_executable(self) -> list[str] | None:
+        """
+        Find a working Python executable for the configured version.
 
-        try:
-            result = subprocess.run(
-                [f"python{self.config.python_version}", "--version"],
-                capture_output=True,
-                timeout=10,
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return False
+        Versioned candidates are always tried first and accepted as-is because
+        they target the exact version by construction:
+        - Unix/macOS: ``python3.10`` (versioned binary)
+        - Windows:    ``py -3.10``   (Windows Python Launcher with version flag)
+
+        Generic fallbacks (``python3``, ``python``) are also tried but are only
+        accepted when their ``--version`` output actually matches the configured
+        version, so the runner never silently runs the wrong Python.
+
+        Returns:
+            list[str]: Command prefix to invoke Python (e.g. ``["python3.10"]``
+                       or ``["py", "-3.10"]``), or ``None`` if no candidate works.
+        """
+        import subprocess
+        import sys
+
+        version = self.config.python_version  # e.g. "3.10"
+
+        if sys.platform == "win32":
+            candidates: list[tuple[bool, list[str]]] = [
+                (True,  ["py", f"-{version}"]),  # Python Launcher – version-pinned
+                (False, ["python"]),              # bare interpreter – verify version
+                (False, ["python3"]),             # rare Windows setups – verify version
+            ]
+        else:
+            candidates = [
+                (True,  [f"python{version}"]),    # e.g. python3.10 – version-pinned
+                (False, ["python3"]),              # verify version before accepting
+                (False, ["python"]),               # verify version before accepting
+            ]
+
+        for is_versioned, candidate in candidates:
+            try:
+                result = subprocess.run(
+                    candidate + ["--version"],
+                    capture_output=True,
+                    timeout=10,
+                )
+                if result.returncode != 0:
+                    continue
+                if not is_versioned:
+                    raw = (result.stdout or result.stderr).decode("utf-8", errors="replace").strip()
+                    if not raw.startswith(f"Python {version}"):
+                        continue
+                return candidate
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
+
+        return None
+
+    def _check_python_version(self) -> bool:
+        """
+        Check if the configured Python version is available and cache the
+        resolved executable in ``self._python_cmd``.
+        """
+        resolved = self._resolve_python_executable()
+        if resolved is not None:
+            self._python_cmd = resolved
+            return True
+        return False
 
     async def ensure_pip(self) -> None:
         """Ensure pip is installed and up-to-date."""
         import subprocess
 
         try:
-            subprocess.run(
-                [f"python{self.config.python_version}", "-m", "ensurepip"],
-                check=True,
+            # Try to ensure pip is available using ensurepip module
+            # This works for Python installations that include ensurepip
+            result = subprocess.run(
+                [*self._python_cmd, "-m", "pip", "--version"],
+                capture_output=True,
+                timeout=10,
             )
+            if result.returncode == 0:
+                # pip is already available
+                return
+
+            # Try to bootstrap pip using ensurepip
             subprocess.run(
-                [f"python{self.config.python_version}", "apt", "install", "-y", "python3.10-venv", "python3.10-distutils"],
+                [*self._python_cmd, "-m", "ensurepip", "--upgrade"],
                 check=True,
+                capture_output=True,
+                timeout=30,
             )
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to ensure pip: {e}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            # Log warning but don't fail - pip might already be available via other means
+            self.logger.warning(f"Could not ensure pip via ensurepip: {e}. Assuming pip is available.")
 
     async def install_dependencies(
         self, requirements: list[str] | None = None
@@ -105,7 +168,7 @@ class WorkflowRunner:
 
         await self.ensure_pip()
 
-        cmd = [f"python{self.config.python_version}", "-m", "pip", "install"]
+        cmd = [*self._python_cmd, "-m", "pip", "install"]
 
         if requirements:
             cmd.extend(requirements)
@@ -135,7 +198,7 @@ class WorkflowRunner:
         with open(script_path, "w") as f:
             f.write(code)
         print(f"Executing script: {script_path}")
-        cmd = [f"python{self.config.python_version}", script_path]
+        cmd = [*self._python_cmd, script_path]
         return await self._run_command(cmd, execution_id, progress_callback)
 
     async def _run_command(
@@ -253,10 +316,6 @@ class WorkflowRunner:
         """Clean up all resources and running processes."""
         for execution_id in list(self._active_processes.keys()):
             await self._kill_process(execution_id)
-        # import shutil
-
-        # if os.path.exists(self.config.temp_dir):
-        #    shutil.rmtree(self.config.temp_dir, ignore_errors=True)
 
 
 async def main():

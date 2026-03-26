@@ -19,27 +19,27 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.extensibility.csv_mode import CsvEvaluationMode
+from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
+from sources.security.check_package import PackageCheck
 
 dotenv.load_dotenv()
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
-    if not os.getenv("HF_TOKEN"):
+    key_found = False
+    envs_key = ['ANTHROPIC_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'HF_TOKEN', 'OPENROUTER_API_KEY']
+    for key in envs_key:
+        if os.getenv(key):
+            print(f"✅ Found environment variable: {key}")
+            key_found = True
+    if not key_found:
         raise ValueError(
-            "⚠️ HF_TOKEN environment variable is not set. Please set it to your Hugging Face token. "
-        )
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise ValueError(
-            "⚠️ ANTHROPIC_API_KEY environment variable is not set. Please set it to your OpenAI API key."
-        )
-    if not os.getenv("PUSHOVER_USER") or not os.getenv("PUSHOVER_TOKEN"):
-        print(
-            "⚠️ PUSHOVER_USER/PUSHOVER_TOKEN not set. We advice using pushover for getting notifications upon task completion. "
+            "⚠️ No valid API key environment variable found. Please set one of the supported API keys. Supported keys: " + ", ".join(envs_key)
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
@@ -117,13 +117,20 @@ async def science_bench_papers_mode(args, config):
                                   single_agent_mode=args.single_agent
                                  )
 
+async def workflow_generation_evals(args, config):
+    evaluator = WorkflowEval(config, csv_runs_limit=args.csv_runs_limit)
+    await evaluator.run_workflow_eval_loop(
+        dataset_type="science_agent_bench",
+        dataset_path="datasets/ScienceAgentBench.csv",
+    )
+
 def load_goal_from_file_or_string(goal_input: str) -> str:
     """
     Load goal from file if the input is a file path, otherwise return the string as-is.
-    
+
     Args:
         goal_input: Either a file path or a goal string
-        
+
     Returns:
         The goal content (either loaded from file or the original string)
     """
@@ -152,7 +159,7 @@ async def normal_execution_mode(args, config):
             print(f"⚠️ Starting in single agent mode")
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
-                            scenario_id=args.scenario,
+                            scenario_rubric=args.scenario,
                             max_iteration=args.max_evolve_iterations,
                             learning_mode=args.learn,
                             single_agent_mode=args.single_agent
@@ -164,10 +171,12 @@ async def normal_execution_mode(args, config):
                                     judge=not args.disable_judge,
                                     max_evolve_iteration=args.max_evolve_iterations
                                    )
-        trs = LocalTransfer(workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
+        trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
     else:
         raise ValueError("No goal provided. Use --task, --goal to start.")
+
+
 
 async def main():
     """Main execution function"""
@@ -194,6 +203,9 @@ async def main():
     )
     parser.add_argument(
         "--manual", action="store_true", help="Full manual mode (No LLM, human choose all actions)."
+    )
+    parser.add_argument(
+        "--workflow_eval_mode", action="store_true", help="Workflow generation evaluation."
     )
     parser.add_argument(
         "--papers", type=str, help="Papers evaluation mode (Run Mimosa on multiple papers from a CSV, automatically monitor run, evaluate, save capsules)"
@@ -225,6 +237,8 @@ async def main():
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
 
+    # security check
+    PackageCheck().run()
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
@@ -247,6 +261,8 @@ async def main():
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
             await normal_execution_mode(args, config)
+        elif args.workflow_eval_mode:
+            await workflow_generation_evals(args, config)
         else:
             raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:

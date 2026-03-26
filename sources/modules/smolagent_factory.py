@@ -129,10 +129,6 @@ ALWAYS Use execute_command("ls -la <path>") to verify file existence and permiss
 - **Rationale**: Standardizes output for consistency and downstream processing
 """
 
-# good models:
-#Qwen/Qwen2.5-72B-Instruct
-#Qwen/Qwen2.5-Coder-32B-Instruct
-# deepseek-ai/DeepSeek-V3
 class SmolAgentFactory:
 
     def __init__(self,
@@ -159,8 +155,6 @@ class SmolAgentFactory:
         os.makedirs(self.memory_folder, exist_ok=True)
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
-        if not self.token:
-            raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
 
         try:
             self.engine = self.get_engine()
@@ -173,20 +167,20 @@ class SmolAgentFactory:
                 additional_authorized_imports = [
                     'requests', 'bs4', 'json', 'requests.exceptions',
                     # Core Utilities
-                    'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse', 
+                    'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
                     'configparser', 'logging',
                     # Data Structures & Algorithms
-                    'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue', 
+                    'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue',
                     'dataclasses', 'enum', 'types',
                     # Text & String Processing
                     're', 'string', 'textwrap', 'difflib', 'unicodedata',
                     # Data Formats
-                    'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64', 
+                    'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64',
                     'html', 'html.parser',
                     # Date & Time
                     'datetime', 'time', 'calendar',
                     # Networking & Web
-                    'urllib', 'urllib.parse', 'urllib.request', 'urllib.error', 'http', 
+                    'urllib', 'urllib.parse', 'urllib.request', 'urllib.error', 'http',
                     'http.client', 'socket', 'email', 'mimetypes',
                     # Cryptography & Hashing
                     'hashlib', 'hmac', 'secrets', 'uuid',
@@ -210,13 +204,7 @@ class SmolAgentFactory:
         self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
 
     def get_engine(self):
-        if self.engine_name == "cached":
-            return LiteLLMModel(
-                model_id=self.model_id,
-                base_url="http://0.0.0.0:6767/v1/chat/completions",
-                max_tokens=self.max_tokens,
-            )
-        elif self.engine_name == "mlx":
+        if self.engine_name == "mlx":
             print("Using MLXModel for local execution.")
             return MLXModel(
                 model_id=self.model_id,
@@ -224,6 +212,8 @@ class SmolAgentFactory:
             )
         elif self.engine_name == "inference_client":
             print("Using InferenceClientModel for inference client execution.")
+            if not self.token:
+                raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
@@ -242,12 +232,6 @@ class SmolAgentFactory:
                 model_id=self.model_id,
                 provider=self.provider,
                 api_key=os.getenv("OPENAI_API_KEY")
-            )
-        elif self.engine_name == "claude":
-            return LiteLLMModel(
-                model_id="bedrock/converse/us.anthropic.claude-opus-4-20250514-v1:0",
-                api_key=os.getenv("ANTHROPIC_API_KEY"),
-                max_tokens=8192
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")
@@ -401,7 +385,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                 print("No matching memories found for the current run.")
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
-    
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         import threading
         workflow_uuid = state.get("workflow_uuid", None)

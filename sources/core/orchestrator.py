@@ -69,7 +69,8 @@ class WorkflowOrchestrator:
         goal: str,
         craft_instructions: str,
         original_task: str = None,
-        single_agent_mode = False
+        single_agent_mode = False,
+        no_run = False
     ) -> tuple[str, str, bool]:
         """Execute a workflow with the given goal prompt.
 
@@ -141,6 +142,8 @@ class WorkflowOrchestrator:
             f"\033[96m✅ Workflow {uuid} generated successfully in {generation_time:.3f}s\033[0m"
         )
 
+        if no_run:
+            return "", uuid, workflow_code, True
         try:
             # Dependencies installation phase
             print(f"\n\033[96m{'📦 DEPENDENCIES INSTALLATION PHASE':^80}\033[0m")

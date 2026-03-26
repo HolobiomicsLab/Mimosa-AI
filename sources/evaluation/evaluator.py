@@ -47,13 +47,13 @@ class ScoreExtractionError(EvaluatorError):
 
 class BaseEvaluator:
     """Base evaluator with common functionality for workflow evaluation."""
-    
+
     def __init__(self, config):
         """Initialize the BaseEvaluator with configuration.
-        
+
         Args:
             config: Configuration object containing memory_dir, workflow_dir, model_pricing, and reasoning_effort
-            
+
         Raises:
             EvaluatorError: If configuration is invalid or required directories don't exist
         """
@@ -92,16 +92,16 @@ class BaseEvaluator:
             if isinstance(e, EvaluatorError):
                 raise
             raise EvaluatorError(f"Failed to initialize BaseEvaluator: {str(e)}") from e
-    
+
     def _load_workflow_data(self, workflow_id: str) -> WorkflowInfo:
         """Load workflow execution data from UUID folder using WorkflowInfo.
-        
+
         Args:
             workflow_id: UUID of the workflow to load
-            
+
         Returns:
             WorkflowInfo instance containing workflow data
-            
+
         Raises:
             WorkflowDataError: If workflow data cannot be loaded
         """
@@ -122,14 +122,14 @@ class BaseEvaluator:
             code = workflow_info.code
             if state_result and not isinstance(state_result, dict):
                 raise WorkflowDataError(f"state_result must be a dictionary, got {type(state_result)}")
-            
+
             if not state_result:
                 self.logger.warning(f"State result is empty for workflow {workflow_id}")
             if not code:
                 self.logger.warning(f"Workflow code is empty for workflow {workflow_id}")
-            
+
             return workflow_info
-            
+
         except ValueError as e:
             raise WorkflowDataError(str(e)) from e
         except Exception as e:
@@ -146,25 +146,23 @@ class BaseEvaluator:
         """
         try:
             workflow_info = self._load_workflow_data(uuid)
-            
+
             state_result = workflow_info.state_result
             workflow_code = workflow_info.code
             goal = workflow_info.goal or "Goal not specified"
-            
+
             if not state_result and not workflow_code:
                 return "workflow execution fully failed. report it."
 
             result = workflow_info.answers
 
-            return f"""You are evaluating a scientific workflow execution.
-                   WORKFLOW GOAL:
+            return f"""
+                   You are evaluating AI agent(s) performance on a computational workflow. The workflow's goal is to achieve the following scientific/research objective:
+                   GOAL:
                    {goal}
-                   FULL WORKFLOW STATE RESULT (JSON):
+                   FINAL ANSWER FROM AGENT(S) EXECUTION:
                    {json.dumps(result, indent=2)}
-                   WORKFLOW CODE:
-                   ```python
-                   {workflow_code or "# No workflow code available"}
-                   ```"""
+                   """
         except Exception as e:
             raise e
 
@@ -175,16 +173,16 @@ class BaseEvaluator:
             scores: The scores to add to the state result
             uuid: UUID of the workflow run
             eval_type: Type of evaluation ('generic' or 'scenario')
-            
+
         Raises:
             EvaluatorError: If results cannot be saved
         """
         if not uuid or not isinstance(uuid, str):
             raise EvaluatorError("Invalid uuid for saving results")
-        
+
         if not isinstance(scores, dict):
             raise EvaluatorError("Scores must be a dictionary")
-        
+
         if not eval_type or not isinstance(eval_type, str):
             raise EvaluatorError("Invalid eval_type for saving results")
 
@@ -212,7 +210,7 @@ class BaseEvaluator:
             # Add scores to state result
             if "evaluation" not in state_result:
                 state_result["evaluation"] = {}
-            
+
             state_result["evaluation"][eval_type] = scores
 
             # Write updated state result back to file
@@ -259,10 +257,10 @@ class BaseEvaluator:
 
 class GenericEvaluator(BaseEvaluator):
     """Evaluator for generic workflow evaluation using LLM judgment."""
-    
+
     def __init__(self, config):
         """Initialize the GenericEvaluator.
-        
+
         Args:
             config: Configuration object
         """
@@ -271,11 +269,11 @@ class GenericEvaluator(BaseEvaluator):
 
     def evaluate(self, uuid: str, answer: str | None = None) -> None:
         """Perform generic evaluation of a workflow.
-        
+
         Args:
             uuid: UUID of the workflow to evaluate
             answer: Optional expected answer for evaluation
-            
+
         Raises:
             LLMEvaluationError: If LLM evaluation fails
             WorkflowDataError: If workflow data cannot be loaded
@@ -323,13 +321,13 @@ class GenericEvaluator(BaseEvaluator):
             "evidence": "[Specific JSON paths/logs proving objective fulfillment]"
         },
         {
-            "category": "agent_collaboration", 
+            "category": "agent_collaboration",
             "score": [0.0-1.0],
             "evidence": "[Message history snippets or error logs]"
         },
         {
             "category": "output_quality",
-            "score": [0.0-1.0], 
+            "score": [0.0-1.0],
             "evidence": "[Output validation errors or missing fields]"
         }""" + ("""
         ,{
@@ -341,7 +339,7 @@ class GenericEvaluator(BaseEvaluator):
     """
 
             self.logger.info(f"Evaluating workflow {uuid} with LLM judge")
-            
+
             # Prepare memory path
             memory_path = Path(self.memory_dir) / uuid
             memory_path.mkdir(parents=True, exist_ok=True)
@@ -355,7 +353,7 @@ class GenericEvaluator(BaseEvaluator):
                     config=self.llm_config,
                 )
                 output = llm_provider(prompt)
-                
+
                 if not output or not isinstance(output, str):
                     raise LLMEvaluationError("LLM returned empty or invalid response")
 
@@ -394,7 +392,7 @@ class GenericEvaluator(BaseEvaluator):
 
         Returns:
             Dictionary containing the extracted scores
-            
+
         Raises:
             ScoreExtractionError: If scores cannot be extracted or are invalid
         """
@@ -408,12 +406,12 @@ class GenericEvaluator(BaseEvaluator):
 
             if not match:
                 raise ScoreExtractionError("No JSON array found in evaluation response")
-            
+
             try:
                 evaluations = json.loads(match.group(0))
             except json.JSONDecodeError as e:
                 raise ScoreExtractionError(f"Invalid JSON format in evaluation response: {str(e)}") from e
-            
+
             if not isinstance(evaluations, list):
                 raise ScoreExtractionError(f"Expected JSON array, got {type(evaluations)}")
 
@@ -461,12 +459,12 @@ class GenericEvaluator(BaseEvaluator):
             # Calculate overall score
             score_keys = ['goal_alignment', 'agent_collaboration', 'output_quality']
             available_keys = [k for k in score_keys if k in result]
-            
+
             if available_keys:
                 result['overall_score'] = sum(result[k] for k in available_keys) / len(available_keys)
             else:
                 self.logger.warning("No standard score categories found for overall score calculation")
-            
+
             return result
 
         except ScoreExtractionError:
@@ -477,37 +475,37 @@ class GenericEvaluator(BaseEvaluator):
 
 class ScenarioEvaluator(BaseEvaluator):
     """Evaluator for scenario-based workflow evaluation."""
-    
+
     def __init__(self, config, scenarios_dir = "datasets/scenarios"):
         """Initialize the ScenarioEvaluator.
-        
+
         Args:
             config: Configuration object
         """
         super().__init__(config)
-        
+
         try:
             self.scenario_loader = ScenarioLoader(scenarios_dir=scenarios_dir)
         except Exception as e:
             raise EvaluatorError(f"Failed to initialize scenario loader: {str(e)}") from e
-        
+
         self.logger.info("ScenarioEvaluator initialized successfully")
 
-    def evaluate(self, uuid: str, scenario_id: str) -> dict[str, Any]:
+    def evaluate(self, uuid: str, scenario_rubric: str) -> dict[str, Any]:
         """Evaluate a workflow against a scenario with scoring.
-        
+
         Args:
             uuid: UUID of the workflow to evaluate
-            scenario_id: ID of the scenario to evaluate against
-            
+            scenario_rubric: ID of the scenario to evaluate against
+
         Returns:
             Dictionary containing scenario evaluation results
-            
+
         Raises:
             ScenarioError: If scenario evaluation fails
         """
         try:
-            self.logger.info(f"Evaluating workflow {uuid} against scenario {scenario_id}")
+            self.logger.info(f"Evaluating workflow {uuid} against scenario {scenario_rubric}")
 
             # Handle null uuid case
             if uuid is None:
@@ -515,63 +513,63 @@ class ScenarioEvaluator(BaseEvaluator):
                     'earned_points': 0,
                     'total_points': 0,
                     'score': 0,
-                    'scenario_id': scenario_id
+                    'scenario_rubric': scenario_rubric
                 }
 
             # Validate inputs
             if not isinstance(uuid, str) or not uuid.strip():
                 raise ScenarioError("Invalid uuid: must be a non-empty string")
-            
-            if not isinstance(scenario_id, str) or not scenario_id.strip():
-                raise ScenarioError("Invalid scenario_id: must be a non-empty string")
+
+            if not isinstance(scenario_rubric, str) or not scenario_rubric.strip():
+                raise ScenarioError("Invalid scenario_rubric: must be a non-empty string")
 
             # Load scenario with error handling
             try:
-                scenario = self.scenario_loader.load_scenario(scenario_id)
+                scenario = self.scenario_loader.load_scenario(scenario_rubric)
                 if not scenario:
-                    raise ScenarioError(f"Scenario {scenario_id} not found or is empty")
-                
+                    raise ScenarioError(f"Scenario {scenario_rubric} not found or is empty")
+
                 if not isinstance(scenario, dict):
-                    raise ScenarioError(f"Scenario {scenario_id} is not a valid dictionary")
+                    raise ScenarioError(f"Scenario {scenario_rubric} is not a valid dictionary")
 
             except Exception as e:
                 if isinstance(e, ScenarioError):
                     raise
-                raise ScenarioError(f"Failed to load scenario {scenario_id}: {str(e)}") from e
+                raise ScenarioError(f"Failed to load scenario {scenario_rubric}: {str(e)}") from e
 
             # Check if this is the new rubric format or legacy format
             is_rubric_format = "total_points" in scenario
-            
+
             if is_rubric_format:
-                return self._evaluate_rubric_format(uuid, scenario_id, scenario)
+                return self._evaluate_rubric_format(uuid, scenario_rubric, scenario)
             else:
-                return self._evaluate_legacy_format(uuid, scenario_id, scenario)
+                return self._evaluate_legacy_format(uuid, scenario_rubric, scenario)
 
         except ScenarioError:
             raise
         except Exception as e:
             raise ScenarioError(f"Scenario evaluation failed: {str(e)}") from e
 
-    def _evaluate_legacy_format(self, uuid: str, scenario_id: str, scenario: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_legacy_format(self, uuid: str, scenario_rubric: str, scenario: dict[str, Any]) -> dict[str, Any]:
         """Evaluate workflow using legacy assertion format.
-        
+
         Args:
             uuid: UUID of the workflow
-            scenario_id: ID of the scenario
+            scenario_rubric: ID of the scenario
             scenario: Scenario dictionary with assertions
-            
+
         Returns:
             Dictionary containing evaluation results
         """
         if "assertions" not in scenario:
-            raise ScenarioError(f"Scenario {scenario_id} missing 'assertions' field")
-        
+            raise ScenarioError(f"Scenario {scenario_rubric} missing 'assertions' field")
+
         assertions = scenario["assertions"]
         if not isinstance(assertions, list):
-            raise ScenarioError(f"Scenario {scenario_id} 'assertions' must be a list")
-        
+            raise ScenarioError(f"Scenario {scenario_rubric} 'assertions' must be a list")
+
         if not assertions:
-            self.logger.warning(f"Scenario {scenario_id} has no assertions")
+            self.logger.warning(f"Scenario {scenario_rubric} has no assertions")
 
         # Evaluate all assertions
         assertion_results = []
@@ -579,7 +577,7 @@ class ScenarioEvaluator(BaseEvaluator):
             try:
                 if not isinstance(assertion, dict):
                     raise ScenarioError(f"Assertion {i} is not a dictionary")
-                
+
                 result = self._evaluate_assertion(uuid, assertion)
                 assertion_results.append(result)
             except Exception as e:
@@ -594,13 +592,14 @@ class ScenarioEvaluator(BaseEvaluator):
                 })
 
         # Calculate score
-        passed_count = sum(1 for result in assertion_results if result.get("passed", False))
+        passed_count = sum(int(result.get("passed", False)) for result in assertion_results)
         total_count = len(assertion_results)
         score = passed_count / total_count if total_count > 0 else 0.0
+        print(f"Scenario evaluation completed for {scenario_rubric}: {passed_count}/{total_count} assertions passed, score: {score:.4f}")
 
         # Generate results
         results = {
-            "scenario_id": scenario_id,
+            "scenario_rubric": scenario_rubric,
             "timestamp": datetime.now().isoformat(),
             "score": score,
             "passed_assertions": passed_count,
@@ -614,28 +613,49 @@ class ScenarioEvaluator(BaseEvaluator):
             self._save_results(results, uuid, 'scenario')
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
-        
+
+        # Save evaluation details to evaluation.txt
+        try:
+            evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
+            evaluation_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(evaluation_path, "w", encoding='utf-8') as file:
+                file.write(f"Scenario Evaluation: {scenario_rubric}\n")
+                file.write(f"Timestamp: {results['timestamp']}\n")
+                file.write(f"Score: {score:.4f}\n")
+                file.write(f"Passed Assertions: {passed_count}/{total_count}\n")
+                file.write(f"Judge Model: {self.judge_model}\n")
+                file.write("\n" + "="*60 + "\n\n")
+                file.write("Assertion Results:\n\n")
+                for result in assertion_results:
+                    status = "✓ PASS" if result.get("passed", False) else "✗ FAIL"
+                    file.write(f"[{status}] {result.get('id', 'unknown')}: {result.get('description', 'No description')}\n")
+                    file.write(f"    Evidence: {result.get('evidence', 'No evidence')}\n")
+                    file.write(f"    Confidence: {result.get('confidence', 0.0):.2f}\n\n")
+            self.logger.info(f"Scenario evaluation saved to: {evaluation_path}")
+        except OSError as e:
+            self.logger.error(f"Failed to save evaluation to file: {str(e)}")
+
         # Return assertion metrics for Evolution tracking
         return {
             'passed_assertions': passed_count,
             'total_assertions': total_count,
             'score': score,
-            'scenario_id': scenario_id
+            'scenario_rubric': scenario_rubric
         }
-    
-    def _evaluate_rubric_format(self, uuid: str, scenario_id: str, scenario: dict[str, Any]) -> dict[str, Any]:
+
+    def _evaluate_rubric_format(self, uuid: str, scenario_rubric: str, scenario: dict[str, Any]) -> dict[str, Any]:
         """Evaluate workflow using ScienceAgentBench rubric format.
-        
+
         Args:
             uuid: UUID of the workflow
-            scenario_id: ID of the scenario
+            scenario_rubric: ID of the scenario
             scenario: Scenario dictionary with rubric categories
-            
+
         Returns:
             Dictionary containing evaluation results
         """
         total_possible_points = scenario.get("total_points", 0)
-        
+
         # Standard ScienceAgentBench categories
         categories = [
             "data_loading",
@@ -644,7 +664,7 @@ class ScenarioEvaluator(BaseEvaluator):
             "output_formatting",
             "output_saving"
         ]
-        
+
         # Collect all rubric items from all categories
         all_items = []
         for category_name in categories:
@@ -655,29 +675,28 @@ class ScenarioEvaluator(BaseEvaluator):
                         item_with_category = item.copy()
                         item_with_category["category"] = category_name
                         all_items.append(item_with_category)
-        
+
         if not all_items:
-            self.logger.warning(f"Scenario {scenario_id} has no rubric items")
-        
+            self.logger.warning(f"Scenario {scenario_rubric} has no rubric items")
+
         # Evaluate all rubric items
         item_results = []
         total_earned = 0
-        
+
         for i, item in enumerate(all_items):
             try:
                 result = self._evaluate_rubric_item(uuid, item)
                 item_results.append(result)
-                
+
                 # Calculate earned points
                 if result.get("passed", False):
                     earned = item.get("points", 0)
                 else:
-                    # Partial credit based on confidence
-                    confidence = result.get("confidence", 0.0)
-                    earned = item.get("points", 0) * confidence
-                
+                    # No partial credit for failed rubric items
+                    earned = 0
+
                 total_earned += earned
-                
+
             except Exception as e:
                 self.logger.error(f"Failed to evaluate rubric item {i}: {str(e)}")
                 # Add failed item result
@@ -691,13 +710,13 @@ class ScenarioEvaluator(BaseEvaluator):
                     "evidence": f"Evaluation error: {str(e)}",
                     "confidence": 0.0,
                 })
-        
+
         # Calculate score as percentage
         score = (total_earned / total_possible_points) if total_possible_points > 0 else 0.0
-        
+
         # Generate results
         results = {
-            "scenario_id": scenario_id,
+            "scenario_rubric": scenario_rubric,
             "timestamp": datetime.now().isoformat(),
             "score": score,
             "earned_points": total_earned,
@@ -706,31 +725,53 @@ class ScenarioEvaluator(BaseEvaluator):
             "judge_model": self.judge_model,
             "format": "rubric"
         }
-        
+
         # Save results
         try:
             self._save_results(results, uuid, 'scenario')
         except EvaluatorError as e:
             self.logger.error(f"Failed to save scenario results: {str(e)}")
-        
+
+        # Save evaluation details to evaluation.txt
+        try:
+            evaluation_path = self.workflow_dir / uuid / "evaluation.txt"
+            evaluation_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(evaluation_path, "w", encoding='utf-8') as file:
+                file.write(f"Scenario Evaluation (Rubric Format): {scenario_rubric}\n")
+                file.write(f"Timestamp: {results['timestamp']}\n")
+                file.write(f"Score: {score:.4f} ({total_earned:.1f}/{total_possible_points} points)\n")
+                file.write(f"Judge Model: {self.judge_model}\n")
+                file.write("\n" + "="*60 + "\n\n")
+                file.write("Rubric Item Results:\n\n")
+                for result in item_results:
+                    status = "✓ PASS" if result.get("passed", False) else "✗ FAIL"
+                    file.write(f"[{status}] {result.get('category', 'unknown')} - {result.get('name', 'unknown')}\n")
+                    file.write(f"    Description: {result.get('description', 'No description')}\n")
+                    file.write(f"    Points: {result.get('earned_points', 0):.1f}/{result.get('possible_points', 0)}\n")
+                    file.write(f"    Evidence: {result.get('evidence', 'No evidence')}\n")
+                    file.write(f"    Confidence: {result.get('confidence', 0.0):.2f}\n\n")
+            self.logger.info(f"Scenario evaluation saved to: {evaluation_path}")
+        except OSError as e:
+            self.logger.error(f"Failed to save evaluation to file: {str(e)}")
+
         # Return metrics for Evolution tracking
         return {
             'earned_points': total_earned,
             'total_points': total_possible_points,
             'score': score,
-            'scenario_id': scenario_id
+            'scenario_rubric': scenario_rubric
         }
-    
+
     def _evaluate_rubric_item(self, uuid: str, item: dict[str, Any]) -> dict[str, Any]:
         """Evaluate single rubric item using LLM.
-        
+
         Args:
             uuid: UUID of the workflow
             item: Rubric item dictionary with name, description, points, and category
-            
+
         Returns:
             Dictionary containing rubric item evaluation results
-            
+
         Raises:
             LLMEvaluationError: If rubric item evaluation fails
         """
@@ -738,7 +779,7 @@ class ScenarioEvaluator(BaseEvaluator):
             # Validate item structure
             if not isinstance(item, dict):
                 raise LLMEvaluationError("Rubric item must be a dictionary")
-            
+
             item_name = item.get("name", "unknown")
             item_desc = item.get("description", "No description provided")
             item_points = item.get("points", 0)
@@ -763,7 +804,7 @@ class ScenarioEvaluator(BaseEvaluator):
                 )
 
                 judge_text = llm_provider(judge_prompt)
-                
+
                 if not judge_text or not isinstance(judge_text, str):
                     raise LLMEvaluationError("LLM returned empty or invalid response")
 
@@ -801,17 +842,17 @@ class ScenarioEvaluator(BaseEvaluator):
             raise
         except Exception as e:
             raise LLMEvaluationError(f"Rubric item evaluation failed: {str(e)}") from e
-    
+
     def _build_rubric_item_prompt(self, uuid: str, item: dict[str, Any]) -> str:
         """Build judge prompt for rubric item evaluation.
-        
+
         Args:
             uuid: UUID of the workflow
             item: Rubric item dictionary
-            
+
         Returns:
             Formatted judge prompt string
-            
+
         Raises:
             WorkflowDataError: If workflow execution text cannot be generated
         """
@@ -835,14 +876,14 @@ Description: {description}
 Points: {points}
 
 EVALUATION TASK:
-Based on the complete execution state and workflow code above, determine if the 
+Based on the complete execution state and workflow code above, determine if the
 rubric item criteria has been met.
 Focus on whether the workflow successfully completed the specific requirement described.
 Analyze the full JSON state and workflow implementation to make your judgment.
 
 Respond in this exact format:
 {{
-    "verdict": [true/false], 
+    "verdict": [true/false],
     "evidence": [Specific evidence from the execution that supports your verdict],
     "confidence": [0.0-1.0 confidence score]
 }}
@@ -852,7 +893,7 @@ Respond in this exact format:
             raise
         except Exception as e:
             raise WorkflowDataError(f"Failed to build rubric item prompt: {str(e)}") from e
-    
+
     def _evaluate_assertion(self, uuid: str, assertion: dict[str, Any]) -> dict[str, Any]:
         """Evaluate single assertion using existing LLM prompt format.
         Args:
@@ -867,7 +908,7 @@ Respond in this exact format:
             # Validate assertion structure
             if not isinstance(assertion, dict):
                 raise LLMEvaluationError("Assertion must be a dictionary")
-            
+
             assertion_id = assertion.get("id", "unknown")
             assertion_desc = assertion.get("description", "No description provided")
 
@@ -890,7 +931,7 @@ Respond in this exact format:
                 )
 
                 judge_text = llm_provider(judge_prompt)
-                
+
                 if not judge_text or not isinstance(judge_text, str):
                     raise LLMEvaluationError("LLM returned empty or invalid response")
 
@@ -921,14 +962,14 @@ Respond in this exact format:
 
     def _build_judge_prompt(self, uuid: str, assertion: dict[str, Any]) -> str:
         """Build judge prompt with workflow data.
-        
+
         Args:
             uuid: UUID of the workflow
             assertion: Assertion dictionary
-            
+
         Returns:
             Formatted judge prompt string
-            
+
         Raises:
             WorkflowDataError: If workflow execution text cannot be generated
         """
@@ -949,14 +990,14 @@ Description: {description}
 Evaluation Criteria: {criteria}
 
 EVALUATION TASK:
-Based on the complete execution state and workflow code above, determine if the 
+Based on the complete execution state and workflow code above, determine if the
 assertion is true or false.
 Focus on whether the workflow achieved the goals and execution was successful.
 Analyze the full JSON state and workflow implementation to make your judgment.
 
 Respond in this exact format:
 {{
-    "verdict": [true/false], 
+    "verdict": [true/false],
     "evidence": [Specific evidence from the execution that supports your verdict],
     "confidence": [0.0-1.0 confidence score]
 }}
@@ -969,48 +1010,48 @@ Respond in this exact format:
 
     def _parse_judge_response(self, judge_text: str) -> tuple[bool, str, float]:
         """Parse LLM judge response from JSON format.
-        
+
         Args:
             judge_text: Raw response text from LLM
-            
+
         Returns:
             Tuple of (verdict, evidence, confidence)
-            
+
         Raises:
             ScoreExtractionError: If response cannot be parsed
         """
         if not judge_text or not isinstance(judge_text, str):
             raise ScoreExtractionError("Judge response is empty or invalid")
 
-        try:       
+        try:
             cleaned_text = judge_text.strip()
-    
+
             # Handle cases where the LLM adds conversational fluff
             json_match = re.search(r'\{.*\}', cleaned_text, re.DOTALL)
             if not json_match:
                 raise ScoreExtractionError("No JSON structure found in judge response")
-            
+
             try:
                 data = json.loads(json_match.group(0))
             except json.JSONDecodeError as e:
                 raise ScoreExtractionError(f"Invalid JSON format in judge response: {str(e)}") from e
-            
+
             if not isinstance(data, dict):
                 raise ScoreExtractionError(f"Expected JSON object, got {type(data)}")
-            
+
             # Validate required fields
             required_fields = ['verdict', 'evidence', 'confidence']
             missing_fields = [field for field in required_fields if field not in data]
             if missing_fields:
                 raise ScoreExtractionError(f"Missing required fields: {missing_fields}")
-            
+
             # Convert verdict to boolean (case-insensitive)
             verdict_str = str(data['verdict']).upper()
             if verdict_str not in ['TRUE', 'FALSE']:
                 raise ScoreExtractionError(f"Invalid verdict value: {data['verdict']}. Must be TRUE or FALSE")
-            
+
             verdict = verdict_str == 'TRUE'
-            
+
             # Validate confidence score
             try:
                 confidence = float(data['confidence'])
@@ -1018,10 +1059,10 @@ Respond in this exact format:
                     raise ScoreExtractionError("Confidence score must be between 0.0 and 1.0")
             except (TypeError, ValueError) as e:
                 raise ScoreExtractionError(f"Invalid confidence score: {str(e)}") from e
-            
+
             # Validate evidence
             evidence = str(data['evidence'])
-            
+
             return verdict, evidence, confidence
 
         except ScoreExtractionError:
@@ -1033,16 +1074,16 @@ Respond in this exact format:
 
 class WorkflowEvaluator:
     """Combined workflow evaluator with both judge and scenario-based evaluation capabilities.
-    
+
     This is a facade class that delegates to GenericEvaluator and ScenarioEvaluator.
     """
 
     def __init__(self, config, scenarios_dir="datasets/scenarios"):
         """Initialize the WorkflowEvaluator with configuration.
-        
+
         Args:
             config: Configuration object containing memory_dir, workflow_dir, model_pricing, and reasoning_effort
-            
+
         Raises:
             EvaluatorError: If configuration is invalid or required directories don't exist
         """
@@ -1056,17 +1097,17 @@ class WorkflowEvaluator:
                 raise
             raise EvaluatorError(f"Failed to initialize WorkflowEvaluator: {str(e)}") from e
 
-    def evaluate(self, uuid: str, answer: str = None, scenario_id: str = None) -> dict[str, Any]:
+    def evaluate(self, uuid: str, answer: str = None, scenario_rubric: str = None) -> dict[str, Any]:
         """Evaluate the workflow results.
 
         Args:
             uuid: UUID of the workflow run to evaluate
             answer: Optional expected answer for evaluation
-            scenario_id: Optional scenario ID for scenario-based evaluation
-            
+            scenario_rubric: Optional scenario ID for scenario-based evaluation
+
         Returns:
             Dictionary containing evaluation results
-            
+
         Raises:
             EvaluatorError: If evaluation fails
         """
@@ -1075,9 +1116,14 @@ class WorkflowEvaluator:
             if not uuid or not isinstance(uuid, str):
                 raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
-            # If scenario_id is provided, use scenario-based evaluation
-            if scenario_id:
-                return self.scenario_evaluator.evaluate(uuid, scenario_id)
+            # If scenario_rubric is provided, use scenario-based evaluation
+            if scenario_rubric:
+                try:
+                    return self.scenario_evaluator.evaluate(uuid, scenario_rubric)
+                except ScenarioError as e:
+                    self.logger.error(f"Scenario evaluation failed for {uuid} with rubric {scenario_rubric}: {str(e)}")
+                    self.generic_evaluator.evaluate(uuid, answer)
+                    return {'evaluation_type': 'generic', 'uuid': uuid}
             else:
                 self.generic_evaluator.evaluate(uuid, answer)
                 return {'evaluation_type': 'generic', 'uuid': uuid}
@@ -1102,7 +1148,7 @@ if __name__ == "__main__":
 
     mock_uuid = "test-uuid-12345"
     try:
-        result = evaluator.evaluate(mock_uuid, scenario_id="clintox_nn_rubric")
+        result = evaluator.evaluate(mock_uuid, scenario_rubric="clintox_nn_rubric")
         print(f"✓ Scenario evaluation completed: {result}")
     except Exception as e:
         print(f"⚠ Unexpected error in scenario evaluation: {e}")
