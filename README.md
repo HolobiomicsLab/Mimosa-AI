@@ -337,11 +337,12 @@ The telemetry dashboard provides:
 
 ## License
 
-This repository is publicly distributed under the GNU Affero General Public License v3.0 (AGPLv3). A separate commercial licensing path may be available from the designated rights-holder.
+This repository is publicly distributed under the Apache License 2.0. Apache 2.0 is a permissive open-source license that allows commercial use, modification, and redistribution, provided that redistributions preserve the applicable license, copyright, patent, trademark, attribution, and NOTICE notices and that modified files carry prominent notices stating that changes were made.
 
 For contribution and licensing details, see:
+- `NOTICE`
 - `docs/licensing-notes.md`
 - `CLA/INDIVIDUAL_CLA.md`
-- `CLA/CORPORATE_CLA.md`
+- `CLA/EMPLOYER_AUTHORIZATION.md`
 
 ---
