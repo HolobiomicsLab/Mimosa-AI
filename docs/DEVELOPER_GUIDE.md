@@ -1,7 +1,6 @@
 # Contributing to Mimosa-AI
 
-> Note: This file is the technical contribution guide. For licensing/CLA policy (including the required `CLA Check` status before merge), use the repository-root `CONTRIBUTING.md`.
-> CLA contact: dr20.spv@listes.cnrs.fr
+> Note: This file is the technical contribution guide.
 
 ## Table of Contents
 1. [Project Philosophy](#project-philosophy)
