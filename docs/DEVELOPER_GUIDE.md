@@ -54,9 +54,19 @@ Uses MCP (Model Context Protocol) for:
 - Automatic discovery of available tools on local network
 - Dynamic tool invocation in generated workflows
 - Seamless integration with lab instruments, web services, data analysis tools
-- Toolhive integration for centralized tool repositories
+- Toolomics integration for centralized MCP tool management and workspace exchange
 
 ---
+
+## Architecture Overview
+
+Mimosa follows the same five-layer architecture described in the manuscript: `(0)` optional planning, `(1)` tool discovery through MCP, `(2)` meta-orchestration, `(3)` agent execution, and `(4)` judge/evaluation. In `goal` mode, the planner decomposes a high-level objective into tasks; in `task` mode, prompts are sent directly to the meta-orchestration layer.
+
+- Layer `0` plans and decomposes goals into tasks.
+- Layer `1` discovers MCP tools exposed through Toolomics or the local network.
+- Layer `2` synthesizes and iteratively refines task-specific multi-agent workflows.
+- Layer `3` executes those workflows with code-generating agents and scientific software.
+- Layer `4` evaluates executions and returns structured feedback for refinement or reporting.
 
 ---
 
