@@ -5,7 +5,7 @@
 
 </div>
 
-<h1 align="center">Mimosa-AI 🌾🔬</h1>
+<h1 align="center">Mimosa-AI 🌼🔬</h1>
 
 <p align="center">
     <em>Autonomous AI-scientist framework for end-to-end reproducible research</em>
@@ -28,7 +28,7 @@
 
 ---
 
-> ***Mimosa-AI*** — like the sensitive mimosa plant that responds and adapts to every touch — is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. Rather than navigating fragmented tooling, hand-wiring pipelines, and manually curating results, ***Mimosa-AI*** strikes at the core challenge: it discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement. It gives academics a powerful, open, and modular alternative to closed black-box systems.
+> ***Mimosa-AI 🌼*** — like the sensitive mimosa plant that responds and adapts to every touch — is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. Rather than navigating fragmented tooling, hand-wiring pipelines, and manually curating results, ***Mimosa-AI*** strikes at the core challenge: it discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement. It gives academics a powerful, open, and modular alternative to closed black-box systems.
 
 **Use cases:**
 - Reproduce scientific studies with rigorous, auditable workflows
