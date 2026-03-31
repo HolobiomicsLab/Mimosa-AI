@@ -1,14 +1,55 @@
-# Mimosa-AI 🌾🔬
+<div align="center">
+<br>
+
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+
+</div>
+
+<h1 align="center">Mimosa-AI 🌾🔬</h1>
 
 <p align="center">
-<img align="center" src="./docs/images/logo_mimosa.png" width="312" height="312" alt="Mimosa-AI Logo">
-<p>
+    <em>Autonomous AI-scientist framework for end-to-end reproducible research</em>
+</p>
 
-***Mimosa-AI*** 🌾🔬 is an AI-scientist framework built to carry out end-to-end research and reproduce published finding autonomously. Built to give academics a powerful open and modular alternative to closed black-box systems.
+<p align="center">
+    <img src="https://img.shields.io/github/license/HolobiomicsLab/Mimosa-AI?style=flat-square&logo=opensourceinitiative&logoColor=white&color=4caf82" alt="license">
+    <img src="https://img.shields.io/github/last-commit/HolobiomicsLab/Mimosa-AI?style=flat-square&logo=git&logoColor=white&color=4caf82" alt="last-commit">
+    <img src="https://img.shields.io/github/languages/count/HolobiomicsLab/Mimosa-AI?style=flat-square&color=4caf82" alt="repo-language-count">
+</p>
 
-**Use case:**
+<p align="center">
+    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers">
+        <img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars">
+    </a>
+    <a href="https://opensource.org/licenses/Apache-2.0">
+        <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0">
+    </a>
+</p>
+
+---
+
+> ***Mimosa-AI*** — like the sensitive mimosa plant that responds and adapts to every touch — is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. Rather than navigating fragmented tooling, hand-wiring pipelines, and manually curating results, ***Mimosa-AI*** strikes at the core challenge: it discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement. It gives academics a powerful, open, and modular alternative to closed black-box systems.
+
+**Use cases:**
 - Reproduce scientific studies with rigorous, auditable workflows
 - Automate full pipelines: bioinformatics, molecular docking, metabolomics, and beyond
+
+## Table of Contents
+
+- [How does it work?](#how-does-it-work-)
+- [Example: Reproducing a Bioactive Molecular Networking Paper](#example-reproducing-a-bioactive-molecular-networking-paper)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Running Mimosa](#running-mimosa)
+- [Output](#output)
+- [Learning through Evolution of Multi-Agent Workflows](#learning-throught-evolution-of-multi-agent-workflows)
+- [Transparency](#transparency)
+- [Command Line Arguments](#command-line-arguments)
+- [Evaluation](#evaluation)
+- [Phone Notifications](#phone-notifications)
+- [Telemetry Setup](#telemetry-setup)
+- [License](#license)
 
 ## How does it work ?
 
