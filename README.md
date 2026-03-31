@@ -28,7 +28,7 @@
 
 ---
 
-> ***Mimosa-AI 🌼*** — like the mimosa plant that responds and adapts to every touch — Mimosa is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. ***Mimosa-AI*** discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement through evolution of multi-agent workflows.
+> ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — Mimosa is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. ***Mimosa-AI*** discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement through evolution of multi-agent workflows.
 
 **Use cases:**
 - Reproduce scientific studies with rigorous, auditable workflows
