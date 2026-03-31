@@ -113,7 +113,7 @@ mimosa-ai/
 │   │
 │   └── prompts/                        # LLM system prompts
 │       ├── planner_reproduction.md     # Planner system prompt
-│       ├── workflow_v7.md              # Workflow generation prompt
+│       ├── workflow_v8.md              # Workflow generation prompt
 │       └── (other specialized prompts)
 │
 ├── sources/workflows/                  # Generated workflow storage
@@ -183,7 +183,7 @@ mimosa-ai/
 1. TASK RECOGNITION
    ├─ Calculate similarity to past tasks
    ├─ Look up historical workflows
-   └─ Check success threshold (0.85)
+   └─ Check success threshold (0.9)
        ├─ If found → Return cached result
        └─ If not → Create new workflow
 

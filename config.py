@@ -67,7 +67,7 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.8
+        self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 10
 
         # folder paths for workflow pre-defined code

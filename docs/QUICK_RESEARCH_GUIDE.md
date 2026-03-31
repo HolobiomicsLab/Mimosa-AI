@@ -105,7 +105,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json
 │  │ Workflow Generation                           │  │
 │  │ - LLM creates LangGraph workflows             │  │
 │  │ - Source: sources/core/workflow_factory.py    │  │
-│  │ - Prompt: sources/prompts/workflow_v7.md      │  │
+│  │ - Prompt: sources/prompts/workflow_v8.md      │  │
 │  └───────────────────────────────────────────────┘  │
 │                      ↓                              │
 │  ┌───────────────────────────────────────────────┐  │
@@ -160,7 +160,7 @@ sources/workflows/
 # Example: "Increasing agent decomposition improves success rate"
 
 # 2. IMPLEMENTATION
-# Edit: sources/prompts/workflow_v7.md
+# Edit: sources/prompts/workflow_v8.md
 # Modify: Section "A. Task Decomposition"
 
 # 3. BASELINE (clean slate)
@@ -187,7 +187,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 \
 ./cleanup.sh
 
 # 2. Run full benchmark
-uv run main.py --science_agent_bench --csv_runs_limit 103 \
+uv run main.py --science_agent_bench --csv_runs_limit 102 \
                --config my_config.json \
                > full_evaluation.log 2>&1
 
@@ -248,7 +248,7 @@ tail -f logs/mimosa.log | grep "WORKFLOW_GENERATION_ERROR"
 # Key hyperparameters in config.py
 
 # Learning parameters
-"learned_score_threshold": 0.85,      # When to stop improving
+"learned_score_threshold": 0.9,      # When to stop improving
 "max_learning_evolve_iterations": 5,     # Max retries per task
 
 # Workflow selection
@@ -268,7 +268,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7  # Quick eval
 uv run main.py --single_agent ...               # Baseline comparison
 
 # Key Files to Modify
-sources/prompts/workflow_v7.md                  # Workflow generation
+sources/prompts/workflow_v8.md                  # Workflow generation
 sources/core/dgm.py                             # Self-improvement loop
 sources/evaluation/evaluator.py                 # Judge system
 sources/core/workflow_selection.py              # Similarity threshold
