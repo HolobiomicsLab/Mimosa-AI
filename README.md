@@ -291,7 +291,7 @@ This replays the full execution trace—thoughts, tool calls and outputs so you 
 - DeepSeek-V3.2 single-agent: `SR 38.2%`, `CBS 0.898`, `$0.05/task`
 - DeepSeek-V3.2 one-shot multi-agent: `SR 32.4%`, `CBS 0.794`, `$0.38/task`
 - DeepSeek-V3.2 iterative-learning: `SR 43.1%`, `CBS 0.921`, `$1.7/task`
-- The manuscript also reports model-dependent behavior: iterative learning improves GPT-4o, but yields marginal degradation for Claude Haiku 4.5.
+- We also report model-dependent behavior in the manuscript: iterative learning improves GPT-4o, but yields marginal degradation for Claude Haiku 4.5.
 
 To evaluate on ScienceAgentBench you must:
 
