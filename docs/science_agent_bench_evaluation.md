@@ -109,6 +109,16 @@ def eval():
 
 ## Usage
 
+### Reported Results Snapshot
+
+The manuscript evaluates Mimosa on all `102` ScienceAgentBench tasks in `task` mode and reports the following DeepSeek-V3.2 results:
+
+- Single-agent: `SR 38.2%`, `CBS 0.898`, `$0.05/task`
+- One-shot multi-agent: `SR 32.4%`, `CBS 0.794`, `$0.38/task`
+- Iterative-learning: `SR 43.1%`, `CBS 0.921`, `$1.7/task`
+
+These figures are manuscript results, not a guaranteed console output for every local run. Actual summary metrics will vary with the selected model, run subset, and configuration.
+
 **Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 iterations**
 
 ```sh
@@ -137,20 +147,7 @@ Saved to `runs_capsule/<capsule_name>/evaluation_results.json`:
 
 #### Aggregate Summary
 
-Displayed at completion:
-
-```
-ScienceAgentBench Metrics
---------------------------------------------------------------------------------
-VER (Valid Execution Rate): 9/10 (90.0%)
-SR (Success Rate): 8/10 (80.0%)
-CBS (CodeBERT Score) Average: 0.847
-Total API Cost: $0.2345
-Average API Cost per Task: $0.0235
-
-Notes saved in: run_notes
-================================================================================
-```
+At completion, Mimosa prints an aggregate ScienceAgentBench summary for the selected run. The exact values depend on the evaluated subset, execution mode, and model configuration.
 
 
 ## Configuration

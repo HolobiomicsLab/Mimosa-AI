@@ -8,7 +8,7 @@
 <h1 align="center">Mimosa-AI 🌼🔬</h1>
 
 <p align="center">
-    <em>An open-source framework for evolving autonomous AI scientists workflows.</em>
+    <em>An open framework for autonomous AI-driven science.</em>
 </p>
 
 <p align="center">
@@ -28,11 +28,11 @@
 
 ---
 
-> ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — Mimosa is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. ***Mimosa-AI*** discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement through evolution of multi-agent workflows.
+> ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — Mimosa is an open-source framework for autonomous scientific research that automatically synthesizes task-specific multi-agent workflows and refines them through execution feedback. Built around MCP-based tool discovery, code-generating agents, and LLM-based evaluation, it offers academics a modular and auditable alternative to closed black-box systems.
 
-**Use cases:**
-- Reproduce scientific studies with rigorous, auditable workflows
-- Automate full pipelines: bioinformatics, molecular docking, metabolomics, and beyond
+**Objectives:**
+- Reproduce scientific studies with traceability and rigor
+- Automate computational scientific pipelines across domains such as bioinformatics, docking, metabolomics, and more
 
 ## Table of Contents
 
@@ -42,8 +42,8 @@
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Running Mimosa](#running-mimosa)
-- [Output](#output)
-- [Learning through Evolution of Multi-Agent Workflows](#learning-throught-evolution-of-multi-agent-workflows)
+- [Workspace and Audit Trail](#workspace-and-audit-trail)
+- [Learning through Evolution of Multi-Agent Workflows](#learning-through-evolution-of-multi-agent-workflows)
 - [Transparency](#transparency)
 - [Command Line Arguments](#command-line-arguments)
 - [Evaluation](#evaluation)
@@ -53,12 +53,14 @@
 
 ## How does it work ?
 
-The user gives ***Mimosa-AI*** a research goal.
+The user gives ***Mimosa-AI*** either a high-level scientific goal or a single task.
 
-- ***Mimosa*** automatically discovers available MCP-based tools on the local network or via Toolhive (anything from data analysis utilities to web browsers or lab instruments like mass spectrometers).
-- Using the user’s objective and the discovered tools, ***Mimosa*** decomposes the problem, builds a tailored multi-agent workflow for each tasks.
-- Each task runs autonomously. Failures are used for self-improvement via a Iterative-learning loop.
-- ***Mimosa*** generates a final capsule containing results, visualizations, reports, logs, and all relevant artifacts.
+- In goal mode, a planner decomposes the objective into smaller tasks. In task mode, the prompt is sent directly to the workflow synthesis layer.
+- ***Mimosa*** discovers available MCP-based tools on the local network through Toolomics, from data-analysis utilities and web services to laboratory instruments.
+- A meta-orchestrator synthesizes a task-specific multi-agent workflow and assigns relevant tools to specialized agents.
+- Code-generating agents execute subtasks using discovered tools and scientific software libraries.
+- An LLM-based judge evaluates execution traces and outputs; in learning mode, this feedback can drive iterative workflow refinement.
+- ***Mimosa*** archives workflows, traces, logs, reports, and generated artifacts in a final capsule for inspection and reuse.
 
 ![schema](./docs/images/mimosa_overall.jpg)
 
@@ -129,7 +131,11 @@ LANGFUSE_PRIVATE_KEY=...
 
 ### 4. Start the MCP server
 
-Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`). Custom MCP tools can be added via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics/README.md).
+Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`).
+
+Toolomics is Mimosa's companion platform for MCP server management. It exposes tools as discoverable MCP services, lets you register custom tools without modifying Mimosa's core orchestration logic, and provides the workspace where Mimosa reads and writes task artifacts. Both Mimosa and Toolomics are released under the Apache License 2.0.
+
+Custom MCP tools can be added via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics/README.md).
 
 ---
 
@@ -195,18 +201,30 @@ uv run main.py \
 uv run main.py --task "Conduct a literature review on graph neural networks for drug discovery." --config my_config.json
 ```
 
+> **Benchmark note:** The results reported in the manuscript are measured in `task` mode, with the planning layer disabled, to isolate workflow synthesis and iterative refinement.
+>
 > **Note:** Toolomics must be installed and the MCP server must be running before executing any mode.
 
-## Output
+## Workspace and Audit Trail
 
-Files are written to the Toolomics `workspace/` directory during execution. On completion, a full snapshot is saved to a timestamped capsule in `runs_capsule/`.
+During execution, Mimosa reads and writes files inside the Toolomics workspace configured by `workspace_dir`. When a run finishes, the workspace contents are copied into a timestamped folder under `runs_capsule/` so the final state is preserved as an archive rather than remaining only in a transient working directory.
+
+- Toolomics `workspace/`: the live working directory for the current run, including intermediate files, scripts, downloads, and generated outputs.
+- `sources/workflows/<uuid>/`: the generated workflow and its execution metadata, including `state_result.json`, `evaluation.txt`, `reward_progress.png`, and `memory/` traces.
+- `runs_capsule/<capsule_name>/`: the archived snapshot of the run, copied from the Toolomics workspace for later inspection, comparison, or sharing.
+- `memory_explorer.py <uuid>`: replay a workflow execution step by step to inspect agent traces, tool calls, and outputs.
+
+Together, these locations form Mimosa's audit trail: they preserve what the system planned, executed, evaluated, and produced, supporting debugging, inspection, and potential replication.
 
 ---
 
-## Learning throught evolution of Multi-Agent Workflows
+## Learning through Evolution of Multi-Agent Workflows
 
-***Mimosa-AI*** dynamically synthesizes specialized workflows for scientific tasks and is capable of learning from failures throught **darwinian-inspired evolution of multi-agents workflows**:
-Rather than forcing tasks through fixed pipelines, the system composes a custom multi-agent graph for each task, then refines it through single-incumbent local search, at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than scratch.
+***Mimosa-AI*** is a **self-evolving multi-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
+
+The full architecture is organized into five layers: `(0)` optional planning, `(1)` MCP-based tool discovery, `(2)` meta-orchestration, `(3)` agent execution, and `(4)` judge/evaluation. In benchmark `task` mode, the planning layer is bypassed so workflow synthesis and refinement can be evaluated directly.
+
+Mimosa is also capable of learning from failures through **Darwinian-inspired evolution of multi-agent workflows**. For each task, it composes a custom multi-agent graph and refines it through single-incumbent local search: at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than from scratch.
 
 For any new task, start with learn mode to let it build competence before full autonomy.
 
@@ -267,6 +285,13 @@ This replays the full execution trace—thoughts, tool calls and outputs so you 
 ⚠️ For unbiased evaluation it is advised to run `./cleanup.sh` first, this will prevent ***Mimosa*** from using existing or cached workflows.
 
 ### ScienceAgentBench
+
+**Manuscript-aligned results snapshot (task mode, 102 tasks):**
+
+- DeepSeek-V3.2 single-agent: `SR 38.2%`, `CBS 0.898`, `$0.05/task`
+- DeepSeek-V3.2 one-shot multi-agent: `SR 32.4%`, `CBS 0.794`, `$0.38/task`
+- DeepSeek-V3.2 iterative-learning: `SR 43.1%`, `CBS 0.921`, `$1.7/task`
+- We also report model-dependent behavior in the manuscript: iterative learning improves GPT-4o, but yields marginal degradation for Claude Haiku 4.5.
 
 To evaluate on ScienceAgentBench you must:
 
