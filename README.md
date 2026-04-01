@@ -12,9 +12,8 @@
 </p>
 
 <p align="center">
-    <img src="https://img.shields.io/github/license/HolobiomicsLab/Mimosa-AI?style=flat-square&logo=opensourceinitiative&logoColor=white&color=4caf82" alt="license">
-    <img src="https://img.shields.io/github/last-commit/HolobiomicsLab/Mimosa-AI?style=flat-square&logo=git&logoColor=white&color=4caf82" alt="last-commit">
-    <img src="https://img.shields.io/github/languages/count/HolobiomicsLab/Mimosa-AI?style=flat-square&color=4caf82" alt="repo-language-count">
+    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv"></a>
+    <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/website-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="website"></a>
 </p>
 
 <p align="center">
