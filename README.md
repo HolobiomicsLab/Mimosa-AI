@@ -8,7 +8,7 @@
 <h1 align="center">Mimosa-AI 🌼🔬</h1>
 
 <p align="center">
-    <em>An open framework for autonomous AI-driven science.</em>
+    <em>An Open-source Evolving AI-Framework for Autonomous Scientific Research</em>
 </p>
 
 <p align="center">
@@ -17,12 +17,8 @@
 </p>
 
 <p align="center">
-    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers">
-        <img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars">
-    </a>
-    <a href="https://opensource.org/licenses/Apache-2.0">
-        <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0">
-    </a>
+    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers"><img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars"></a>&nbsp;
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
 </p>
 
 ---
@@ -32,6 +28,13 @@
 **Objectives:**
 - Reproduce scientific studies with traceability and rigor
 - Automate computational scientific pipelines across domains such as bioinformatics, docking, metabolomics, and more
+
+---
+
+<p align="center">
+<b>Citation:</b> <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
+M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a> — <a href="#citation">[BibTeX]</a>
+</p>
 
 ## Table of Contents
 
@@ -49,6 +52,7 @@
 - [Phone Notifications](#phone-notifications)
 - [Telemetry Setup](#telemetry-setup)
 - [License](#license)
+- [Citation](#citation)
 
 ## How does it work ?
 
@@ -411,3 +415,16 @@ For contribution and licensing details, see:
 - `CLA/EMPLOYER_AUTHORIZATION.md`
 
 ---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@article{legrand2026mimosa,
+  title={Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author={Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal={arXiv preprint arXiv:2603.28986},
+  year={2026}
+}
+```
