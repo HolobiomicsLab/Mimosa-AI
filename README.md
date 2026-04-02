@@ -8,6 +8,14 @@
 <h1 align="center">Mimosa-AI 🌼🔬</h1>
 
 <p align="center">
+  <a href="./README.md">English</a> &nbsp;|&nbsp;
+  <a href="./README.CHS.md">简体中文</a> &nbsp;|&nbsp;
+  <a href="./README.CHT.md">繁體中文</a> &nbsp;|&nbsp;
+  <a href="./README.JPN.md">日本語</a> &nbsp;|&nbsp;
+  <a href="./README.KOR.md">한국어</a>
+</p>
+
+<p align="center">
     <em>An Open-source Evolving AI-Framework for Autonomous Scientific Research</em>
 </p>
 
