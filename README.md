@@ -27,6 +27,20 @@
 
 ---
 
+<div align="center">
+
+### 📄 Preprint
+
+**[Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research](https://arxiv.org/abs/2603.28986)**
+
+Martin Legrand, Tao Jiang, Matthieu Feraud, Benjamin Navet, Yousouf Taghzouti, Fabien Gandon, Elise Dumont, Louis-Félix Nothias
+
+*arXiv:2603.28986 [cs.AI], April 2026* — [[Cite]](#citation)
+
+</div>
+
+---
+
 > ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — Mimosa is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. ***Mimosa-AI*** discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement through evolution of multi-agent workflows.
 
 **Use cases:**
@@ -49,6 +63,7 @@
 - [Phone Notifications](#phone-notifications)
 - [Telemetry Setup](#telemetry-setup)
 - [License](#license)
+- [Citation](#citation)
 
 ## How does it work ?
 
@@ -386,3 +401,16 @@ For contribution and licensing details, see:
 - `CLA/EMPLOYER_AUTHORIZATION.md`
 
 ---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@article{legrand2026mimosa,
+  title={Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author={Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal={arXiv preprint arXiv:2603.28986},
+  year={2026}
+}
+```
