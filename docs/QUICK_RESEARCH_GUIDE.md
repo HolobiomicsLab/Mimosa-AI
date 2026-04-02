@@ -77,13 +77,15 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json
 
 ## Understanding the Architecture
 
-### Four-Layer Structure
+### Five-Layer Architecture
+
+The manuscript describes Mimosa as a five-layer architecture numbered `0` through `4`: planning, tool discovery, meta-orchestration, agent execution, and judge/evaluation. Quick research on ScienceAgentBench runs in `task` mode, so Layer `0` is bypassed during benchmarking, but it remains part of the full system design.
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Layer 0 (Optional): Planning                       │
 │  - Goal → Task decomposition                        │
-│  - Not used in quick research (task mode only)      │
+│  - Bypassed in quick research (task mode)           │
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
@@ -94,7 +96,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
-│  Layer 2: Meta-Orchestration (Neuro-evolution Core) │
+│  Layer 2: Meta-Orchestration                        │
 │  ┌───────────────────────────────────────────────┐  │
 │  │ Workflow Selection                            │  │
 │  │ - Embedding similarity search                 │  │
@@ -123,8 +125,8 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
-│  Layer 4: Evaluation (LLM Judge)                    │
-│  - Generic evaluation (4 criteria)                  │
+│  Layer 4: Judge / Evaluation                        │
+│  - LLM judge with structured feedback               │
 │  - Scenario evaluation (rubric-based)               │
 │  - Source: sources/evaluation/evaluator.py          │
 └─────────────────────────────────────────────────────┘
@@ -148,6 +150,8 @@ sources/workflows/
     ├── state_result.json          # Final state with scores
     └── evaluation.txt             # Judge feedback
 ```
+
+These folders form the main audit trail for a run: `sources/workflows/<uuid>/` captures the generated workflow, evaluation artifacts, and iteration history, while `runs_capsule/` preserves the final workspace snapshot copied from Toolomics. Use `memory_explorer.py <uuid>` when you want to replay an execution trace interactively.
 
 ---
 
