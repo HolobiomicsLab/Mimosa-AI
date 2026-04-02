@@ -17,26 +17,24 @@
 </p>
 
 <p align="center">
-    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers">
-        <img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars">
-    </a>
-    <a href="https://opensource.org/licenses/Apache-2.0">
-        <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0">
-    </a>
+    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers"><img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars"></a>&nbsp;
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
 </p>
 
 ---
 
 > ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — Mimosa is an AI-scientist framework built to carry out end-to-end research and reproduce published findings autonomously. ***Mimosa-AI*** discovers available tools, decomposes research objectives into structured workflows, and drives multi-agent execution with iterative self-improvement through evolution of multi-agent workflows.
 
-<p align="center">
-📄 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
-M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="#citation">[Cite]</a>
-</p>
-
 **Use cases:**
 - Reproduce scientific studies with rigorous, auditable workflows
 - Automate full pipelines: bioinformatics, molecular docking, metabolomics, and beyond
+
+---
+
+<p align="center">
+Citation: <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
+M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a> — <a href="#citation">[BibTeX]</a>
+</p>
 
 ## Table of Contents
 
