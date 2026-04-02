@@ -8,7 +8,7 @@
 <h1 align="center">Mimosa-AI 🌼🔬</h1>
 
 <p align="center">
-    <em>An open-source framework for evolving autonomous AI scientists workflows.</em>
+    <em>An Open-source Evolving AI-Framework for Autonomous Scientific Research.</em>
 </p>
 
 <p align="center">
