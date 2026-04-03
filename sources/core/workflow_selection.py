@@ -12,7 +12,7 @@ class WorkflowSelector:
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
         self.workflows_info = self.discover_workflows()
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
 
     def discover_workflows(self) -> dict[str, WorkflowInfo]:
         workflows = {}
@@ -20,29 +20,29 @@ class WorkflowSelector:
         if not self.workflows_folder.exists():
             print(f"Workflows directory {self.workflows_folder} does not exist.")
             return workflows
-            
+
         for workflow_folder in self.workflows_folder.iterdir():
             if not workflow_folder.is_dir():
                 continue
-                
+
             uuid = workflow_folder.name
             workflow_info = WorkflowInfo(uuid, workflow_folder)
-            
+
             if not workflow_info.is_valid():
                 continue
-                
+
             # Check if state_result is empty
             if not workflow_info.load_state_result():
                 print(f"Skipping workflow {uuid}: empty state_result.json")
                 continue
-        
+
             workflow_info.load_code()
             if not workflow_info.code:
                 print(f"Skipping workflow {uuid}: unable to load code")
                 continue
-                
+
             workflows[uuid] = workflow_info
-            
+
         return workflows
 
     def cosine_similarity(self, a: str, b: str) -> float:
@@ -61,12 +61,12 @@ class WorkflowSelector:
         self, goal: str, threshold=0.8, debug=False
     ) -> list[WorkflowInfo]:
         """Find workflows with similar goals using original unwrapped tasks.
-        
+
         Args:
             goal: The task to match against (will be compared with original_task of workflows)
             threshold: Minimum similarity score (0.0-1.0)
             debug: Whether to print debug information
-            
+
         Returns:
             list[WorkflowInfo]: Workflows sorted by similarity, filtered by threshold
         """
@@ -75,14 +75,14 @@ class WorkflowSelector:
         if not self.workflows_info:
             print("No workflows found.")
             return []
-        
+
         # Use original_task for comparison to avoid knowledge wrapper interference
         similar_workflows = sorted(
             self.workflows_info.values(),
             key=lambda wf: self.cosine_similarity(wf.original_task[-512:], goal[-512:]),
             reverse=True,
         )
-        
+
         if debug:
             for wf in similar_workflows:
                 sim = self.cosine_similarity(wf.original_task[-512:], goal[-512:])
@@ -90,13 +90,13 @@ class WorkflowSelector:
                       f"Original Task:\n{wf.original_task[:512]}\n"
                       f"Target:\n{goal[:512]}\n"
                       f"Similarity: {sim:.4f}\n---\n")
-        
+
         return [
             wf
             for wf in similar_workflows
             if self.cosine_similarity(wf.original_task[-512:], goal[-512:]) >= threshold
         ]
-    
+
     def sort_workflows_by_score(
         self, workflows_info: list[WorkflowInfo], threshold: float
     ) -> list[WorkflowInfo]:

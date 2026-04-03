@@ -6,6 +6,10 @@ import logging
 import time
 
 from sources.utils.notify import PushNotifier
+from sources.utils.perspicacite_client import (
+    format_scientific_context,
+    query_perspicacite,
+)
 from .workflow_factory import WorkflowFactory
 from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
@@ -87,6 +91,29 @@ class WorkflowOrchestrator:
 
         workflow_start_time = time.time()
         execution_output = ""
+
+        # ------------------------------------------------------------------ #
+        # Query Perspicacite-AI for grounded scientific context.
+        # ------------------------------------------------------------------ #
+        science_task = original_task if original_task else goal
+        print(
+            f"\n\033[94m🔬 Querying Perspicacite-AI for scientific context...\033[0m"
+        )
+        scientific_context = query_perspicacite(science_task)
+        if scientific_context:
+            print(
+                "\033[94m✅ [Perspicacite] Scientific context: {scientific_context[:500]}...\033[0m"
+            )
+            logger.info("[Perspicacite] Prepending scientific context to craft instructions.")
+            craft_instructions = (
+                format_scientific_context(science_task, scientific_context)
+                + craft_instructions
+            )
+        else:
+            print(
+                "\033[93m⚠️  [Perspicacite] Service unavailable or returned no "
+                "results – proceeding without scientific grounding.\033[0m"
+            )
 
         logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
         print(f"\n\033[96m{'🏗️  WORKFLOW GENERATION PHASE':^80}\033[0m")
