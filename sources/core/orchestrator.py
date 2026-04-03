@@ -104,7 +104,6 @@ class WorkflowOrchestrator:
             print(
                 "\033[94m✅ [Perspicacite] Scientific context: {scientific_context[:500]}...\033[0m"
             )
-            logger.info("[Perspicacite] Prepending scientific context to craft instructions.")
             craft_instructions = (
                 format_scientific_context(science_task, scientific_context)
                 + craft_instructions

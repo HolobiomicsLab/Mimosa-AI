@@ -14,6 +14,11 @@ from sources.utils.planner_visualization import PlannerVisualizer
 from sources.utils.list_files import list_files
 from sources.extensibility.text_to_speech import create_tts_service
 
+from sources.utils.perspicacite_client import (
+    format_scientific_context,
+    query_perspicacite,
+)
+
 
 class PlanValidationError(Exception):
     """Exception raised when plan validation fails."""
@@ -57,6 +62,26 @@ class Planner:
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
 
+    def make_scientific_grounded_prompt(self, goal: str) -> str:
+        """
+        Create a scientific-grounded prompt by incorporating relevant scientific knowledge.
+        Args:
+            goal: The original goal description
+        Returns:
+            str: Enhanced prompt with scientific context
+        """
+        scientific_context = query_perspicacite(goal) or "No relevant scientific context found."
+        print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:500]}...\n---")
+
+        return f"""
+You are a top-tier scientific in research. When generating the plan, please incorporate relevant scientific principles, theories, or findings that could inform the approach to achieving the goal. This will help ensure that the plan is not only practical but also grounded in scientific understanding.
+Scientific context related to the goal:
+{scientific_context}
+You must generate a plan for goal:\n
+{goal}\n
+Important: Every task description should be very detailled and specific with the full path of all input output files specified.
+"""
+
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
         Generate a workflow plan using the LLM with retry logic and multiple parsing strategies.
@@ -76,7 +101,7 @@ class Planner:
 
         last_error = None
 
-        prompt = f"You must generate a plan for goal:\n{goal_prompt}\nImportant: Every task description should be very detailled and specific with the full path of all input output files specified."
+        prompt = self.make_scientific_grounded_prompt(goal_prompt)
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
