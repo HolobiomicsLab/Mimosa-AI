@@ -379,7 +379,7 @@ class DarwinMachine:
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
         if learning_mode:
-            max_iteration = max(3, self.config.max_learning_evolve_iterations)
+            max_iteration = max(1, self.config.max_learning_evolve_iterations)
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
