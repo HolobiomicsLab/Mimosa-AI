@@ -54,6 +54,7 @@ class Planner:
         self.visualizer_thread: threading.Thread | None = None
         self.use_visualization: bool = True  # Can be disabled if pygame not available
         self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
+        self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
 
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
@@ -315,7 +316,7 @@ Original request:
         print("   • Press [ENTER] to approve and execute the plan")
         print("   • Type your corrections/feedback and press [ENTER] to regenerate")
         print("\n" + "─" * 80)
-        
+
         user_input = input("\n👉 Your decision: ").strip()
         if not user_input:
             print("\n✅ Plan approved by human. Proceeding with execution...")
@@ -339,7 +340,7 @@ Original request:
         system_prompt = self._read_prompt()
         plan_approved = False
         human_feedback = ""
-        
+
         while not plan_approved:
             current_goal = goal
             if human_feedback:
@@ -358,7 +359,7 @@ Original request:
         """
         Initialize the pygame visualization window.
         On macOS, pygame must run on the main thread due to Cocoa requirements.
-        On Linux, it can run in a separate thread for better performance.
+        On Linux and Windows, it can run in a separate thread for better performance.
 
         Args:
             plan: The execution plan to visualize
@@ -370,7 +371,7 @@ Original request:
             self.visualizer = PlannerVisualizer(plan)
             print("🎨 Visualization window initialized")
 
-            # On Linux, use a separate thread for event handling
+            # On Linux and Windows, use a separate thread for event handling.
             # On macOS, event handling must be done from main thread (will be called periodically)
             if not self.is_macos:
                 def visualization_loop():
@@ -382,7 +383,8 @@ Original request:
 
                 self.visualizer_thread = threading.Thread(target=visualization_loop, daemon=True)
                 self.visualizer_thread.start()
-                print("🎨 Visualization running in separate thread (Linux)")
+                platform_name = "Windows" if self.is_windows else "Linux"
+                print(f"🎨 Visualization running in separate thread ({platform_name})")
             else:
                 print("🎨 Visualization will update from main thread (macOS)")
 
@@ -396,7 +398,7 @@ Original request:
         """
         Update the visualization with the current task states.
         On macOS, also handle events since we can't use a separate thread.
-        
+
         Args:
             total_cost: The cumulative cost to display
         """
@@ -434,8 +436,13 @@ Original request:
     def _get_workspace_files(self) -> list[str]:
         """
         Get all files in the workspace directory recursively.
+        Paths are always returned with forward slashes so that comparisons
+        against plan-defined paths (which use forward slashes) work correctly
+        on every platform including Windows.
+
         Returns:
-            set[str]: Set of relative file paths from workspace root
+            list[str]: List of relative file paths from workspace root
+                       using forward slashes as separator.
         """
         files = []
         try:
@@ -452,7 +459,8 @@ Original request:
                         file_path = Path(root) / filename
                         try:
                             relative_path = file_path.relative_to(workspace_path)
-                            files.append(str(relative_path))
+                            # Always use forward slashes for cross-platform consistency
+                            files.append(relative_path.as_posix())
                         except ValueError:
                             continue
         except Exception as e:
@@ -478,8 +486,12 @@ Original request:
         """
         missing_inputs = []
 
+        workspace_files = self._get_workspace_files()
         for required_input in step.required_inputs:
-            if required_input not in self._get_workspace_files():
+            # Normalise to forward slashes so Windows backslashes never cause
+            # a false-negative when comparing against plan-defined paths.
+            normalised_input = Path(required_input).as_posix()
+            if normalised_input not in workspace_files:
                 missing_inputs.append(required_input)
         return len(missing_inputs) == 0, missing_inputs
 
@@ -496,10 +508,14 @@ Original request:
         workspace_files = self._capture_workspace_snapshot()
 
         for expected_output in step.expected_outputs:
-            exp_terms = set(re.sub(r'[_\-.]', ' ', os.path.splitext(expected_output)[0].lower()).split())
+            # Normalise expected path to forward slashes for cross-platform comparison
+            normalised_expected = Path(expected_output).as_posix()
+            # Use Path.stem to strip the extension in a platform-agnostic way
+            exp_stem = Path(expected_output).stem.lower()
+            exp_terms = set(re.sub(r'[_\-.]', ' ', exp_stem).split())
             found = any(
-                expected_output in actual or
-                len(exp_terms & set(re.sub(r'[_\-.]', ' ', os.path.splitext(actual)[0].lower()).split())) >= len(exp_terms) * 0.7
+                normalised_expected in actual or
+                len(exp_terms & set(re.sub(r'[_\-.]', ' ', Path(actual).stem.lower()).split())) >= len(exp_terms) * 0.7
                 for actual in workspace_files
             )
             if not found:
@@ -561,7 +577,7 @@ Original request:
         try:
             # Use original_task for lookup to avoid knowledge wrapper interference
             lookup_task = original_task if original_task else task
-            
+
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
                 lookup_task, threshold_similary=0.8, threshod_score=0.85
@@ -657,9 +673,9 @@ Original request:
                 enhanced_task = self._build_knowledge_aware_task(step_task)
                 # Pass both enhanced task and original task for proper workflow matching
                 evolve_runs = await self.evolve_runs(
-                    enhanced_task, 
-                    judge, 
-                    max_evolve_iteration, 
+                    enhanced_task,
+                    judge,
+                    max_evolve_iteration,
                     cached_wf_allow=(attempt<=1),
                     original_task=step_task  # Pass original for similarity matching
                 )

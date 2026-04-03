@@ -63,12 +63,12 @@ class Config:
         self.reasoning_effort: str = "high"
 
         # max_tokens: Maximum number of tokens to generate for LLM responses
-        self.max_tokens: int = 8190
+        self.max_tokens: int = 8192
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.8
+        self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 10
 
         # folder paths for workflow pre-defined code

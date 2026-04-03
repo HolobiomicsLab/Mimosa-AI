@@ -1,7 +1,6 @@
 # Contributing to Mimosa-AI
 
-> Note: This file is the technical contribution guide. For licensing/CLA policy (including the required `CLA Check` status before merge), use the repository-root `CONTRIBUTING.md`.
-> CLA contact: dr20.spv@listes.cnrs.fr
+> Note: This file is the technical contribution guide.
 
 ## Table of Contents
 1. [Project Philosophy](#project-philosophy)
@@ -55,9 +54,19 @@ Uses MCP (Model Context Protocol) for:
 - Automatic discovery of available tools on local network
 - Dynamic tool invocation in generated workflows
 - Seamless integration with lab instruments, web services, data analysis tools
-- Toolhive integration for centralized tool repositories
+- Toolomics integration for centralized MCP tool management and workspace exchange
 
 ---
+
+## Architecture Overview
+
+Mimosa follows the same five-layer architecture described in the manuscript: `(0)` optional planning, `(1)` tool discovery through MCP, `(2)` meta-orchestration, `(3)` agent execution, and `(4)` judge/evaluation. In `goal` mode, the planner decomposes a high-level objective into tasks; in `task` mode, prompts are sent directly to the meta-orchestration layer.
+
+- Layer `0` plans and decomposes goals into tasks.
+- Layer `1` discovers MCP tools exposed through Toolomics or the local network.
+- Layer `2` synthesizes and iteratively refines task-specific multi-agent workflows.
+- Layer `3` executes those workflows with code-generating agents and scientific software.
+- Layer `4` evaluates executions and returns structured feedback for refinement or reporting.
 
 ---
 
@@ -114,7 +123,7 @@ mimosa-ai/
 │   │
 │   └── prompts/                        # LLM system prompts
 │       ├── planner_reproduction.md     # Planner system prompt
-│       ├── workflow_v7.md              # Workflow generation prompt
+│       ├── workflow_v8.md              # Workflow generation prompt
 │       └── (other specialized prompts)
 │
 ├── sources/workflows/                  # Generated workflow storage
@@ -184,7 +193,7 @@ mimosa-ai/
 1. TASK RECOGNITION
    ├─ Calculate similarity to past tasks
    ├─ Look up historical workflows
-   └─ Check success threshold (0.85)
+   └─ Check success threshold (0.9)
        ├─ If found → Return cached result
        └─ If not → Create new workflow
 
