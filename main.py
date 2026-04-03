@@ -238,10 +238,6 @@ async def main():
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
 
-<<<<<<< HEAD
-
-=======
->>>>>>> dev
     # security check
     PackageCheck().run()
     # Setup logging with debug flag
