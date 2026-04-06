@@ -109,14 +109,22 @@ async def papers_mode(args, config):
                                  )
 
 async def science_bench_papers_mode(args, config):
-    papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    # Use concurrent evaluation by default for science_agent_bench
+    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 4)
+    papers = CsvEvaluationMode(
+        config,
+        csv_runs_limit=args.csv_runs_limit,
+        max_concurrent_tasks=max_concurrent
+    )
     if args.single_agent:
         print(f"⚠️ Starting in single agent mode")
-    await papers.start_evaluation(dataset_type="science_agent_bench",
-                                  dataset_path="datasets/ScienceAgentBench.csv",
-                                  learning=args.learn,
-                                  single_agent_mode=args.single_agent
-                                 )
+    await papers.start_evaluation(
+        dataset_type="science_agent_bench",
+        dataset_path="datasets/ScienceAgentBench.csv",
+        learning=args.learn,
+        single_agent_mode=args.single_agent,
+        concurrent=True  # Enable concurrent mode by default
+    )
 
 async def workflow_generation_evals(args, config):
     evaluator = WorkflowEval(config, csv_runs_limit=args.csv_runs_limit)

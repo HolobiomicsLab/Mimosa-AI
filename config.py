@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -56,7 +56,7 @@ class Config:
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v9.md"
         self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
@@ -70,6 +70,9 @@ class Config:
         # learning parameters
         self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 10
+
+        # evaluation concurrency settings
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
