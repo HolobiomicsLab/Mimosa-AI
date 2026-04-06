@@ -197,11 +197,37 @@ Provide a structured analysis with:
             )
             print(f"\033[95mRestored {total_eval} previous evaluations from cache\033[0m")
 
-    def _save_run_notes(self, capsule_name: str, goal: str,
-                       analysis: dict, execution_time: float) -> None:
-        """Save detailed notes about the run."""
+    def _save_run_notes(
+        self,
+        capsule_name: str,
+        goal: str,
+        analysis: dict,
+        execution_time: float,
+        current_execution_data: dict | None = None
+    ) -> None:
+        """
+        Save detailed notes about the run.
+
+        Args:
+            capsule_name: Name of the capsule directory
+            goal: The task goal
+            analysis: Analysis results dictionary
+            execution_time: Time taken for execution
+            current_execution_data: Optional current task execution data (for concurrent mode).
+                                   If provided, this task's data is included even if not yet
+                                   in self.execution_history.
+        """
         timestamp = datetime.now().isoformat()
+
+        # Build the list of SAB runs, including current task if provided
         sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
+
+        # For concurrent mode: include current_execution_data if it has SAB metrics
+        if current_execution_data and 'VER' in current_execution_data:
+            # Check if this task is not already in execution_history (concurrent mode)
+            if current_execution_data not in sab_runs:
+                sab_runs = sab_runs + [current_execution_data]
+
         notes = {
             "timestamp": timestamp,
             "model": self.config.smolagent_model_id,
@@ -210,8 +236,12 @@ Provide a structured analysis with:
             "analysis": analysis["full_analysis"],
             "total_eval": len(sab_runs)
         }
+
         if sab_runs:
-            runs_data = sab_runs[-1].get('runs', [])
+            # Use current_execution_data if provided, otherwise use last from sab_runs
+            current_task_data = current_execution_data if current_execution_data and 'VER' in current_execution_data else sab_runs[-1]
+            runs_data = current_task_data.get('runs', [])
+
             notes = {
                 **notes,
                 "capsule_name": capsule_name,
@@ -219,8 +249,8 @@ Provide a structured analysis with:
                 "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
                 "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
                 "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
-                "is_success": sab_runs[-1].get('SR', False),
-                "task_cost": sab_runs[-1].get('eval_cost', 0.0),
+                "is_success": current_task_data.get('SR', False),
+                "task_cost": current_task_data.get('eval_cost', 0.0),
                 "max_judge_reward": max((getattr(run, 'reward', 0.0) for run in runs_data), default=0.0),
                 "evolution_iterations": len(runs_data),
                 "evolved_workflows_uuids": [getattr(run, 'current_uuid', '') for run in runs_data],
@@ -542,7 +572,7 @@ Provide your analysis following the specified output format."""
         # Acquire semaphore to limit concurrency
         async with self._semaphore:
             self.logger.info(f"[CONCURRENT] Starting task {i + 1} (workspace: {workspace_name})")
-            print(f"\033[96m🚀 [Worker {workspace_name}] Starting task {i + 1}\033[0m")
+            print(f"\033[96m[Worker {workspace_name}] Starting task {i + 1}\033[0m")
 
             # Create isolated config and instances for this task
             isolated_config = self._create_isolated_config(task_id)
@@ -630,7 +660,11 @@ Provide your analysis following the specified output format."""
                 print(f"\033[96m[Worker {task_id}]    Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
 
                 # Save run notes (thread-safe via file system)
-                self._save_run_notes(capsule_name, goal, analysis, execution_time)
+                # Pass current execution_data for concurrent mode since execution_history isn't updated yet
+                self._save_run_notes(
+                    capsule_name, goal, analysis, execution_time,
+                    current_execution_data=execution_data
+                )
 
                 return execution_data
 
