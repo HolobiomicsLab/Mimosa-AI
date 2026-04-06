@@ -615,7 +615,7 @@ class DarwinMachine:
 
     async def _evaluate_and_calculate_cost(
         self, executed: bool, judge: bool, uuid: str,
-        answer: str, scenario_rubric: str, assertion_history: list
+        agent_answers: str, scenario_rubric: str, assertion_history: list
     ) -> tuple[str, float]:
         """Evaluate workflow and calculate cost."""
         logger = logging.getLogger(__name__)
@@ -623,8 +623,8 @@ class DarwinMachine:
         exec_cost = 0.0
 
         if judge and uuid:
-            answer = answer if executed else "workflow failed to execute."
-            eval_type = await self._evaluate_workflow(uuid, answer, scenario_rubric, assertion_history)
+            agent_answers = agent_answers if executed else "workflow failed to execute."
+            eval_type = await self._evaluate_workflow(uuid, agent_answers, scenario_rubric, assertion_history)
         # Calculate cost regardless of execution success
         cost_start = time.time()
         exec_cost = self.pricing.calculate_cost(uuid)
@@ -634,7 +634,7 @@ class DarwinMachine:
         return eval_type, exec_cost
 
     async def _evaluate_workflow(
-        self, uuid: str, answer: str, scenario_rubric: str, assertion_history: list
+        self, uuid: str, agent_answers: str, scenario_rubric: str, assertion_history: list
     ) -> str:
         """Evaluate the workflow and update assertion history."""
         logger = logging.getLogger(__name__)
@@ -643,7 +643,7 @@ class DarwinMachine:
         print(f"\033[94m{'=' * 80}\033[0m")
 
         eval_start = time.time()
-        eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_rubric=scenario_rubric)
+        eval_result = self.judge.evaluate(uuid=uuid, agent_answers=agent_answers, scenario_rubric=scenario_rubric)
         eval_type = 'scenario' if scenario_rubric else 'generic'
         eval_time = time.time() - eval_start
 

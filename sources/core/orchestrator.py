@@ -102,7 +102,7 @@ class WorkflowOrchestrator:
         scientific_context = query_perspicacite(science_task)
         if scientific_context:
             print(
-                "\033[94m✅ [Perspicacite] Scientific context: {scientific_context[:500]}...\033[0m"
+                f"\033[94m✅ [Perspicacite] Scientific context: {scientific_context[:500]}...\033[0m"
             )
             craft_instructions = (
                 format_scientific_context(science_task, scientific_context)

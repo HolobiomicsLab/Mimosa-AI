@@ -18,6 +18,7 @@ if __name__ == "__main__":
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.core.workflow_info import WorkflowInfo
+from sources.utils.perspicacite_client import query_perspicacite
 
 
 class EvaluatorError(Exception):
@@ -146,7 +147,6 @@ class BaseEvaluator:
         """
         try:
             workflow_info = self._load_workflow_data(uuid)
-
             state_result = workflow_info.state_result
             workflow_code = workflow_info.code
             goal = workflow_info.goal or "Goal not specified"
@@ -157,10 +157,11 @@ class BaseEvaluator:
             result = workflow_info.answers
 
             return f"""
-                   You are evaluating AI agent(s) performance on a computational workflow. The workflow's goal is to achieve the following scientific/research objective:
                    GOAL:
+                    The workflow's goal was to achieve the following scientific/research objective:
                    {goal}
                    FINAL ANSWER FROM AGENT(S) EXECUTION:
+                   The final answer produced by the agent(s) at the end of the workflow execution was:
                    {json.dumps(result, indent=2)}
                    """
         except Exception as e:
@@ -267,12 +268,31 @@ class GenericEvaluator(BaseEvaluator):
         super().__init__(config)
         self.logger.info("GenericEvaluator initialized successfully")
 
-    def evaluate(self, uuid: str, answer: str | None = None) -> None:
+    def get_perspicacite_grounding(self, execution_text: str) -> str:
+        """Query Perspicacite for citation grounded verification of workflow execution.
+        Args:
+            execution_text: The execution text to send to Perspicacite
+        """
+        prompt = f"""
+        You are tasked with verifying the correctness of a computational workflow execution based on the scientific literature.
+        You must verify the plausibility of the correctness of agents answers for the goal achievement, based on the execution trace or final answer and claims produced by the agents.
+        {execution_text}
+        Do not evalute the goal plausibility but the agents answer plausibility according to the scientific literature.
+        Access the scientific literature to find relevant information that can confirm or refute the correctness of answers provided by the agents.
+        """
+        try:
+            response = query_perspicacite(prompt)
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to query Perspicacite: {str(e)}")
+            return "Perspicacite query failed, unable to provide grounded verification. Estimating plausibility based on available evidence without external grounding."
+
+    def evaluate(self, uuid: str, agent_answers: str | None = None) -> None:
         """Perform generic evaluation of a workflow.
 
         Args:
             uuid: UUID of the workflow to evaluate
-            answer: Optional expected answer for evaluation
+            agent_answers: Optional list of answers from agents for evaluation
 
         Raises:
             LLMEvaluationError: If LLM evaluation fails
@@ -282,9 +302,15 @@ class GenericEvaluator(BaseEvaluator):
             execution_text = self.workflow_execution_text(uuid)
             if not execution_text:
                 raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
+            litterature_grounding = self.get_perspicacite_grounding(execution_text)
+            print(f"Perspicacite grounding for workflow {uuid}:\n{litterature_grounding}\n")
 
             prompt = f"""
+    You are evaluating AI agent(s) performance on a computational task.
     {execution_text}
+
+    According to scientific literature grounding, the following information is relevant to assessing the workflow execution:
+    {litterature_grounding}
 
     EVALUATION TASK:
     Based on the complete execution state and workflow code above, provide a score for each category.
@@ -306,35 +332,33 @@ class GenericEvaluator(BaseEvaluator):
     Is the output complete?
     Is the output well-formatted?
 
-    """ + (f"""4. ANSWER PLAUSIBILITY
-    Answer should be : {answer}
+    4. ANSWER PLAUSIBILITY
     Does the answer appear plausible given the workflow trace and available evidence?
     Is the answer logically consistent?
     Is the answer appropriately qualified rather than overstated?
-    """ if answer else "") + """
 
     Respond in this exact format:
     [
-        {
+        {{
             "category": "goal_alignment",
             "score": [0.0-1.0],
             "evidence": "[Specific JSON paths/logs proving objective fulfillment]"
-        },
-        {
+        }},
+        {{
             "category": "agent_collaboration",
             "score": [0.0-1.0],
             "evidence": "[Message history snippets or error logs]"
-        },
-        {
+        }},
+        {{
             "category": "output_quality",
             "score": [0.0-1.0],
             "evidence": "[Output validation errors or missing fields]"
-        }""" + ("""
-        ,{
+        }},
+        {{
             "category": "answer_plausibility",
             "score": [0.0-1.0],
             "evidence": "[Why the answer seems plausible or implausible from the available evidence]"
-        }""" if answer else "") + """
+        }}
     ]
     """
 
@@ -1097,12 +1121,12 @@ class WorkflowEvaluator:
                 raise
             raise EvaluatorError(f"Failed to initialize WorkflowEvaluator: {str(e)}") from e
 
-    def evaluate(self, uuid: str, answer: str = None, scenario_rubric: str = None) -> dict[str, Any]:
+    def evaluate(self, uuid: str, agent_answers: str = None, scenario_rubric: str = None) -> dict[str, Any]:
         """Evaluate the workflow results.
 
         Args:
             uuid: UUID of the workflow run to evaluate
-            answer: Optional expected answer for evaluation
+            agent_answers: Optional list of answers from agents for evaluation
             scenario_rubric: Optional scenario ID for scenario-based evaluation
 
         Returns:
@@ -1122,10 +1146,10 @@ class WorkflowEvaluator:
                     return self.scenario_evaluator.evaluate(uuid, scenario_rubric)
                 except ScenarioError as e:
                     self.logger.error(f"Scenario evaluation failed for {uuid} with rubric {scenario_rubric}: {str(e)}")
-                    self.generic_evaluator.evaluate(uuid, answer)
+                    self.generic_evaluator.evaluate(uuid, agent_answers)
                     return {'evaluation_type': 'generic', 'uuid': uuid}
             else:
-                self.generic_evaluator.evaluate(uuid, answer)
+                self.generic_evaluator.evaluate(uuid, agent_answers)
                 return {'evaluation_type': 'generic', 'uuid': uuid}
 
         except (WorkflowDataError, ScenarioError, LLMEvaluationError) as _:
