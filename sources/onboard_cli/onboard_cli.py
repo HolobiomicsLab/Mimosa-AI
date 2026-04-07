@@ -363,8 +363,14 @@ class OnboardCLI:
             _warn(f"Discovery error: {exc}")
             return []
 
+    _CONFIG_DEFAULT_PATH = "config_default.json"
+
     def _verify_workspace_dir(self) -> None:
-        """Check that config.workspace_dir exists; prompt the user until it does."""
+        """Check that config.workspace_dir exists; prompt the user until it does.
+
+        When the user supplies a valid path it is written back to
+        *config_default.json* so that subsequent runs don't ask again.
+        """
         while True:
             workspace = self.config.workspace_dir
             if os.path.isdir(workspace):
@@ -389,8 +395,30 @@ class OnboardCLI:
             if os.path.isdir(new_path):
                 self.config.workspace_dir = new_path
                 _ok(f"Workspace directory set to: {new_path}")
+                self._persist_workspace_dir(new_path)
                 return
             _err(f"Directory does not exist: {new_path}. Please try again.")
+
+    def _persist_workspace_dir(self, path: str) -> None:
+        """Write *path* as workspace_dir into config_default.json."""
+        cfg_path = self._CONFIG_DEFAULT_PATH
+        try:
+            # Read existing config (or start from empty dict)
+            if os.path.isfile(cfg_path):
+                with open(cfg_path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+            else:
+                data = {}
+
+            data["workspace_dir"] = path
+
+            with open(cfg_path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2)
+                fh.write("\n")
+
+            _ok(f"Saved workspace_dir to {cfg_path}")
+        except Exception as exc:
+            _warn(f"Could not persist workspace path to {cfg_path}: {exc}")
 
     def _collect_objective(self) -> None:
         """Prompt the user for their initial research objective."""

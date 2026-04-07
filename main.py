@@ -244,7 +244,6 @@ async def main():
     setup_logging(debug=args.debug)
 
     # Detect interactive (no-argument) mode early so we can skip pre-checks
-    # that the onboarding CLI handles itself (API keys, config, Toolomics).
     no_mode_selected = not any([
         args.manual,
         args.papers,
@@ -256,8 +255,7 @@ async def main():
     ])
 
     if no_mode_selected:
-        # Interactive onboarding CLI — it owns the full setup flow.
-        # PackageCheck and logging are already initialised above.
+        # Interactive onboarding CLI for full setup flow.
         try:
             cli = OnboardCLI(config)
             await cli.run()
