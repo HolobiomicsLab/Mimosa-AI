@@ -47,7 +47,26 @@ MIMOSA_BANNER = f"""
 {DIM}  Self-evolving AI Framework for Autonomous Scientific Research{RESET}
 """
 
-TOTAL_STEPS = 7
+TOTAL_STEPS = 8
+
+# ---------------------------------------------------------------------------
+# Model presets — ordered by quality/preference
+# (env_key, display_label, litellm_model_id)
+# ---------------------------------------------------------------------------
+_MODEL_PRESETS: list[tuple[str, str, str]] = [
+    ("ANTHROPIC_API_KEY",  "Claude Sonnet 4.5  (Anthropic)",  "anthropic/claude-sonnet-4-5"),
+    ("DEEPSEEK_API_KEY",   "DeepSeek Chat      (DeepSeek)",   "deepseek/deepseek-chat"),
+    ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5"),
+    ("OPENAI_API_KEY",     "GPT-4o             (OpenAI)",     "openai/gpt-4o"),
+    ("MISTRAL_API_KEY",    "Mistral Large      (Mistral)",    "mistral/mistral-large-latest"),
+]
+# Config keys that all share the same "main" LLM selection
+_MODEL_CFG_KEYS = [
+    "planner_llm_model",
+    "prompts_llm_model",
+    "workflow_llm_model",
+    "judge_model",
+]
 
 
 def _print_step(step: int, total: int, title: str) -> None:
@@ -224,24 +243,28 @@ class OnboardCLI:
         _print_step(2, TOTAL_STEPS, "Configuration")
         self._load_config()
 
-        # Step 3 – Toolomics / MCP connectivity (loops until online or skipped)
-        _print_step(3, TOTAL_STEPS, "Toolomics MCP Connectivity")
+        # Step 3 – LLM model selection
+        _print_step(3, TOTAL_STEPS, "LLM Model Selection")
+        self._choose_models()
+
+        # Step 4 – Toolomics / MCP connectivity (loops until online or skipped)
+        _print_step(4, TOTAL_STEPS, "Toolomics MCP Connectivity")
         await self._check_toolomics()
 
-        # Step 4 – Initial objective
-        _print_step(4, TOTAL_STEPS, "Your Research Objective")
+        # Step 5 – Initial objective
+        _print_step(5, TOTAL_STEPS, "Your Research Objective")
         self._collect_objective()
 
-        # Step 5 – LLM clarification + prompt refinement loop
-        _print_step(5, TOTAL_STEPS, "Objective Clarification & Refinement")
+        # Step 6 – LLM clarification + prompt refinement loop
+        _print_step(6, TOTAL_STEPS, "Objective Clarification & Refinement")
         self._clarify_and_refine()
 
-        # Step 6 – Mode classification
-        _print_step(6, TOTAL_STEPS, "Mode Selection (Goal vs Task)")
+        # Step 7 – Mode classification
+        _print_step(7, TOTAL_STEPS, "Mode Selection (Goal vs Task)")
         self._classify_and_confirm()
 
-        # Step 7 – Extra options then launch
-        _print_step(7, TOTAL_STEPS, "Options & Launch")
+        # Step 8 – Extra options then launch
+        _print_step(8, TOTAL_STEPS, "Options & Launch")
         self._collect_options()
         await self._launch()
 
@@ -434,6 +457,157 @@ class OnboardCLI:
             _ok(f"Saved workspace_dir to {cfg_path}")
         except Exception as exc:
             _warn(f"Could not persist workspace path to {cfg_path}: {exc}")
+
+    # ------------------------------------------------------------------
+    # Model selection helpers
+    # ------------------------------------------------------------------
+
+    def _model_menu(
+        self,
+        prompt_desc: str,
+        current_value: str,
+        available: list[tuple[str, str]],
+    ) -> str:
+        """Generic numbered model-selection menu.
+
+        Args:
+            prompt_desc: One-line description shown to the user (what this model
+                         controls).
+            current_value: Value already in config (may be empty string).
+            available: List of (display_label, litellm_model_id) for presets whose
+                       API key is present.
+
+        Returns:
+            The chosen model ID (may equal *current_value* if the user just
+            pressed Enter).
+        """
+        suggested = current_value or (available[0][1] if available else "")
+
+        if current_value:
+            _info(f"Current value (from config): {current_value}")
+
+        print(_wrap(prompt_desc, width=70, indent=2))
+        print()
+
+        if available:
+            print(f"  {BOLD}Available presets:{RESET}")
+            for idx, (label, model_id) in enumerate(available, start=1):
+                is_default = (model_id == suggested)
+                tag = f"{GREEN}← default{RESET}" if is_default else ""
+                num_color = GREEN if is_default else CYAN
+                print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
+                print(f"         {DIM}{model_id}{RESET}")
+            print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
+        else:
+            _warn("No matching API key found — enter a model ID manually.")
+
+        print()
+        if suggested:
+            choice = _ask(
+                "Select number, 'c' for custom, or Enter to keep current",
+                default="",
+            )
+        else:
+            choice = _ask("Select number or 'c' for custom")
+
+        if not choice and suggested:
+            return suggested
+        if choice.lower() == "c" or (not available):
+            custom = _ask(
+                "Enter model ID  (e.g. openai/gpt-4o, "
+                "anthropic/claude-3-5-sonnet-20241022)"
+            )
+            return custom.strip() if custom.strip() else suggested
+        # Numbered selection
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(available):
+                return available[idx][1]
+            _warn(f"Invalid selection '{choice}'. Using default.")
+        except ValueError:
+            _warn(f"Unrecognised input '{choice}'. Using default.")
+        return suggested or (available[0][1] if available else "")
+
+    def _choose_models(self) -> None:
+        """Step 3 – model selection.
+
+        Sub-step 3a: orchestration model (planner, prompts, workflow, judge).
+        Sub-step 3b: agent execution model (smolagent_model_id).
+
+        Both choices are persisted to *config_default.json*.
+        """
+        available: list[tuple[str, str]] = [
+            (label, model_id)
+            for env_key, label, model_id in _MODEL_PRESETS
+            if os.getenv(env_key)
+        ]
+
+        # ── 3a · Orchestration model ──────────────────────────────────
+        print(f"\n{BOLD}  3a · Orchestration model{RESET}")
+        print(f"  {DIM}Used for planning, workflow generation, and evaluation.{RESET}")
+        orch_model = self._model_menu(
+            prompt_desc=(
+                "Choose the main LLM Mimosa will use for orchestration "
+                "(planning, workflow generation, and evaluation). Applied to "
+                "planner, prompts, workflow, and judge roles."
+            ),
+            current_value=self.config.planner_llm_model or "",
+            available=available,
+        )
+
+        if orch_model:
+            for key in _MODEL_CFG_KEYS:
+                setattr(self.config, key, orch_model)
+            _ok(f"Orchestration model: {orch_model}")
+        else:
+            _warn("No orchestration model chosen — keeping existing config values.")
+
+        # ── 3b · Agent execution model (smolagent_model_id) ──────────
+        print(f"\n{BOLD}  3b · Agent execution model (SmolAgents){RESET}")
+        print(f"  {DIM}Used by the code-executing agents inside each workflow.{RESET}")
+        print(f"  {DIM}Can be the same as the orchestration model or a faster/cheaper one.{RESET}")
+        agent_model = self._model_menu(
+            prompt_desc=(
+                "Choose the LLM for agent execution (SmolAgents tasks). "
+                "A fast, cost-effective model works well here."
+            ),
+            current_value=self.config.smolagent_model_id or "",
+            available=available,
+        )
+
+        if agent_model:
+            self.config.smolagent_model_id = agent_model
+            _ok(f"Agent execution model: {agent_model}")
+        else:
+            _warn("No agent model chosen — keeping existing config values.")
+
+        # Persist both choices at once
+        self._persist_models(orch_model or "", agent_model or "")
+
+    def _persist_models(self, orch_model_id: str, agent_model_id: str) -> None:
+        """Write both model choices to config_default.json."""
+        cfg_path = self._CONFIG_DEFAULT_PATH
+        try:
+            if os.path.isfile(cfg_path):
+                with open(cfg_path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+            else:
+                data = {}
+
+            if orch_model_id:
+                for key in _MODEL_CFG_KEYS:
+                    data[key] = orch_model_id
+
+            if agent_model_id:
+                data["smolagent_model_id"] = agent_model_id
+
+            with open(cfg_path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2)
+                fh.write("\n")
+
+            _ok(f"Saved model choices to {cfg_path}")
+        except Exception as exc:
+            _warn(f"Could not persist model choices to {cfg_path}: {exc}")
 
     def _collect_objective(self) -> None:
         """Prompt the user for their initial research objective."""
