@@ -187,7 +187,25 @@ Custom MCP tools can be added via the [Toolomics docs](https://github.com/Holobi
 
 ---
 
-## Configuration
+
+## Running Mimosa
+
+### Interactive Onboarding (recommended for first-time setup)
+
+> **If you are new to Mimosa, start here.**
+
+Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard that guides you through everything before the first execution:
+
+```bash
+uv run main.py
+```
+Once you complete setup once, subsequent runs remember your workspace path via `config_default.json` — no re-configuration needed.
+
+---
+
+### Manual onboarding:
+
+1. Start by editing the config:
 
 ```bash
 cp config_default.json my_config.json
@@ -207,39 +225,9 @@ Edit `my_config.json`. Key parameters:
 | `learned_score_threshold` | Minimum score to accept a result and stop iterating |
 | `max_learning_evolve_iterations` | Maximum self-improvement iterations before accepting the result |
 
----
+2. Choose a mode `task` or `goal` depending on the complexity of your objective.
 
-## Running Mimosa
-
-Mimosa supports two execution modes: **Goal** and **Task**.
-
-### Interactive Onboarding (recommended for first-time setup)
-
-> **If you are new to Mimosa, start here.**
-
-Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard that guides you through everything before the first execution:
-
-```bash
-uv run main.py
-```
-
-The wizard walks you through **7 steps**:
-
-| Step | What happens |
-|------|-------------|
-| 1. API Key Check | Detects your LLM provider keys; lets you enter missing ones interactively |
-| 2. Configuration | Auto-loads `config_default.json` (or lets you point to a custom file) |
-| 3. Toolomics MCP Connectivity | Scans for running MCP servers; loops until at least one is found. Also verifies the shared workspace directory exists and saves the validated path to `config_default.json` for future runs |
-| 4. Your Research Objective | Collects your initial free-text objective |
-| 5. Objective Clarification & Refinement | An LLM asks follow-up questions to fill any gaps, then produces a polished, actionable restatement of your objective for you to confirm |
-| 6. Mode Selection | An LLM classifies your objective as **Goal** (multi-step planning) or **Task** (single workflow) and explains its reasoning; you can override |
-| 7. Options & Launch | Optionally enables learning mode, shows a summary, then launches the selected execution mode |
-
-Once you complete setup once, subsequent runs remember your workspace path via `config_default.json` — no re-configuration needed.
-
----
-
-### Goal mode — multi-step scientific objective
+**2.1 Goal mode — multi-step scientific objective**
 
 Use this when your objective requires planning across multiple distinct operations (e.g., reproducing a paper, building an ML pipeline).
 
@@ -258,7 +246,7 @@ uv run main.py \
   --config my_config.json
 ```
 
-### Task mode — single granular operation
+**2.2 Task mode — single granular operation**
 
 Use this for a focused, self-contained operation without long-term planning.
 
