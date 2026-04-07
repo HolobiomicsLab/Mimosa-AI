@@ -205,7 +205,7 @@ Once you complete setup once, subsequent runs remember your workspace path via `
 
 ### Manual onboarding:
 
-1. Start by editing the config:
+**1. Start by editing the config:**
 
 ```bash
 cp config_default.json my_config.json
@@ -225,7 +225,7 @@ Edit `my_config.json`. Key parameters:
 | `learned_score_threshold` | Minimum score to accept a result and stop iterating |
 | `max_learning_evolve_iterations` | Maximum self-improvement iterations before accepting the result |
 
-2. Choose a mode `task` or `goal` depending on the complexity of your objective.
+**2. Choose a mode `task` or `goal` depending on the complexity of your objective.**
 
 **2.1 Goal mode — multi-step scientific objective**
 
