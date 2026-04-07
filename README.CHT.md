@@ -16,11 +16,22 @@
 </p>
 
 <p align="center">
-    <em>一個用於演化自主 AI 科學家工作流程的開源框架。</em>
+    <em>自主科學研究的自演化AI框架</em>
+</p>
+<p align="center">
+  🧬 自演化多智能體工作流 &nbsp;·&nbsp;
+  🔍 基於MCP的工具自動發現 &nbsp;·&nbsp;
+  🔁 達爾文式工作流優化 &nbsp;·&nbsp;
+  📦 完整審計追蹤與可重現性 &nbsp;·&nbsp;
 </p>
 
 <p align="center">
-    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv"></a>
+    <em>Mimosa-AI 自主完成了 Nothias et al. (2018) 的端到端重現——從原始 .mzML 檔案到分子網路——僅需一條命令。</em>
+</p>
+
+<p align="center">
+    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv 預印本"></a>
+    <a href="https://doi.org/10.48550/arXiv.2603.28986"><img src="https://img.shields.io/badge/DOI-10.48550%2FarXiv.2603.28986-blue?style=flat-square" alt="DOI"></a>
     <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/網站-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="網站"></a>
 </p>
 
@@ -35,22 +46,68 @@
 
 ---
 
-> ***Mimosa-AI 🌼*** — 如同能感知、學習與適應的含羞草植物，Mimosa 是一個 AI 科學家框架，旨在自主完成端到端的科學研究並重現已發表的研究成果。***Mimosa-AI*** 能夠自動發現可用工具，將研究目標分解為結構化工作流程，並透過多智能體工作流程的演化式自我迭代驅動多智能體執行。
+## 即時示範：自主重現科學論文
 
-**應用場景：**
-- 透過嚴謹、可稽核的工作流程重現科學研究
-- 自動化完整流水線：生物資訊學、分子對接、代謝體學等
+https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
+
+**結果：** 下方的分子網路從原始 `.mzML` 檔案出發自主重現，與 [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation) 報告的拓撲結構完全吻合——包括叢集分離和邊權重。
+
+<p align="center">
+  <img src="./docs/images/network.png" alt="重現的分子網路" width="80%">
+</p>
+
+---
+
+## 基準測試結果
+
+在 **ScienceAgentBench** 上的評估結果（102 個任務，`task` 模式）：
+
+| 模式 | 成功率 | Code-BLEU 分數 | 每任務成本 |
+|------|--------|----------------|-----------|
+| DeepSeek-V3.2 單智能體 | 38.2% | 0.898 | $0.05 |
+| DeepSeek-V3.2 一次性多智能體 | 32.4% | 0.794 | $0.38 |
+| **DeepSeek-V3.2 迭代學習** | **43.1%** | **0.921** | **$1.7** |
+
+> 迭代學習可提升 GPT-4o 的效能，但對 Claude Haiku 4.5 影響輕微——詳見[論文](https://arxiv.org/abs/2603.28986)中的模型相關行為分析。
+
+---
+
+## Mimosa-AI 是什麼？
+
+> ***Mimosa-AI 🌼*** — 如同能感知、學習與適應的含羞草植物，Mimosa 是一個用於自主科學研究的開源框架，能自動合成任務專屬的多智能體工作流程，並透過執行回饋持續優化。基於 MCP 工具發現、程式碼生成智能體和 LLM 評估，為學術研究提供模組化、可稽核的替代方案。
+
+**核心能力：**
+- **重現科學研究**，具備可追蹤性和嚴謹性——從原始資料到可發表的圖表
+- **自動化計算流水線**，涵蓋生物資訊學、分子對接、代謝體學、機器學習等領域
+- **自我進化**，透過達爾文式工作流程變異——每次失敗都為下一次嘗試提供資訊
+
+### 架構概覽
+
+框架分為五層：
+
+1. **規劃層**（可選）——將高層次科學目標分解為離散任務
+2. **工具發現層**——透過 Toolomics 自動發現本地網路上的 MCP 工具
+3. **元編排層**——合成任務專屬的多智能體工作流程，將工具分配給專屬智能體
+4. **智能體執行層**——程式碼生成智能體使用發現的工具和科學函式庫執行子任務
+5. **評判/評估層**——LLM 評判對輸出評分；在學習模式下驅動迭代工作流程優化
+
+<p align="center">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa 架構概覽" width="90%">
+</p>
+
+在基準測試 `task` 模式下，規劃層（1）被跳過，以便單獨評估工作流程合成和優化。
+
+---
 
 ## 目錄
 
-- [運作原理](#運作原理)
-- [範例：重現生物活性分子網路論文](#範例重現生物活性分子網路論文)
+- [Toolomics 是什麼？我需要它嗎？](#toolomics-是什麼我需要它嗎)
 - [前置條件](#前置條件)
 - [安裝](#安裝)
 - [設定](#設定)
 - [執行 Mimosa](#執行-mimosa)
-- [輸出](#輸出)
-- [透過多智能體工作流程的演化進行學習](#透過多智能體工作流程的演化進行學習)
+- [工作區與稽核追蹤](#工作區與稽核追蹤)
+- [透過多智能體工作流程演化進行學習](#透過多智能體工作流程演化進行學習)
 - [透明度](#透明度)
 - [命令列參數](#命令列參數)
 - [評估](#評估)
@@ -58,32 +115,19 @@
 - [遙測設定](#遙測設定)
 - [授權條款](#授權條款)
 
-## 運作原理
+---
 
-使用者向 ***Mimosa-AI*** 提供一個研究目標。
+## Toolomics 是什麼？我需要它嗎？
 
-- ***Mimosa*** 自動發現本地網路上或透過 Toolhive 提供的 MCP 工具（涵蓋從資料分析工具到網頁瀏覽器，乃至質譜儀等實驗室儀器的一切工具）。
-- 基於使用者目標和已發現的工具，***Mimosa*** 對問題進行分解，為每個任務構建量身定製的多智能體工作流程。
-- 每個任務自主執行，失敗案例透過迭代學習迴圈用於自我改進。
-- ***Mimosa*** 最終產生包含結果、視覺化內容、報告、日誌及所有相關產出物的完整膠囊。
+**[Toolomics](https://github.com/HolobiomicsLab/toolomics)** 是 Mimosa 的配套平台，用於 MCP 伺服器管理。它將科學工具（資料分析工具、網路服務、實驗室儀器）作為可發現的 MCP 服務公開，提供 Mimosa 讀寫任務產出物的共享工作區，並允許在不修改 Mimosa 核心的情況下註冊自訂工具。
 
-![schema](./docs/images/mimosa_overall.jpg)
+**是否必須安裝？** 是——在執行任何 Mimosa 模式前，Toolomics 必須處於執行狀態。好消息是：安裝設定只需幾分鐘。
 
-## 範例：重現生物活性分子網路論文
+- Mimosa 和 Toolomics 均採用 Apache 2.0 授權條款，完全免費。
+- Toolomics 在本地可設定的連接埠範圍內執行（預設 `5000–5100`）。
+- 可透過 [Toolomics 文件](https://github.com/HolobiomicsLab/toolomics)新增自訂 MCP 工具。
 
-> **目標** — 端到端重現 [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation)：從特徵偵測到網路視覺化，以 `.mzML` 檔案作為起點（假設原始資料轉換已完成）。
-
-Mimosa-AI 獲得了該論文、原始資料，以及一套涵蓋論文中未完整說明的設定細節的領域專屬技能。
-
-**執行延時展示**
-
-https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
-
-**輸出結果**
-
-![molecular_network](./docs/images/network.png)
-
-所得分子網路與原論文報告的拓撲結構相符，包括叢集分離和邊權重均由系統自主重現。
+> **快速啟動路徑：** 複製 Toolomics → 在預設連接埠範圍啟動 → 執行 Mimosa。除 LLM API 金鑰外，無需任何雲端帳戶或付費服務。
 
 ---
 
@@ -136,7 +180,9 @@ LANGFUSE_PRIVATE_KEY=...
 
 ### 4. 啟動 MCP 伺服器
 
-請參考 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) 的設定說明，將其設定為在某個連接埠範圍內執行（例如 `5000–5100`）。自訂 MCP 工具可透過 [Toolomics 文件](https://github.com/HolobiomicsLab/toolomics/README.md) 新增。
+請參考 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) 的設定說明，將其設定為在某個連接埠範圍內執行（例如 `5000–5100`）。
+
+自訂 MCP 工具可透過 [Toolomics 文件](https://github.com/HolobiomicsLab/toolomics/README.md) 新增。
 
 ---
 
@@ -154,7 +200,7 @@ cp config_default.json my_config.json
 | `discovery_addresses` | MCP 伺服器探索的 IP 及連接埠範圍 |
 | `planner_llm_model` | 用於任務分解與規劃的 LLM |
 | `prompts_llm_model` | 用於工作流程提示產生的 LLM |
-| `workflow_llm_model` | 用於多智能體編排的 LLM（建議：anthropic/claude-opus-4-5 或 z-ai/glm-5） |
+| `workflow_llm_model` | 用於多智能體編排的 LLM（建議：`anthropic/claude-opus-4-5` 或 `z-ai/glm-5`） |
 | `smolagent_model_id` | 用於 SmolAgents 執行子任務的模型 |
 | `judge_model` | 用於輸出自我評估和評分的 LLM |
 | `learned_score_threshold` | 接受結果並停止迭代的最低分數 |
@@ -202,20 +248,30 @@ uv run main.py \
 uv run main.py --task "對圖神經網路在藥物探索中的應用進行文獻綜述。" --config my_config.json
 ```
 
+> **基準測試說明：** 論文中報告的結果在 `task` 模式下測量，規劃層被停用，以單獨評估工作流程合成和迭代優化。
+>
 > **注意：** 執行任何模式前，必須先安裝 Toolomics 並確保 MCP 伺服器正在執行。
-
-## 輸出
-
-執行過程中，檔案將寫入 Toolomics 的 `workspace/` 目錄。執行完成後，完整快照將儲存至 `runs_capsule/` 中帶時間戳記的膠囊目錄。
 
 ---
 
-## 透過多智能體工作流程的演化進行學習
+## 工作區與稽核追蹤
 
-***Mimosa-AI*** 能夠為科學任務動態合成專用工作流程，並透過**達爾文式多智能體工作流程演化**從失敗中學習：
-系統不再將任務強行套入固定流水線，而是為每個任務組合定製的多智能體圖，並透過單候選局部搜尋對其進行優化。在每次迭代中，僅由表現最優的工作流程產生繼承者，且只保留改進結果。隨著時間推移，系統累積了一個經過驗證的工作流程庫，使類似的未來任務能夠從強基準出發，而非從零開始。
+執行過程中，檔案將寫入 `workspace_dir` 設定的 Toolomics 工作區。執行完成後，工作區內容被複製到 `runs_capsule/` 下帶時間戳記的資料夾，作為存檔永久保存。
 
-對於任何新任務，建議先以學習模式執行，讓系統在獲得完全自主權之前積累能力。
+- **Toolomics `workspace/`** — 即時工作目錄：中間檔案、腳本、下載內容、產生的輸出
+- **`sources/workflows/<uuid>/`** — 產生的工作流程和執行元資料：`state_result.json`、`evaluation.txt`、`reward_progress.png`、`memory/` 追蹤
+- **`runs_capsule/<capsule_name>/`** — 執行快照存檔，可供後續檢查、比較或分享
+- **`memory_explorer.py <uuid>`** — 逐步回放工作流程執行，檢查智能體追蹤、工具呼叫和輸出
+
+這些位置共同構成 Mimosa 的完整稽核追蹤：規劃、執行、評估和產出的全過程。
+
+---
+
+## 透過多智能體工作流程演化進行學習
+
+***Mimosa-AI*** 是一個**自我進化的多智能體系統**，能為科學任務動態合成專用工作流程。系統透過**達爾文式單候選局部搜尋**進化工作流程：在每次迭代中，僅由表現最優的工作流程產生繼承者，且只保留改進結果。隨著時間推移，系統積累了一個經過驗證的工作流程庫，使類似的未來任務能夠從強基準出發，而非從零開始。
+
+對於任何新任務，建議**先以學習模式執行**，讓系統在獲得完全自主權之前積累能力。
 
 **啟動學習模式**
 
@@ -223,25 +279,31 @@ uv run main.py --task "對圖神經網路在藥物探索中的應用進行文獻
 uv run main.py --task "在 Clintox 資料集上訓練一個多任務模型，以預測藥物毒性和 FDA 核准狀態" --learn --config my_config.json
 ```
 
-![dgm](./docs/images/workflow_mutation.png)
+<p align="center">
+  <img src="./docs/images/workflow_mutation.png" alt="工作流程變異示意圖" width="80%">
+</p>
 
 **進度視覺化：**
 
-***Mimosa-AI*** 完成某任務的學習階段後，您可以視覺化其隨時間的改進過程。展示各次嘗試中效能提升的獎勵進度圖將自動儲存。
+***Mimosa-AI*** 完成學習階段後，獎勵進度圖（各次嘗試的效能提升）將自動儲存至 `sources/workflows/<uuid>/reward_progress.png`。
 
-獎勵進度圖儲存於 `sources/workflows/<uuid>` 資料夾下，檔案名稱為 `reward_progress.png`。
+<p align="center">
+  <img src="./docs/images/evolve_example.png" alt="獎勵進度範例" width="80%">
+</p>
 
-***範例：***
-
-![dgm](./docs/images/evolve_example.png)
+---
 
 ## 透明度
 
-我們內建了互動式除錯器 `memory_explorer.py`，允許您以精細粒度逐步回溯任意智能體執行過程。
+我們內建了互動式除錯器 `memory_explorer.py`，允許以精細粒度逐步回溯任意智能體執行過程。
 
-使用工作流程 `<uuid>` 啟動（例如：`memory_explorer.py 20260115_113303_9bb63437`）
+```bash
+python memory_explorer.py 20260115_113303_9bb63437
+```
 
-該工具將重播完整的執行軌跡——包括思考過程、工具呼叫及輸出結果——以便您精確檢查決策是如何展開的。
+該工具將重播完整的執行軌跡——包括思考過程、工具呼叫及輸出結果——以便精確檢查每個決策是如何展開的。
+
+---
 
 ## 命令列參數
 
@@ -272,48 +334,39 @@ uv run main.py --task "在 Clintox 資料集上訓練一個多任務模型，以
 
 ***Mimosa-AI*** 可在 [ScienceAgentBench](https://arxiv.org/abs/2410.05080) 或 [PaperBench](https://arxiv.org/pdf/2504.01848) 上進行評估。
 
-⚠️ 為確保評估公正，建議先執行 `./cleanup.sh`，以防止 ***Mimosa*** 使用已有或快取的工作流程。
+⚠️ 為確保評估公正，請先執行 `./cleanup.sh`，以防止 ***Mimosa*** 使用快取的工作流程。
 
 ### ScienceAgentBench
 
-在 ScienceAgentBench 上進行評估，您需要：
-
 1. 下載 ScienceAgentBench 完整資料集：
-[資料集連結](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
+   [資料集連結](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
 2. 使用密碼 `scienceagentbench` 解壓縮
-3. 將 `benchmark/benchmark/datasets` 資料夾的內容複製到 `Mimosa-AI/datasets/scienceagentbench/datasets`
+3. 將 `benchmark/benchmark/datasets/` 複製到 `Mimosa-AI/datasets/scienceagentbench/datasets/`
 
-**啟用學習模式在 ScienceAgentBench 上評估**
+**啟用學習模式進行完整評估：**
 ```sh
 uv run main.py --science_agent_bench --learn
 ```
 
-**限制 10 個任務且學習迭代次數不超過 4 次的 ScienceAgentBench 評估**
-
+**快速評估（10 個任務，4 次學習迭代）：**
 ```sh
 uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
 ```
 
 ### PaperBench
 
-**啟用學習模式在 OpenAI PaperBench 上評估**
-
-OpenAI PaperBench 是一個用於評估 AI 智能體重現 AI 研究能力的基準，來源於論文 `PaperBench: Evaluating AI's Ability to Replicate AI Research`。
+OpenAI PaperBench 用於評估 AI 智能體重現 AI 研究的能力（*PaperBench: Evaluating AI's Ability to Replicate AI Research*）。
 
 ```sh
-uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20  --learn
+uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
 ```
 
-⚠️ 此操作將在 `runs_capsule/` 資料夾中儲存所有論文重現嘗試的結果，完整評估請參考 [Paper Bench 文件](https://github.com/openai/frontier-evals/tree/main/project/paperbench)。
+⚠️ 結果儲存於 `runs_capsule/`。完整評估請參考 [PaperBench 文件](https://github.com/openai/frontier-evals/tree/main/project/paperbench)。
 
-**在自訂研究論文基準上評估**
-
-1. 將與 `paper_bench.csv` 格式相同的基準 CSV 檔案放置於 `datasets/<您的基準名稱>.csv`。
-
-2. 在您的基準上執行：
+**自訂基準測試：**
 
 ```sh
-uv run main.py --papers datasets/<您的基準名稱>.csv --csv_runs_limit 20  --learn
+uv run main.py --papers datasets/<您的基準名稱>.csv --csv_runs_limit 20 --learn
 ```
 
 ---
@@ -324,23 +377,14 @@ uv run main.py --papers datasets/<您的基準名稱>.csv --csv_runs_limit 20  -
 
 ### 設定步驟
 
-1. **建立 Pushover 帳戶**
-   - 造訪 [pushover.net](https://pushover.net/)
-   - 註冊並記錄您的**使用者金鑰（User Key）**
-
-2. **建立應用程式**
-   - 在 Pushover 控制台中，點選「建立應用程式/API Token」
-   - 命名為「***Mimosa***」並複製產生的 **API Token**
-
-3. **設定環境變數**
+1. 建立 [Pushover](https://pushover.net/) 帳戶並記錄**使用者金鑰**
+2. 建立名為「Mimosa」的應用程式——複製 **API Token**
+3. 匯出環境變數：
    ```bash
    export PUSHOVER_USER="您的使用者金鑰"
    export PUSHOVER_TOKEN="您的 API Token"
    ```
-
-4. **安裝行動應用程式**
-   - 從裝置應用程式商店下載 Pushover
-   - 使用您的 Pushover 帳戶登入
+4. 安裝 Pushover 行動應用程式並登入
 
 ---
 
@@ -350,35 +394,22 @@ uv run main.py --papers datasets/<您的基準名稱>.csv --csv_runs_limit 20  -
 
 ### 快速開始
 
-1. **本地部署 Langfuse**
+1. **本地部署 Langfuse：**
    ```bash
    git clone https://github.com/langfuse/langfuse.git
    cd langfuse
    docker compose up -d
    ```
 
-2. **設定環境變數**
-
-   在您的 `.env` 檔案中新增：
+2. **新增到 `.env`：**
    ```env
    LANGFUSE_PUBLIC_KEY=您的公開金鑰
    LANGFUSE_PRIVATE_KEY=您的私密金鑰
    ```
 
-3. **存取儀表板**
+3. **存取儀表板**：***Mimosa-AI*** 執行時，造訪 `http://localhost:3000`
 
-   ***Mimosa-AI*** 執行時，造訪 `http://localhost:3000`
-
-### 可用指標
-
-遙測儀表板提供：
-- **智能體執行追蹤**：逐步工作流程視覺化
-- **效能指標**：回應時間和成功率
-- **錯誤除錯**：詳細故障分析
-- **資源使用情況**：Token 消耗和 API 呼叫統計
-
-**儀表板範例：**
-![Langfuse Dashboard](https://langfuse.com/images/cookbook/integration-smolagents/smolagent_example_trace.png)
+儀表板提供智能體執行追蹤、效能指標、錯誤除錯和 Token/API 使用統計。
 
 > **注意：** 遙測為可選功能，但建議用於除錯和效能優化。
 
@@ -386,12 +417,26 @@ uv run main.py --papers datasets/<您的基準名稱>.csv --csv_runs_limit 20  -
 
 ## 授權條款
 
-本儲存庫在 Apache License 2.0 下公開發布。Apache 2.0 是一個寬鬆的開源授權條款，允許商業使用、修改和再發布，但要求再發布時保留適用的授權條款、版權、專利、商標、署名及 NOTICE 聲明，且修改後的檔案須附帶顯著說明，注明已做出的變更。
-
-有關貢獻與授權細節，請參閱：
+本儲存庫在 Apache License 2.0 下公開發布。有關貢獻與授權細節，請參閱：
 - `NOTICE`
 - `docs/licensing-notes.md`
 - `CLA/INDIVIDUAL_CLA.md`
 - `CLA/EMPLOYER_AUTHORIZATION.md`
 
 ---
+
+## 引用
+
+<p align="center">
+<b>引用：</b> <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
+M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a>
+</p>
+
+```bibtex
+@article{legrand2026mimosa,
+  title={Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author={Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal={arXiv preprint arXiv:2603.28986},
+  year={2026}
+}
+```
