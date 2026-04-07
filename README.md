@@ -217,7 +217,7 @@ Mimosa supports two execution modes: **Goal** and **Task**.
 
 > **If you are new to Mimosa, start here.**
 
-Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard — similar in style to Claude Code — that guides you through everything before the first execution:
+Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard that guides you through everything before the first execution:
 
 ```bash
 uv run main.py
