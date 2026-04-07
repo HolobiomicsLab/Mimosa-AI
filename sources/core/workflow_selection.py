@@ -12,7 +12,7 @@ class WorkflowSelector:
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
         self.workflows_info = self.discover_workflows()
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
 
     def discover_workflows(self) -> dict[str, WorkflowInfo]:
         workflows = {}

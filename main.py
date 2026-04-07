@@ -19,6 +19,7 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
+from sources.onboard_cli import OnboardCLI
 from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.evaluation.eval_workflow_generation import WorkflowEval
@@ -242,6 +243,29 @@ async def main():
     # Setup logging with debug flag
     setup_logging(debug=args.debug)
 
+    # Detect interactive (no-argument) mode early so we can skip pre-checks
+    # that the onboarding CLI handles itself (API keys, config, Toolomics).
+    no_mode_selected = not any([
+        args.manual,
+        args.papers,
+        args.science_agent_bench,
+        args.task,
+        args.goal,
+        args.scenario,
+        args.workflow_eval_mode,
+    ])
+
+    if no_mode_selected:
+        # Interactive onboarding CLI — it owns the full setup flow.
+        # PackageCheck and logging are already initialised above.
+        try:
+            cli = OnboardCLI(config)
+            await cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        return
+
+    # ── Normal (argument-driven) execution path ───────────────────────────
     # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
 
@@ -263,8 +287,6 @@ async def main():
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
-        else:
-            raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:
