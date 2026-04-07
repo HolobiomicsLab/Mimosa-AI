@@ -284,12 +284,19 @@ class OnboardCLI:
             sys.exit(1)
 
     def _load_config(self) -> None:
-        """Optionally load a JSON config file."""
+        """Optionally load a JSON config file.
+
+        When the user leaves the path blank, *config_default.json* is loaded
+        automatically (if it exists) so that any previously saved settings —
+        including the Toolomics workspace_dir — are picked up without asking.
+        """
         _info(
             "A config file lets you override LLM models, workspace paths, "
             "port ranges, etc. (see config_default.json for reference)."
         )
-        path = _ask("Path to config file (leave blank to use defaults)")
+        path = _ask(
+            f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
+        )
         if path:
             if not os.path.isfile(path):
                 _warn(f"File not found: {path}. Using default configuration.")
@@ -300,7 +307,15 @@ class OnboardCLI:
                 except Exception as exc:
                     _warn(f"Failed to load config ({exc}). Using defaults.")
         else:
-            _info("Using default configuration.")
+            # Auto-load config_default.json if it exists
+            if os.path.isfile(self._CONFIG_DEFAULT_PATH):
+                try:
+                    self.config.load(self._CONFIG_DEFAULT_PATH)
+                    _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
+                except Exception as exc:
+                    _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
+            else:
+                _info("Using built-in default configuration.")
 
         # Ensure internal directories exist before later steps need them
         self.config.create_paths()
