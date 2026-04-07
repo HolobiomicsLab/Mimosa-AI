@@ -274,7 +274,7 @@ uv run main.py --task "Conduct a literature review on graph neural networks for 
 During execution, Mimosa reads and writes files inside the Toolomics workspace configured by `workspace_dir`. When a run finishes, the workspace contents are copied into a timestamped folder under `runs_capsule/` so the final state is preserved as an archive.
 
 - **Toolomics `workspace/`** — live working directory: intermediate files, scripts, downloads, generated outputs
-- **`sources/workflows/<uuid>/`** — generated workflow and execution metadata: `state_result.json`, `evaluation.txt`, `reward_progress.png`, `memory/` traces
+- **`sources/workflows/<uuid>/`** — generated workflow and execution metadata: `state_result.json`, `evaluation.txt`, `reward_progress.png`
 - **`runs_capsule/<capsule_name>/`** — archived snapshot of the run for later inspection, comparison, or sharing
 - **`memory_explorer.py <uuid>`** — replay a workflow execution step-by-step to inspect agent traces, tool calls, and outputs
 
