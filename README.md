@@ -103,6 +103,9 @@ In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthes
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Running Mimosa](#running-mimosa)
+  - [Interactive Onboarding (recommended for first-time setup)](#interactive-onboarding-recommended-for-first-time-setup)
+  - [Goal mode — multi-step scientific objective](#goal-mode--multi-step-scientific-objective)
+  - [Task mode — single granular operation](#task-mode--single-granular-operation)
 - [Workspace and Audit Trail](#workspace-and-audit-trail)
 - [Learning through Evolution of Multi-Agent Workflows](#learning-through-evolution-of-multi-agent-workflows)
 - [Transparency](#transparency)
@@ -184,7 +187,25 @@ Custom MCP tools can be added via the [Toolomics docs](https://github.com/Holobi
 
 ---
 
-## Configuration
+
+## Running Mimosa
+
+### Interactive Onboarding (recommended for first-time setup)
+
+> **If you are new to Mimosa, start here.**
+
+Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard that guides you through everything before the first execution:
+
+```bash
+uv run main.py
+```
+Once you complete setup once, subsequent runs remember your workspace path via `config_default.json` — no re-configuration needed.
+
+---
+
+### Manual onboarding:
+
+**1. Start by editing the config:**
 
 ```bash
 cp config_default.json my_config.json
@@ -204,13 +225,9 @@ Edit `my_config.json`. Key parameters:
 | `learned_score_threshold` | Minimum score to accept a result and stop iterating |
 | `max_learning_evolve_iterations` | Maximum self-improvement iterations before accepting the result |
 
----
+**2. Choose a mode `task` or `goal` depending on the complexity of your objective.**
 
-## Running Mimosa
-
-Mimosa supports two execution modes: **Goal** and **Task**.
-
-### Goal mode — multi-step scientific objective
+**2.1 Goal mode — multi-step scientific objective**
 
 Use this when your objective requires planning across multiple distinct operations (e.g., reproducing a paper, building an ML pipeline).
 
@@ -229,7 +246,7 @@ uv run main.py \
   --config my_config.json
 ```
 
-### Task mode — single granular operation
+**2.2 Task mode — single granular operation**
 
 Use this for a focused, self-contained operation without long-term planning.
 
@@ -257,7 +274,7 @@ uv run main.py --task "Conduct a literature review on graph neural networks for 
 During execution, Mimosa reads and writes files inside the Toolomics workspace configured by `workspace_dir`. When a run finishes, the workspace contents are copied into a timestamped folder under `runs_capsule/` so the final state is preserved as an archive.
 
 - **Toolomics `workspace/`** — live working directory: intermediate files, scripts, downloads, generated outputs
-- **`sources/workflows/<uuid>/`** — generated workflow and execution metadata: `state_result.json`, `evaluation.txt`, `reward_progress.png`, `memory/` traces
+- **`sources/workflows/<uuid>/`** — generated workflow and execution metadata: `state_result.json`, `evaluation.txt`, `reward_progress.png`
 - **`runs_capsule/<capsule_name>/`** — archived snapshot of the run for later inspection, comparison, or sharing
 - **`memory_explorer.py <uuid>`** — replay a workflow execution step-by-step to inspect agent traces, tool calls, and outputs
 

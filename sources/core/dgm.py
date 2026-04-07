@@ -451,6 +451,7 @@ class DarwinMachine:
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
 
         iteration_start_time = time.time()
+        on_error = False
         uuid = None
         current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
 
@@ -463,12 +464,13 @@ class DarwinMachine:
             single_agent_mode=single_agent_mode
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+        if "WORKFLOW_GENERATION_ERROR" in run_stdout:
+            on_error = True
         if workflow_code:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
-            # Don't overwrite runs[-1].cost - it contains cumulative from previous iterations
             runs[-1].reward = wf_info.overall_score
 
         runs[-1].current_uuid = uuid
@@ -533,7 +535,7 @@ class DarwinMachine:
                 priority=0
             )
             return runs
-        elif not learning_mode and all_success:
+        elif not learning_mode and all_success and not on_error:
             self._save_final_plots(assertion_history, rewards_history, uuid)
             print("\nDGM completed task.\n")
             self.notifier.send_message(
