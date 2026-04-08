@@ -277,7 +277,7 @@ class DarwinMachine:
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
         if learning_mode:
-            max_iteration = max(3, self.config.max_learning_evolve_iterations)
+            max_iteration = self.config.max_learning_evolve_iterations
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
@@ -417,7 +417,7 @@ class DarwinMachine:
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
 
         # Check termination conditions
-        if runs[-1].iteration_count >= runs[-1].max_depth-1:
+        if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
         if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
@@ -437,7 +437,7 @@ class DarwinMachine:
                 self._save_final_plots(assertion_history, rewards_history, uuid)
                 print_ok("DGM completed task successfully.")
                 self.notifier.send_message(
-                    f"Evolution completed successfully!\n"
+                    f"Task completed successfully!\n"
                     f"Goal: {runs[-1].goal[:128]}...\n"
                     f"Final UUID: {uuid}\n"
                     f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
@@ -472,7 +472,6 @@ class DarwinMachine:
             original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
-        time.sleep(5)
         runs = await self.recursive_self_improvement(
             runs,
             rewards_history=rewards_history,

@@ -3,8 +3,11 @@ This module provides an asynchronous workflow execution engine for Python code.
 """
 
 import asyncio
+import fcntl
 import logging
 import os
+import pty
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -200,33 +203,86 @@ class WorkflowRunner:
         cmd = [*self._python_cmd, script_path]
         return await self._run_command(cmd, execution_id, progress_callback)
 
+    @staticmethod
+    def _build_color_env() -> dict[str, str]:
+        """Build an environment dict that encourages color output.
+
+        Copies the host environment and adds variables commonly checked by
+        CLI tools and Python libraries (rich, click, tqdm, pytest, …) to
+        force colored output even when stdout is not a real TTY.
+        """
+        env = dict(os.environ)
+        env.setdefault("TERM", "xterm-256color")
+        env["FORCE_COLOR"] = "1"          # chalk / supports-color (Node & Python)
+        env["PY_COLORS"] = "1"            # pytest, tox, …
+        env["CLICOLOR_FORCE"] = "1"       # BSD / GNU convention
+        env["PYTHONUNBUFFERED"] = "1"      # disable Python output buffering
+        return env
+
+    def _pty_available(self) -> bool:
+        """Return True when pseudo-terminal support can be used."""
+        return sys.platform != "win32"
+
     async def _run_command(
         self,
         cmd: list[str],
         execution_id: str | None = None,
         progress_callback: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
-        """Core async command execution with monitoring."""
+        """Core async command execution with monitoring.
+
+        On platforms that support PTYs (Linux / macOS) the subprocess stdout
+        is connected to a pseudo-terminal so that child processes see
+        ``isatty(1) == True`` and emit ANSI colour codes.  Stderr is still
+        captured via a regular pipe.
+        """
 
         start_time = asyncio.get_event_loop().time()
+        master_fd = slave_fd = -1
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                limit=1024 * 1024,  # 1MB buffer limit
-                env=dict(os.environ),  # Pass host environment variables
-                cwd=self.execution_dir,  # Set working directory for execution
-            )
+            env = self._build_color_env()
 
-            if execution_id:
-                self._active_processes[execution_id] = process
+            if self._pty_available():
+                # --- PTY path: child stdout goes through a pseudo-terminal ---
+                master_fd, slave_fd = pty.openpty()
 
-            stdout_data, stderr_data = await asyncio.wait_for(
-                self._stream_output(process, progress_callback),
-                timeout=self.config.timeout,
-            )
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=slave_fd,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                    cwd=self.execution_dir,
+                )
+                # Parent no longer needs the slave side; the child inherited it.
+                os.close(slave_fd)
+                slave_fd = -1
+
+                if execution_id:
+                    self._active_processes[execution_id] = process
+
+                stdout_data, stderr_data = await asyncio.wait_for(
+                    self._stream_output_pty(process, master_fd, progress_callback),
+                    timeout=self.config.timeout,
+                )
+            else:
+                # --- Pipe fallback (Windows or if PTY unavailable) ---
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    limit=1024 * 1024,
+                    env=env,
+                    cwd=self.execution_dir,
+                )
+
+                if execution_id:
+                    self._active_processes[execution_id] = process
+
+                stdout_data, stderr_data = await asyncio.wait_for(
+                    self._stream_output_pipe(process, progress_callback),
+                    timeout=self.config.timeout,
+                )
 
             await process.wait()
             execution_time = asyncio.get_event_loop().time() - start_time
@@ -257,27 +313,83 @@ class WorkflowRunner:
             return ExecutionResult(ExecutionStatus.FAILED, -1, "", str(e), 0.0)
 
         finally:
+            if slave_fd >= 0:
+                os.close(slave_fd)
+            if master_fd >= 0:
+                os.close(master_fd)
             if execution_id and execution_id in self._active_processes:
                 del self._active_processes[execution_id]
 
-    async def _stream_output(
+    # ------------------------------------------------------------------
+    # Output streaming helpers
+    # ------------------------------------------------------------------
+
+    async def _stream_output_pty(
+        self,
+        process: asyncio.subprocess.Process,
+        master_fd: int,
+        progress_callback: Callable[[str], None] | None = None,
+    ) -> tuple[str, str]:
+        """Stream stdout from a PTY master fd and stderr from a pipe.
+
+        The PTY preserves ANSI escape sequences (colours, bold, …) because
+        the child process sees a real terminal on its stdout.
+        """
+        loop = asyncio.get_event_loop()
+        stdout_chunks: list[str] = []
+        stderr_lines: list[str] = []
+        stdout_done = asyncio.Event()
+
+        # Make the master fd non-blocking so we can use add_reader.
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        def _on_master_readable() -> None:
+            """Called by the event loop when data is available on the PTY."""
+            try:
+                data = os.read(master_fd, 65536)
+                if not data:
+                    loop.remove_reader(master_fd)
+                    stdout_done.set()
+                    return
+                text = data.decode("utf-8", errors="replace")
+                stdout_chunks.append(text)
+                if progress_callback:
+                    for line in text.splitlines():
+                        progress_callback(line)
+            except OSError:
+                # EIO is expected when the slave side is closed (child exited).
+                loop.remove_reader(master_fd)
+                stdout_done.set()
+
+        loop.add_reader(master_fd, _on_master_readable)
+
+        async def _read_stderr() -> None:
+            async for raw_line in process.stderr:
+                stderr_lines.append(raw_line.decode("utf-8", errors="replace"))
+
+        # Wait for both stdout (PTY) and stderr (pipe) to finish.
+        await asyncio.gather(stdout_done.wait(), _read_stderr())
+
+        return "".join(stdout_chunks), "".join(stderr_lines)
+
+    async def _stream_output_pipe(
         self,
         process: asyncio.subprocess.Process,
         progress_callback: Callable[[str], None] | None = None,
     ) -> tuple[str, str]:
-        """Stream process output with real-time callbacks."""
+        """Fallback: stream stdout/stderr when both are plain pipes."""
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
 
-        stdout_lines = []
-        stderr_lines = []
-
-        async def read_stdout():
+        async def read_stdout() -> None:
             async for line in process.stdout:
                 line_str = line.decode("utf-8", errors="replace")
                 stdout_lines.append(line_str)
                 if progress_callback:
                     progress_callback(line_str.rstrip())
 
-        async def read_stderr():
+        async def read_stderr() -> None:
             async for line in process.stderr:
                 stderr_lines.append(line.decode("utf-8", errors="replace"))
 
@@ -323,7 +435,12 @@ async def main():
     runner = WorkflowRunner(config)
     await runner.install_dependencies(["requests", "numpy"])
     code = """
-print("Hello from the workflow runner!")
+import sys
+
+# Demonstrate that color is preserved through the PTY
+print("\\033[32m✔ Hello from the workflow runner (green)\\033[0m")
+print("\\033[1;34mBold blue text\\033[0m")
+print(f"stdout is a TTY: {sys.stdout.isatty()}")
 """
 
     def progress_handler(line: str):
