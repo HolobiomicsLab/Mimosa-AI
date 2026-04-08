@@ -15,10 +15,13 @@ import dotenv
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
+
 from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
+from sources.cli import OnboardCLI
 from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.evaluation.eval_workflow_generation import WorkflowEval
@@ -35,11 +38,11 @@ def validate_environment() -> None:
     envs_key = ['ANTHROPIC_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'HF_TOKEN', 'OPENROUTER_API_KEY']
     for key in envs_key:
         if os.getenv(key):
-            print(f"✅ Found environment variable: {key}")
+            print_ok(f"Found environment variable: {key}")
             key_found = True
     if not key_found:
         raise ValueError(
-            "⚠️ No valid API key environment variable found. Please set one of the supported API keys. Supported keys: " + ", ".join(envs_key)
+            "No valid API key environment variable found. Please set one of the supported API keys. Supported keys: " + ", ".join(envs_key)
         )
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
@@ -86,7 +89,7 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
     def signal_handler(signum, frame):
-        print(f"\n⚠️ Received signal {signum}. Shutting down gracefully...")
+        print_warn(f"Received signal {signum}. Shutting down gracefully…")
         for task in asyncio.all_tasks():
             if not task.done():
                 task.cancel()
@@ -110,7 +113,7 @@ async def papers_mode(args, config):
 async def science_bench_papers_mode(args, config):
     papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
     if args.single_agent:
-        print(f"⚠️ Starting in single agent mode")
+        print_info("Starting in single agent mode")
     await papers.start_evaluation(dataset_type="science_agent_bench",
                                   dataset_path="datasets/ScienceAgentBench.csv",
                                   learning=args.learn,
@@ -138,11 +141,11 @@ def load_goal_from_file_or_string(goal_input: str) -> str:
         try:
             with open(goal_input, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
-                print(f"✅ Loaded goal from file: {goal_input}")
+                print_ok(f"Loaded goal from file: {goal_input}")
                 return content
         except Exception as e:
-            print(f"⚠️ Failed to read file '{goal_input}': {e}")
-            print(f"Using input as a literal string instead.")
+            print_warn(f"Failed to read file '{goal_input}': {e}")
+            print_info("Using input as a literal string instead.")
             return goal_input
     return goal_input
 
@@ -156,7 +159,7 @@ async def normal_execution_mode(args, config):
         # Load goal from file if args.task is a file path
         goal_content = load_goal_from_file_or_string(args.task)
         if args.single_agent:
-            print(f"⚠️ Starting in single agent mode")
+            print_info("Starting in single agent mode")
         await dgm.start_dgm(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_rubric=args.scenario,
@@ -223,7 +226,10 @@ async def main():
         "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
     )
     parser.add_argument(
-        "--debug", action="store_true", help="Enable debug logging to console"
+        "--debug", action="store_true", help="Enable advanced debug logging to console"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable verbose logging to console"
     )
     parser.add_argument(
         "--max_evolve_iterations", type=int, default=1, help="Maximum number of learning iterations. Used for retrying/learning a task."
@@ -240,8 +246,29 @@ async def main():
     # security check
     PackageCheck().run()
     # Setup logging with debug flag
-    setup_logging(debug=args.debug)
+    setup_logging(debug=args.debug, disable=not args.verbose)
 
+    # Detect interactive (no-argument) mode early so we can skip pre-checks
+    no_mode_selected = not any([
+        args.manual,
+        args.papers,
+        args.science_agent_bench,
+        args.task,
+        args.goal,
+        args.scenario,
+        args.workflow_eval_mode,
+    ])
+
+    if no_mode_selected:
+        # Interactive onboarding CLI for full setup flow.
+        try:
+            cli = OnboardCLI(config)
+            await cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        return
+
+    # ── Normal (argument-driven) execution path ───────────────────────────
     # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
 
@@ -263,8 +290,6 @@ async def main():
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
-        else:
-            raise ValueError("No goal provided. Use --task, --goal, --papers  to start.")
     except KeyboardInterrupt:
         raise
     except Exception as e:

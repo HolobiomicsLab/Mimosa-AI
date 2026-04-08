@@ -21,6 +21,13 @@ from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
 from .schema import IndividualRun, ImprovementLog
 from .improvement_validator import ImprovementValidator
+from sources.cli.pretty_print import (
+    print_ok, print_warn, print_err, print_info,
+    print_phase, print_section,
+    print_iteration_header, print_box,
+    print_summary, print_agent_answers,
+    CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
+)
 
 
 def check_answer_success(answer: str) -> bool:
@@ -142,10 +149,7 @@ class DarwinMachine:
         return flow_answers
 
     def show_answers(self, flow_answers):
-        print(f"\n\033[96m{'> WORKFLOW AGENTS ANSWERS':^60}\033[0m")
-        print(f"\033[96m{'─' * 60}\033[0m")
-        print(f"\033[96m{flow_answers}\033[0m")
-        print(f"\033[96m{'─' * 60}\033[0m\n")
+        print_box(flow_answers, title="Workflow Agents Answers", color=YELLOW)
 
     def improvement_prompt(
         self,
@@ -233,11 +237,9 @@ class DarwinMachine:
                 threshold_similary=0.8,
                 threshod_score=0.0,
             )
-            print(f"\n\033[96m{'🎯 WORKFLOW SELECTION':^60}\033[0m")
-            print(f"\033[96m{'─' * 60}\033[0m")
-            print(f"\033[96mSelected {len(candidates)} candidates.\033[0m")
-            print(f"\033[96mTop candidate: {candidates[0].uuid if candidates else str(None)}\033[0m")
-            print(f"\033[96m{'─' * 60}\033[0m\n")
+            print_section("🎯 WORKFLOW SELECTION")
+            print_info(f"Selected {len(candidates)} candidate(s)")
+            print_info(f"Top candidate: {candidates[0].uuid if candidates else 'None'}")
             return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
         return WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
 
@@ -275,7 +277,7 @@ class DarwinMachine:
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
         if learning_mode:
-            max_iteration = max(3, self.config.max_learning_evolve_iterations)
+            max_iteration = self.config.max_learning_evolve_iterations
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
@@ -286,10 +288,8 @@ class DarwinMachine:
             if wf is None:
                 raise ValueError("❌ Mockup mode requires a valid workflow template. "
                                  "Please provide a template_uuid or ensure workflows exist in the workflow directory.")
-            print(f"\n\033[93m{'MOCKUP MODE':^60}\033[0m")
-            print(f"\033[93m{'─' * 60}\033[0m")
-            print(f"\033[93mUsing existing workflow data from: {wf.uuid}\033[0m")
-            print(f"\033[93m{'─' * 60}\033[0m\n")
+            print_phase("MOCKUP MODE", color="\033[93m")
+            print_info(f"Using existing workflow data from: {wf.uuid}")
             mock_run = IndividualRun(
                 goal=wf.goal or goal,
                 prompt=wf.code or goal,
@@ -307,7 +307,7 @@ class DarwinMachine:
             )
             flow_answers = self.get_flow_answers(wf.state_result)
             self.show_answers(flow_answers)
-            print(f"\n\033[93mMockup run completed with reward: {wf.overall_score:.1f}\033[0m")
+            print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
             return [mock_run]
 
         craft_instructions = self.get_craft_instructions(goal, wf)
@@ -347,11 +347,12 @@ class DarwinMachine:
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
 
         iteration_start_time = time.time()
+        on_error = False
         uuid = None
         current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
 
         # Execute workflow
-        print(f"\nCurrently at run: {runs[-1].iteration_count}. max depth: {runs[-1].max_depth}.\n")
+        print_info(f"Run {runs[-1].iteration_count + 1} of {runs[-1].max_depth}")
         run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
@@ -359,12 +360,14 @@ class DarwinMachine:
             single_agent_mode=single_agent_mode
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+        if "WORKFLOW_GENERATION_ERROR" in run_stdout:
+            print_err(f"Workflow generation failed:\n{run_stdout[256:]}")
+            on_error = True
         if workflow_code:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
-            # Don't overwrite runs[-1].cost - it contains cumulative from previous iterations
             runs[-1].reward = wf_info.overall_score
 
         runs[-1].current_uuid = uuid
@@ -414,12 +417,12 @@ class DarwinMachine:
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
 
         # Check termination conditions
-        if runs[-1].iteration_count >= runs[-1].max_depth-1:
-            print("\nmax recursive depth reached.\n")
+        if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
+            print_info("Maximum recursive depth reached.")
             return runs
         if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
             # reach learning threshold
-            print("\nDGM done learning task.\n")
+            print_ok("DGM done learning task.")
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
                 f"Done learning task: {wf_info.goal[:256]} \n"
@@ -429,19 +432,20 @@ class DarwinMachine:
                 priority=0
             )
             return runs
-        elif not learning_mode and all_success:
-            self._save_final_plots(assertion_history, rewards_history, uuid)
-            print("\nDGM completed task.\n")
-            self.notifier.send_message(
-                f"Evolution completed successfully!\n"
-                f"Goal: {runs[-1].goal[:128]}...\n"
-                f"Final UUID: {uuid}\n"
-                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
-                f"All workflows successful!",
-                title=f"Evolution success - {uuid}",
-                priority=0
-            )
-            return runs
+        elif not on_error:
+            if not learning_mode and all_success:
+                self._save_final_plots(assertion_history, rewards_history, uuid)
+                print_ok("DGM completed task successfully.")
+                self.notifier.send_message(
+                    f"Task completed successfully!\n"
+                    f"Goal: {runs[-1].goal[:128]}...\n"
+                    f"Final UUID: {uuid}\n"
+                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                    f"All workflows successful!",
+                    title=f"Evolution success - {uuid}",
+                    priority=0
+                )
+                return runs
 
         # select and use best scoring workflow
         wf_info_best = self.select_workflow_template(
@@ -468,7 +472,6 @@ class DarwinMachine:
             original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
-        time.sleep(5)
         runs = await self.recursive_self_improvement(
             runs,
             rewards_history=rewards_history,
@@ -484,29 +487,15 @@ class DarwinMachine:
         """Get human validation for continuing the workflow."""
         human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
         if human_validation not in ["yes", "y"]:
-            print("Exiting self-improvement loop.\n")
+            print("Exiting self-improvement loop.")
             return False
         return True
 
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
         """Log the start of an iteration."""
         logger = logging.getLogger(__name__)
-
-        print(f"\n\033[94m{'=' * 60}\033[0m")
-        print(f"\033[94mITERATION {iteration_count + 1}/{max_depth} - Self-Improvement Loop.\n\033[0m"
-              f"\033[94mDGM Will attempt to retry and improve workflow on same task.\033[0m")
-        print(f"\033[94m{'=' * 60}\033[0m")
-        print(f"\n\033[94m{'📋 CURRENT TASK':^60}\033[0m")
-        print(f"\033[94m{'─' * 60}\033[0m")
-        goal_lines = goal.split('\n')
-        for line in goal_lines:
-            if len(line) <= 256:
-                print(f"\033[94m  {line}\033[0m")
-            else:
-                truncated = line[:256]
-                remaining = len(line) - 256
-                print(f"\033[94m  {truncated}...({remaining} remaining characters not displayed)\033[0m")
-        print(f"\033[94m{'─' * 60}\033[0m\n")
+        print_iteration_header(iteration_count + 1, max_depth)
+        print_box(goal, title="📋 CURRENT TASK", truncate=256)
         logger.info(f"[ITERATION START] {iteration_count + 1}/{max_depth} - {goal[:50]}...")
 
     async def _evaluate_and_calculate_cost(
@@ -534,22 +523,16 @@ class DarwinMachine:
     ) -> str:
         """Evaluate the workflow and update assertion history."""
         logger = logging.getLogger(__name__)
-
-        print(f"\n\033[94m{'⚖️  WORKFLOW EVALUATION PHASE':^80}\033[0m")
-        print(f"\033[94m{'=' * 80}\033[0m")
-
+        print_phase("⚖️  WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
         eval_result = self.judge.evaluate(uuid=uuid, answer=answer, scenario_rubric=scenario_rubric)
         eval_type = 'scenario' if scenario_rubric else 'generic'
         eval_time = time.time() - eval_start
-
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
-        print(f"\033[94m✅ Workflow evaluation completed in {eval_time:.3f}s\033[0m")
-
+        print_ok(f"Workflow evaluation completed in {eval_time:.3f}s")
         # Track assertion progress for scenario evaluation
         if scenario_rubric and isinstance(eval_result, dict) and assertion_history is not None:
             self._update_assertion_history(eval_result, assertion_history)
-
         return eval_type
 
     def _update_assertion_history(self, eval_result: dict, assertion_history: list):
@@ -557,15 +540,14 @@ class DarwinMachine:
         passed = eval_result.get('passed_assertions', eval_result.get('earned_points', 0))
         total = eval_result.get('total_assertions', eval_result.get('total_points', 100))
         assertion_history.append([passed, total])
-        print(f"\033[94m📊 Assertions Progress: {passed}/{total} "
-              f"({passed/total*100 if total > 0 else 0:.0f}%)\033[0m")
+        pct = passed / total * 100 if total > 0 else 0
+        print_info(f"📊 Assertions progress: {passed}/{total} ({pct:.0f}%)")
 
     def _update_visualizations(
         self, rewards_history: list, assertion_history: list,
         goal: str, scenario_rubric: str, uuid: str
     ):
         """Update all visualizations with current data."""
-        # Update assertion plot if available
         if assertion_history:
             self._update_assertion_plot(assertion_history, scenario_rubric, uuid)
         elif rewards_history:
@@ -580,18 +562,12 @@ class DarwinMachine:
     ):
         """Update assertion progress plot."""
         from sources.evaluation.scenario_loader import ScenarioLoader
-
         scenario = ScenarioLoader().load_scenario(scenario_rubric)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0
-
-        self.viz_utils.update_assertion_progress_plot(
-            assertion_history, total_assertions
-        )
-
-        # Save plot after each update for real-time monitoring
+        self.viz_utils.update_assertion_progress_plot(assertion_history, total_assertions)
         plot_filename = f"{self.workflow_dir}/{uuid}/assertion_progress.png"
         self.viz_utils.save_plot(plot_filename)
-        print(f"\033[94m📊 Assertion progress plot updated: {plot_filename}\033[0m")
+        print_info(f"📊 Assertion progress plot updated: {plot_filename}")
 
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
@@ -601,18 +577,18 @@ class DarwinMachine:
         """Log iteration completion and send notification."""
         logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
-
         logger.info(
             f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
             f"Rewards: {wf_rewards:.1f}, Cost: {exec_cost:.3f} USD"
         )
-
-        print(f"\n\033[94m{'-' * 60}\033[0m")
-        print(f"\033[94mTotal rewards: {wf_rewards:.1f}\033[0m")
-        print(f"\033[94mTotal cost: {exec_cost:.6f} USD\033[0m")
-        print(f"\033[94mIteration time: {iteration_time:.3f}s\033[0m")
-        print(f"\033[94m{'-' * 60}\033[0m\n")
-
+        print_summary(
+            f"ITERATION {iteration_count + 1}/{max_depth} COMPLETE",
+            [
+                ("Rewards", f"{wf_rewards:.1f}"),
+                ("Cost", f"${exec_cost:.6f}"),
+                ("Time", f"{iteration_time:.3f}s"),
+            ],
+        )
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n"
             f"Goal: {goal[:128]}...\n"
@@ -628,5 +604,5 @@ class DarwinMachine:
         if assertion_history or reward_history:
             plot_filename = f"{self.workflow_dir}/{uuid}/reward_progress.png"
             self.viz_utils.save_plot(plot_filename)
-        print(f"\033[94m📊 Assertion progress plot saved to: {plot_filename}\033[0m")
+        print_info(f"📊 Reward progress plot saved: {plot_filename}")
         return plot_filename
