@@ -49,6 +49,16 @@ MIMOSA_BANNER = f"""
 {DIM}  Self-evolving AI Framework for Autonomous Scientific Research{RESET}
 """
 
+MIMOSA_START_BANNER = f"""
+{GREEN}{BOLD}
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║    🌱  M I M O S A   —   S T A R T I N G   U P  🌱           ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+{RESET}
+"""
+
 TOTAL_STEPS = 9
 
 # ---------------------------------------------------------------------------
@@ -234,8 +244,7 @@ class OnboardCLI:
         """Run the full onboarding flow, then launch the selected mode."""
         print(MIMOSA_BANNER)
         print(_wrap(
-            "Welcome! This interactive guide will walk you through Mimosa setup "
-            "and launch the right execution mode for your scientific objective. "
+            "Welcome to Mimosa-AI!"
             "Press Ctrl-C at any time to quit.",
             width=70, indent=2,
         ))
@@ -980,6 +989,8 @@ class OnboardCLI:
                 "Make sure Toolomics is running and the workspace exists and try again."
             )
             sys.exit(1)
+
+        print(MIMOSA_START_BANNER)
 
         if self._mode == "goal":
             await self._launch_goal()
