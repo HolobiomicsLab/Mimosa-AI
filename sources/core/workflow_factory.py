@@ -296,7 +296,7 @@ The following tools packages are available for agents:
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
-        self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
+        self.logger.debug(f"Workflow entry point: START → {entry_node}")
 
         self.logger.info("✅ Workflow structure validation passed")
 

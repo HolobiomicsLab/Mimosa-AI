@@ -149,7 +149,7 @@ class DarwinMachine:
         return flow_answers
 
     def show_answers(self, flow_answers):
-        print_agent_answers(flow_answers)
+        print_box(flow_answers, title="Workflow Agents Answers", color=YELLOW)
 
     def improvement_prompt(
         self,

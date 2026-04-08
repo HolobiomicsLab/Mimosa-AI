@@ -85,12 +85,6 @@ def print_phase(
 ) -> None:
     """
     Full-width phase banner with centred title and horizontal rules.
-
-    Example::
-
-        ────────────────────────────────────────────────────────────────────────────────
-                               📦  DEPENDENCIES INSTALLATION PHASE
-        ────────────────────────────────────────────────────────────────────────────────
     """
     label = f"{icon}  {title}" if icon else title
     bar = "─" * width
@@ -106,10 +100,6 @@ def print_section(
 ) -> None:
     """
     Compact inline section label.
-
-    Example::
-
-        ──  🎯 WORKFLOW SELECTION  ────────────────────────────────────
     """
     label = f"  {title}  "
     remaining = max(0, width - len(label) - 2)
@@ -131,13 +121,6 @@ def print_iteration_header(
 ) -> None:
     """
     Prominent iteration counter banner shown at the start of each DGM loop.
-
-    Example::
-
-        ════════════════════════════════════════════════════════════════════════════════
-          ITERATION 1 / 3  ·  Self-Improvement Loop
-          DGM will attempt to retry and improve the workflow on the same task.
-        ════════════════════════════════════════════════════════════════════════════════
     """
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")
@@ -164,7 +147,7 @@ def print_box(
 
     Example::
 
-        ╭─  📋 CURRENT TASK  ──────────────────────────────────────────╮
+        ╭─  CURRENT TASK  ──────────────────────────────────────────╮
         │  Create a simple test workflow that demonstrates basic        │
         │  functionality by outputting the text 'Hello World'.          │
         ╰──────────────────────────────────────────────────────────────╯

@@ -71,10 +71,13 @@ _MODEL_CFG_KEYS = [
 ]
 
 
-def _print_step(step: int, total: int, title: str) -> None:
+def _print_step(step: int, total: int, title: str, no_count: bool = False) -> None:
     bar = "─" * 60
     print(f"\n{CYAN}{bar}{RESET}")
-    print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
+    if not no_count:
+        print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
+    else:
+        print(f"{CYAN}  {title}{RESET}")
     print(f"{CYAN}{bar}{RESET}")
 
 
@@ -257,24 +260,28 @@ class OnboardCLI:
         _print_step(5, TOTAL_STEPS, "Workspace Setup")
         self._setup_workspace_files()
 
+        first_pass = True
         while True:
             # Infine loop for conversation to continue
             # Step 6 – Initial objective
-            _print_step(6, TOTAL_STEPS, "Your Research Objective")
+            step_6_text = "Your Research Objective" if first_pass else "Keep working on the same objective"
+            _print_step(6, TOTAL_STEPS, "Your Research Objective", no_count=not first_pass)
             self._collect_objective()
 
             # Step 7 – LLM clarification + prompt refinement loop
-            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement")
+            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", no_count=not first_pass)
             self._clarify_and_refine()
 
             # Step 8 – Mode classification
-            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)")
+            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", no_count=not first_pass)
             self._classify_and_confirm()
 
             # Step 9 – Extra options then launch
-            _print_step(9, TOTAL_STEPS, "Options & Launch")
+            _print_step(9, TOTAL_STEPS, "Options & Launch", no_count=not first_pass)
             self._collect_options()
+
             await self._launch()
+            first_pass = False
 
     # ------------------------------------------------------------------
     # Step implementations
@@ -970,7 +977,7 @@ class OnboardCLI:
             _err(f"Configuration validation failed: {exc}")
             _info(
                 "Check that your workspace_dir and other paths in config are correct. "
-                "Make sure Toolomics is running and the workspace exists."
+                "Make sure Toolomics is running and the workspace exists and try again."
             )
             sys.exit(1)
 
@@ -978,32 +985,33 @@ class OnboardCLI:
             await self._launch_goal()
         else:
             await self._launch_task()
-
-    async def _launch_goal(self) -> None:
-        """Start planner mode (multi-step goal)."""
-        from sources.core.planner import Planner
-        from sources.utils.transfer_toolomics import LocalTransfer
-
-        print(f"\n{GREEN}{BOLD}  🚀  Launching in GOAL mode …{RESET}\n")
-        planner = Planner(self.config)
-        await planner.start_planner(
-            goal=self._objective,
-            judge=True,
-            max_evolve_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
-        )
         # Archive workspace after completion
         trs = LocalTransfer(
             config=self.config,
             workspace_path=self.config.workspace_dir,
             runs_capsule_dir=self.config.runs_capsule_dir,
         )
-        trs.transfer_workspace_files_to_capsule(self._objective)
+        capsule = trs.transfer_workspace_files_to_capsule(self._objective)
+        print(f"\n{GREEN}{BOLD}  Workspace files archived to capsule: {capsule}{RESET}\n")
+
+    async def _launch_goal(self) -> None:
+        """Start planner mode (multi-step goal)."""
+        from sources.core.planner import Planner
+        from sources.utils.transfer_toolomics import LocalTransfer
+
+        print(f"\n{GREEN}{BOLD}  Launching in GOAL mode …{RESET}\n")
+        planner = Planner(self.config)
+        await planner.start_planner(
+            goal=self._objective,
+            judge=True,
+            max_evolve_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
+        )
 
     async def _launch_task(self) -> None:
         """Start DGM task mode (single operation)."""
         from sources.core.dgm import DarwinMachine
 
-        print(f"\n{GREEN}{BOLD}  🚀  Launching in TASK mode …{RESET}\n")
+        print(f"\n{GREEN}{BOLD}  Launching in TASK mode …{RESET}\n")
         dgm = DarwinMachine(self.config)
         await dgm.start_dgm(
             goal=self._objective,
