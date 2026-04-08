@@ -125,7 +125,7 @@ def print_iteration_header(
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")
     print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
-    print(f"{DIM}  DGM will attempt to retry and improve the workflow on the same task.{RESET}")
+    print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
     print(f"{CYAN}{bar}{RESET}")
 
 
