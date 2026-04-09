@@ -14,6 +14,7 @@ from sources.modules import state_schema
 from .factory import Factory
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
+from sources.cli.pretty_print import print_ok, print_info, print_warn, print_err
 
 
 class WorkflowFactory(Factory):
@@ -126,7 +127,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
-            print("💬 LLM commentary on workflow:")
+            print_info("LLM commentary on workflow:")
             print(commentary)
 
             workflow_code = self.remove_imports(workflow_code)
@@ -269,7 +270,6 @@ SYSTEM_PROMPT = {smolagent_system_prompt!r}
 # Generated workflow
 {workflow_code}
 
-print("worflow run: compiling workflow...")
 app = workflow.compile()
 
 # Initialize and execute workflow
@@ -279,18 +279,14 @@ try:
     if WORKFLOW_PATH:
         try:
             png = app.get_graph().draw_mermaid_png()
-            print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
-                print("workflow run: writing PNG file...")
                 f.write(png)
-                print("PNG saved at ", os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"))
         except Exception as e:
             RuntimeError(f"Could not save workflow graph:" + str(e))
 except Exception as e:
     print(f"❌ Error saving PNG workflow:" + str(e))
     pass
 
-print("workflow run: invoking workflow...")
 try:
     result_state = app.invoke(initial_state)
 except KeyboardInterrupt:

@@ -134,13 +134,11 @@ class SmolAgentFactory:
 
     def get_engine(self):
         if self.engine_name == "mlx":
-            print("Using MLXModel for local execution.")
             return MLXModel(
                 model_id=self.model_id,
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "inference_client":
-            print("Using InferenceClientModel for inference client execution.")
             if not self.token:
                 raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
             return InferenceClientModel(
@@ -150,7 +148,6 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "litellm":
-            print(f"Using LiteLLM for {self.model_id} execution.")
             return LiteLLMModel(
                 model_id=self.model_id,
                 temperature=1.0,

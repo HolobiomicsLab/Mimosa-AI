@@ -89,6 +89,7 @@ class Config:
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
         self.runner_requirements: list[str] = [
+            "setuptools>=70.0",
             "python-dotenv",
             "fastmcp==2.8.1",
             "requests>=2.31.0",

@@ -33,12 +33,10 @@ class WorkflowSelector:
 
             # Check if state_result is empty
             if not workflow_info.load_state_result():
-                print(f"Skipping workflow {uuid}: empty state_result.json")
                 continue
 
             workflow_info.load_code()
             if not workflow_info.code:
-                print(f"Skipping workflow {uuid}: unable to load code")
                 continue
 
             workflows[uuid] = workflow_info

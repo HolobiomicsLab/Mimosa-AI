@@ -13,6 +13,11 @@ from sources.utils.notify import PushNotifier
 from sources.utils.planner_visualization import PlannerVisualizer
 from sources.utils.list_files import list_files
 from sources.extensibility.text_to_speech import create_tts_service
+from sources.cli.pretty_print import (
+    print_ok, print_warn, print_err, print_info,
+    print_phase, print_section, print_summary,
+    CYAN, BOLD, DIM, RESET,
+)
 
 from sources.utils.perspicacite_client import (
     format_scientific_context,
@@ -104,7 +109,7 @@ Important: Every task description should be very detailled and specific with the
         prompt = self.make_scientific_grounded_prompt(goal_prompt)
         for attempt in range(1, max_retries + 1):
             try:
-                print(f"🔄 Plan generation attempt {attempt}/{max_retries}")
+                print_info(f"Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = getattr(self.config, 'memory_path', 'sources/memory')
                 raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
@@ -112,41 +117,40 @@ Important: Every task description should be very detailled and specific with the
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
 
-                print(f"📝 Received plan response ({len(raw_plan)} characters)")
+                print_info(f"Received plan response ({len(raw_plan)} characters)")
                 print(raw_plan)
                 print("---")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
                     raise ValueError("Failed to extract valid JSON from LLM response\n")
                 plan = self._parse_and_validate_plan(plan_dict, goal_prompt)
-                print(f"✅ Successfully generated and validated plan with {len(plan.steps)} steps")
+                print_ok(f"Plan generated and validated — {len(plan.steps)} step(s)")
                 return plan
 
             except (ValueError, PlanValidationError, json.JSONDecodeError) as e:
                 last_error = e
                 error_msg = str(e)
-                # Check if this might be a truncation error (unterminated string at end of response)
                 is_truncation = False
                 if "Unterminated string" in error_msg or "Unexpected end of data" in error_msg:
                     is_truncation = True
                     error_msg = f"{error_msg} (This often indicates the response was truncated due to max_tokens limit)"
-                print(f"⚠️ Attempt {attempt} failed: {error_msg}")
+                print_warn(f"Attempt {attempt} failed: {error_msg}")
                 if is_truncation:
-                    print(f"💡 Tip: Consider increasing max_tokens in your config (current: {getattr(self.config, 'max_tokens', 'not set')})")
+                    print_info(f"Tip: consider increasing max_tokens (current: {getattr(self.config, 'max_tokens', 'not set')})")
 
                 if attempt < max_retries:
                     wait_time = 2 ** attempt
-                    print(f"⏳ Waiting {wait_time} seconds before retry...")
+                    print_info(f"Waiting {wait_time}s before retry…")
                     time.sleep(wait_time)
 
                     if attempt > 1:
                         goal_prompt = self._enhance_prompt_with_error(goal_prompt, error_msg)
                 else:
-                    print(f"❌ All {max_retries} attempts failed")
+                    print_err(f"All {max_retries} attempts failed")
 
             except Exception as e:
                 last_error = e
-                print(f"❌ Unexpected error in attempt {attempt}: {str(e)}")
+                print_err(f"Unexpected error in attempt {attempt}: {str(e)}")
                 if attempt >= max_retries:
                     break
                 time.sleep(2 ** attempt)
@@ -312,18 +316,18 @@ Original request:
         Args:
             plan: The plan to display
         """
-        print(f"\n📋 Execution Plan: {plan.goal}")
-        print("=" * 80)
+        print_phase("📋 EXECUTION PLAN")
+        print(f"  {BOLD}Goal:{RESET} {plan.goal}\n")
         for i, step in enumerate(plan.steps, 1):
-            print(f"\n{i}. {step.name.upper()} [{step.complexity}]")
-            print(f"   Task: {step.task}")
+            print(f"  {CYAN}{BOLD}{i}. {step.name.upper()}{RESET}  {DIM}[{step.complexity}]{RESET}")
+            print(f"     {step.task}")
             if step.depends_on:
-                print(f"   Dependencies: {', '.join(step.depends_on)}")
+                print(f"     {DIM}Depends on: {', '.join(step.depends_on)}{RESET}")
             if step.required_inputs:
-                print(f"   Required Inputs: {', '.join(step.required_inputs)}")
+                print(f"     {DIM}Inputs: {', '.join(step.required_inputs)}{RESET}")
             if step.expected_outputs:
-                print(f"   Expected Outputs: {', '.join(step.expected_outputs)}")
-        print("\n" + "=" * 80)
+                print(f"     {DIM}Outputs: {', '.join(step.expected_outputs)}{RESET}")
+            print()
 
     def _request_human_plan_validation(self, plan: Plan) -> tuple[bool, str]:
         """
@@ -333,22 +337,17 @@ Original request:
                 - is_approved: True if human pressed Enter (approve), False otherwise
                 - feedback: User's correction/feedback if plan not approved
         """
-        print("\n" + "_" * 40)
-        print("👤 HUMAN VALIDATION REQUIRED")
-        print("_" * 40)
-        print("\nPlease review the plan above.")
-        print("\nOptions:")
-        print("   • Press [ENTER] to approve and execute the plan")
-        print("   • Type your corrections/feedback and press [ENTER] to regenerate")
-        print("\n" + "─" * 80)
+        print_section("👤 HUMAN VALIDATION REQUIRED")
+        print(f"  {DIM}Please review the plan above.{RESET}")
+        print(f"  {DIM}Press [ENTER] to approve  ·  Type feedback and [ENTER] to regenerate{RESET}\n")
 
-        user_input = input("\n👉 Your decision: ").strip()
+        user_input = input(f"  {BOLD}➤  Your decision: {RESET}").strip()
         if not user_input:
-            print("\n✅ Plan approved by human. Proceeding with execution...")
+            print_ok("Plan approved. Proceeding with execution…")
             return True, ""
         else:
-            print(f"\n📝 Feedback received: {user_input}")
-            print("🔄 Will regenerate plan based on your feedback...")
+            print_info(f"Feedback received: {user_input}")
+            print_info("Regenerating plan based on your feedback…")
             return False, user_input
 
     def _generate_plan_with_human_validation(self, goal: str, human_approve = False) -> Plan:
@@ -394,7 +393,7 @@ Original request:
 
         try:
             self.visualizer = PlannerVisualizer(plan)
-            print("🎨 Visualization window initialized")
+            print_ok("Visualization window initialized")
 
             # On Linux and Windows, use a separate thread for event handling.
             # On macOS, event handling must be done from main thread (will be called periodically)
@@ -409,13 +408,13 @@ Original request:
                 self.visualizer_thread = threading.Thread(target=visualization_loop, daemon=True)
                 self.visualizer_thread.start()
                 platform_name = "Windows" if self.is_windows else "Linux"
-                print(f"🎨 Visualization running in separate thread ({platform_name})")
+                print_info(f"Visualization running in separate thread ({platform_name})")
             else:
-                print("🎨 Visualization will update from main thread (macOS)")
+                print_info("Visualization will update from main thread (macOS)")
 
         except Exception as e:
-            print(f"⚠️ Could not initialize visualization: {str(e)}")
-            print("⚠️ Continuing without visualization...")
+            print_warn(f"Could not initialize visualization: {str(e)}")
+            print_warn("Continuing without visualization…")
             self.use_visualization = False
             self.visualizer = None
 
@@ -435,7 +434,7 @@ Original request:
 
                 self.visualizer.update_tasks(self.task_history, total_cost=total_cost)
             except Exception as e:
-                print(f"⚠️ Error updating visualization: {str(e)}")
+                print_warn(f"Error updating visualization: {str(e)}")
 
     def _cleanup_visualization(self) -> None:
         """
@@ -453,9 +452,9 @@ Original request:
                     self.visualizer_thread.join(timeout=0.5)
                 self.visualizer = None
                 self.visualizer_thread = None
-                print("🎨 Visualization window closed")
+                print_ok("Visualization window closed")
             except Exception as e:
-                print(f"⚠️ Error closing visualization: {str(e)}")
+                print_warn(f"Error closing visualization: {str(e)}")
 
 
     def _get_workspace_files(self) -> list[str]:
@@ -473,7 +472,7 @@ Original request:
         try:
             workspace_path = Path(self.workspace_path)
             if not workspace_path.exists():
-                print(f"⚠️ Workspace path does not exist: {self.workspace_path}")
+                print_warn(f"Workspace path does not exist: {self.workspace_path}")
                 return files
 
             for root, dirs, filenames in os.walk(workspace_path):
@@ -489,7 +488,7 @@ Original request:
                         except ValueError:
                             continue
         except Exception as e:
-            print(f"⚠️ Error scanning workspace files: {str(e)}")
+            print_warn(f"Error scanning workspace files: {str(e)}")
 
         return files
 
@@ -498,7 +497,7 @@ Original request:
         Capture a snapshot of current workspace files before step execution.
         """
         self._workspace_files_before_step = self._get_workspace_files()
-        print(f"📸 Captured workspace snapshot: {len(self._workspace_files_before_step)} files")
+        print_info(f"Workspace snapshot: {len(self._workspace_files_before_step)} file(s)")
         return self._workspace_files_before_step
 
     def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
@@ -595,9 +594,9 @@ Original request:
 
         if max_evolve_iteration is None or max_evolve_iteration < 1:
             max_evolve_iteration = 1
-            print(f"⚠️ Invalid max_evolve_iteration, using default: {max_evolve_iteration}")
+            print_warn(f"Invalid max_evolve_iteration, using default: {max_evolve_iteration}")
 
-        print(f"🎯 Starting Iterative-Learning for task: {task[:50]}...")
+        print_info(f"Starting Iterative-Learning for task: {task[:60]}…")
 
         try:
             # Use original_task for lookup to avoid knowledge wrapper interference
@@ -611,10 +610,10 @@ Original request:
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]
                 if best_match is None:
-                    print("⚠️ Best match is None, proceeding with new Evolution run")
+                    print_warn("Best match is None, proceeding with new Evolution run")
                 #elif self._get_evolve_success(best_match):
                 elif best_match.is_success:
-                    print(f"🔁 Using previously run workflow result with UUID: {getattr(best_match, 'uuid', 'N/A')}")
+                    print_ok(f"Using cached workflow result  UUID: {getattr(best_match, 'uuid', 'N/A')}")
 
                     run = IndividualRun(
                         goal=best_match.goal,
@@ -628,7 +627,7 @@ Original request:
                     return [run]
 
             # Generate new workflows via Evolution
-            print(f"🔄 No cached run found, starting task learning (max_iter: {max_evolve_iteration})")
+            print_info(f"No cached run found, starting task learning (max_iter: {max_evolve_iteration})")
 
             if self.dgm is None:
                 raise ValueError("❌ Planner: instance is None")
@@ -643,7 +642,7 @@ Original request:
             )
 
             if runs is None:
-                print("⚠️ Runs is None, returning empty list")
+                print_warn("Runs is None, returning empty list")
                 return []
 
             return runs
@@ -669,7 +668,7 @@ Original request:
             PlanStep: The updated step with execution status
         """
         if step is None:
-            print("❌ Step is None, cannot execute")
+            print_err("Step is None, cannot execute")
             return step
 
         if attempt_counts is None:
@@ -677,7 +676,7 @@ Original request:
 
         if max_attempts is None or max_attempts < 1:
             max_attempts = 1
-            print(f"⚠️ Invalid max_attempts, using default: {max_attempts}")
+            print_warn(f"Invalid max_attempts, using default: {max_attempts}")
 
         step_name = getattr(step, 'name', 'unknown_step')
         goal = getattr(step, 'goal_context', '')
@@ -690,7 +689,7 @@ Original request:
             attempt += 1
             attempt_counts[step_name] = attempt
 
-            print(f"🔄 Attempt {attempt}/{max_attempts} for task: {step_name}")
+            print_info(f"Attempt {attempt}/{max_attempts} for task: {step_name}")
             if self.tts:
                 self.tts.speak(f"now starting task {step_name}", voice_index=0)
 
@@ -741,13 +740,13 @@ Original request:
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     step.status = TaskStatus.COMPLETED
                     if outputs_produced:
-                        print(f"✅ Task '{step_name}' completed successfully")
+                        print_ok(f"Task '{step_name}' completed successfully")
                         break
                     else:
-                        print(f"⚠️ Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
+                        print_warn(f"Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
                         break
                 else:
-                    print(f"❌ Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}\n")
+                    print_err(f"Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}")
                     if self.tts:
                         self.tts.speak(f"Task {step_name} failure, retrying...", voice_index=0)
                     continue
@@ -788,7 +787,7 @@ Original request:
             raise ValueError("❌ Planner: Goal must be a non-empty string")
 
         goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
-        print(f"▶ Starting planner with goal: {goal}")
+        print_info(f"Starting planner with goal: {goal[:80]}…")
 
         try:
             # Generate plan with human validation loop
@@ -801,7 +800,7 @@ Original request:
             self._init_visualization(self.current_plan)
             # Check for stop condition
             if self._check_stop_condition(self.current_plan):
-                print("⏹️ Stop condition found in plan. Exiting.")
+                print_info("Stop condition found in plan. Exiting.")
                 return self.task_history
 
             # Validate plan has steps
@@ -815,17 +814,17 @@ Original request:
             total_cost = 0
             for step_idx, step in enumerate(self.current_plan.steps):
                 if step is None:
-                    print(f"⚠️ Step {step_idx + 1} is None, skipping")
+                    print_warn(f"Step {step_idx + 1} is None, skipping")
                     continue
                 step_name = getattr(step, 'name', f'step_{step_idx}')
-                print(f"\n{'='*60}")
-                print(f"📋 Executing Step {step_idx + 1}/{len(self.current_plan.steps)}: {step_name}")
-                print(f"{'='*60}")
+                print_phase(
+                    f"📋 STEP {step_idx + 1}/{len(self.current_plan.steps)}  ·  {step_name}",
+                )
                 # Check if step can be executed (dependencies satisfied)
                 if lst_step:
                     can_execute, missing_deps = self._can_execute_step(lst_step)
                     if not can_execute:
-                        self.request_user_exit(f"⚠️ Cannot execute step '{step_name}' - missing dependencies: {missing_deps}")
+                        self.request_user_exit(f"Cannot execute step '{step_name}' — missing dependencies: {missing_deps}")
 
                 # Execute the step with retry logic
                 step.status = TaskStatus.RUNNING
@@ -844,7 +843,6 @@ Original request:
 
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED
-                    # Send notification for task failure
                     self.notifier.send_message(
                         f"Task '{step_name}' failed after {max_attempts} attempts\n"
                         f"Goal: {goal[:128]}...\n"
@@ -854,10 +852,15 @@ Original request:
                     )
                     raise Exception(f"❌ Giving up on task '{step_name}' after {max_attempts} attempts")
 
-            print(f"\n🏁 Planner execution completed. Executed {len(self.task_history)} tasks. Cost: {total_cost}")
-
-            # Send success notification
             completed_tasks = sum(1 for t in self.task_history if t.status == TaskStatus.COMPLETED)
+            print_summary(
+                "🏁 PLANNER EXECUTION COMPLETE",
+                [
+                    ("Tasks executed", str(len(self.task_history))),
+                    ("Tasks completed", str(completed_tasks)),
+                    ("Total cost", f"${total_cost:.6f}"),
+                ],
+            )
             self.notifier.send_message(
                 f"Planner completed successfully!\n"
                 f"Goal: {goal[:128]}...\n"
@@ -871,7 +874,7 @@ Original request:
             return self.task_history
 
         except Exception as e:
-            print(f"❌ Critical error in planner execution: {str(e)}")
+            print_err(f"Critical error in planner execution: {str(e)}")
             self.notifier.send_message(str(e), title="error during Mimosa execution.")
             self._cleanup_visualization()
             raise ValueError(f"❌ Planner: Execution failed: {str(e)}") from e
