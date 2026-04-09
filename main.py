@@ -243,7 +243,7 @@ async def main():
         "--verbose", action="store_true", help="Enable verbose logging to console"
     )
     parser.add_argument(
-        "--max_evolve_iterations", type=int, default=1, help="Maximum number of learning iterations. Used for retrying/learning a task."
+        "--max_evolve_iterations", type=int, help="Maximum number of learning iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)

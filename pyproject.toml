@@ -3,7 +3,7 @@ name = "mimosa-ai"
 version = "1.0.0"
 description = "Self-evolving AI-Framework for Autonomous Scientific Research"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "dotenv",
     "fastmcp>=2.5.0",

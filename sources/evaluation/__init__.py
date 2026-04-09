@@ -21,8 +21,6 @@ from .science_agent_bench import ScienceAgentBenchLoader
 from .capsule_evaluator import CapsuleEvaluator
 from .execution_sandbox import ExecutionSandbox
 from .bs_detection import BullshitDetectorNumerical, MemoryExtraction
-from .csv_mode import CsvEvaluationMode
-from .eval_workflow_generation import WorkflowEval
 
 __all__ = [
     # Evaluators
@@ -45,7 +43,4 @@ __all__ = [
     # Fraud / BS detection
     "BullshitDetectorNumerical",
     "MemoryExtraction",
-    # Batch / CSV evaluation
-    "CsvEvaluationMode",
-    "WorkflowEval",
 ]

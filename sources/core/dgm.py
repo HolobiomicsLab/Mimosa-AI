@@ -11,7 +11,6 @@ from pathlib import Path
 
 import random
 
-from sources.evaluation.evaluator import WorkflowEvaluator
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.shared_visualization import SharedVisualizationData
@@ -243,6 +242,7 @@ class DarwinMachine:
         viz_utils: VisualizationUtils = None,
         process_id: int = None,
     ) -> None:
+        from sources.evaluation.evaluator import WorkflowEvaluator
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing

@@ -332,12 +332,16 @@ All file operations MUST be performed within this subfolder.
         workspace_instruction = ""
         if workspace_subfolder:
             workspace_instruction = f"""
-⚠️ CRITICAL WORKSPACE REQUIREMENT:
-You MUST work exclusively in the workspace subfolder: {workspace_subfolder}
-All file operations (reading, writing, creating files) MUST be performed within this subfolder.
-Do NOT access or modify files outside of this designated workspace.
-Your working directory is set to this subfolder - use relative paths from there.
+⚠️ CRITICAL WORKSPACE REQUIREMENT ⚠️
+Your ENTIRE working environment is confined to the subfolder: {workspace_subfolder}
+• ALL file reads, writes and creations MUST happen inside {workspace_subfolder}/ — never outside.
+• Treat {workspace_subfolder}/ as your root directory and use paths relative to it.
+• Do NOT access, create or modify anything outside {workspace_subfolder}/.
 """
+
+        # Build explicit output paths
+        output_path = f"{workspace_subfolder}/{output_fname}" if workspace_subfolder else output_fname
+        script_path = f"{workspace_subfolder}/{script_name}" if workspace_subfolder else script_name
 
         task_prompt = f"""
 DOMAIN KNOWLEDGE:
@@ -353,10 +357,17 @@ DATASET PREVIEW:
 {dataset_preview}
 
 EXPECTED OUTPUT:
-Save results to a formatted file named exactly: {output_fname}
-Keep only one final python script at the root of {workspace_subfolder} named exactly: {script_name}.
-You need to respect stricly the output format, otherwise the evaluation will fail.
-For example if a input data CSV is named FDA_APPROVED then the column in the output file is also named FDA_APPROVED. No modified pattern such as FDA_APPROVED_prob will be tolerated, otherwise the evaluation will fail.
+1. Results file — save to the EXACT path: {output_path}
+   (i.e. at the root of your workspace subfolder, not in any sub-directory)
+2. Python script — keep exactly ONE final script at: {script_path}
+   (i.e. directly inside {workspace_subfolder}/, not nested deeper)
+3. Others scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
+
+⚠️ OUTPUT FORMAT RULES — non-compliance will cause evaluation failure:
+• Column names in the output file must match the source data exactly.
+  Example: if the input CSV column is named FDA_APPROVED, the output column MUST also be FDA_APPROVED.
+  Variants such as FDA_APPROVED_prob are NOT acceptable.
+• Do not rename, reorder, or otherwise alter column identifiers from the source.
 """
         return task_prompt, scenario_id, scoring_rubric_file
 

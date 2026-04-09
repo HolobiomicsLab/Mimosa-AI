@@ -72,7 +72,7 @@ class Config:
         self.max_learning_evolve_iterations = 10
 
         # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = 4  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
