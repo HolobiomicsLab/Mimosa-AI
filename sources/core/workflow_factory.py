@@ -300,7 +300,7 @@ if WORKFLOW_PATH:
         with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
             json.dump(result_state, f, indent=2)
     except Exception as e:
-        raise(f"Could not save workflow data:" + str(e))
+        raise(Exception(f"Could not save workflow data:" + str(e)))
 """
 
     async def craft_workflow(

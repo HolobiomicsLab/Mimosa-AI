@@ -105,11 +105,11 @@ class WorkflowSelector:
         return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
 
     def select_best_workflows(
-        self, goal: str, threshold_similary=0.7, threshod_score=0.5
+        self, goal: str, threshold_similarity=0.7, threshold_score=0.5
     ) -> list[WorkflowInfo]:
         """Choose a workflow that matches the goal with a minimum threshold."""
-        similar_workflows = self.sort_similar_workflows(goal, threshold_similary)
-        best_workflows = self.sort_workflows_by_score(similar_workflows, threshod_score)
+        similar_workflows = self.sort_similar_workflows(goal, threshold_similarity)
+        best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
 
 

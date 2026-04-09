@@ -2,17 +2,17 @@ import sys
 
 class PackageCheck():
     def __init__(self):
-        self.malicious_versions = {
+        self.safe_versions = {
             # CVE litellm 1.82.8 supply-chain attack
             'litellm': {'max': '1.82.8', 'min': None, 'reason': '.pth supply chain attack'}
         }
 
     def run(self):
-        for pkg, info in self.malicious_versions.items():
+        for pkg, info in self.safe_versions.items():
             self._check_version(pkg, info['min'], info['max'], info['reason'])
 
     def _check_version(self, package, version_min, version_max, reason) -> None:
-        """Exit early if a known-malicious version is installed."""
+        """Exit early if a version outside of the safe range is installed."""
         try:
             from importlib.metadata import version as pkg_version, PackageNotFoundError
             try:

@@ -70,8 +70,10 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
 
 class PromptGradient:
     def __init__(self):
-        # hints to provide diversity in generated workflows, we sample 3 of them at random for each workflow generation
-        # provide an approximate search direction to the LLM to improve workflow quality and diversity
+        """
+        hints to provide diversity in generated workflows, we sample 3 of them at random for each workflow generation
+        provide an approximate search direction to the LLM to improve workflow quality and diversity
+        """
         self.rn_seed = int(time.time() * 1000) % 2**32
         self.hints = [
             # === TOPOLOGY & ORCHESTRATION ===
@@ -270,7 +272,6 @@ class DarwinMachine:
             return None
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
-        return None
 
     def load_workflow_code(self, workflow_id: str) -> str:
         """
@@ -338,8 +339,8 @@ class DarwinMachine:
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal,
-                threshold_similary=0.8,
-                threshod_score=0.0,
+                threshold_similarity=0.8,
+                threshold_score=0.0,
             )
             print_section("🎯 WORKFLOW SELECTION")
             print_info(f"Selected {len(candidates)} candidate(s)")
@@ -483,8 +484,8 @@ class DarwinMachine:
 
         if runs[-1].iteration_count > 0:
             validation_result = self.improvement_validator.validate_improvement(
-                baseline_run=runs[-5:],
-                new_run=runs[-1:],
+                baseline_runs=runs[-5:],
+                new_runs=runs[-1:],
                 threshold=0.05  # 5% improvement threshold
             )
 
