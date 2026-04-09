@@ -158,7 +158,7 @@ source .venv/bin/activate
 ### 2. Install dependencies
 
 ```bash
-cd mimosa
+cd Mimosa-AI
 uv pip install -r requirements.txt
 ```
 

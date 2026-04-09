@@ -1,4 +1,4 @@
-#!nne/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Mimosa - A AI Agent Framework for advancing scientific research
 ============================================================================

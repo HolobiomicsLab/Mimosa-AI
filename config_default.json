@@ -1,5 +1,5 @@
 {
-  "workspace_dir": "/home/martin/Projects/CNRS/toolomics/workspace",
+  "workspace_dir": "/home/martin/Projects/CNRS/Toolomics/workspace",
   "discovery_addresses": [
     {
       "ip": "0.0.0.0",
@@ -9,7 +9,7 @@
   ],
   "planner_llm_model": "anthropic/claude-sonnet-4-5",
   "prompts_llm_model": "anthropic/claude-sonnet-4-5",
-  "workflow_llm_model": "anthropic/claude-opus-4-5",
+  "workflow_llm_model": "anthropic/claude-sonnet-4-5",
   "smolagent_model_id": "deepseek/deepseek-chat",
   "judge_model": "anthropic/claude-sonnet-4-5",
   "engine_name": "litellm",

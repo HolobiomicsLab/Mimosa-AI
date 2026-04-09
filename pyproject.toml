@@ -1,14 +1,14 @@
 [project]
 name = "mimosa-ai"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "Self-evolving AI-Framework for Autonomous Scientific Research"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "dotenv",
     "fastmcp>=2.5.0",
     "requests>=2.31.0",
-    "smolagents[all]>=1.21.1",
+    "smolagents[litellm,mlx-lm,telemetry,mcp]>=1.21.1",
     "langgraph>=0.4.7",
     "matplotlib>=3.9.0",
     "numpy>=2.3.0",
