@@ -124,8 +124,11 @@ def print_iteration_header(
     """
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")
-    print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
-    print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
+    if total <= 1:
+        print(f"{CYAN}{BOLD} Starting task... {RESET}")
+    else:
+        print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
+        print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
     print(f"{CYAN}{bar}{RESET}")
 
 

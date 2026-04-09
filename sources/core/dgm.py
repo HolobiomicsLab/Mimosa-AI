@@ -576,7 +576,7 @@ class DarwinMachine:
             original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
-        runs = await self.recursive_self_improvement(
+        runs = await self.recursive_self_evolution(
             runs,
             rewards_history=rewards_history,
             assertion_history=assertion_history,

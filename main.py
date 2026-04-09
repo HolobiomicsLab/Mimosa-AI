@@ -114,10 +114,12 @@ async def papers_mode(args, config):
 async def science_bench_papers_mode(args, config):
     # Use concurrent evaluation by default for science_agent_bench
     max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 4)
+    task_start_delay = getattr(config, 'task_start_delay', 30.0)
     papers = CsvEvaluationMode(
         config,
         csv_runs_limit=args.csv_runs_limit,
-        max_concurrent_tasks=max_concurrent
+        max_concurrent_tasks=max_concurrent,
+        task_start_delay=task_start_delay
     )
     if args.single_agent:
         print(f"⚠️ Starting in single agent mode")

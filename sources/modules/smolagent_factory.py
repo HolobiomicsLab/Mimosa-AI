@@ -173,7 +173,7 @@ class SmolAgentFactory:
             step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
             recent_steps = step_pairs[-5:]
 
-            prev_infos = "Informations given by previous agents (address any complain from the last agent:\n"
+            prev_infos = "Informations given by previous agents (address any complain from the last agent:)\n"
             for step_name, answer in recent_steps:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"

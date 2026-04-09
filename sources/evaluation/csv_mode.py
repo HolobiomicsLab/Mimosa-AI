@@ -43,7 +43,7 @@ class CsvEvaluationMode:
     Supports concurrent evaluation of multiple tasks.
     """
 
-    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1):
+    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1, task_start_delay: float = 30.0):
         """
         Initialize CsvEvaluationMode.
 
@@ -51,6 +51,8 @@ class CsvEvaluationMode:
             config: Mimosa configuration object
             csv_runs_limit: Maximum number of autonomous iterations
             max_concurrent_tasks: Maximum number of tasks to run concurrently (default: 1 for sequential)
+            task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
+                              Staggers agent starts to avoid overwhelming shell/API resources.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
@@ -62,6 +64,7 @@ class CsvEvaluationMode:
         self.done_rows = []
 
         # Concurrency control
+        self.task_start_delay = task_start_delay
         self._semaphore: asyncio.Semaphore | None = None
         self._results_lock = asyncio.Lock()
         self._base_workspace_dir = config.workspace_dir
@@ -551,7 +554,8 @@ Provide your analysis following the specified output format."""
         dataset_type: str,
         learning: bool,
         single_agent_mode: bool,
-        sab_loader: ScienceAgentBenchLoader | None
+        sab_loader: ScienceAgentBenchLoader | None,
+        launch_index: int = 0
     ) -> dict[str, Any]:
         """
         Process a single task evaluation in an isolated environment.
@@ -562,6 +566,7 @@ Provide your analysis following the specified output format."""
             learning: Whether learning mode is enabled
             single_agent_mode: Whether to use single agent mode
             sab_loader: ScienceAgentBench loader instance (if applicable)
+            launch_index: Position in the launch queue, used to stagger task starts
 
         Returns:
             Execution data dictionary with results
@@ -572,6 +577,13 @@ Provide your analysis following the specified output format."""
         # Extract workspace name from gold_program_name (e.g., 'clintox_nn' from 'clintox_nn.py')
         workspace_name = self._extract_workspace_name_from_row(row)
         task_id = workspace_name  # Use the clean name as task_id
+
+        # Stagger task launches to avoid overwhelming shell/API resources
+        if launch_index > 0 and self.task_start_delay > 0:
+            stagger_delay = launch_index * self.task_start_delay
+            self.logger.info(f"[CONCURRENT] Task {i + 1} (workspace: {workspace_name}) waiting {stagger_delay:.1f}s before starting (stagger delay)")
+            print(f"\033[93m[Worker {workspace_name}] ⏳ Stagger delay: waiting {stagger_delay:.1f}s before starting...\033[0m")
+            await asyncio.sleep(stagger_delay)
 
         # Acquire semaphore to limit concurrency
         async with self._semaphore:
@@ -786,6 +798,7 @@ Provide your analysis following the specified output format."""
             print(f"\n\033[95m{'🤖 CONCURRENT EVALUATION MODE':^80}\033[0m")
             print(f"\033[95m{'=' * 80}\033[0m")
             print(f"\033[95mMax concurrent tasks: {self.max_concurrent_tasks}\033[0m")
+            print(f"\033[95mStagger delay between launches: {self.task_start_delay:.1f}s\033[0m")
             print(f"\033[95mTotal rows in CSV: {total_rows}\033[0m")
             print(f"\033[95m{'=' * 80}\033[0m\n")
 
@@ -810,16 +823,17 @@ Provide your analysis following the specified output format."""
 
         print(f"\033[95m📋 Processing {len(task_contexts)} tasks with {self.max_concurrent_tasks} concurrent workers\033[0m\n")
 
-        # Create coroutines for all tasks
+        # Create coroutines for all tasks with staggered launch indices
         tasks = [
             self._process_single_task(
                 task_context=ctx,
                 dataset_type=dataset_type,
                 learning=learning,
                 single_agent_mode=single_agent_mode,
-                sab_loader=sab_loader
+                sab_loader=sab_loader,
+                launch_index=idx
             )
-            for ctx in task_contexts
+            for idx, ctx in enumerate(task_contexts)
         ]
 
         # Execute all tasks concurrently with semaphore control

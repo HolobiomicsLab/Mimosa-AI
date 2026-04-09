@@ -70,7 +70,7 @@ Tools                →  execution, I/O, external packages, search, file creati
 Python + Tools       →  stateful multi-step experiments, adaptive workflows, self-correcting pipelines
 ```
 
-Use Python for what Python is good at. Reach for a tool when you need to cross a boundary (disk, network, subprocess, external package). Never use a tool to do what a one-liner can do.
+Use Python for what Python is good at. Reach for a tool when you need to cross a boundary (disk, network, external package). Never use a tool to do what a one-liner can do.
 
 ---
 

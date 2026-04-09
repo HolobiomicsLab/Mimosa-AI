@@ -56,7 +56,7 @@ class Config:
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v9.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
         self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"

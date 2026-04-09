@@ -98,13 +98,13 @@ class WorkflowOrchestrator:
         # Query Perspicacite-AI for grounded scientific context.
         # ------------------------------------------------------------------ #
         science_task = original_task if original_task else goal
-        print(
-            f"\n\033[94m🔬 Querying Perspicacite-AI for scientific context...\033[0m"
+        print_phase(
+            f"🔬 Querying Perspicacite-AI for scientific context..."
         )
         scientific_context = query_perspicacite(science_task)
         if scientific_context:
-            print(
-                f"\033[94m✅ [Perspicacite] Scientific context: {scientific_context[:500]}...\033[0m"
+            print_info(
+                f"\033[94m[Perspicacite] Scientific context:\n{scientific_context[:1024]}...\033[0m"
             )
             craft_instructions = (
                 format_scientific_context(science_task, scientific_context)
