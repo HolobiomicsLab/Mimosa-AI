@@ -26,6 +26,8 @@ class WorkflowSelector:
                 continue
 
             uuid = workflow_folder.name
+            if "single_agent" in uuid:
+                continue
             workflow_info = WorkflowInfo(uuid, workflow_folder)
 
             if not workflow_info.is_valid():

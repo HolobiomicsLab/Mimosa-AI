@@ -564,7 +564,7 @@ class DarwinMachine:
         runs.append(IndividualRun(
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
-            cost=runs[-1].cost + current_iteration_cost,  # Correct cumulative cost
+            cost=runs[-1].cost,  # Correct cumulative cost
             current_uuid=uuid,
             template_uuid=None,
             workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
