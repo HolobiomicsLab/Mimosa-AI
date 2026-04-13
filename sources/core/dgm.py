@@ -513,10 +513,10 @@ class DarwinMachine:
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
 
-        # Log and notify completion
+        # Log and notify completion (show per-iteration cost, not cumulative)
         self._log_iteration_completion(
             runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-            wf_info.overall_score, runs[-1].cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+            wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
         all_success = evaluate_workflow_success(wf_info, runs[-1].answers)

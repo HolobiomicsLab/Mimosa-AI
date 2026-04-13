@@ -252,20 +252,20 @@ Provide a structured analysis with:
             notes = {
                 **notes,
                 "capsule_name": capsule_name,
-                "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
-                "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
-                "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
-                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
+                "ver_success": sum(1 for sab in sab_runs if sab.get('VER', False)),
+                "sr_success": sum(1 for sab in sab_runs if sab.get('SR', False)),
+                "avg_cbs": sum(sab.get('CBS', 0.0) for sab in sab_runs) / len(sab_runs),
+                "total_cost": sum(sab.get('eval_cost', 0.0) for sab in sab_runs),
                 "is_success": current_task_data.get('SR', False),
                 "task_cost": current_task_data.get('eval_cost', 0.0),
                 "max_judge_reward": max((getattr(run, 'reward', 0.0) for run in runs_data), default=0.0),
                 "evolution_iterations": len(runs_data),
                 "evolved_workflows_uuids": [getattr(run, 'current_uuid', '') for run in runs_data],
                 "evolution_rewards": [getattr(run, 'reward', 0.0) for run in runs_data],
-                "evolution_costs": [getattr(run, 'cost', 0.0) for run in runs_data],
-                "evolution_total_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data),
+                "evolution_costs": self._compute_per_iteration_costs(runs_data),
+                "evolution_total_cost": getattr(runs_data[-1], 'cost', 0.0) if runs_data else 0.0,
                 "evolution_avg_reward": sum(getattr(run, 'reward', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0,
-                "evolution_avg_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0
+                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0
             }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
@@ -273,6 +273,31 @@ Provide a structured analysis with:
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
+
+    @staticmethod
+    def _compute_per_iteration_costs(runs_data: list) -> list[float]:
+        """
+        Compute per-iteration costs from IndividualRun objects.
+
+        IndividualRun.cost is cumulative (each run accumulates cost from prior runs).
+        This method extracts the per-iteration cost by computing deltas between
+        consecutive runs.
+
+        Args:
+            runs_data: List of IndividualRun objects
+
+        Returns:
+            List of per-iteration costs (one per run)
+        """
+        if not runs_data:
+            return []
+        costs = []
+        prev_cost = 0.0
+        for run in runs_data:
+            run_cost = getattr(run, 'cost', 0.0)
+            costs.append(run_cost - prev_cost)
+            prev_cost = run_cost
+        return costs
 
     @staticmethod
     def _extract_workspace_name_from_row(row: dict) -> str:
@@ -626,6 +651,9 @@ Provide your analysis following the specified output format."""
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
+                # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                max_iter = self.config.max_learning_evolve_iterations if learning else 1
+
                 runs = None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
@@ -636,7 +664,7 @@ Provide your analysis following the specified output format."""
                         judge=True,
                         learning_mode=learning,
                         scenario_rubric=None,
-                        max_iteration=self.config.max_learning_evolve_iterations,
+                        max_iteration=max_iter,
                         single_agent_mode=single_agent_mode
                     )
                     results_str = self._format_task_mode_results(runs[-1])
@@ -644,7 +672,7 @@ Provide your analysis following the specified output format."""
                     tasks_data = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
-                        max_evolve_iteration=self.config.max_learning_evolve_iterations,
+                        max_evolve_iteration=max_iter,
                         max_task_retry=3
                     )
                     results_str = self._format_goal_mode_results(tasks_data)
@@ -923,13 +951,16 @@ Provide your analysis following the specified output format."""
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
+                    # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                    max_iter = self.config.max_learning_evolve_iterations if learning else 1
+
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
                                                         scenario_rubric=None, # Don't pass scenario rubric to use generic evaluator (file based scenario doesn't give mearningful feedback signal for workflow iterative refinements as for now)
-                                                        max_iteration=self.config.max_learning_evolve_iterations,
+                                                        max_iteration=max_iter,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
