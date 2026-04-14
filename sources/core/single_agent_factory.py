@@ -169,6 +169,7 @@ agent = CodeAgent(
         'gzip', 'zipfile', 'tarfile', 'zlib',
     ]
 )
+
 agent.prompt_templates["system_prompt"] = SYSTEM_PROMPT
 
 def save_agent_memories(agent, memory_path: str, agent_name: str):

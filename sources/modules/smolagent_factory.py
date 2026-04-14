@@ -130,7 +130,6 @@ class SmolAgentFactory:
         """Override the system prompt for the agent."""
         if not sys_prompt or not sys_prompt.strip():
             return # use original system prompt by smolagents
-        self.agent.prompt_templates["system_prompt"] = sys_prompt
 
     def get_engine(self):
         if self.engine_name == "mlx":
