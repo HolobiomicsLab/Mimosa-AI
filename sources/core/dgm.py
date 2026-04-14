@@ -383,6 +383,8 @@ class DarwinMachine:
         """
         if learning_mode:
             max_iteration = self.config.max_learning_evolve_iterations
+        if max_iteration is None:
+            max_iteration = 1
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
