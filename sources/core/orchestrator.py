@@ -71,6 +71,35 @@ class WorkflowOrchestrator:
         else:
             print_err(f"Workflow execution failed: {result.stderr}")
             raise Exception(f"Workflow execution failed: {result.stderr}")
+    
+    def perspicacite_grounding_task(self, task):
+        prompt = f"""You are a scientific literature specialist supporting a scientist on a task.
+SCIENTIFIC TASK:
+{task}
+
+Query the literature to design a litterature grounded approach.
+
+1. LITERATURE FOUNDATION
+   - Canonical methods and key papers (authors, year, venue)
+   - Field conventions that must be followed
+   - Standard validation criteria
+
+2. WORKFLOW DESIGN
+   For each stage, specify:
+   - Expert role needed (e.g., "Data Curator", "Method Specialist", "Quality Reviewer")
+   - Inputs required and outputs produced
+   - Completion criteria grounded in literature
+   - Conditions to proceed to next stage
+   - Known failure modes and recovery strategies from best practices
+   - Complexity and uncertainty estimates (flag high-risk steps)
+
+CONSTRAINTS: Cite sources for all methodological claims. Note where literature is sparse or conflicting.
+        """
+        try:
+            response = query_perspicacite(prompt) or "No relevant scientific context."
+            return response
+        except Exception as e:
+            return "Query failed. Unable to help with scientific litterature"
 
     async def orchestrate_workflow(
         self,
@@ -99,12 +128,12 @@ class WorkflowOrchestrator:
         # ------------------------------------------------------------------ #
         science_task = original_task if original_task else goal
         print_phase(
-            f"🔬 Querying Perspicacite-AI for scientific context..."
+            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
         )
-        scientific_context = query_perspicacite(science_task)
+        scientific_context = self.perspicacite_grounding_task(science_task)
         if scientific_context:
             print_info(
-                f"\033[94m[Perspicacite] Scientific context:\n{scientific_context[:1024]}...\033[0m"
+                f"\033[94m[Perspicacite] Scientific context:\n{scientific_context[:2048]}...\033[0m"
             )
             craft_instructions = (
                 format_scientific_context(science_task, scientific_context)

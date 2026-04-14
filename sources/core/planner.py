@@ -66,6 +66,37 @@ class Planner:
         self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
+    
+    def perspicacite_grounding(self, goal):
+        prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
+
+TASK TO SUPPORT:
+{goal}
+
+Retrieve peer-reviewed sources and established methodologies. Synthesize findings into actionable planning guidance.
+
+OUTPUT FORMAT:
+1. RELEVANT LITERATURE
+   - Key papers/theory (cite authors, year, venue)
+   - Foundational methods standard in this domain
+
+2. ESTABLISHED WORKFLOW
+   - Step-by-step methodology from current literature
+   - Critical decision points and typical resolutions
+   - Common pitfalls and literature-backed avoidance strategies
+
+3. PRACTICAL GUIDANCE FOR PLANNER
+   - Sub-tasks to create based on canonical approaches
+   - Standard validation steps
+   - Resource/data requirements
+
+CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain conventions. Note if literature is sparse/conflicting.
+        """
+        try:
+            response = query_perspicacite(prompt) or "No relevant scientific context."
+            return response
+        except Exception as e:
+            return "Query failed. Unable to help with scientific litterature"
 
     def make_scientific_grounded_prompt(self, goal: str) -> str:
         """
@@ -75,8 +106,11 @@ class Planner:
         Returns:
             str: Enhanced prompt with scientific context
         """
-        scientific_context = query_perspicacite(goal) or "No relevant scientific context found."
-        print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:500]}...\n---")
+        print_phase(
+            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+        )
+        scientific_context = self.perspicacite_grounding(goal)
+        print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
 
         return f"""
 You are a top-tier scientific in research. When generating the plan, please incorporate relevant scientific principles, theories, or findings that could inform the approach to achieving the goal. This will help ensure that the plan is not only practical but also grounded in scientific understanding.
@@ -118,8 +152,6 @@ Important: Every task description should be very detailled and specific with the
                     raise ValueError("LLM returned empty or invalid response")
 
                 print_info(f"Received plan response ({len(raw_plan)} characters)")
-                print(raw_plan)
-                print("---")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
                     raise ValueError("Failed to extract valid JSON from LLM response\n")

@@ -152,6 +152,7 @@ class SmolAgentFactory:
                 model_id=self.model_id,
                 temperature=1.0,
                 max_tokens=self.max_tokens,
+                timeout=self.timeout
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
