@@ -66,7 +66,7 @@ class Planner:
         self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
-    
+
     def perspicacite_grounding(self, goal):
         prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
 
@@ -217,8 +217,8 @@ Important: Every task description should be very detailled and specific with the
         if not plan_dict["steps"]:
             raise PlanValidationError("❌ Planner: Plan must contain at least one step")
 
-        goal = plan_dict.get("goal", "")
-        if not goal:
+        plan_goal = plan_dict.get("goal", "") or goal
+        if not plan_goal:
             raise PlanValidationError("❌ Planner: Plan must have a goal")
 
         steps = []
@@ -227,7 +227,7 @@ Important: Every task description should be very detailled and specific with the
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
-                    goal_context=goal,
+                    goal_context=plan_goal,
                     cost=0.0,
                     score=0.0,
                     depends_on=step_dict.get("depends_on", []),
@@ -561,7 +561,7 @@ Original request:
             Tuple[bool, List[str]]: (all_produced, missing_outputs)
         """
         missing_outputs = []
-        workspace_files = self._capture_workspace_snapshot()
+        workspace_files = self._get_workspace_files()
 
         for expected_output in step.expected_outputs:
             # Normalise expected path to forward slashes for cross-platform comparison
@@ -717,7 +717,8 @@ Original request:
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
-        while attempt <= max_attempts:
+        final_answers = []
+        while attempt < max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
 
@@ -762,7 +763,7 @@ Original request:
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
                     complexity=getattr(step, 'complexity', 'medium'),
-                    produced_outputs=self._workspace_files_before_step
+                    produced_outputs=[f for f in self._get_workspace_files() if f not in self._workspace_files_before_step]
                 )
 
                 self.task_history.append(task)
@@ -789,7 +790,7 @@ Original request:
         step.cost = attempt_cost
         step.score = attempt_score
         if self.tts:
-            answer = '. '.join([x[:128] for x in final_answers])
+            answer = '. '.join([x[:128] for x in final_answers if x]) if final_answers else "No answers produced."
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
@@ -854,7 +855,7 @@ Original request:
                 )
                 # Check if step can be executed (dependencies satisfied)
                 if lst_step:
-                    can_execute, missing_deps = self._can_execute_step(lst_step)
+                    can_execute, missing_deps = self._can_execute_step(step)
                     if not can_execute:
                         self.request_user_exit(f"Cannot execute step '{step_name}' — missing dependencies: {missing_deps}")
 
@@ -864,6 +865,7 @@ Original request:
                 max_attempts = max_task_retry
 
                 try:
+                    self._capture_workspace_snapshot()  # Snapshot before execution for output diff
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_evolve_iteration)
                     total_cost += step.cost
                     self._update_visualization(total_cost)  # Update after step completes

@@ -7,7 +7,6 @@ import os
 import re
 import time
 import uuid
-import numpy as np
 
 from sources.modules import state_schema
 
@@ -251,7 +250,7 @@ from langgraph.graph import StateGraph, START, END
 from pydantic import BaseModel
 
 # because LLM like to use random typing
-from typing import Any, Optional, Union, List, Dict, Tuple, Callable, TypeDict
+from typing import Any, Optional, Union, List, Dict, Tuple, Callable
 from typing import ClassVar, Final, Literal, Protocol, TypedDict
 
 MEMORY_PATH = {memory_path!r}

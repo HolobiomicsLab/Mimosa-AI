@@ -40,7 +40,7 @@ def check_answer_success(answer: str) -> bool:
     """
     answer_lower = str(answer).lower()
     failure_patterns = [
-        r'\bfailed\b', r'\berror\b', r'\failure\b',
+        r'\bfailed\b', r'\berror\b', r'\bfailure\b',
     ]
     return all(not re.search(pattern, answer_lower) for pattern in failure_patterns)
 
@@ -147,13 +147,14 @@ class PromptGradient:
         )
         return flow_answers
 
-    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> str:
+    def sample_workflow_hints(self, hints: list[tuple[str, str]], n: int, seed: int | None = None) -> list[tuple[str, str]]:
         rng = random.Random(seed)
         sampled = rng.sample(hints, min(n, len(hints)))
         return sampled
 
-    def get_hints(self) -> str:
+    def get_hints(self) -> tuple[list[str], list[str]]:
         sampled_hints = self.sample_workflow_hints(self.hints, n=3, seed=self.rn_seed)
+        self.rn_seed += 1  # Advance seed so next call samples different hints
         hints_names = [hint[0] for hint in sampled_hints]
         hints = [hint[1] for hint in sampled_hints]
         return hints, hints_names
@@ -381,10 +382,10 @@ class DarwinMachine:
         - mockup_mode (bool, optional): If True, use existing workflow data from select_workflow_template
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
-        if learning_mode:
-            max_iteration = self.config.max_learning_evolve_iterations
         if max_iteration is None:
             max_iteration = 1
+        if learning_mode:
+            max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
 
         wf = self.select_workflow_template(
             goal, template_uuid=template_uuid
