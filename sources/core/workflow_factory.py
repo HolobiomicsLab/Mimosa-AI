@@ -248,8 +248,11 @@ import sys
 import re
 import json
 from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List
 from pydantic import BaseModel
+
+# because LLM like to use random typing
+from typing import Any, Optional, Union, List, Dict, Tuple, Callable, TypeDict
+from typing import ClassVar, Final, Literal, Protocol, TypedDict
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}

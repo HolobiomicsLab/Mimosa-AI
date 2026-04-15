@@ -12,11 +12,62 @@ therefore uses *streaming* by default (SSE) so intermediate "thinking" events
 keep the connection alive, and sets generous read timeouts.
 """
 
+import hashlib
+import json
 import logging
 import os
+import pathlib
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Request cache
+# ---------------------------------------------------------------------------
+_CACHE_DIR = pathlib.Path(__file__).resolve().parent.parent / "memory" / "perspicacite_requests"
+
+def _cache_key(science_query: str, mode: str) -> str:
+    """Return a deterministic hex digest for a (query, mode) pair."""
+    blob = json.dumps({"query": science_query, "mode": mode}, sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _read_cache(science_query: str, mode: str) -> Optional[str]:
+    """Return the cached answer for *science_query* + *mode*, or ``None``."""
+    key = _cache_key(science_query, mode)
+    cache_file = _CACHE_DIR / f"{key}.json"
+    if not cache_file.exists():
+        return None
+    try:
+        data = json.loads(cache_file.read_text(encoding="utf-8"))
+        logger.info(
+            "[Perspicacite] Cache HIT for query (mode=%s): %s…",
+            mode, science_query[:80],
+        )
+        return data.get("answer")
+    except Exception:
+        logger.debug("[Perspicacite] Failed to read cache file %s", cache_file)
+        return None
+
+
+def _write_cache(science_query: str, mode: str, answer: str) -> None:
+    """Persist *answer* to disk so future identical requests are served from cache."""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    key = _cache_key(science_query, mode)
+    cache_file = _CACHE_DIR / f"{key}.json"
+    payload = {
+        "query": science_query,
+        "mode": mode,
+        "answer": answer,
+    }
+    try:
+        cache_file.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        logger.info("[Perspicacite] Cached answer → %s", cache_file.name)
+    except Exception as exc:
+        logger.debug("[Perspicacite] Failed to write cache file: %s", exc)
 
 # Default Perspicacite API base URL (can be overridden by env var)
 PERSPICACITE_BASE_URL = os.environ.get(
@@ -73,14 +124,23 @@ def query_perspicacite(
         A string containing the scientific context retrieved from Perspicacite,
         or ``None`` if the service is unavailable or the query fails.
     """
+    # ---- check the on-disk cache first ----
+    cached = _read_cache(science_query, mode)
+    if cached is not None:
+        return cached
+
     # Try streaming first (preferred — keeps connection alive during long ops)
     result = _query_perspicacite_streaming(science_query, mode, base_url)
     if result:
+        _write_cache(science_query, mode, result)
         return result
 
     # Fall back to non-streaming JSON if streaming failed
     logger.info("[Perspicacite] Streaming failed; trying non-streaming fallback.")
-    return _query_perspicacite_non_streaming(science_query, mode, base_url)
+    result = _query_perspicacite_non_streaming(science_query, mode, base_url)
+    if result:
+        _write_cache(science_query, mode, result)
+    return result
 
 
 def _query_perspicacite_streaming(
