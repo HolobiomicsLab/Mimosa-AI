@@ -133,7 +133,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## 前提条件
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv)（推奨）または pip
 - 実行中の [Toolomics MCP サーバー](https://github.com/HolobiomicsLab/toolomics)
 
@@ -141,27 +141,20 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## インストール
 
-### 1. リポジトリのクローンと仮想環境の作成
+### 1. 依存関係のインストール
 
 ```bash
-# uv を使用（推奨）
+# uv を使用（推奨——仮想環境の作成と依存関係のインストールを一括で実行）
 pip install uv
-uv venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv sync
 
 # または pip を使用
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install .
 ```
 
-### 2. 依存関係のインストール
-
-```bash
-cd mimosa
-uv pip install -r requirements.txt
-```
-
-### 3. API キーの設定
+### 2. API キーの設定
 
 プロジェクトルートに `.env` ファイルを作成します。使用する予定の LLM プロバイダーのキーのみを含めてください：
 
@@ -178,7 +171,7 @@ LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 4. MCP サーバーの起動
+### 3. MCP サーバーの起動
 
 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) のセットアップ手順に従ってください。ポート範囲（例：`5000–5100`）で実行するように設定します。
 

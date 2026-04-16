@@ -134,7 +134,7 @@ In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthes
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - A running [Toolomics MCP server](https://github.com/HolobiomicsLab/toolomics)
 
@@ -142,27 +142,20 @@ In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthes
 
 ## Installation
 
-### 1. Clone and create virtual environment
+### 1. Install dependencies
 
 ```bash
-# Using uv (recommended)
+# Using uv (recommended — creates venv and installs dependencies in one step)
 pip install uv
-uv venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv sync
 
 # Or with pip
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install .
 ```
 
-### 2. Install dependencies
-
-```bash
-cd mimosa
-uv pip install -r requirements.txt
-```
-
-### 3. Set API keys
+### 2. Set API keys
 
 Create a `.env` file at the project root. Include only the keys for the LLM providers you plan to use:
 
@@ -179,7 +172,7 @@ LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 4. Start the MCP server
+### 3. Start the MCP server
 
 Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`).
 

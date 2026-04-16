@@ -133,7 +133,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## 前置条件
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv)（推荐）或 pip
 - 正在运行的 [Toolomics MCP 服务器](https://github.com/HolobiomicsLab/toolomics)
 
@@ -141,27 +141,20 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## 安装
 
-### 1. 克隆仓库并创建虚拟环境
+### 1. 安装依赖
 
 ```bash
-# 使用 uv（推荐）
+# 使用 uv（推荐——一步完成虚拟环境创建和依赖安装）
 pip install uv
-uv venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv sync
 
 # 或使用 pip
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install .
 ```
 
-### 2. 安装依赖
-
-```bash
-cd mimosa
-uv pip install -r requirements.txt
-```
-
-### 3. 设置 API 密钥
+### 2. 设置 API 密钥
 
 在项目根目录创建 `.env` 文件，仅包含您计划使用的 LLM 提供商的密钥：
 
@@ -178,7 +171,7 @@ LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 4. 启动 MCP 服务器
+### 3. 启动 MCP 服务器
 
 请参考 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) 的配置说明，将其配置为在某个端口范围内运行（例如 `5000–5100`）。
 

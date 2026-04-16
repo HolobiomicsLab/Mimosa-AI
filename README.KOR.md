@@ -133,7 +133,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## 사전 요구사항
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (권장) 또는 pip
 - 실행 중인 [Toolomics MCP 서버](https://github.com/HolobiomicsLab/toolomics)
 
@@ -141,27 +141,20 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ## 설치
 
-### 1. 저장소 클론 및 가상 환경 생성
+### 1. 의존성 설치
 
 ```bash
-# uv 사용 (권장)
+# uv 사용 (권장 — 가상 환경 생성과 의존성 설치를 한 번에 수행)
 pip install uv
-uv venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv sync
 
 # 또는 pip 사용
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install .
 ```
 
-### 2. 의존성 설치
-
-```bash
-cd mimosa
-uv pip install -r requirements.txt
-```
-
-### 3. API 키 설정
+### 2. API 키 설정
 
 프로젝트 루트에 `.env` 파일을 생성합니다. 사용할 LLM 프로바이더의 키만 포함하세요:
 
@@ -178,7 +171,7 @@ LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 4. MCP 서버 시작
+### 3. MCP 서버 시작
 
 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)의 설정 지침을 따르세요. 포트 범위(예: `5000–5100`)에서 실행되도록 설정합니다.
 
