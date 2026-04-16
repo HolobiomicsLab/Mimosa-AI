@@ -252,6 +252,7 @@ from pydantic import BaseModel
 # because LLM like to use random typing
 from typing import Any, Optional, Union, List, Dict, Tuple, Callable
 from typing import ClassVar, Final, Literal, Protocol, TypedDict
+from typing import Annotated
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
