@@ -1,5 +1,5 @@
-{
-  "workspace_dir": "/home/martin/Projects/CNRS/Toolomics/workspace",
+g
+  "workspace_dir": "/Users/cnrs/Documents/repository/Toolomics/workspace",
   "discovery_addresses": [
     {
       "ip": "0.0.0.0",
@@ -7,11 +7,11 @@
       "port_max": 5200
     }
   ],
-  "planner_llm_model": "anthropic/claude-sonnet-4-5",
-  "prompts_llm_model": "anthropic/claude-sonnet-4-5",
-  "workflow_llm_model": "anthropic/claude-sonnet-4-5",
-  "smolagent_model_id": "deepseek/deepseek-chat",
-  "judge_model": "anthropic/claude-sonnet-4-5",
+  "planner_llm_model": "openrouter/z-ai/glm-5",
+  "prompts_llm_model": "openrouter/z-ai/glm-5",
+  "workflow_llm_model": "openrouter/z-ai/glm-5",
+  "smolagent_model_id": "anthropic/claude-sonnet-4-5",
+  "judge_model": "openrouter/z-ai/glm-5",
   "engine_name": "litellm",
   "prompt_planner": "sources/prompts/planner_reproduction.md",
   "prompt_workflow_creator": "sources/prompts/workflow_v8.md",

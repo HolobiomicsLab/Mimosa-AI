@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -49,7 +49,7 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_id: str = "anthropic/claude-sonnet-4-5"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
@@ -72,7 +72,7 @@ class Config:
         self.max_learning_evolve_iterations = 10
 
         # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 4  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
