@@ -29,10 +29,10 @@ class PricingCalculator:
 
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
-    
+
     def _strip_routing_prefix(self, model_name: str) -> str:
         """Strip common routing prefixes from model name.
-        
+
         Handles cases like:
         - openrouter/mistralai/mistral-large-2407 -> mistralai/mistral-large-2407
         - litellm/anthropic/claude-3.5-sonnet -> anthropic/claude-3.5-sonnet
@@ -45,7 +45,7 @@ class PricingCalculator:
 
     def _normalize_model_name(self, model_name: str) -> str:
         """Normalize model name for flexible matching.
-        
+
         Handles variations like:
         - claude-haiku-4-5 vs claude-haiku-4.5 (hyphen vs dot in versions)
         - claude-haiku-4-5-20251001 (strips date suffixes)
@@ -55,26 +55,26 @@ class PricingCalculator:
         # First strip any routing prefixes
         normalized = self._strip_routing_prefix(model_name)
         normalized = normalized.lower()
-        
+
         # Remove common date/version suffixes (e.g., -20251001, -2024-11-20, -v1, -001)
         # Match patterns like: -YYYYMMDD, -YYYY-MM-DD, -MMDD, -vX, -XXX (3+ digits at end)
         normalized = re.sub(r'-\d{8}$', '', normalized)  # -20251001
         normalized = re.sub(r'-\d{4}-\d{2}-\d{2}$', '', normalized)  # -2024-11-20
         normalized = re.sub(r'-\d{4}$', '', normalized)  # -2501 (YYMM format)
         normalized = re.sub(r'-\d{3}$', '', normalized)  # -001
-        
+
         # Normalize version separators: replace dots and underscores with hyphens
         # This makes "4.5" become "4-5" and "4_5" become "4-5"
         normalized = normalized.replace('.', '-').replace('_', '-')
-        
+
         # Collapse multiple consecutive hyphens into one
         normalized = re.sub(r'-+', '-', normalized)
-        
+
         return normalized.strip('-')
 
     def _find_model_by_substring(self, target_model: str) -> str | None:
         """Find best matching model from pricing data using flexible matching.
-        
+
         Uses a multi-strategy approach:
         1. Direct substring match (original behavior)
         2. Normalized name matching (handles version format variations)
@@ -84,7 +84,7 @@ class PricingCalculator:
             return None
 
         matches = []
-        
+
         # Strategy 1: Direct substring match (original logic)
         for available_model in self.model_pricing:
             if available_model in target_model:
@@ -94,12 +94,12 @@ class PricingCalculator:
                 valid_end = end_idx == len(target_model) or target_model[end_idx] in ['/', '-', ':']
                 if valid_start and valid_end:
                     matches.append((available_model, len(available_model), 1))  # priority 1 (best)
-        
+
         # Strategy 2: Normalized name matching
         normalized_target = self._normalize_model_name(target_model)
         for available_model in self.model_pricing:
             normalized_available = self._normalize_model_name(available_model)
-            
+
             # Check if normalized available model is contained in normalized target
             if normalized_available in normalized_target:
                 idx = normalized_target.find(normalized_available)
@@ -110,26 +110,26 @@ class PricingCalculator:
                     # Avoid duplicates from strategy 1
                     if not any(m[0] == available_model for m in matches):
                         matches.append((available_model, len(normalized_available), 2))  # priority 2
-        
+
         # Strategy 3: Provider + base model name matching (more lenient)
         # Extract provider (e.g., "anthropic") and base model name
         target_provider = target_model.split('/')[0]
         target_base = target_model.split('/')[-1] if '/' in target_model else target_model
-        
+
         for available_model in self.model_pricing:
             if '/' not in available_model:
                 continue
             available_provider = available_model.split('/')[0]
             available_base = available_model.split('/')[-1]
-            
+
             # Must match provider
             if target_provider != available_provider:
                 continue
-            
+
             # Normalize base names and check for significant overlap
             norm_target_base = self._normalize_model_name(target_base)
             norm_avail_base = self._normalize_model_name(available_base)
-            
+
             # Check if one contains the other (after normalization)
             if norm_avail_base in norm_target_base or norm_target_base in norm_avail_base:
                 # Avoid duplicates
@@ -138,34 +138,34 @@ class PricingCalculator:
                     common_len = len(os.path.commonprefix([norm_target_base, norm_avail_base]))
                     if common_len >= 5:  # Require at least 5 chars of common prefix
                         matches.append((available_model, common_len, 3))  # priority 3 (lowest)
-        
+
         if not matches:
             return None
-        
+
         # Sort by: priority (ascending), then length (descending)
         # This prefers direct matches, then longer matches within same priority
         matches.sort(key=lambda x: (x[2], -x[1]))
         return matches[0][0]
-    
+
     def _get_model_pricing_with_fallback(self, model_name: str) -> dict:
         """Get model pricing with intelligent fallback."""
-        
+
         # 1. Try exact match
         if model_name in self.model_pricing:
             return self.model_pricing[model_name]
-        
+
         # 2. Try exact match after stripping routing prefix
         stripped_name = self._strip_routing_prefix(model_name)
         if stripped_name != model_name and stripped_name in self.model_pricing:
             print(f"📊 Using pricing for {stripped_name} (stripped prefix from {model_name})")
             return self.model_pricing[stripped_name]
-        
+
         # 3. Try substring matching (includes normalization and prefix stripping)
         pattern_match = self._find_model_by_substring(model_name)
         if pattern_match:
             print(f"📊 Using pricing for {pattern_match} (pattern matched from {model_name})")
             return self.model_pricing[pattern_match]
-        
+
         print(f"⚠️  No match found for {model_name}, please enter model cost manually:")
         try:
             input_str = input("Input cost per 1M tokens: ")
@@ -193,8 +193,6 @@ class PricingCalculator:
             float: The total cost in USD
         """
 
-        print("\n📊 Calculating final cost...")
-
         memory_path = Path(self.memory_dir) / uuid
 
         if not memory_path.exists():
@@ -221,7 +219,7 @@ class PricingCalculator:
                         json_call["usage"]["total_tokens"],
                     )
                 )
-        
+
         # Check for single agent mode (no orchestrator calls but has task files)
         if not orchestrator_calls_found:
             print("📊 Single agent mode detected - calculating agent execution costs only")
@@ -274,20 +272,57 @@ class PricingCalculator:
             print("📊 Skipping SmolAgent cost calculation (workflow execution failed)")
 
         total_cost = 0.0
-        print("\n💰 Cost Breakdown:")
-        print("=" * 60)
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_all_tokens = 0
+
+        # Pre-calculate costs
+        call_costs = []
         for call in llm_calls:
             pricing = self._get_model_pricing_with_fallback(call.model)
             cost = (
                 call.input_tokens * pricing["input"]
                 + call.output_tokens * pricing["output"]
             ) / 1_000_000
-            print("Agent:", call.agent)
-            print(f"  Model: {call.model}")
-            print(f"  Tokens: {call.total_tokens:,}")
-            print(f"  Cost: {cost:.3f} USD")
-            print("-" * 40)
+            call_costs.append((call, cost))
             total_cost += cost
+            total_input_tokens += call.input_tokens
+            total_output_tokens += call.output_tokens
+            total_all_tokens += call.total_tokens
+
+        from sources.cli.pretty_print import (
+            BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW,
+        )
+
+        W = 64
+
+        # Header
+        print(f"\n{CYAN}{'─' * W}{RESET}")
+        print(f"{CYAN}{'💰  COST BREAKDOWN':^{W}}{RESET}")
+        print(f"{CYAN}{'─' * W}{RESET}")
+
+        for call, cost in call_costs:
+            # Agent name row
+            label = call.agent.replace("_", " ").title()
+            print(f"  {BOLD}{MAGENTA}▸ {label}{RESET}")
+            # Details as aligned key-value pairs
+            print(f"    {DIM}Model{RESET}    {call.model}")
+            print(
+                f"    {DIM}Tokens{RESET}   "
+                f"{call.input_tokens:>9,} in  │  "
+                f"{call.output_tokens:>9,} out  │  "
+                f"{BOLD}{call.total_tokens:>10,}{RESET} total"
+            )
+            cost_color = GREEN if cost < 0.01 else (YELLOW if cost < 0.10 else CYAN)
+            print(f"    {DIM}Cost{RESET}     {cost_color}${cost:.4f}{RESET}")
+            print(f"  {DIM}{'·' * (W - 4)}{RESET}")
+
+        # Totals
+        print(f"\n  {BOLD}{'Total Tokens':<14}{RESET}  {total_all_tokens:>10,}   "
+              f"{DIM}({total_input_tokens:,} in / {total_output_tokens:,} out){RESET}")
+        total_color = GREEN if total_cost < 0.05 else (YELLOW if total_cost < 0.50 else CYAN)
+        print(f"  {BOLD}{'Total Cost':<14}{RESET}  {total_color}{BOLD}${total_cost:.4f} USD{RESET}")
+        print(f"{CYAN}{'─' * W}{RESET}\n")
 
         return total_cost
 

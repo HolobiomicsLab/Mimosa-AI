@@ -21,6 +21,8 @@ from typing import Literal
 from config import Config
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.core.tools_manager import ToolManager
+from sources.utils.list_files import list_files
+from sources.utils.transfer_toolomics import LocalTransfer
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +49,17 @@ MIMOSA_BANNER = f"""
 {DIM}  Self-evolving AI Framework for Autonomous Scientific Research{RESET}
 """
 
-TOTAL_STEPS = 8
+MIMOSA_START_BANNER = f"""
+{GREEN}{BOLD}
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║    🌱  M I M O S A   —   S T A R T I N G   U P  🌱           ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+{RESET}
+"""
+
+TOTAL_STEPS = 9
 
 # ---------------------------------------------------------------------------
 # Model presets — ordered by quality/preference
@@ -69,10 +81,13 @@ _MODEL_CFG_KEYS = [
 ]
 
 
-def _print_step(step: int, total: int, title: str) -> None:
+def _print_step(step: int, total: int, title: str, no_count: bool = False) -> None:
     bar = "─" * 60
     print(f"\n{CYAN}{bar}{RESET}")
-    print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
+    if not no_count:
+        print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
+    else:
+        print(f"{CYAN}  {title}{RESET}")
     print(f"{CYAN}{bar}{RESET}")
 
 
@@ -229,8 +244,7 @@ class OnboardCLI:
         """Run the full onboarding flow, then launch the selected mode."""
         print(MIMOSA_BANNER)
         print(_wrap(
-            "Welcome! This interactive guide will walk you through Mimosa setup "
-            "and launch the right execution mode for your scientific objective. "
+            "Welcome to Mimosa-AI!"
             "Press Ctrl-C at any time to quit.",
             width=70, indent=2,
         ))
@@ -251,22 +265,32 @@ class OnboardCLI:
         _print_step(4, TOTAL_STEPS, "Toolomics MCP Connectivity")
         await self._check_toolomics()
 
-        # Step 5 – Initial objective
-        _print_step(5, TOTAL_STEPS, "Your Research Objective")
-        self._collect_objective()
+        # Step 5 – Workspace file setup (select/clean files, optionally import)
+        _print_step(5, TOTAL_STEPS, "Workspace Setup")
+        self._setup_workspace_files()
 
-        # Step 6 – LLM clarification + prompt refinement loop
-        _print_step(6, TOTAL_STEPS, "Objective Clarification & Refinement")
-        self._clarify_and_refine()
+        first_pass = True
+        while True:
+            # Infine loop for conversation to continue
+            # Step 6 – Initial objective
+            step_6_text = "Your Research Objective" if first_pass else "Keep working on the same objective"
+            _print_step(6, TOTAL_STEPS, "Your Research Objective", no_count=not first_pass)
+            self._collect_objective()
 
-        # Step 7 – Mode classification
-        _print_step(7, TOTAL_STEPS, "Mode Selection (Goal vs Task)")
-        self._classify_and_confirm()
+            # Step 7 – LLM clarification + prompt refinement loop
+            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", no_count=not first_pass)
+            self._clarify_and_refine()
 
-        # Step 8 – Extra options then launch
-        _print_step(8, TOTAL_STEPS, "Options & Launch")
-        self._collect_options()
-        await self._launch()
+            # Step 8 – Mode classification
+            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", no_count=not first_pass)
+            self._classify_and_confirm()
+
+            # Step 9 – Extra options then launch
+            _print_step(9, TOTAL_STEPS, "Options & Launch", no_count=not first_pass)
+            self._collect_options()
+
+            await self._launch()
+            first_pass = False
 
     # ------------------------------------------------------------------
     # Step implementations
@@ -457,6 +481,178 @@ class OnboardCLI:
             _ok(f"Saved workspace_dir to {cfg_path}")
         except Exception as exc:
             _warn(f"Could not persist workspace path to {cfg_path}: {exc}")
+
+    # ------------------------------------------------------------------
+    # Workspace file setup
+    # ------------------------------------------------------------------
+
+    def _setup_workspace_files(self) -> None:
+        """Step 5 – Let the user curate workspace contents before execution.
+
+        • If the workspace contains files, list them and let the user choose
+          which ones to keep (the rest are deleted), or delete everything.
+        • If the workspace is empty (or became empty after cleanup), offer to
+          copy files from a user-supplied source directory.
+        """
+        import shutil
+        from pathlib import Path
+
+        workspace = self.config.workspace_dir
+        if not os.path.isdir(workspace):
+            _warn(f"Workspace directory not found ({workspace}). Skipping setup.")
+            return
+
+        # ── List current workspace files ──────────────────────────────
+        raw_listing = list_files(path=workspace, max_depth=2)
+        file_list: list[str] = [
+            f for f in raw_listing.splitlines() if f.strip()
+        ]
+
+        workspace_was_empty = len(file_list) == 0
+        kept_files: list[str] = []
+
+        if file_list:
+            print(_wrap(
+                f"The workspace ({workspace}) currently contains "
+                f"{len(file_list)} file(s):",
+                width=70, indent=2,
+            ))
+            print()
+
+            # Show numbered file list
+            for idx, fname in enumerate(file_list, start=1):
+                print(f"    {CYAN}[{idx}]{RESET}  {fname}")
+
+            print()
+            print(f"  {BOLD}Options:{RESET}")
+            print(f"    {CYAN}Enter numbers{RESET}  – comma-separated list of files to "
+                  f"{GREEN}keep{RESET} (others will be deleted)")
+            print(f"    {CYAN}all{RESET}           – keep all files")
+            print(f"    {CYAN}none{RESET}          – {RED}delete all{RESET} files in the workspace")
+            print()
+
+            choice = _ask("Files to keep").strip().lower()
+
+            if choice == "all":
+                kept_files = list(file_list)
+                _ok(f"Keeping all {len(kept_files)} file(s).")
+            elif choice == "none" or choice == "":
+                # Delete everything
+                kept_files = []
+            else:
+                # Parse comma-separated indices
+                selected_indices: set[int] = set()
+                for part in choice.replace(" ", "").split(","):
+                    # Support ranges like "1-5"
+                    if "-" in part:
+                        bounds = part.split("-", 1)
+                        try:
+                            lo, hi = int(bounds[0]), int(bounds[1])
+                            selected_indices.update(range(lo, hi + 1))
+                        except ValueError:
+                            _warn(f"Ignoring invalid range: {part}")
+                    else:
+                        try:
+                            selected_indices.add(int(part))
+                        except ValueError:
+                            _warn(f"Ignoring invalid number: {part}")
+
+                for idx in sorted(selected_indices):
+                    if 1 <= idx <= len(file_list):
+                        kept_files.append(file_list[idx - 1])
+
+                if kept_files:
+                    _ok(f"Keeping {len(kept_files)} file(s).")
+                else:
+                    _warn("No valid files selected — all files will be deleted.")
+
+            # ── Perform deletion of un-kept files ─────────────────────
+            if kept_files and len(kept_files) < len(file_list):
+                kept_set = set(kept_files)
+                deleted = 0
+                for fname in file_list:
+                    if fname not in kept_set:
+                        full_path = os.path.join(workspace, fname)
+                        try:
+                            if os.path.isfile(full_path):
+                                os.remove(full_path)
+                                deleted += 1
+                            elif os.path.isdir(full_path):
+                                shutil.rmtree(full_path)
+                                deleted += 1
+                        except OSError as exc:
+                            _warn(f"Could not delete {fname}: {exc}")
+                # Clean up empty parent directories left behind
+                self._prune_empty_dirs(workspace)
+                if deleted:
+                    _ok(f"Deleted {deleted} file(s) from workspace.")
+            elif not kept_files and file_list:
+                # Delete everything
+                for item in Path(workspace).iterdir():
+                    try:
+                        if item.is_dir():
+                            shutil.rmtree(item)
+                        else:
+                            item.unlink()
+                    except OSError as exc:
+                        _warn(f"Could not delete {item.name}: {exc}")
+                _ok("All workspace files deleted.")
+
+        # ── Offer to import files if workspace is (now) empty ─────────
+        # Re-check after potential deletions
+        fresh_listing = list_files(path=workspace, max_depth=2)
+        remaining = [f for f in fresh_listing.splitlines() if f.strip()]
+        workspace_is_empty = len(remaining) == 0
+
+        if workspace_is_empty:
+            if workspace_was_empty:
+                _info("Workspace is empty.")
+            print()
+            want_import = _ask_yn(
+                "Copy files from a source directory into the workspace?",
+                default=False,
+            )
+            if want_import:
+                self._import_files_to_workspace()
+            else:
+                _info("Workspace will remain empty — agents can create files at runtime.")
+
+    def _import_files_to_workspace(self) -> None:
+        """Ask for a source directory and copy its contents into the workspace
+        using ``LocalTransfer.transfer_files_to_workspace``.
+        """
+        while True:
+            src_path = _ask("Path to source directory")
+            if not src_path:
+                _info("No path provided — skipping import.")
+                return
+            src_path = os.path.expanduser(src_path.strip())
+            if os.path.isdir(src_path):
+                break
+            _err(f"Directory not found: {src_path}. Please try again.")
+
+        try:
+            transfer = LocalTransfer(
+                config=self.config,
+                workspace_path=self.config.workspace_dir,
+                runs_capsule_dir=self.config.runs_capsule_dir,
+            )
+            copied = transfer.transfer_files_to_workspace(src_path)
+            _ok(f"Copied {copied} file(s) into workspace.")
+        except Exception as exc:
+            _err(f"File transfer failed: {exc}")
+
+    @staticmethod
+    def _prune_empty_dirs(root: str) -> None:
+        """Remove empty sub-directories under *root* (bottom-up)."""
+        for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+            if dirpath == root:
+                continue
+            if not filenames and not dirnames:
+                try:
+                    os.rmdir(dirpath)
+                except OSError:
+                    pass
 
     # ------------------------------------------------------------------
     # Model selection helpers
@@ -790,40 +986,43 @@ class OnboardCLI:
             _err(f"Configuration validation failed: {exc}")
             _info(
                 "Check that your workspace_dir and other paths in config are correct. "
-                "Make sure Toolomics is running and the workspace exists."
+                "Make sure Toolomics is running and the workspace exists and try again."
             )
             sys.exit(1)
+
+        print(MIMOSA_START_BANNER)
 
         if self._mode == "goal":
             await self._launch_goal()
         else:
             await self._launch_task()
-
-    async def _launch_goal(self) -> None:
-        """Start planner mode (multi-step goal)."""
-        from sources.core.planner import Planner
-        from sources.utils.transfer_toolomics import LocalTransfer
-
-        print(f"\n{GREEN}{BOLD}  🚀  Launching in GOAL mode …{RESET}\n")
-        planner = Planner(self.config)
-        await planner.start_planner(
-            goal=self._objective,
-            judge=True,
-            max_evolve_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
-        )
         # Archive workspace after completion
         trs = LocalTransfer(
             config=self.config,
             workspace_path=self.config.workspace_dir,
             runs_capsule_dir=self.config.runs_capsule_dir,
         )
-        trs.transfer_workspace_files_to_capsule(self._objective)
+        capsule = trs.transfer_workspace_files_to_capsule(self._objective)
+        print(f"\n{GREEN}{BOLD}  Workspace files archived to capsule: {capsule}{RESET}\n")
+
+    async def _launch_goal(self) -> None:
+        """Start planner mode (multi-step goal)."""
+        from sources.core.planner import Planner
+        from sources.utils.transfer_toolomics import LocalTransfer
+
+        print(f"\n{GREEN}{BOLD}  Launching in GOAL mode …{RESET}\n")
+        planner = Planner(self.config)
+        await planner.start_planner(
+            goal=self._objective,
+            judge=True,
+            max_evolve_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
+        )
 
     async def _launch_task(self) -> None:
         """Start DGM task mode (single operation)."""
         from sources.core.dgm import DarwinMachine
 
-        print(f"\n{GREEN}{BOLD}  🚀  Launching in TASK mode …{RESET}\n")
+        print(f"\n{GREEN}{BOLD}  Launching in TASK mode …{RESET}\n")
         dgm = DarwinMachine(self.config)
         await dgm.start_dgm(
             goal=self._objective,

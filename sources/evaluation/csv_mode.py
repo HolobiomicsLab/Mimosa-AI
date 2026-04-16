@@ -17,6 +17,10 @@ from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.list_files import list_files
+from sources.cli.pretty_print import (
+    print_ok, print_warn, print_err, print_info,
+    print_phase, print_summary,
+)
 
 class CsvEvaluationMode:
     """
@@ -172,7 +176,7 @@ Provide a structured analysis with:
                 f"[CACHE RECOVERY] Restored {total_eval} evaluations: "
                 f"VER={ver_success}, SR={sr_success}, CBS={avg_cbs:.3f}"
             )
-            print(f"\033[95mRestored {total_eval} previous evaluations from cache\033[0m")
+            print_info(f"Restored {total_eval} previous evaluations from cache")
 
     def _save_run_notes(self, capsule_name: str, goal: str,
                        analysis: dict, execution_time: float) -> None:
@@ -312,12 +316,12 @@ Provide your analysis following the specified output format."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
         self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
-        print(f"\033[95m📁 Transferring dataset: {task_dataset_path.name}\033[0m")
+        print_info(f"📁 Transferring dataset: {task_dataset_path.name}")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
         time.sleep(0.5)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
-        print(f"\033[95m✓ Transferred {files_transferred} files to workspace\033[0m")
-        print(f"\033[95m📊 Verification: {workspace_files_after} files present in workspace\033[0m")
+        print_ok(f"Transferred {files_transferred} file(s) to workspace")
+        print_info(f"Verification: {workspace_files_after} file(s) present in workspace")
 
         if workspace_files_after == 0:
             raise ValueError(
@@ -349,7 +353,7 @@ Provide your analysis following the specified output format."""
             Updated execution_data dictionary with evaluation metrics
         """
         try:
-            print("\033[95m📊 Evaluating results with ScienceAgentBench metrics...\033[0m")
+            print_info("📊 Evaluating results with ScienceAgentBench metrics…")
 
             api_cost = runs[-1].cost if runs and hasattr(runs[-1], 'cost') else 0.0
             evaluator = CapsuleEvaluator(
@@ -370,7 +374,7 @@ Provide your analysis following the specified output format."""
                 'eval_cost': eval_results['cost'],
                 'runs': runs
             })
-            print(f"\033[95m{eval_results['summary']}\033[0m")
+            print_ok(eval_results['summary'])
 
             self.logger.info(
                 f"[SAB EVAL] Task {row.get('instance_id')}: "
@@ -382,7 +386,7 @@ Provide your analysis following the specified output format."""
 
         except Exception as eval_error:
             self.logger.error(f"[SAB EVAL] Evaluation error: {str(eval_error)}")
-            print(f"\033[91m⚠️ Evaluation failed: {str(eval_error)}\033[0m")
+            print_err(f"Evaluation failed: {str(eval_error)}")
             execution_data.update({
                 'VER': False,
                 'SR': False,
@@ -426,19 +430,18 @@ Provide your analysis following the specified output format."""
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
             self.logger.info(f"[PAPERS DATASET MODE] Starting autonomous loop for {total_rows} CSV entry")
-            print(f"\n\033[95m{'🤖 RUN ON PAPERS DATASETS':^80}\033[0m")
-            print(f"\033[95m{'=' * 80}\033[0m")
+            print_phase("🤖 RUN ON PAPERS DATASETS")
             for i, row in enumerate(reader):
                 if i < start_row:
-                    print("Skipping evaluation (using cache) for :", i+1)
+                    print_info(f"Skipping evaluation (using cache) for row {i + 1}")
                     continue
                 if i >= self.csv_runs_limit:
                     break
                 try:
                     iteration_start_time = time.time()
                     goal, scenario_id, scenario_rubric_filename = self._generate_next_task(row, dataset_type)
-                    print(f"\033[95m📋 GOAL: {goal}\033[0m")
-                    print(f"\033[95m📄 Scenario Rubric: {scenario_rubric_filename}\033[0m")
+                    print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
+                    print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
@@ -457,10 +460,10 @@ Provide your analysis following the specified output format."""
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
-                    print("\033[95m📊 Transfering results files...\033[0m")
+                    print_info("📦 Transferring results files…")
                     trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
                     capsule_name = trs.transfer_workspace_files_to_capsule(goal)
-                    print("\033[95m📊 Analyzing results...\033[0m")
+                    print_info("📊 Analyzing results…")
                     execution_time = time.time() - iteration_start_time
                     analysis = self._analyze_results(goal, results_str, execution_time)
                     execution_data = {
@@ -486,12 +489,12 @@ Provide your analysis following the specified output format."""
                         analysis, execution_time
                     )
 
-                    print(f"\033[95m✅ Iteration {i + 1} completed\033[0m")
-                    print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
-                    print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
+                    print_ok(f"Iteration {i + 1} completed")
+                    print_info(f"  Success Level: {analysis.get('success_level', 'Unknown')}")
+                    print_info(f"  Time: {execution_time:.2f}s")
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
-                    print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
+                    print_err(f"Error in csv row {i + 1}: {str(e)}")
                     continue
 
         self._print_final_summary()
@@ -504,38 +507,43 @@ Provide your analysis following the specified output format."""
 
         successful_runs = [exec_data for exec_data in current_runs
                           if exec_data.get("success_level") in ["High", "Medium"]]
-        print(f"\n\033[95mSUMMARY step: {len(current_runs)}\033[0m")
-        print(f"\033[95m{'=' * 80}\033[0m")
-        print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
-        if len(current_runs) > 0:
-            print(f"\033[95mSuccess rate: {len(successful_runs)/len(current_runs)*100:.1f}%\033[0m")
+
+        success_rate = (
+            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
+            if current_runs else "N/A"
+        )
+        rows = [
+            ("Steps evaluated", str(len(current_runs))),
+            ("Successful runs", str(len(successful_runs))),
+            ("Success rate", success_rate),
+        ]
 
         # For SAB metrics, also exclude cached entries
-        sab_runs = [exec_data for exec_data in current_runs
-                    if 'VER' in exec_data]
+        sab_runs = [exec_data for exec_data in current_runs if 'VER' in exec_data]
         if sab_runs:
-            print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")
-            print(f"\033[95m{'-' * 80}\033[0m")
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
             sr_success = sum(1 for run in sab_runs if run.get('SR', False))
             avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
             total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
+            rows += [
+                ("── ScienceAgentBench ──", ""),
+                ("VER (Valid Exec Rate)", f"{ver_success}/{len(sab_runs)} ({ver_success/len(sab_runs)*100:.1f}%)"),
+                ("SR  (Success Rate)", f"{sr_success}/{len(sab_runs)} ({sr_success/len(sab_runs)*100:.1f}%)"),
+                ("CBS (CodeBERT avg)", f"{avg_cbs:.3f}"),
+                ("Total API Cost", f"${total_cost:.4f}"),
+                ("Avg cost/task", f"${total_cost/len(sab_runs):.4f}"),
+            ]
 
-            print(f"\033[95mVER (Valid Execution Rate): {ver_success}/{len(sab_runs)} ({ver_success/len(sab_runs)*100:.1f}%)\033[0m")
-            print(f"\033[95mSR (Success Rate): {sr_success}/{len(sab_runs)} ({sr_success/len(sab_runs)*100:.1f}%)\033[0m")
-            print(f"\033[95mCBS (CodeBERT Score) Average: {avg_cbs:.3f}\033[0m")
-            print(f"\033[95mTotal API Cost: ${total_cost:.4f}\033[0m")
-            print(f"\033[95mAverage API Cost per Task: ${total_cost/len(sab_runs):.4f}\033[0m")
-        print(f"\033[95m{'=' * 80}\033[0m\n")
+        print_summary("📊 EVALUATION SUMMARY", rows)
 
     async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False, single_agent_mode=False) -> None:
         """Public method to start the autonomous mode."""
         try:
             await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
         except KeyboardInterrupt:
-            print("\n\033[95m⚠️ Autonomous mode interrupted by user\033[0m")
+            print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
         except Exception as e:
             self.logger.error(f"[PAPERS DATASET MODE] Fatal error: {str(e)}")
-            print(f"\033[91m❌ Fatal error in autonomous mode: {str(e)}\033[0m")
+            print_err(f"Fatal error in autonomous mode: {str(e)}")
             raise

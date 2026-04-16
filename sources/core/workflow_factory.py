@@ -12,6 +12,7 @@ from sources.modules import state_schema
 
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
+from sources.cli.pretty_print import print_ok, print_info, print_warn, print_err
 
 
 class WorkflowFactory:
@@ -94,7 +95,7 @@ class WorkflowFactory:
             client_prompt = tool_manager.get_client_prompt(mcp)
             tools_code += client_code + "\n"
             existing_tool_prompt += client_prompt + "\n"
-        print(f"🔧 Discovered {len(mcps)} MCP servers capabilities. Workflow generation can start.")
+        print_ok(f"Discovered {len(mcps)} MCP server(s) — workflow generation can start.")
         return tools_code, existing_tool_prompt
 
     def remove_imports(self, code: str) -> str:
@@ -209,22 +210,22 @@ The following tools packages are available for agents:
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
         try:
-            print("📝 Step 1/2: Generating prompts code...")
+            print_info("Step 1/2: Generating prompts code…")
             llm_output = self.llm_make_prompts(
                 system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             prompts_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(prompts_code, "").split("```python")[0]
-            print("💬 LLM commentary on prompt:")
+            print_info("LLM commentary on prompts:")
             print(commentary)
 
-            print("🔧 Step 2/2: Generating workflow code...")
+            print_info("Step 2/2: Generating workflow code…")
             llm_output = self.llm_make_workflow(
                 system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
-            print("💬 LLM commentary on workflow:")
+            print_info("LLM commentary on workflow:")
             print(commentary)
 
             workflow_code = prompts_code + "\n\n" + workflow_code
@@ -295,7 +296,7 @@ The following tools packages are available for agents:
         entry_node = start_match.group(1)
         if entry_node not in nodes:
             raise ValueError(f"START targets non-existent node '{entry_node}'")
-        self.logger.debug(f"🚀 Workflow entry point: START → {entry_node}")
+        self.logger.debug(f"Workflow entry point: START → {entry_node}")
 
         self.logger.info("✅ Workflow structure validation passed")
 
@@ -382,7 +383,6 @@ GOAL = {goal!r}
 # Generated workflow
 {workflow_code}
 
-print("worflow run: compiling workflow...")
 app = workflow.compile()
 
 # Initialize and execute workflow
@@ -392,18 +392,14 @@ try:
     if WORKFLOW_PATH:
         try:
             png = app.get_graph().draw_mermaid_png()
-            print("workflow run: saving workflow graph as PNG at ", WORKFLOW_PATH)
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:
-                print("workflow run: writing PNG file...")
                 f.write(png)
-                print("PNG saved at ", os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"))
         except Exception as e:
             RuntimeError(f"Could not save workflow graph:" + str(e))
 except Exception as e:
     print(f"❌ Error saving PNG workflow:" + str(e))
     pass
 
-print("workflow run: invoking workflow...")
 try:
     result_state = app.invoke(initial_state)
 except KeyboardInterrupt:
@@ -587,13 +583,11 @@ token = {token!r}
 engine_name = {self.config.engine_name!r}
 engine = None
 if engine_name == "mlx":
-    print("Using MLXModel for local execution.")
     engine = MLXModel(
         model_id=model_id,
         max_tokens=max_tokens,
     )
 elif engine_name == "inference_client":
-    print("Using InferenceClientModel for inference client execution.")
     if not token:
         raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
     engine = InferenceClientModel(
@@ -710,7 +704,6 @@ agent = CodeAgent(
 )
 
 def save_agent_memories(agent, memory_path: str, agent_name: str):
-    print(f"Saving agent memory to: {{{{memory_path}}}}")
     try:
         memories = []
         for idx, step in enumerate(agent.memory.steps):
