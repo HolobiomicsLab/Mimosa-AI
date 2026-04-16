@@ -250,6 +250,7 @@ from langgraph.graph import StateGraph, START, END
 from pydantic import BaseModel
 
 # because LLM like to use random typing
+import operator
 from typing import Any, Optional, Union, List, Dict, Tuple, Callable
 from typing import ClassVar, Final, Literal, Protocol, TypedDict
 from typing import Annotated
