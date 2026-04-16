@@ -146,7 +146,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             )
 
         logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
-        print_phase("🏗️  WORKFLOW GENERATION PHASE")
+        print_phase("WORKFLOW GENERATION PHASE")
 
         # Workflow generation timing
         generation_start = time.time()
@@ -200,7 +200,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             return "", uuid, workflow_code, True
         try:
             # Dependencies installation phase
-            print_phase("📦 DEPENDENCIES INSTALLATION PHASE")
+            print_phase("DEPENDENCIES INSTALLATION PHASE")
             deps_start = time.time()
             await self.workflow_requirements_install()
             deps_time = time.time() - deps_start

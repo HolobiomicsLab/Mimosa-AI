@@ -79,7 +79,7 @@ def print_step(step: int, total: int, title: str, width: int = 60) -> None:
 
 def print_phase(
     title: str,
-    icon: str = "",
+    icon: str = "▶▶",
     width: int = _W,
     color: str = CYAN,
 ) -> None:
@@ -87,7 +87,7 @@ def print_phase(
     Full-width phase banner with centred title and horizontal rules.
     """
     label = f"{icon}  {title}" if icon else title
-    bar = "─" * width
+    bar = "▓" * width
     print(f"\n{color}{bar}{RESET}")
     print(f"{color}{label:^{width}}{RESET}")
     print(f"{color}{bar}{RESET}")
@@ -137,8 +137,8 @@ def print_iteration_header(
 def print_box(
     content: str,
     title: str = "",
-    color: str = CYAN,
-    width: int = 80,
+    color: str = YELLOW,
+    width: int = 100,
     truncate: int = 512,
 ) -> None:
     """
@@ -233,7 +233,7 @@ def print_summary(
 
 def print_agent_answers(
     answers_text: str,
-    color: str = CYAN,
+    color: str = MAGENTA,
     width: int = _W,
 ) -> None:
     """
@@ -257,3 +257,56 @@ def print_agent_answers(
     for line in answers_text.splitlines():
         print(f"{color}  {line}{RESET}")
     print(f"{color}{'─' * width}{RESET}\n")
+
+
+# ── Demo / quick test ──────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Status lines
+    print_ok("Configuration loaded successfully")
+    print_warn("API key missing – falling back to local mode")
+    print_err("Failed to connect to remote host")
+    print_info("Waiting for next instruction...")
+
+    # Step header
+    print_step(1, 3, "Environment Check")
+
+    # Phase banner
+    print_phase("MIMOSA WORKFLOW INITIALISATION")
+
+    # Section divider
+    print_section("Configuration Details")
+    print_kv_row("Model", "claude-3-5-sonnet-20241022")
+    print_kv_row("Temperature", "0.7")
+    print_kv_row("Max Tokens", "4096")
+
+    # Content box
+    print_box(
+        "Create a multi-agent workflow that:\n"
+        "  1. Parses a scientific paper PDF\n"
+        "  2. Extracts key findings\n"
+        "  3. Generates a critical summary",
+        title="CURRENT TASK"
+    )
+
+    # Iteration banner
+    print_iteration_header(2, 5)
+
+    # Agent answers
+    print_agent_answers(
+        "agent 0: PDF parsed – 12 pages, 3 tables detected\\n"
+        "agent 1: Key findings extracted – 7 main claims identified\\n"
+        "agent 2: Summary drafted – 340 words"
+    )
+
+    # Summary block
+    print_summary(
+        "✨ WORKFLOW COMPLETION SUMMARY",
+        [
+            ("UUID", "20260416_144700_a1b2c3d4"),
+            ("Total time", "8.420s"),
+            ("Iterations", "3/5"),
+            ("Status", "converged"),
+        ]
+    )
+
+    print_ok("Demo completed – all pretty-print utilities functional")

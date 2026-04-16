@@ -631,7 +631,7 @@ class DarwinMachine:
     ) -> str:
         """Evaluate the workflow and update assertion history."""
         logger = logging.getLogger(__name__)
-        print_phase("⚖️  WORKFLOW EVALUATION PHASE")
+        print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
         eval_result = self.judge.evaluate(uuid=uuid, agent_answers=agent_answers, scenario_rubric=scenario_rubric)
         eval_type = 'scenario' if scenario_rubric else 'generic'
