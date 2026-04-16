@@ -155,6 +155,8 @@ def print_box(
         │  functionality by outputting the text 'Hello World'.          │
         ╰──────────────────────────────────────────────────────────────╯
     """
+    if not content:
+        return
     inner_w = width - 4  # 2 border chars + 2 spaces padding on each side
 
     # Top border

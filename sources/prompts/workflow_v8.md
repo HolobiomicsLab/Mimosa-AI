@@ -295,3 +295,4 @@ Above is an example, create tailored workflow for the task.
 - [ ] Error agents receive diagnostic context, not just "failed"
 - [ ] Knowledge-seeking agents exist for computational workflows
 - [ ] All agents have SHELL_MCP + domain tools
+- [ ] You are forbidden from using any annotation or typehint.
