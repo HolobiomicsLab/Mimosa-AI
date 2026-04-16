@@ -16,6 +16,9 @@ import dotenv
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+# Ensure the default memory directory exists before local imports that may read it.
+os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
+
 from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
 
 from config import Config
