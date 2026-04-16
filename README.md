@@ -101,6 +101,7 @@ In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthes
 - [What is Toolomics and do I need it?](#what-is-toolomics-and-do-i-need-it)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Optional: Perspicacité for Scientific Grounding](#optional-perspicacité-for-scientific-grounding)
 - [Configuration](#configuration)
 - [Running Mimosa](#running-mimosa)
   - [Interactive Onboarding (recommended for first-time setup)](#interactive-onboarding-recommended-for-first-time-setup)
@@ -177,6 +178,21 @@ LANGFUSE_PRIVATE_KEY=...
 Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`).
 
 Custom MCP tools can be added via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics/README.md).
+
+### 4. (Optional) Start Perspicacité for Scientific Grounding
+
+**[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)** is an optional companion AI that provides scientific grounding for Mimosa's workflow creation and evaluation. When running, Mimosa will automatically interact with it to improve the scientific rigor of its outputs.
+
+**Setup:**
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git
+cd Perspicacite-AI
+uv sync
+uv run web_app_full.py
+```
+
+That's it — Perspicacité will start and be ready to interact. Then launch Mimosa in another terminal the normal way and it will be able to interact automatically.
 
 ---
 

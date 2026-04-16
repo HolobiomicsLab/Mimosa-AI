@@ -104,6 +104,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 - [Toolomics 是什麼？我需要它嗎？](#toolomics-是什麼我需要它嗎)
 - [前置條件](#前置條件)
 - [安裝](#安裝)
+- [可選：Perspicacité 科學基礎支撐](#可選perspicacité-科學基礎支撐)
 - [設定](#設定)
 - [執行 Mimosa](#執行-mimosa)
 - [工作區與稽核追蹤](#工作區與稽核追蹤)
@@ -176,6 +177,21 @@ LANGFUSE_PRIVATE_KEY=...
 請參考 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) 的設定說明，將其設定為在某個連接埠範圍內執行（例如 `5000–5100`）。
 
 自訂 MCP 工具可透過 [Toolomics 文件](https://github.com/HolobiomicsLab/toolomics/README.md) 新增。
+
+### 4. （可選）啟動 Perspicacité 以提供科學基礎支撐
+
+**[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)** 是一個可選的配套 AI，為 Mimosa 的工作流程建立與評估提供科學依據。啟動後，Mimosa 會自動與其互動，以提升輸出結果的科學嚴謹性。
+
+**設定步驟：**
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git
+cd Perspicacite-AI
+uv sync
+uv run web_app_full.py
+```
+
+完成 —— Perspicacité 啟動後即可進行互動。然後在另一個終端機按常規方式啟動 Mimosa，即可自動建立連線。
 
 ---
 

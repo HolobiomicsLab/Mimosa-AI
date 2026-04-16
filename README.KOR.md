@@ -104,6 +104,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 - [Toolomics란 무엇이며, 필요한가요?](#toolomics란-무엇이며-필요한가요)
 - [사전 요구사항](#사전-요구사항)
 - [설치](#설치)
+- [선택사항: Perspicacité를 통한 과학적 근거 마련](#선택사항-perspicacité를-통한-과학적-근거-마련)
 - [설정](#설정)
 - [Mimosa 실행](#mimosa-실행)
 - [워크스페이스와 감사 추적](#워크스페이스와-감사-추적)
@@ -176,6 +177,21 @@ LANGFUSE_PRIVATE_KEY=...
 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)의 설정 지침을 따르세요. 포트 범위(예: `5000–5100`)에서 실행되도록 설정합니다.
 
 사용자 정의 MCP 도구는 [Toolomics 문서](https://github.com/HolobiomicsLab/toolomics/README.md)를 통해 추가할 수 있습니다.
+
+### 4. (선택사항) 과학적 근거를 위해 Perspicacité 시작
+
+**[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)**는 Mimosa의 워크플로우 생성 및 평가에 과학적 근거를 제공하는 선택적 보조 AI입니다. 실행 중이면 Mimosa가 자동으로 이와 상호작용하여 출력의 과학적 엄밀성을 높입니다.
+
+**설정:**
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git
+cd Perspicacite-AI
+uv sync
+uv run web_app_full.py
+```
+
+이것으로 끝입니다 —— Perspicacité가 시작되어 상호작용할 준비가 됩니다. 그런 다음 다른 터미널에서 평소와 같이 Mimosa를 시작하면 자동으로 상호작용할 수 있습니다.
 
 ---
 

@@ -104,6 +104,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 - [Toolomics とは何か？必要ですか？](#toolomics-とは何か必要ですか)
 - [前提条件](#前提条件)
 - [インストール](#インストール)
+- [オプション：Perspicacité による科学的根拠付け](#オプションperspicacité-による科学的根拠付け)
 - [設定](#設定)
 - [Mimosa の実行](#mimosa-の実行)
 - [ワークスペースと監査証跡](#ワークスペースと監査証跡)
@@ -176,6 +177,21 @@ LANGFUSE_PRIVATE_KEY=...
 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics) のセットアップ手順に従ってください。ポート範囲（例：`5000–5100`）で実行するように設定します。
 
 カスタム MCP ツールは [Toolomics ドキュメント](https://github.com/HolobiomicsLab/toolomics/README.md) から追加できます。
+
+### 4. （オプション）科学的根拠付けのため Perspicacité を起動
+
+**[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)** は、Mimosa のワークフロー作成と評価に科学的根拠を提供するオプションのコンパニオン AI です。起動中、Mimosa は自動的に Perspicacité と連携し、出力の科学的厳密性を向上させます。
+
+**セットアップ：**
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git
+cd Perspicacite-AI
+uv sync
+uv run web_app_full.py
+```
+
+以上です —— Perspicacité が起動し、連携準備が整います。別のターミナルで通常通り Mimosa を起動すれば、自動的に相互作用できるようになります。
 
 ---
 
