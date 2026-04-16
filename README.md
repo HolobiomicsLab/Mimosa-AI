@@ -348,6 +348,8 @@ This replays the full execution trace — thoughts, tool calls, and outputs — 
 
 ### ScienceAgentBench
 
+**Note:** For manuscript aligned results checkout: `latest_benchmark_run`
+
 1. Download the full ScienceAgentBench dataset:
    [dataset link](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
 2. Unzip with password: `scienceagentbench`
