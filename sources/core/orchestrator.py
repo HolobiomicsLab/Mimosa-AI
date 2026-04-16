@@ -6,11 +6,16 @@ import logging
 import time
 
 from sources.utils.notify import PushNotifier
+from sources.utils.perspicacite_client import (
+    format_scientific_context,
+    query_perspicacite,
+)
 from sources.cli.pretty_print import (
     print_ok, print_err, print_info,
     print_phase, print_summary,
 )
 from .workflow_factory import WorkflowFactory
+from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
 
@@ -28,8 +33,9 @@ class WorkflowOrchestrator:
             config: Configuration object containing paths and settings
         """
         self.config = config
-        self.workflow_dir = config.workflow_dir
+        self.single_agent_factory = SingleAgentFactory(config)
         self.workflow_factory = WorkflowFactory(config)
+        self.workflow_dir = config.workflow_dir
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
 
         self.runner_config = RuntimeConfig(
@@ -65,6 +71,35 @@ class WorkflowOrchestrator:
         else:
             print_err(f"Workflow execution failed: {result.stderr}")
             raise Exception(f"Workflow execution failed: {result.stderr}")
+    
+    def perspicacite_grounding_task(self, task):
+        prompt = f"""You are a scientific literature specialist supporting a scientist on a task.
+SCIENTIFIC TASK:
+{task}
+
+Query the literature to design a litterature grounded approach.
+
+1. LITERATURE FOUNDATION
+   - Canonical methods and key papers (authors, year, venue)
+   - Field conventions that must be followed
+   - Standard validation criteria
+
+2. WORKFLOW DESIGN
+   For each stage, specify:
+   - Expert role needed (e.g., "Data Curator", "Method Specialist", "Quality Reviewer")
+   - Inputs required and outputs produced
+   - Completion criteria grounded in literature
+   - Conditions to proceed to next stage
+   - Known failure modes and recovery strategies from best practices
+   - Complexity and uncertainty estimates (flag high-risk steps)
+
+CONSTRAINTS: Cite sources for all methodological claims. Note where literature is sparse or conflicting.
+        """
+        try:
+            response = query_perspicacite(prompt) or "No relevant scientific context."
+            return response
+        except Exception as e:
+            return "Query failed. Unable to help with scientific litterature"
 
     async def orchestrate_workflow(
         self,
@@ -88,8 +123,30 @@ class WorkflowOrchestrator:
         workflow_start_time = time.time()
         execution_output = ""
 
+        # ------------------------------------------------------------------ #
+        # Query Perspicacite-AI for grounded scientific context.
+        # ------------------------------------------------------------------ #
+        science_task = original_task if original_task else goal
+        print_phase(
+            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+        )
+        scientific_context = self.perspicacite_grounding_task(science_task)
+        if scientific_context:
+            print_info(
+                f"\033[94m[Perspicacite] Scientific context:\n{scientific_context[:2048]}...\033[0m"
+            )
+            craft_instructions = (
+                format_scientific_context(science_task, scientific_context)
+                + craft_instructions
+            )
+        else:
+            print(
+                "\033[93m⚠️  [Perspicacite] Service unavailable or returned no "
+                "results – proceeding without scientific grounding.\033[0m"
+            )
+
         logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
-        print_phase("🏗️  WORKFLOW GENERATION PHASE")
+        print_phase("WORKFLOW GENERATION PHASE")
 
         # Workflow generation timing
         generation_start = time.time()
@@ -102,7 +159,7 @@ class WorkflowOrchestrator:
                     original_task=original_task
                 )
             else:
-                complete_code, workflow_code, uuid = await self.workflow_factory.craft_single_agent(
+                complete_code, workflow_code, uuid = await self.single_agent_factory.craft_single_agent(
                     goal,
                     original_task=original_task
                 )
@@ -143,7 +200,7 @@ class WorkflowOrchestrator:
             return "", uuid, workflow_code, True
         try:
             # Dependencies installation phase
-            print_phase("📦 DEPENDENCIES INSTALLATION PHASE")
+            print_phase("DEPENDENCIES INSTALLATION PHASE")
             deps_start = time.time()
             await self.workflow_requirements_install()
             deps_time = time.time() - deps_start
@@ -153,7 +210,7 @@ class WorkflowOrchestrator:
             print_ok(f"Dependencies installed in {deps_time:.3f}s")
 
             # Execution phase
-            print_phase("▶ WORKFLOW EXECUTION PHASE")
+            print_phase("WORKFLOW EXECUTION PHASE")
             exec_start = time.time()
             execution_output = await self.workflow_sandbox_run(complete_code)
             exec_time = time.time() - exec_start

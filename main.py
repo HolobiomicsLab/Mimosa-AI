@@ -1,4 +1,4 @@
-#!nne/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Mimosa - A AI Agent Framework for advancing scientific research
 ============================================================================
@@ -11,6 +11,7 @@ import signal
 import sys
 
 import dotenv
+
 
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -111,14 +112,24 @@ async def papers_mode(args, config):
                                  )
 
 async def science_bench_papers_mode(args, config):
-    papers = CsvEvaluationMode(config, csv_runs_limit=args.csv_runs_limit)
+    # Use concurrent evaluation by default for science_agent_bench
+    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 4)
+    task_start_delay = getattr(config, 'task_start_delay', 30.0)
+    papers = CsvEvaluationMode(
+        config,
+        csv_runs_limit=args.csv_runs_limit,
+        max_concurrent_tasks=max_concurrent,
+        task_start_delay=task_start_delay
+    )
     if args.single_agent:
-        print_info("Starting in single agent mode")
-    await papers.start_evaluation(dataset_type="science_agent_bench",
-                                  dataset_path="datasets/ScienceAgentBench.csv",
-                                  learning=args.learn,
-                                  single_agent_mode=args.single_agent
-                                 )
+        print(f"⚠️ Starting in single agent mode")
+    await papers.start_evaluation(
+        dataset_type="science_agent_bench",
+        dataset_path="datasets/ScienceAgentBench.csv",
+        learning=args.learn,
+        single_agent_mode=args.single_agent,
+        concurrent=True  # Enable concurrent mode by default
+    )
 
 async def workflow_generation_evals(args, config):
     evaluator = WorkflowEval(config, csv_runs_limit=args.csv_runs_limit)
@@ -232,7 +243,7 @@ async def main():
         "--verbose", action="store_true", help="Enable verbose logging to console"
     )
     parser.add_argument(
-        "--max_evolve_iterations", type=int, default=1, help="Maximum number of learning iterations. Used for retrying/learning a task."
+        "--max_evolve_iterations", type=int, help="Maximum number of learning iterations. Used for retrying/learning a task."
     )
 
     add_config_arguments(parser, config)

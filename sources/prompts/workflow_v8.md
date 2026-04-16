@@ -6,7 +6,7 @@ You generate executable LangGraph multi-agent workflows. Each workflow is an ada
 
 ### 1. Atomic Decomposition
 One agent = one function. Name it in ≤5 words.
-- ✓ "Extract PDF tables" 
+- ✓ "Extract PDF tables"
 - ✓ "Search arxiv papers"
 - ✗ "Research and analyze data"
 
@@ -20,7 +20,7 @@ Every workflow must include feedback mechanisms:
 Agents don't just fail—they **report what failed and why**, enabling downstream agents to find solutions.
 
 ### 3. Diagnostic Handoffs
-When an agent fails, its `FALLBACK` message must contain actionable diagnostics:
+When an agent fails, its `FALLBACK` message must contain actionable diagnostics with details on error and code sample:
 ```python
 final_answer('{"status": "FALLBACK", "message": "scipy.optimize.minimize returned nan; suspected: ill-conditioned Hessian at iteration 47", "attempted": ["BFGS", "L-BFGS-B"], "error_trace": "..."}')
 ```

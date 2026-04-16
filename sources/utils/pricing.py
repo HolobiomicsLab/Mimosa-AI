@@ -157,13 +157,11 @@ class PricingCalculator:
         # 2. Try exact match after stripping routing prefix
         stripped_name = self._strip_routing_prefix(model_name)
         if stripped_name != model_name and stripped_name in self.model_pricing:
-            print(f"📊 Using pricing for {stripped_name} (stripped prefix from {model_name})")
             return self.model_pricing[stripped_name]
 
         # 3. Try substring matching (includes normalization and prefix stripping)
         pattern_match = self._find_model_by_substring(model_name)
         if pattern_match:
-            print(f"📊 Using pricing for {pattern_match} (pattern matched from {model_name})")
             return self.model_pricing[pattern_match]
 
         print(f"⚠️  No match found for {model_name}, please enter model cost manually:")

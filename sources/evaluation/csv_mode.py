@@ -1,13 +1,19 @@
 """
-CsvEvaluationMode - Autonomous goal generation and execution system
+CsvEvaluationMode - Autonomous goal generation and execution system with concurrent evaluation support.
 """
 
+import asyncio
+import copy
 import csv
 import json
 import logging
+import os
+import shutil
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from sources.core.dgm import DarwinMachine
 from sources.core.llm_provider import LLMConfig, LLMProvider
@@ -22,26 +28,46 @@ from sources.cli.pretty_print import (
     print_phase, print_summary,
 )
 
+
+@dataclass
+class TaskContext:
+    """Context for a single concurrent task evaluation."""
+    row_index: int
+    row_data: dict
+    workspace_dir: str
+    task_id: str
+
 class CsvEvaluationMode:
     """
     Autonomous mode that automatically run Mimosa on various goal's defined in a CSV datasets, such a list of paper to replicate.
+    Supports concurrent evaluation of multiple tasks.
     """
 
-    def __init__(self, config, csv_runs_limit: int = 103):
+    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1, task_start_delay: float = 30.0):
         """
         Initialize CsvEvaluationMode.
 
         Args:
             config: Mimosa configuration object
             csv_runs_limit: Maximum number of autonomous iterations
+            max_concurrent_tasks: Maximum number of tasks to run concurrently (default: 1 for sequential)
+            task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
+                              Staggers agent starts to avoid overwhelming shell/API resources.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
+        self.max_concurrent_tasks = max_concurrent_tasks
         self.dgm = DarwinMachine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
         self.done_rows = []
+
+        # Concurrency control
+        self.task_start_delay = task_start_delay
+        self._semaphore: asyncio.Semaphore | None = None
+        self._results_lock = asyncio.Lock()
+        self._base_workspace_dir = config.workspace_dir
 
         model_name = "anthropic/claude-haiku-4-5-20251001"  # judge
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
@@ -178,11 +204,37 @@ Provide a structured analysis with:
             )
             print_info(f"Restored {total_eval} previous evaluations from cache")
 
-    def _save_run_notes(self, capsule_name: str, goal: str,
-                       analysis: dict, execution_time: float) -> None:
-        """Save detailed notes about the run."""
+    def _save_run_notes(
+        self,
+        capsule_name: str,
+        goal: str,
+        analysis: dict,
+        execution_time: float,
+        current_execution_data: dict | None = None
+    ) -> None:
+        """
+        Save detailed notes about the run.
+
+        Args:
+            capsule_name: Name of the capsule directory
+            goal: The task goal
+            analysis: Analysis results dictionary
+            execution_time: Time taken for execution
+            current_execution_data: Optional current task execution data (for concurrent mode).
+                                   If provided, this task's data is included even if not yet
+                                   in self.execution_history.
+        """
         timestamp = datetime.now().isoformat()
+
+        # Build the list of SAB runs, including current task if provided
         sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
+
+        # For concurrent mode: include current_execution_data if it has SAB metrics
+        if current_execution_data and 'VER' in current_execution_data:
+            # Check if this task is not already in execution_history (concurrent mode)
+            if current_execution_data not in sab_runs:
+                sab_runs = sab_runs + [current_execution_data]
+
         notes = {
             "timestamp": timestamp,
             "model": self.config.smolagent_model_id,
@@ -191,25 +243,29 @@ Provide a structured analysis with:
             "analysis": analysis["full_analysis"],
             "total_eval": len(sab_runs)
         }
+
         if sab_runs:
-            runs_data = sab_runs[-1].get('runs', [])
+            # Use current_execution_data if provided, otherwise use last from sab_runs
+            current_task_data = current_execution_data if current_execution_data and 'VER' in current_execution_data else sab_runs[-1]
+            runs_data = current_task_data.get('runs', [])
+
             notes = {
                 **notes,
                 "capsule_name": capsule_name,
-                "ver_success": sum(1 for run in sab_runs if run.get('VER', False)),
-                "sr_success": sum(1 for run in sab_runs if run.get('SR', False)),
-                "avg_cbs": sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs),
-                "total_cost": sum(run.get('eval_cost', 0.0) for run in sab_runs),
-                "is_success": sab_runs[-1].get('SR', False),
-                "task_cost": sab_runs[-1].get('eval_cost', 0.0),
+                "ver_success": sum(1 for sab in sab_runs if sab.get('VER', False)),
+                "sr_success": sum(1 for sab in sab_runs if sab.get('SR', False)),
+                "avg_cbs": sum(sab.get('CBS', 0.0) for sab in sab_runs) / len(sab_runs),
+                "total_cost": sum(sab.get('eval_cost', 0.0) for sab in sab_runs),
+                "is_success": current_task_data.get('SR', False),
+                "task_cost": current_task_data.get('eval_cost', 0.0),
                 "max_judge_reward": max((getattr(run, 'reward', 0.0) for run in runs_data), default=0.0),
                 "evolution_iterations": len(runs_data),
                 "evolved_workflows_uuids": [getattr(run, 'current_uuid', '') for run in runs_data],
                 "evolution_rewards": [getattr(run, 'reward', 0.0) for run in runs_data],
-                "evolution_costs": [getattr(run, 'cost', 0.0) for run in runs_data],
-                "evolution_total_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data),
+                "evolution_costs": self._compute_per_iteration_costs(runs_data),
+                "evolution_total_cost": getattr(runs_data[-1], 'cost', 0.0) if runs_data else 0.0,
                 "evolution_avg_reward": sum(getattr(run, 'reward', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0,
-                "evolution_avg_cost": sum(getattr(run, 'cost', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0
+                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0
             }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
@@ -218,19 +274,76 @@ Provide a structured analysis with:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
 
-    def _generate_task_default(self, row):
+    @staticmethod
+    def _compute_per_iteration_costs(runs_data: list) -> list[float]:
+        """
+        Compute per-iteration costs from IndividualRun objects.
+
+        IndividualRun.cost is cumulative (each run accumulates cost from prior runs).
+        This method extracts the per-iteration cost by computing deltas between
+        consecutive runs.
+
+        Args:
+            runs_data: List of IndividualRun objects
+
+        Returns:
+            List of per-iteration costs (one per run)
+        """
+        if not runs_data:
+            return []
+        costs = []
+        prev_cost = 0.0
+        for run in runs_data:
+            run_cost = getattr(run, 'cost', 0.0)
+            costs.append(run_cost - prev_cost)
+            prev_cost = run_cost
+        return costs
+
+    @staticmethod
+    def _extract_workspace_name_from_row(row: dict) -> str:
+        """
+        Extract a clean workspace folder name from the gold_program_name field.
+
+        Args:
+            row: CSV row data containing 'gold_program_name' field
+
+        Returns:
+            Cleaned folder name (e.g., 'clintox_nn' from 'clintox_nn.py')
+        """
+        script_name = (row.get('gold_program_name') or '').strip()
+        # Remove .py extension if present
+        if script_name.endswith('.py'):
+            script_name = script_name[:-3]
+        # Fallback to instance_id if script_name is empty
+        if not script_name:
+            script_name = (row.get('instance_id') or f'task_{id(row)}').strip()
+        # Sanitize: replace any non-alphanumeric characters with underscore
+        return ''.join(c if c.isalnum() or c == '_' else '_' for c in script_name)
+
+    def _generate_task_default(self, row, workspace_subfolder: str | None = None):
         paper_title = (row.get('Title') or '').strip()
         url = (row.get('URLS') or '').strip()
         prompt = (row.get('Prompt') or '').strip()
         if prompt == "":
             prompt = "Reproduce the experiments from the paper and compare the result."
+
+        workspace_instruction = ""
+        if workspace_subfolder:
+            workspace_instruction = f"""
+
+⚠️ CRITICAL WORKSPACE REQUIREMENT:
+You MUST work exclusively in the workspace subfolder: {workspace_subfolder}
+All file operations MUST be performed within this subfolder.
+"""
+
         return f"""
     Paper title: {paper_title}
     Url to paper: {url}
     Goal to achieve: {prompt}
+    {workspace_instruction}
         """.strip()
 
-    def _generate_task_science_agent_bench(self, row):
+    def _generate_task_science_agent_bench(self, row, workspace_subfolder: str | None = None):
         task_inst = (row.get('task_inst') or '').strip()
         domain_knowledge = (row.get('domain_knowledge') or '').strip()
         dataset_folder_tree = (row.get('dataset_folder_tree') or '').strip()
@@ -240,13 +353,28 @@ Provide a structured analysis with:
         scoring_rubric_file = (row.get('scoring_rubric_file') or '').strip()
         script_name = (row.get('gold_program_name') or '').strip()
 
+        # Build workspace instruction if subfolder is specified (concurrent mode)
+        workspace_instruction = ""
+        if workspace_subfolder:
+            workspace_instruction = f"""
+⚠️ CRITICAL WORKSPACE REQUIREMENT ⚠️
+Your ENTIRE working environment is confined to the subfolder: {workspace_subfolder}
+• ALL file reads, writes and creations MUST happen inside {workspace_subfolder}/ — never outside.
+• Treat {workspace_subfolder}/ as your root directory and use paths relative to it.
+• Do NOT access, create or modify anything outside {workspace_subfolder}/.
+"""
+
+        # Build explicit output paths
+        output_path = f"{workspace_subfolder}/{output_fname}" if workspace_subfolder else output_fname
+        script_path = f"{workspace_subfolder}/{script_name}" if workspace_subfolder else script_name
+
         task_prompt = f"""
 DOMAIN KNOWLEDGE:
 {domain_knowledge}
 
 INSTRUCTIONS:
 {task_inst}
-
+{workspace_instruction}
 DATASET STRUCTURE:
 {dataset_folder_tree}
 
@@ -254,10 +382,17 @@ DATASET PREVIEW:
 {dataset_preview}
 
 EXPECTED OUTPUT:
-Save results to a formatted file named exactly: {output_fname}
-Keep only one final python script at the root named exactly: {script_name}.
-You need to respect stricly the output format, otherwise the evaluation will fail.
-For example if a input data CSV is named FDA_APPROVED then the column in the output file is also named FDA_APPROVED. No modified pattern such as FDA_APPROVED_prob will be tolerated, otherwise the evaluation will fail.
+1. Results file — save to the EXACT path: {output_path}
+   (i.e. at the root of your workspace subfolder, not in any sub-directory)
+2. Python script — keep exactly ONE final script at: {script_path}
+   (i.e. directly inside {workspace_subfolder}/, not nested deeper)
+3. Others scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
+
+⚠️ OUTPUT FORMAT RULES — non-compliance will cause evaluation failure:
+• Column names in the output file must match the source data exactly.
+  Example: if the input CSV column is named FDA_APPROVED, the output column MUST also be FDA_APPROVED.
+  Variants such as FDA_APPROVED_prob are NOT acceptable.
+• Do not rename, reorder, or otherwise alter column identifiers from the source.
 """
         return task_prompt, scenario_id, scoring_rubric_file
 
@@ -397,14 +532,387 @@ Provide your analysis following the specified output format."""
 
         return execution_data
 
-    async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
+    def _create_isolated_config(self, task_id: str) -> Any:
+        """
+        Create a copy of config with an isolated workspace directory for concurrent execution.
+
+        Args:
+            task_id: Unique identifier for the task (used in workspace path)
+
+        Returns:
+            A copy of the config with modified workspace_dir
+        """
+        isolated_config = copy.copy(self.config)
+        isolated_workspace = Path(self._base_workspace_dir) / f"worker_{task_id}"
+        isolated_workspace.mkdir(parents=True, exist_ok=True)
+        isolated_config.workspace_dir = str(isolated_workspace)
+        return isolated_config
+
+    def _cleanup_isolated_workspace(self, task_id: str) -> None:
+        """
+        Clean up an isolated workspace after task completion.
+
+        Args:
+            task_id: Unique identifier for the task
+        """
+        isolated_workspace = Path(self._base_workspace_dir) / f"worker_{task_id}"
+        if isolated_workspace.exists():
+            try:
+                shutil.rmtree(isolated_workspace, ignore_errors=True)
+                self.logger.debug(f"[CONCURRENT] Cleaned up workspace for task {task_id}")
+            except Exception as e:
+                self.logger.warning(f"[CONCURRENT] Failed to cleanup workspace for task {task_id}: {e}")
+
+    def _generate_next_task_concurrent(self, row: dict, dataset_type: str, workspace_subfolder: str) -> tuple[str, str | None, str | None]:
+        """
+        Generate the next goal for concurrent execution, including workspace subfolder in prompt.
+
+        Args:
+            row: CSV row data
+            dataset_type: Type of dataset being evaluated
+            workspace_subfolder: The workspace subfolder name for this task
+
+        Returns:
+            Tuple of (task_prompt, scenario_id, scoring_rubric_file)
+        """
+        try:
+            if dataset_type == "science_agent_bench":
+                task, scenario_id, scoring_rubric_file = self._generate_task_science_agent_bench(row, workspace_subfolder)
+                return task, scenario_id, scoring_rubric_file
+            return self._generate_task_default(row, workspace_subfolder), None, None
+        except Exception as e:
+            self.logger.error(f"Error generating task for row: {row}, error: {e}")
+            return "Error generating task", None, None
+
+    async def _process_single_task(
+        self,
+        task_context: TaskContext,
+        dataset_type: str,
+        learning: bool,
+        single_agent_mode: bool,
+        sab_loader: ScienceAgentBenchLoader | None,
+        launch_index: int = 0
+    ) -> dict[str, Any]:
+        """
+        Process a single task evaluation in an isolated environment.
+
+        Args:
+            task_context: Context containing row data and workspace info
+            dataset_type: Type of dataset being evaluated
+            learning: Whether learning mode is enabled
+            single_agent_mode: Whether to use single agent mode
+            sab_loader: ScienceAgentBench loader instance (if applicable)
+            launch_index: Position in the launch queue, used to stagger task starts
+
+        Returns:
+            Execution data dictionary with results
+        """
+        row = task_context.row_data
+        i = task_context.row_index
+
+        # Extract workspace name from gold_program_name (e.g., 'clintox_nn' from 'clintox_nn.py')
+        workspace_name = self._extract_workspace_name_from_row(row)
+        task_id = workspace_name  # Use the clean name as task_id
+
+        # Stagger task launches to avoid overwhelming shell/API resources
+        if launch_index > 0 and self.task_start_delay > 0:
+            stagger_delay = launch_index * self.task_start_delay
+            self.logger.info(f"[CONCURRENT] Task {i + 1} (workspace: {workspace_name}) waiting {stagger_delay:.1f}s before starting (stagger delay)")
+            print(f"\033[93m[Worker {workspace_name}] ⏳ Stagger delay: waiting {stagger_delay:.1f}s before starting...\033[0m")
+            await asyncio.sleep(stagger_delay)
+
+        # Acquire semaphore to limit concurrency
+        async with self._semaphore:
+            self.logger.info(f"[CONCURRENT] Starting task {i + 1} (workspace: {workspace_name})")
+            print(f"\033[96m[Worker {workspace_name}] Starting task {i + 1}\033[0m")
+
+            # Create isolated config and instances for this task
+            isolated_config = self._create_isolated_config(task_id)
+            workspace_subfolder = f"worker_{task_id}"
+
+            try:
+                iteration_start_time = time.time()
+                # Generate task with workspace subfolder information in the prompt
+                goal, scenario_id, scenario_rubric_filename = self._generate_next_task_concurrent(
+                    row, dataset_type, workspace_subfolder
+                )
+
+                print(f"\033[96m[Worker {workspace_name}] 📋 GOAL: {goal[:100]}...\033[0m")
+                print(f"\033[96m[Worker {workspace_name}] 📄 Scenario Rubric: {scenario_rubric_filename}\033[0m")
+
+                # Create isolated DGM/Planner instances
+                isolated_dgm = DarwinMachine(isolated_config)
+                isolated_planner = Planner(isolated_config)
+
+                # Create file transfer with isolated workspace
+                file_transfer = LocalTransfer(
+                    config=isolated_config,
+                    workspace_path=isolated_config.workspace_dir,
+                    runs_capsule_dir=self.config.runs_capsule_dir
+                )
+
+                # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                max_iter = self.config.max_learning_evolve_iterations if learning else 1
+
+                runs = None
+                if dataset_type == "science_agent_bench" and sab_loader:
+                    # Transfer files to isolated workspace
+                    self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
+
+                    runs = await isolated_dgm.start_dgm(
+                        goal=goal,
+                        judge=True,
+                        learning_mode=learning,
+                        scenario_rubric=None,
+                        max_iteration=max_iter,
+                        single_agent_mode=single_agent_mode
+                    )
+                    results_str = self._format_task_mode_results(runs[-1])
+                else:
+                    tasks_data = await isolated_planner.start_planner(
+                        goal=goal,
+                        judge=True,
+                        max_evolve_iteration=max_iter,
+                        max_task_retry=3
+                    )
+                    results_str = self._format_goal_mode_results(tasks_data)
+
+                print(f"\033[96m[Worker {task_id}] 📊 Transferring results files...\033[0m")
+
+                # Transfer results to capsule (uses shared capsule dir)
+                trs = LocalTransfer(
+                    config=isolated_config,
+                    workspace_path=isolated_config.workspace_dir,
+                    runs_capsule_dir=self.config.runs_capsule_dir
+                )
+                capsule_name = trs.transfer_workspace_files_to_capsule(goal)
+
+                print(f"\033[96m[Worker {task_id}] 📊 Analyzing results...\033[0m")
+                execution_time = time.time() - iteration_start_time
+
+                # Analyze results using isolated workspace path
+                analysis = self._analyze_results_isolated(goal, results_str, execution_time, isolated_config.workspace_dir)
+
+                execution_data = {
+                    "iteration": i + 1,
+                    "goal": goal,
+                    "execution_time": execution_time,
+                    "success_level": analysis.get("success_level", "Unknown"),
+                    "key_insight": analysis.get("full_analysis", "Unknown"),
+                    "task_id": task_id
+                }
+
+                if dataset_type == "science_agent_bench" and sab_loader and runs:
+                    execution_data = self._evaluate_with_science_agent_bench(
+                        capsule_name=capsule_name,
+                        row=row,
+                        runs=runs,
+                        sab_loader=sab_loader,
+                        execution_data=execution_data
+                    )
+
+                print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
+                print(f"\033[96m[Worker {task_id}]    Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
+
+                # Save run notes (thread-safe via file system)
+                # Pass current execution_data for concurrent mode since execution_history isn't updated yet
+                self._save_run_notes(
+                    capsule_name, goal, analysis, execution_time,
+                    current_execution_data=execution_data
+                )
+
+                return execution_data
+
+            except Exception as e:
+                self.logger.error(f"[CONCURRENT] Error in task {i + 1} (worker_{task_id}): {str(e)}")
+                print(f"\033[91m[Worker {task_id}] ❌ Error in task {i + 1}: {str(e)}\033[0m")
+                return {
+                    "iteration": i + 1,
+                    "goal": str(goal) if 'goal' in dir() else "Unknown",
+                    "execution_time": time.time() - iteration_start_time if 'iteration_start_time' in dir() else 0,
+                    "success_level": "Error",
+                    "key_insight": str(e),
+                    "task_id": task_id,
+                    "error": str(e)
+                }
+
+            finally:
+                # Cleanup isolated workspace
+                self._cleanup_isolated_workspace(task_id)
+
+    def _sab_files_transfer_isolated(self, sab_loader, file_transfer, row, task_id: str):
+        """Transfer dataset files to isolated workspace with validation."""
+        file_transfer.clean_workspace()
+        task_dataset_path = sab_loader.get_dataset_path(row)
+        self.logger.info(f"[Worker {task_id}] Transferring dataset from: {task_dataset_path}")
+        print(f"\033[96m[Worker {task_id}] 📁 Transferring dataset: {task_dataset_path.name}\033[0m")
+        files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
+        time.sleep(0.3)  # Give filesystem a moment to sync
+        workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
+        print(f"\033[96m[Worker {task_id}] ✓ Transferred {files_transferred} files to workspace\033[0m")
+
+        if workspace_files_after == 0:
+            raise ValueError(
+                f"Files disappeared after transfer! "
+                f"Transferred {files_transferred} but workspace now has 0 files."
+            )
+        self.logger.info(f"[Worker {task_id}] Successfully transferred {files_transferred} files")
+
+    def _analyze_results_isolated(self, goal: str, results_str: str, execution_time: float, workspace_dir: str) -> dict[str, str]:
+        """Analyze execution results using LLM with isolated workspace."""
+        files = list_files(workspace_dir, max_depth=3)
+        prompt = f"""Analyze the following Mimosa-AI execution:
+TASK: {goal}
+EXECUTION TIME: {execution_time:.2f} seconds
+FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
+{files}
+EXECUTION RESULTS:
+{results_str}
+Provide your analysis following the specified output format."""
+
+        analysis_text = self.result_analyzer(prompt)
+        analysis = {
+            "full_analysis": analysis_text,
+            "success_level": "Medium",
+            "key_insight": "Analysis completed"
+        }
+        return analysis
+
+    async def run_concurrent_eval_loop(
+        self,
+        dataset_type: str,
+        dataset_path: str,
+        learning: bool,
+        single_agent_mode: bool = False
+    ) -> None:
+        """
+        Concurrent execution loop that processes multiple tasks in parallel.
+        Uses asyncio.gather with semaphore-based concurrency control.
+
+        Args:
+            dataset_type: Type of dataset being evaluated
+            dataset_path: Path to the CSV dataset file
+            learning: Whether learning mode is enabled
+            single_agent_mode: Whether to use single agent mode
+        """
+        papers_csv_path = Path(dataset_path)
+
+        # Get starting row from user
+        while True:
+            user_input = input("Enter starting row ([Enter] 0 by default): ")
+            if not user_input.strip():
+                start_row = 0
+                break
+            try:
+                start_row = int(user_input) - 1
+                break
+            except ValueError:
+                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+
+        # Load and restore from cache if available
+        cached_notes = self._load_previous_run_notes()
+        if cached_notes:
+            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
+            if restore_input.strip().lower() != 'n':
+                self._restore_execution_history_from_cache(cached_notes)
+
+        # Initialize semaphore for concurrency control
+        self._semaphore = asyncio.Semaphore(self.max_concurrent_tasks)
+
+        # Initialize ScienceAgentBench loader if needed
+        sab_loader = None
+        if dataset_type == "science_agent_bench":
+            sab_loader = ScienceAgentBenchLoader()
+            self.logger.info("[CONCURRENT] ScienceAgentBench mode activated")
+
+        # Read CSV and prepare task contexts
+        task_contexts: list[TaskContext] = []
+        with open(papers_csv_path, encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            total_rows = sum(1 for _ in reader)
+            csvfile.seek(0)
+            reader = csv.DictReader(csvfile)
+
+            self.logger.info(f"[CONCURRENT] Preparing tasks for {total_rows} CSV entries")
+            print(f"\n\033[95m{'🤖 CONCURRENT EVALUATION MODE':^80}\033[0m")
+            print(f"\033[95m{'=' * 80}\033[0m")
+            print(f"\033[95mMax concurrent tasks: {self.max_concurrent_tasks}\033[0m")
+            print(f"\033[95mStagger delay between launches: {self.task_start_delay:.1f}s\033[0m")
+            print(f"\033[95mTotal rows in CSV: {total_rows}\033[0m")
+            print(f"\033[95m{'=' * 80}\033[0m\n")
+
+            for i, row in enumerate(reader):
+                if i < start_row:
+                    print(f"Skipping evaluation (using cache) for: {i + 1}")
+                    continue
+                if i >= self.csv_runs_limit:
+                    break
+
+                task_id = f"{i + 1}_{int(time.time() * 1000) % 10000}"
+                task_contexts.append(TaskContext(
+                    row_index=i,
+                    row_data=dict(row),  # Make a copy of the row
+                    workspace_dir="",  # Will be set in _process_single_task
+                    task_id=task_id
+                ))
+
+        if not task_contexts:
+            print("\033[93m⚠️ No tasks to process\033[0m")
+            return
+
+        print(f"\033[95m📋 Processing {len(task_contexts)} tasks with {self.max_concurrent_tasks} concurrent workers\033[0m\n")
+
+        # Create coroutines for all tasks with staggered launch indices
+        tasks = [
+            self._process_single_task(
+                task_context=ctx,
+                dataset_type=dataset_type,
+                learning=learning,
+                single_agent_mode=single_agent_mode,
+                sab_loader=sab_loader,
+                launch_index=idx
+            )
+            for idx, ctx in enumerate(task_contexts)
+        ]
+
+        # Execute all tasks concurrently with semaphore control
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect results thread-safely
+        for result in results:
+            if isinstance(result, Exception):
+                self.logger.error(f"[CONCURRENT] Task failed with exception: {result}")
+                self.execution_history.append({
+                    "iteration": -1,
+                    "goal": "Unknown",
+                    "execution_time": 0,
+                    "success_level": "Error",
+                    "key_insight": str(result)
+                })
+            elif isinstance(result, dict):
+                self.execution_history.append(result)
+
+        # Sort execution history by iteration for consistent ordering
+        self.execution_history.sort(key=lambda x: x.get("iteration", 0))
+
+        self._print_final_summary()
+
+    async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
         """
         Main autonomous execution loop.
         Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
-        user_input = input("Enter starting row ([Enter] 0 by default): ")
-        start_row = int(user_input)-1 if user_input.strip() else 0
+        while True:
+            user_input = input("Enter starting row ([Enter] 0 by default): ")
+            if not user_input.strip():
+                start_row = 0
+                break
+            try:
+                start_row = int(user_input) - 1
+                break
+            except ValueError:
+                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -443,13 +951,16 @@ Provide your analysis following the specified output format."""
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
+                    # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                    max_iter = self.config.max_learning_evolve_iterations if learning else 1
+
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.dgm.start_dgm(goal=goal,
                                                         judge=True,
                                                         learning_mode=learning,
-                                                        scenario_rubric=None, # Don't pass scenario rubric to use generic evaluator (file based scenario doesn't give mearningful feedback signal for workflow iterative refinements as for now)
-                                                        max_iteration=self.config.max_learning_evolve_iterations,
+                                                        scenario_rubric=None,
+                                                        max_iteration=max_iter,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
@@ -494,8 +1005,8 @@ Provide your analysis following the specified output format."""
                     print_info(f"  Time: {execution_time:.2f}s")
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
-                    print_err(f"Error in csv row {i + 1}: {str(e)}")
-                    continue
+                    print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
+                    raise e
 
         self._print_final_summary()
 
@@ -536,10 +1047,32 @@ Provide your analysis following the specified output format."""
 
         print_summary("📊 EVALUATION SUMMARY", rows)
 
-    async def start_evaluation(self, dataset_type: str = "default", dataset_path = "datasets/our_benchmark.csv", learning=False, single_agent_mode=False) -> None:
-        """Public method to start the autonomous mode."""
+    async def start_evaluation(
+        self,
+        dataset_type: str = "default",
+        dataset_path: str = "datasets/our_benchmark.csv",
+        learning: bool = False,
+        single_agent_mode: bool = False,
+        concurrent: bool = False
+    ) -> None:
+        """
+        Public method to start the evaluation mode.
+
+        Args:
+            dataset_type: Type of dataset ("default" or "science_agent_bench")
+            dataset_path: Path to the CSV dataset file
+            learning: Whether to enable learning mode
+            single_agent_mode: Whether to use single agent mode
+            concurrent: Whether to run tasks concurrently (uses max_concurrent_tasks from init)
+        """
         try:
-            await self.run_autonomous_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+            if concurrent and self.max_concurrent_tasks > 1:
+                print(f"\033[95mStarting CONCURRENT evaluation with {self.max_concurrent_tasks} workers\033[0m")
+                await self.run_concurrent_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+            else:
+                if concurrent and self.max_concurrent_tasks <= 1:
+                    print("\033[93m⚠️ Concurrent mode requested but max_concurrent_tasks <= 1, falling back to sequential\033[0m")
+                await self.run_single_thread_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
         except KeyboardInterrupt:
             print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
@@ -547,3 +1080,28 @@ Provide your analysis following the specified output format."""
             self.logger.error(f"[PAPERS DATASET MODE] Fatal error: {str(e)}")
             print_err(f"Fatal error in autonomous mode: {str(e)}")
             raise
+
+    async def start_concurrent_evaluation(
+        self,
+        dataset_type: str = "default",
+        dataset_path: str = "datasets/our_benchmark.csv",
+        learning: bool = False,
+        single_agent_mode: bool = False
+    ) -> None:
+        """
+        Convenience method to start concurrent evaluation directly.
+        Equivalent to start_evaluation(..., concurrent=True)
+
+        Args:
+            dataset_type: Type of dataset ("default" or "science_agent_bench")
+            dataset_path: Path to the CSV dataset file
+            learning: Whether to enable learning mode
+            single_agent_mode: Whether to use single agent mode
+        """
+        await self.start_evaluation(
+            dataset_type=dataset_type,
+            dataset_path=dataset_path,
+            learning=learning,
+            single_agent_mode=single_agent_mode,
+            concurrent=True
+        )

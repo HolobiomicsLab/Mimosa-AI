@@ -20,11 +20,11 @@ class WorkflowInfo:
             state_result = self.load_state_result()
             self._goal = state_result.get("goal", "") if state_result else ""
         return self._goal
-    
+
     @property
     def original_task(self) -> str:
         """Load the original unwrapped task for similarity matching.
-        
+
         Returns:
             str: The original task without knowledge wrapper. Falls back to
                  extracting from goal if original_task file doesn't exist.
@@ -43,24 +43,24 @@ class WorkflowInfo:
                 # Fallback: extract from goal if it has the wrapper pattern
                 self._original_task = self._extract_original_from_wrapped(self.goal)
         return self._original_task
-    
+
     def _extract_original_from_wrapped(self, text: str) -> str:
         """Extract original task from knowledge-wrapped text.
-        
+
         Args:
             text: Potentially wrapped text
-            
+
         Returns:
             str: Extracted task or original text if not wrapped
         """
         if not text:
             return ""
-        
+
         # Pattern: "...complete the following task:\n<actual_task>"
         match = re.search(r'complete the following task:\s*\n(.*)', text, re.DOTALL)
         if match:
             return match.group(1).strip()
-        
+
         # If not wrapped, return as-is
         return text
 
@@ -71,17 +71,17 @@ class WorkflowInfo:
         return self._state_result
 
     @property
-    def answers(self) -> dict:
+    def answers(self) -> list:
         state_result = self.load_state_result()
         return state_result.get('answers', [])
 
     @property
-    def success(self) -> dict:
+    def success(self) -> list:
         state_result = self.load_state_result()
         return state_result.get('success', [])
 
     @property
-    def is_success(self) -> dict:
+    def is_success(self) -> bool:
         state_result = self.load_state_result()
         success_list = state_result.get('success', [False]) if isinstance(state_result, dict) else [False]
         return success_list[-1]
@@ -104,7 +104,7 @@ class WorkflowInfo:
         eval_file = self.workflow_folder / "evaluation.txt"
         if not eval_file.exists():
             return {}
-        
+
         try:
             with open(eval_file) as f:
                 return f.read().strip()
@@ -117,7 +117,7 @@ class WorkflowInfo:
         state_file = self.workflow_folder / "state_result.json"
         if not state_file.exists():
             return {}
-        
+
         try:
             with open(state_file) as f:
                 content = f.read().strip()
@@ -134,7 +134,7 @@ class WorkflowInfo:
         if not code_file.exists():
             print(f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}.")
             return ""
-        
+
         try:
             with open(code_file) as f:
                 return f.read()
@@ -147,7 +147,7 @@ class WorkflowInfo:
         state_result = self.load_state_result()
         if not state_result:
             return 0.0
-            
+
         evaluation = state_result.get("evaluation", {})
         scores = []
         if evaluation:

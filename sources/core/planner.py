@@ -19,6 +19,11 @@ from sources.cli.pretty_print import (
     CYAN, BOLD, DIM, RESET,
 )
 
+from sources.utils.perspicacite_client import (
+    format_scientific_context,
+    query_perspicacite,
+)
+
 
 class PlanValidationError(Exception):
     """Exception raised when plan validation fails."""
@@ -62,6 +67,60 @@ class Planner:
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
 
+    def perspicacite_grounding(self, goal):
+        prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
+
+TASK TO SUPPORT:
+{goal}
+
+Retrieve peer-reviewed sources and established methodologies. Synthesize findings into actionable planning guidance.
+
+OUTPUT FORMAT:
+1. RELEVANT LITERATURE
+   - Key papers/theory (cite authors, year, venue)
+   - Foundational methods standard in this domain
+
+2. ESTABLISHED WORKFLOW
+   - Step-by-step methodology from current literature
+   - Critical decision points and typical resolutions
+   - Common pitfalls and literature-backed avoidance strategies
+
+3. PRACTICAL GUIDANCE FOR PLANNER
+   - Sub-tasks to create based on canonical approaches
+   - Standard validation steps
+   - Resource/data requirements
+
+CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain conventions. Note if literature is sparse/conflicting.
+        """
+        try:
+            response = query_perspicacite(prompt) or "No relevant scientific context."
+            return response
+        except Exception as e:
+            return "Query failed. Unable to help with scientific litterature"
+
+    def make_scientific_grounded_prompt(self, goal: str) -> str:
+        """
+        Create a scientific-grounded prompt by incorporating relevant scientific knowledge.
+        Args:
+            goal: The original goal description
+        Returns:
+            str: Enhanced prompt with scientific context
+        """
+        print_phase(
+            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+        )
+        scientific_context = self.perspicacite_grounding(goal)
+        print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
+
+        return f"""
+You are a top-tier scientific in research. When generating the plan, please incorporate relevant scientific principles, theories, or findings that could inform the approach to achieving the goal. This will help ensure that the plan is not only practical but also grounded in scientific understanding.
+Scientific context related to the goal:
+{scientific_context}
+You must generate a plan for goal:\n
+{goal}\n
+Important: Every task description should be very detailled and specific with the full path of all input output files specified.
+"""
+
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
         """
         Generate a workflow plan using the LLM with retry logic and multiple parsing strategies.
@@ -81,7 +140,7 @@ class Planner:
 
         last_error = None
 
-        prompt = f"You must generate a plan for goal:\n{goal_prompt}\nImportant: Every task description should be very detailled and specific with the full path of all input output files specified."
+        prompt = self.make_scientific_grounded_prompt(goal_prompt)
         for attempt in range(1, max_retries + 1):
             try:
                 print_info(f"Plan generation attempt {attempt}/{max_retries}")
@@ -93,8 +152,6 @@ class Planner:
                     raise ValueError("LLM returned empty or invalid response")
 
                 print_info(f"Received plan response ({len(raw_plan)} characters)")
-                print(raw_plan)
-                print("---")
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
                     raise ValueError("Failed to extract valid JSON from LLM response\n")
@@ -160,8 +217,8 @@ class Planner:
         if not plan_dict["steps"]:
             raise PlanValidationError("❌ Planner: Plan must contain at least one step")
 
-        goal = plan_dict.get("goal", "")
-        if not goal:
+        plan_goal = plan_dict.get("goal", "") or goal
+        if not plan_goal:
             raise PlanValidationError("❌ Planner: Plan must have a goal")
 
         steps = []
@@ -170,7 +227,7 @@ class Planner:
                 step = PlanStep(
                     name=step_dict.get("name", f"step_{i}"),
                     task=step_dict.get("task", ""),
-                    goal_context=goal,
+                    goal_context=plan_goal,
                     cost=0.0,
                     score=0.0,
                     depends_on=step_dict.get("depends_on", []),
@@ -504,7 +561,7 @@ Original request:
             Tuple[bool, List[str]]: (all_produced, missing_outputs)
         """
         missing_outputs = []
-        workspace_files = self._capture_workspace_snapshot()
+        workspace_files = self._get_workspace_files()
 
         for expected_output in step.expected_outputs:
             # Normalise expected path to forward slashes for cross-platform comparison
@@ -579,7 +636,7 @@ Original request:
 
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                lookup_task, threshold_similary=0.8, threshod_score=0.85
+                lookup_task, threshold_similarity=0.8, threshold_score=0.85
             ) if cached_wf_allow else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
@@ -660,7 +717,8 @@ Original request:
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
-        while attempt <= max_attempts:
+        final_answers = []
+        while attempt < max_attempts:
             attempt += 1
             attempt_counts[step_name] = attempt
 
@@ -705,7 +763,7 @@ Original request:
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
                     complexity=getattr(step, 'complexity', 'medium'),
-                    produced_outputs=self._workspace_files_before_step
+                    produced_outputs=[f for f in self._get_workspace_files() if f not in self._workspace_files_before_step]
                 )
 
                 self.task_history.append(task)
@@ -732,7 +790,7 @@ Original request:
         step.cost = attempt_cost
         step.score = attempt_score
         if self.tts:
-            answer = '. '.join([x[:128] for x in final_answers])
+            answer = '. '.join([x[:128] for x in final_answers if x]) if final_answers else "No answers produced."
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
@@ -797,7 +855,7 @@ Original request:
                 )
                 # Check if step can be executed (dependencies satisfied)
                 if lst_step:
-                    can_execute, missing_deps = self._can_execute_step(lst_step)
+                    can_execute, missing_deps = self._can_execute_step(step)
                     if not can_execute:
                         self.request_user_exit(f"Cannot execute step '{step_name}' — missing dependencies: {missing_deps}")
 
@@ -807,6 +865,7 @@ Original request:
                 max_attempts = max_task_retry
 
                 try:
+                    self._capture_workspace_snapshot()  # Snapshot before execution for output diff
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_evolve_iteration)
                     total_cost += step.cost
                     self._update_visualization(total_cost)  # Update after step completes

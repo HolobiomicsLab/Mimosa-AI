@@ -165,7 +165,7 @@ def test_pricing_data_format():
 
 def run_all_tests():
     """Run all pricing tests."""
-    print("🚀 Starting pricing functionality tests...\n")
+    print("Starting pricing functionality tests...\n")
 
     try:
         test_openrouter_pricing_client()

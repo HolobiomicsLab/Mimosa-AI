@@ -10,12 +10,13 @@ import uuid
 
 from sources.modules import state_schema
 
+from .factory import Factory
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
 from sources.cli.pretty_print import print_ok, print_info, print_warn, print_err
 
 
-class WorkflowFactory:
+class WorkflowFactory(Factory):
     """Handles the creation and management of Langraph-SmolAgent workflow generation"""
 
     def __init__(self, config) -> None:
@@ -42,7 +43,6 @@ class WorkflowFactory:
         except Exception as e:
             raise ValueError(f"Failed to load system prompt: {str(e)}") from e
 
-
     @staticmethod
     def extract_python_code(code: str) -> str:
         """Extract Python code blocks from text.
@@ -64,40 +64,6 @@ class WorkflowFactory:
                 code_blocks.append(line)
         return "\n".join(code_blocks)
 
-    async def load_tools_code(self) -> tuple[str, str]:
-        """Discover all MCP servers and format their client code.
-        Returns:
-            str: Combined code for all MCP clients.
-            str: Prompt of discovered MCP names for workflow generation tools-awareness.
-        """
-        tools_code = ""
-        existing_tool_prompt = ""
-        tool_manager = ToolManager(self.config)
-        try:
-            tool_setup = False
-            while tool_setup == False:
-                mcps = await tool_manager.discover_mcp_servers()
-                tool_setup = await tool_manager.verify_tools()
-        except Exception as e:
-            self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
-            raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
-        if not mcps:
-            raise ValueError(
-                "\n" + "=" * 80 +
-                "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
-                "\n" + "-" * 80 +
-                "\nPlease ensure at least one MCP instance is running on Toolomics."
-                "\nRetrying until MCPs detected.... use CTRL+C to stop."
-                "\n" + "=" * 80 + "\n"
-            )
-        for mcp in mcps:
-            client_code = tool_manager.get_client_code(mcp)
-            client_prompt = tool_manager.get_client_prompt(mcp)
-            tools_code += client_code + "\n"
-            existing_tool_prompt += client_prompt + "\n"
-        print_ok(f"Discovered {len(mcps)} MCP server(s) — workflow generation can start.")
-        return tools_code, existing_tool_prompt
-
     def remove_imports(self, code: str) -> str:
         # remove attempt from LLM to import modules/class
         lines = code.splitlines()
@@ -109,67 +75,19 @@ class WorkflowFactory:
             )
         )
 
-    def llm_make_prompts(
-        self,
-        system_prompt: str,
-        craft_instructions: str,
-        existing_tool_prompt: str,
-        path: str,
-        allow_cache: bool
-    ) -> str:
-        """Generate prompts code using the LLM."""
-        prompt = f"""
-You must generate Python code that defines prompt templates for the LangGraph-SmolAgent workflow.
-
-# AVAILABLE TOOLS:
-
-The following tools packages are available for agents:
-{existing_tool_prompt}
-
-# INSTRUCTIONS/GOAL:
-{craft_instructions}
-
-You must first comment about the overall strategy to accomplish the task using the available tools.
-Decide what agent you need and which tools package they should each use.
-Then, generate Python code that defines prompt templates for each agent.
-Do not generate the whole workflow, just the prompts as Python code.
-Generate the prompt within python blocks ```python<code with prompt>```
-Previous workflow failed due to python error ? You don't need to change prompts.
-Keep the prompt short and efficient. Agents are smart domains expert, not children.
-document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-        """
-
-        provider, model = extract_model_pattern(self.config.prompts_llm_model)
-        llm_config = LLMConfig(
-            model=model,
-            provider=provider,
-            reasoning_effort=self.config.reasoning_effort,
-            max_tokens=getattr(self.config, 'max_tokens', 8192)
-        )
-        return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
-
     def llm_make_workflow(
         self,
         system_prompt: str,
         craft_instructions: str,
         existing_tool_prompt: str,
         path: str,
-        prompts_code: str,
         allow_cache: bool
     ) -> str:
         """Generate a workflow using the LLM."""
+
         prompt = f"""
-# EXISTING PROMPTS:
+# INSTRUCTIONS:
 
-The prompts have already been generated for you as Python code:
-
-{prompts_code}
-
-You may add another if prompt if you need to add another agent, or overwrite a prompt by declaring it again if needed. Please use existing prompt as much as possible. Do not EVER rewrite prompt you wish to keep, they will be automatically part of the context. You may add a prompt by including it in the workflow code you write but do NOT rewrite existing prompt.
-
-# INSTRUCTIONS/GOAL:
-
-Generate a workflow for this goal:
 {craft_instructions}
 
 # AVAILABLE TOOLS:
@@ -177,15 +95,7 @@ Generate a workflow for this goal:
 The following tools packages are available for agents:
 {existing_tool_prompt}
 
-# CONSTRAINT:
-
-1. Agents can ONLY use the tools listed above. If a task requires capabilities not available in the listed tools, you MUST clearly state that the task cannot be completed and give up.
-2. Use smart routing, fallback could go all the way back to first agent, not the previous agent.
-3. You must write a commentary before the workflow code explaining the workflow and how you choose to use (or disgard) existing prompts.
-4. Always provide every single agents with a tool to execute bash (execute_command), no matter their specialized task.
-5. Document analysis is highly complex for single agent and therefore require MULTIPLE agents including a quality judge.
-6. Last agent must be an extremely rigourous judge that decide on whenever the task is a success or failure, upon success it should also organize files and ensure the structure is the one expected, ensuring no-error cascade to downstream tasks.
-7. Agent should always be provided with tool to use shell, take notes and retrieve their own memory in addition to a primary tool.
+Proceed to generate the workflow in Python code using the LangGraph library. Follow the instructions and constraints carefully.
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
@@ -210,25 +120,15 @@ The following tools packages are available for agents:
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
         try:
-            print_info("Step 1/2: Generating prompts code…")
-            llm_output = self.llm_make_prompts(
-                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
-            )
-            prompts_code = self.extract_python_code(llm_output)
-            commentary = llm_output.replace(prompts_code, "").split("```python")[0]
-            print_info("LLM commentary on prompts:")
-            print(commentary)
-
-            print_info("Step 2/2: Generating workflow code…")
+            print("🔧 Generating workflow code...")
             llm_output = self.llm_make_workflow(
-                system_prompt, craft_instructions, existing_tool_prompt, path, prompts_code, allow_cache
+                system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache
             )
             workflow_code = self.extract_python_code(llm_output)
             commentary = llm_output.replace(workflow_code, "").split("```python")[0]
             print_info("LLM commentary on workflow:")
             print(commentary)
 
-            workflow_code = prompts_code + "\n\n" + workflow_code
             workflow_code = self.remove_imports(workflow_code)
             if not workflow_code.strip():
                 raise ValueError("LLM did not return valid workflow code")
@@ -290,7 +190,7 @@ The following tools packages are available for agents:
         nodes = set(re.findall(patterns["nodes"], workflow_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
-        self.logger.debug(f"📋 Workflow nodes discovered: {', '.join(sorted(nodes))}")
+        self.logger.debug(f"Workflow nodes discovered: {', '.join(sorted(nodes))}")
 
         # Validate START edge target exists
         entry_node = start_match.group(1)
@@ -299,21 +199,6 @@ The following tools packages are available for agents:
         self.logger.debug(f"Workflow entry point: START → {entry_node}")
 
         self.logger.info("✅ Workflow structure validation passed")
-
-    def create_folder_structure(self, uuid_str: str) -> tuple[str]:
-        """Create directory structure for new workflow.
-        Args:
-            uuid_str: Unique identifier for the workflow
-        Returns:
-            str: Path to created workflow directory
-        """
-        workflow_path = os.path.join(self.workflow_dir, uuid_str)
-        self.logger.info(f"Created workflow directory: {workflow_path}")
-        os.makedirs(workflow_path, exist_ok=True)
-        memory_path = os.path.join(self.memory_dir, uuid_str)
-        os.makedirs(memory_path, exist_ok=True)
-        self.logger.info(f"Created memory directory: {memory_path}")
-        return workflow_path, memory_path
 
     def assemble_workflow(
         self,
@@ -325,6 +210,7 @@ The following tools packages are available for agents:
         memory_path: str,
         uuid_str: str,
         goal: str,
+        smolagent_system_prompt: str = None
     ) -> str:
         """Assemble the complete workflow code.
         Args:
@@ -361,15 +247,18 @@ import sys
 import re
 import json
 from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List
 from pydantic import BaseModel
-from typing import Annotated
+
+# because LLM like to use random typing
+from typing import Any, Optional, Union, List, Dict, Tuple, Callable
+from typing import ClassVar, Final, Literal, Protocol, TypedDict
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
 GOAL = {goal!r}
+SYSTEM_PROMPT = {smolagent_system_prompt!r}
 
 # Load tools
 {tools_code}
@@ -413,7 +302,7 @@ if WORKFLOW_PATH:
         with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
             json.dump(result_state, f, indent=2)
     except Exception as e:
-        raise(f"Could not save workflow data:" + str(e))
+        raise(Exception(f"Could not save workflow data:" + str(e)))
 """
 
     async def craft_workflow(
@@ -481,6 +370,7 @@ if WORKFLOW_PATH:
             self.logger.error(f"craft_workflow: Workflow structure validation failed: {str(e)}")
             raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
 
+        smolagent_system_prompt = await self.load_single_agent_system_prompt()
         # Assemble complete workflow
         complete_code = self.assemble_workflow(
             tools_code,
@@ -491,6 +381,7 @@ if WORKFLOW_PATH:
             memory_path,
             uuid_str,
             goal,
+            smolagent_system_prompt
         )
 
         self.logger.info("Workflow generation completed")
@@ -499,273 +390,3 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Memory path: {memory_path}")
 
         return complete_code, workflow_code, uuid_str
-
-    def _extract_original_from_goal(self, goal: str) -> str:
-        """Extract original task from knowledge-wrapped goal.
-
-        Args:
-            goal: Goal text that may be wrapped with knowledge context
-
-        Returns:
-            str: Extracted original task or goal if not wrapped
-        """
-        if not goal:
-            return ""
-
-        # Pattern: "...Now, use this knowledge to complete:\n<actual_task>"
-        # This is the pattern used by planner._build_knowledge_aware_task()
-        match = re.search(r'Now, use this knowledge to complete:\s*\n(.*)', goal, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-
-        # If no wrapper pattern found, return goal as-is
-        return goal
-
-    def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
-    ) -> None:
-        """Save workflow code and metadata to files.
-
-        Args:
-            path: Directory path to save files
-            uuid_str: Unique workflow identifier
-            workflow_code: Generated workflow code
-            goal: The goal description (may be knowledge-wrapped)
-            original_task: The original unwrapped task for similarity matching
-        """
-        try:
-            with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
-                f.write(workflow_code)
-            self.logger.info(
-                f"Saved workflow code to: {path}/workflow_code_{uuid_str}.py"
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to save workflow code: {str(e)}")
-
-        try:
-            with open(os.path.join(path, f"system_prompt_{uuid_str}.md"), "w") as f:
-                f.write(self.get_system_prompt())
-            self.logger.info(
-                f"Saved system prompt to: {path}/system_prompt_{uuid_str}.md"
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to save system prompt: {str(e)}")
-
-        try:
-            with open(os.path.join(path, f"goal_{uuid_str}.txt"), "w") as f:
-                f.write(goal)
-            self.logger.info(f"Saved goal to: {path}/goal_{uuid_str}.txt")
-        except Exception as e:
-            self.logger.error(f"Failed to save goal: {str(e)}")
-
-        # Save original task for better similarity matching
-        # Extract from goal if not provided explicitly
-        task_to_save = original_task if original_task else self._extract_original_from_goal(goal)
-        if task_to_save:
-            try:
-                with open(os.path.join(path, f"original_task_{uuid_str}.txt"), "w") as f:
-                    f.write(task_to_save)
-                self.logger.info(f"Saved original task to: {path}/original_task_{uuid_str}.txt")
-            except Exception as e:
-                self.logger.error(f"Failed to save original task: {str(e)}")
-
-    def get_engine_code(self) -> str:
-        """Get code snippet for initializing the LLM engine for single agent mode."""
-        model_id = self.config.smolagent_model_id
-        max_tokens = getattr(self.config, 'max_tokens', 8192)
-        provider, _ = extract_model_pattern(self.config.smolagent_model_id)
-        token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
-        return f"""
-model_id = {model_id!r}
-max_tokens = {max_tokens}
-provider = {provider!r}
-token = {token!r}
-engine_name = {self.config.engine_name!r}
-engine = None
-if engine_name == "mlx":
-    engine = MLXModel(
-        model_id=model_id,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "inference_client":
-    if not token:
-        raise ValueError("Hugging Face token is required. Please set the HF_TOKEN environment variable or pass a token.")
-    engine = InferenceClientModel(
-        model_id=model_id,
-        provider=provider,
-        token=token,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "litellm":
-    engine = LiteLLMModel(
-        model_id=model_id,
-        temperature=1.0,
-        max_tokens=max_tokens,
-    )
-elif engine_name == "openai":
-    engine = InferenceClientModel(
-        model_id=model_id,
-        provider=provider,
-        api_key=os.getenv("OPENAI_API_KEY")
-    )
-else:
-    raise ValueError(f"Unknown engine name.. Supported engines are: mlx, hf_api, inference_client and litellm.")
-        """.strip()
-
-    async def craft_single_agent(self, goal: str, original_task: str = None):
-        """
-        For crafting single agent with cost tracking support.
-
-        Args:
-            goal: The goal description (may be knowledge-wrapped)
-            original_task: The original unwrapped task for similarity matching
-
-        Returns:
-            tuple[str, str, str]: (complete_code, workflow_code, uuid)
-        """
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        short_uuid = str(uuid.uuid4())[:8]
-        uuid_str = f"single_agent_{timestamp}_{short_uuid}"
-
-        try:
-            tools_code, existing_tool_prompt = await self.load_tools_code()
-        except Exception as e:
-            self.logger.error(f"craft_single_agent: Failed to load tools code: {str(e)}")
-            raise RuntimeError(f"Failed to load tools code: {str(e)}") from e
-
-        # Create folder structure for cost tracking (like multi-agent mode)
-        workflow_path, memory_path = self.create_folder_structure(uuid_str)
-
-        INSTRUCTIONS = ". ".join([
-            "TASK:",
-            goal,
-            "",
-            "Address complaints from the last agent informations if any.",
-            "",
-            "CONSTRAINTS:",
-            "- No placeholder or example values.",
-            "- No assumptions about missing data. Investigate first using available workspace data.",
-            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
-            "- Save outputs instead of plotting.",
-            "- Only use execute_command to install packages.",
-            "- You are only allowed to use tools to create and execute the code required to accomplish the goal.",
-            "- Use python/code editing tools when available.",
-            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
-            "",
-            "INITIAL STEP:",
-            "- Assess the workspace by running: ls -la"
-        ])
-
-        # Resolve absolute paths (like craft_workflow does)
-        from pathlib import Path
-        script_dir = Path(__file__).resolve().parent.parent.parent
-        memory_path_abs = str((script_dir / memory_path).resolve())
-        workflow_path_abs = str((script_dir / workflow_path).resolve())
-
-        mcp_vars = sorted(set(
-            re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
-        ))
-        mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
-        engine_code = self.get_engine_code()
-
-        code = f"""
-import os
-import json
-from dataclasses import asdict
-from typing import List
-
-import smolagents
-from smolagents import CodeAgent, LiteLLMModel, ActionStep, InferenceClientModel, MLXModel
-from smolagents.models import get_dict_from_nested_dataclasses
-from dotenv import load_dotenv
-
-load_dotenv()
-
-MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = {goal!r}
-INSTRUCTIONS = {INSTRUCTIONS!r}
-MEMORY_PATH = {memory_path_abs!r}
-WORKFLOW_PATH = {workflow_path_abs!r}
-
-{engine_code}
-{tools_code}
-{mcps_string}
-
-all_tools = []
-for mcp_tools in MCPS:
-    all_tools.extend(mcp_tools)
-
-agent = CodeAgent(
-    tools=all_tools,
-    model=engine,
-    name="single_agent",
-    max_steps=256,
-    additional_authorized_imports=["requests", "bs4", "json"],
-)
-
-def save_agent_memories(agent, memory_path: str, agent_name: str):
-    try:
-        memories = []
-        for idx, step in enumerate(agent.memory.steps):
-            if isinstance(step, ActionStep):
-                action_step = step.dict()
-                action_step["model_input_messages"] = (
-                    get_dict_from_nested_dataclasses(
-                        [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages],
-                        ignore_key="raw"
-                    )
-                    if step.model_input_messages
-                    else None
-                )
-                action_step["model_output_message"] = (
-                    get_dict_from_nested_dataclasses(
-                        step.model_output_message, ignore_key="raw"
-                    )
-                    if step.model_output_message
-                    else None
-                )
-                memories.append(action_step)
-
-        os.makedirs(memory_path, exist_ok=True)
-        agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
-        with open(agent_task_path, "w") as f:
-            json.dump(memories, f, indent=2)
-        print(f"✅ Agent memories saved successfully to {{{{agent_task_path}}}}")
-    except Exception as e:
-        print(f"⚠️  Failed to save memory: {{{{str(e)}}}}")
-
-# Run agent
-result = agent.run(INSTRUCTIONS)
-
-# Save agent memories for cost tracking
-save_agent_memories(agent, MEMORY_PATH, "single_agent")
-
-# Save state_result.json for cost tracking and evaluation
-state_result = {{
-    "model_id": MODEL_ID,
-    "goal": GOAL,
-    "workflow_uuid": "{uuid_str}",
-    "single_agent_mode": True,
-    "step_name": ["single_agent"],
-    "answers": [str(result)],
-    "success": [True]  # Assume success if no exception
-}}
-
-try:
-    with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
-        json.dump(state_result, f, indent=2)
-    print(f"✅ Saved state_result.json to {{WORKFLOW_PATH}}")
-except Exception as e:
-    print(f"❌ Failed to save state_result.json: {{e}}")
-        """
-
-        # Save metadata files (like multi-agent mode)
-        self.save_workflow_files(
-            workflow_path,
-            uuid_str,
-            code,  # Save the single agent code
-            goal,
-            original_task
-        )
-
-        return code, code, uuid_str

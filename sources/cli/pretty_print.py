@@ -32,7 +32,7 @@ DIM     = "\033[2m"
 RESET   = "\033[0m"
 
 # Default column width used for banners/summaries
-_W = 80
+_W = 120
 
 
 # ── Status lines ──────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ def print_info(msg: str) -> None:
 
 # ── Step header (used by onboarding CLI) ──────────────────────────────────────
 
-def print_step(step: int, total: int, title: str, width: int = 60) -> None:
+def print_step(step: int, total: int, title: str, width: int = 120) -> None:
     """
     Numbered step header used by the onboarding wizard.
 
@@ -79,7 +79,7 @@ def print_step(step: int, total: int, title: str, width: int = 60) -> None:
 
 def print_phase(
     title: str,
-    icon: str = "",
+    icon: str = "▶▶",
     width: int = _W,
     color: str = CYAN,
 ) -> None:
@@ -87,7 +87,7 @@ def print_phase(
     Full-width phase banner with centred title and horizontal rules.
     """
     label = f"{icon}  {title}" if icon else title
-    bar = "─" * width
+    bar = "▓" * width
     print(f"\n{color}{bar}{RESET}")
     print(f"{color}{label:^{width}}{RESET}")
     print(f"{color}{bar}{RESET}")
@@ -95,8 +95,8 @@ def print_phase(
 
 def print_section(
     title: str,
-    color: str = CYAN,
-    width: int = 60,
+    color: str = GREEN,
+    width: int = 120,
 ) -> None:
     """
     Compact inline section label.
@@ -124,8 +124,11 @@ def print_iteration_header(
     """
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")
-    print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
-    print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
+    if total <= 1:
+        print(f"{CYAN}{BOLD} Starting task... {RESET}")
+    else:
+        print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
+        print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
     print(f"{CYAN}{bar}{RESET}")
 
 
@@ -134,9 +137,9 @@ def print_iteration_header(
 def print_box(
     content: str,
     title: str = "",
-    color: str = CYAN,
-    width: int = 60,
-    truncate: int = 256,
+    color: str = YELLOW,
+    width: int = 120,
+    truncate: int = 512,
 ) -> None:
     """
     Render content inside a Unicode-bordered box.
@@ -188,8 +191,8 @@ def print_box(
 def print_kv_row(
     key: str,
     value: str,
-    color: str = CYAN,
-    key_width: int = 20,
+    color: str = YELLOW,
+    key_width: int = 30,
 ) -> None:
     """Print a single ``key → value`` row with aligned columns."""
     print(f"  {BOLD}{key:<{key_width}}{RESET}  {color}{value}{RESET}")
@@ -198,7 +201,7 @@ def print_kv_row(
 def print_summary(
     title: str,
     items: list[tuple[str, str]],
-    color: str = CYAN,
+    color: str = GREEN,
     width: int = _W,
 ) -> None:
     """
@@ -230,7 +233,7 @@ def print_summary(
 
 def print_agent_answers(
     answers_text: str,
-    color: str = CYAN,
+    color: str = MAGENTA,
     width: int = _W,
 ) -> None:
     """
@@ -254,3 +257,56 @@ def print_agent_answers(
     for line in answers_text.splitlines():
         print(f"{color}  {line}{RESET}")
     print(f"{color}{'─' * width}{RESET}\n")
+
+
+# ── Demo / quick test ──────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Status lines
+    print_ok("Configuration loaded successfully")
+    print_warn("API key missing – falling back to local mode")
+    print_err("Failed to connect to remote host")
+    print_info("Waiting for next instruction...")
+
+    # Step header
+    print_step(1, 3, "Environment Check")
+
+    # Phase banner
+    print_phase("MIMOSA WORKFLOW INITIALISATION")
+
+    # Section divider
+    print_section("Configuration Details")
+    print_kv_row("Model", "claude-3-5-sonnet-20241022")
+    print_kv_row("Temperature", "0.7")
+    print_kv_row("Max Tokens", "4096")
+
+    # Content box
+    print_box(
+        "Create a multi-agent workflow that:\n"
+        "  1. Parses a scientific paper PDF\n"
+        "  2. Extracts key findings\n"
+        "  3. Generates a critical summary",
+        title="CURRENT TASK"
+    )
+
+    # Iteration banner
+    print_iteration_header(2, 5)
+
+    # Agent answers
+    print_agent_answers(
+        "agent 0: PDF parsed – 12 pages, 3 tables detected\\n"
+        "agent 1: Key findings extracted – 7 main claims identified\\n"
+        "agent 2: Summary drafted – 340 words"
+    )
+
+    # Summary block
+    print_summary(
+        "✨ WORKFLOW COMPLETION SUMMARY",
+        [
+            ("UUID", "20260416_144700_a1b2c3d4"),
+            ("Total time", "8.420s"),
+            ("Iterations", "3/5"),
+            ("Status", "converged"),
+        ]
+    )
+
+    print_ok("Demo completed – all pretty-print utilities functional")

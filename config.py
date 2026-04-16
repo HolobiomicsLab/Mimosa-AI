@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.workflow_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
+        self.smolagent_model_id: str = "anthropic/claude-sonnet-4-5"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
@@ -57,6 +57,7 @@ class Config:
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
+        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "high"
@@ -70,6 +71,9 @@ class Config:
         self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 10
 
+        # evaluation concurrency settings
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
         self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
@@ -80,7 +84,7 @@ class Config:
 
         # runner settings
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 3600*2
+        self.runner_default_timeout: int = 3600
         self.runner_default_max_memory_mb: int = 1024
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
@@ -93,7 +97,8 @@ class Config:
             "pillow>=12.1.0",
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
             "langgraph>=0.4.7",
-            "matplotlib>=3.9.0",
+            #"matplotlib>=3.9.0",
+            "pandas==2.3.2",
             "numpy>=2.0.0",
             # correct PyPI package name
             "python-a2a",
@@ -256,9 +261,7 @@ class Config:
             f"schema_code_path={self.schema_code_path},\n"
             f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
             f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
-            f"workflow_llm_provider={self.workflow_llm_provider},\n"
             f"workflow_llm_model={self.workflow_llm_model},\n"
-            f"prompts_llm_model={self.workflow_llm_model},\n"
             f"reasoning_effort={self.reasoning_effort},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
@@ -266,3 +269,7 @@ class Config:
             f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
             f"runner_temp_dir={self.runner_temp_dir})\n"
         )
+
+if __name__ == "__main__":
+    config = Config()
+    config.dump("config_default.json")

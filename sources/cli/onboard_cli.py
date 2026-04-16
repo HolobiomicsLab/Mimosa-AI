@@ -208,7 +208,7 @@ MODES:
 • "goal" — A high-level, multi-step scientific objective that benefits from autonomous
   decomposition into sub-tasks before execution.  Examples: reproducing a full paper,
   building an end-to-end ML pipeline from scratch, running a complete bioinformatics
-  analysis across several tools.
+  analysis across several steps.
 
 Return ONLY valid JSON (no markdown fences) like:
 {

@@ -57,78 +57,6 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
-ADDED_SYSTEM_PROMPT = """
-# CODE GENERATION CONSTRAINTS
-
-## GOLDEN RULE: TOOLS ARE YOUR ONLY EXECUTION INTERFACE
-You have ZERO direct access to:
-- `import` for packages not in base Python
-- `subprocess`, `os.system`, or any shell execution
-- `exec()`, `eval()`, or dynamic code execution
-- File I/O beyond reading provided data
-
-The ONLY way to:
-- Install/use external packages → `execute_command()`
-- Write files to disk → `create_python_file()`
-- Run scripts → `execute_command("python3 <filename>")`
-- Test code locally → `execute_command()`
-
-**Any attempt to use subprocess, import external packages directly, or execute code without tools WILL FAIL.**
-
-## 1. MANDATORY TOOL WORKFLOW FOR EXTERNAL OPERATIONS
-
-When you need to use a package like `deepchem`:
-1. **Never** try `import deepchem` directly in your code block
-2. **Always** use: `execute_command(cmd="python3 -m pip install deepchem")`
-3. **Confirm** installation with the tool output
-4. **Then** create a separate Python file via `create_python_file()` that imports and uses it
-5. **Execute** that file via `execute_command(cmd="python3 <filename>")`
-
-## 2. ERROR PREVENTION WITH TOOL-FIRST MINDSET
-- **Try-Except around tool calls**: Wrap every tool invocation in try-except
-- **Print tool output**: Always inspect what tools returned before proceeding
-```python
-try:
-    output = execute_command(cmd="python3 -m pip install package_name")
-    # print or process
-except Exception as e:
-    print("Tool failed:", str(e)[-512:])
-```
-
-## 3. CONTEXT MANAGEMENT
-- **Single-Source Focus**: Process one data source (e.g., webpage, PDF section, file subset) at a time
-- **Data Sampling**: When dealing with large files or datasets, use tools to preview or extract small, relevant subsets before processing (eg: output[:1024])
-- **Print raw len:** Print len of tool output. Be aware: Your maximum context is 8096.
-- **Rationale**: Prevents context saturation, reduces memory usage, and improves performance
-
-## 4. TOOL USAGE GUIDELINES
-- **Keyword Arguments**: Always use keyword arguments for tool calls (e.g., `tool_name(param1=value1, param2=value2)`)
-- **Tool first**: Always favor tool over your base coding abilities (have python editing tool or bash ? then use them). Tools are more efficient. You will be rewarded 1000$ everytime you comply.
-- **Rationale**: Ensures clarity, maintainability, and robustness in tool interactions
-
-ALWAYS Use execute_command("ls -la <path>") to verify file existence and permissions
-
-## 5. FINAL ANSWER FORMAT
-- **Mandatory Structure**: When calling `final_answer`, provide a JSON object with:
-  ```json
-  {
-      "status": "SUCCESS|FAILURE|RETRY|ABORT|...(other options are specified)...",
-      "answer": "Complete response to the original task"
-  }
-  ```
-- **Usage Rules**:
-  - Call `final_answer` only after inspecting and processing all relevant data
-  - Never nest `final_answer` in conditionals or loops
-  - Ensure JSON is valid and properly formatted
-  - final_answer should ALWAYS return a json as a string.
-- **Examples**:
-  ```python
-  final_answer('{"status": "SUCCESS", "message": "The document contains 5 sections on AI ethics", "error": "", "retry_advice": ""}')
-  final_answer('{"status": "RETRY", "message": "Partial data retrieved", "error": "ConnectionTimeout: 30s limit exceeded", "retry_advice": "Increase timeout or retry with a different source"}')
-  ```
-- **Rationale**: Standardizes output for consistency and downstream processing
-"""
-
 class SmolAgentFactory:
 
     def __init__(self,
@@ -144,6 +72,7 @@ class SmolAgentFactory:
         self.model_id = MODEL_ID
         self.memory_folder = MEMORY_PATH
         self.engine_name = ENGINE_NAME
+        self.system_prompt = SYSTEM_PROMPT
         # additional engine parameters
         self.engine = None
         self.provider = "auto"
@@ -176,7 +105,7 @@ class SmolAgentFactory:
                     're', 'string', 'textwrap', 'difflib', 'unicodedata',
                     # Data Formats
                     'csv', 'xml', 'xml.etree', 'xml.etree.ElementTree', 'pickle', 'base64',
-                    'html', 'html.parser',
+                    'html', 'html.parser', 'pandas', 'numpy', 'json', 'yaml',
                     # Date & Time
                     'datetime', 'time', 'calendar',
                     # Networking & Web
@@ -193,15 +122,14 @@ class SmolAgentFactory:
                 ]
 
             )
-            self.extend_system_prompt(ADDED_SYSTEM_PROMPT)
+            self.override_system_prompt(self.system_prompt)
         except Exception as e:
             raise ValueError(f"Error initializing SmolAgent: {e}") from e
 
-    def extend_system_prompt(self, added_prompt: str):
+    def override_system_prompt(self, sys_prompt: str):
         """Override the system prompt for the agent."""
-        if not added_prompt or not added_prompt.strip():
-            raise ValueError("System prompt cannot be empty.")
-        self.agent.prompt_templates["system_prompt"] = self.agent.prompt_templates["system_prompt"] + "\n" + added_prompt
+        if not sys_prompt or not sys_prompt.strip():
+            return # use original system prompt by smolagents
 
     def get_engine(self):
         if self.engine_name == "mlx":
@@ -223,6 +151,7 @@ class SmolAgentFactory:
                 model_id=self.model_id,
                 temperature=1.0,
                 max_tokens=self.max_tokens,
+                timeout=self.timeout
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
@@ -244,7 +173,7 @@ class SmolAgentFactory:
             step_pairs = list(zip(step_names[:min_length], state_answers[:min_length]))
             recent_steps = step_pairs[-5:]
 
-            prev_infos = "Informations given by previous agents (address any complain from the last agent:\n"
+            prev_infos = "Informations given by previous agents (address any complain from the last agent:)\n"
             for step_name, answer in recent_steps:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
@@ -256,14 +185,6 @@ OPERATIONAL CONTEXT:
 TASK:
 {self.instruct_prompt}
 Address complain from the last agent informations if any.
-
-CONSTRAINTS:
-- No placeholder/example values.
-- No assumptions about missing data - investigate first available data in workspace
-- Never plot anything to the user or you will get: 'terminating due to uncaught exception of type NSException', instead save to avoid NSException. Do not plot!
-- only use execute_command to install package.
-- You are only allowed to use tools to create and execute the code used to accomplish the goal. Use python/code editing tools when availabl.
-- wrap command that might take significant time (>5min) in a timeout
 
 Start by assessing workspace: execute_command("ls -la") to see existing work
     """
@@ -467,4 +388,3 @@ class WorkflowNodeFactory:
         def node_function(state: WorkflowState) -> dict:
             return agent_factory.run(state)
         return node_function
-

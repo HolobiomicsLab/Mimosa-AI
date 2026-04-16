@@ -94,6 +94,7 @@ mimosa-ai/
 │   │   └── schema.py                   # Data classes (IndividualRun, Task, Plan, etc.)
 │   │
 │   ├── evaluation/                     # Performance assessment
+│   │   ├── csv_mode.py                 # Batch evaluation on CSV datasets
 │   │   ├── evaluator.py                # Generic/Scenario evaluation
 │   │   ├── capsule_evaluator.py        # ScienceAgentBench metrics (VER/SR/CBS)
 │   │   ├── codebert_scorer.py          # Semantic code similarity
@@ -102,7 +103,6 @@ mimosa-ai/
 │   │   └── science_agent_bench.py      # ScienceAgentBench dataset integration
 │   │
 │   ├── extensibility/                  # Alternative execution modes
-│   │   ├── csv_mode.py                 # Batch evaluation on CSV datasets
 │   │   ├── human_mode.py               # Interactive manual CLI
 │   │   └── text_to_speech.py           # Text to speech
 │   │
