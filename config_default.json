@@ -1,4 +1,4 @@
-g
+{
   "workspace_dir": "/Users/cnrs/Documents/repository/Toolomics/workspace",
   "discovery_addresses": [
     {
@@ -9,7 +9,7 @@ g
   ],
   "planner_llm_model": "openrouter/z-ai/glm-5",
   "prompts_llm_model": "openrouter/z-ai/glm-5",
-  "workflow_llm_model": "openrouter/z-ai/glm-5",
+  "workflow_llm_model": "anthropic/claude-opus-4-5",
   "smolagent_model_id": "anthropic/claude-sonnet-4-5",
   "judge_model": "openrouter/z-ai/glm-5",
   "engine_name": "litellm",
