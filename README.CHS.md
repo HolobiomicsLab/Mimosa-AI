@@ -157,9 +157,11 @@ source .venv/bin/activate
 ### 2. 安装依赖
 
 ```bash
-cd mimosa
-uv pip install -r requirements.txt
+cd Mimosa-AI
+uv pip install python-dotenv openai anthropic pydantic numpy pandas tqdm
 ```
+
+> **注意：** 本项目不提供 `requirements.txt`，也不能作为标准 Python 包安装（`pip install -e .`）。
 
 ### 3. 设置 API 密钥
 

@@ -157,9 +157,11 @@ source .venv/bin/activate
 ### 2. 依存関係のインストール
 
 ```bash
-cd mimosa
-uv pip install -r requirements.txt
+cd Mimosa-AI
+uv pip install python-dotenv openai anthropic pydantic numpy pandas tqdm
 ```
+
+> **注意:** このプロジェクトには `requirements.txt` は含まれておらず、標準の Python パッケージとしてはインストールできません（`pip install -e .`）。
 
 ### 3. API キーの設定
 

@@ -159,8 +159,10 @@ source .venv/bin/activate
 
 ```bash
 cd Mimosa-AI
-uv pip install -r requirements.txt
+uv pip install python-dotenv openai anthropic pydantic numpy pandas tqdm
 ```
+
+> **Note:** This project does not provide `requirements.txt` and is not installable as a standard Python package (`pip install -e .`).
 
 ### 3. Set API keys
 
