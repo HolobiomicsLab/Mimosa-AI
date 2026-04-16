@@ -95,8 +95,8 @@ def print_phase(
 
 def print_section(
     title: str,
-    color: str = CYAN,
-    width: int = 60,
+    color: str = GREEN,
+    width: int = 80,
 ) -> None:
     """
     Compact inline section label.
@@ -138,8 +138,8 @@ def print_box(
     content: str,
     title: str = "",
     color: str = CYAN,
-    width: int = 60,
-    truncate: int = 256,
+    width: int = 80,
+    truncate: int = 512,
 ) -> None:
     """
     Render content inside a Unicode-bordered box.
@@ -191,7 +191,7 @@ def print_box(
 def print_kv_row(
     key: str,
     value: str,
-    color: str = CYAN,
+    color: str = YELLOW,
     key_width: int = 20,
 ) -> None:
     """Print a single ``key → value`` row with aligned columns."""
@@ -201,7 +201,7 @@ def print_kv_row(
 def print_summary(
     title: str,
     items: list[tuple[str, str]],
-    color: str = CYAN,
+    color: str = GREEN,
     width: int = _W,
 ) -> None:
     """

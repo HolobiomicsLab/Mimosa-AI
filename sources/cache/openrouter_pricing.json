@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-14T15:08:53.004155",
+  "timestamp": "2026-04-16T11:08:24.902915",
   "pricing": {
     "openrouter/elephant-alpha": {
       "input": 0.0,
@@ -781,10 +781,6 @@
       "input": 0.28,
       "output": 1.1
     },
-    "inception/mercury": {
-      "input": 0.25,
-      "output": 0.75
-    },
     "mistralai/mistral-small-3.2-24b-instruct": {
       "input": 0.075,
       "output": 0.19999999999999998
@@ -834,8 +830,8 @@
       "output": 0.0
     },
     "google/gemma-3n-e4b-it": {
-      "input": 0.02,
-      "output": 0.04
+      "input": 0.06,
+      "output": 0.12
     },
     "mistralai/mistral-medium-3": {
       "input": 0.39999999999999997,
@@ -861,9 +857,9 @@
       "input": 0.5,
       "output": 0.7999999999999999
     },
-    "inception/mercury-coder": {
-      "input": 0.25,
-      "output": 0.75
+    "meta-llama/llama-guard-4-12b:free": {
+      "input": 0.0,
+      "output": 0.0
     },
     "meta-llama/llama-guard-4-12b": {
       "input": 0.18,
@@ -900,10 +896,6 @@
     "openai/o4-mini": {
       "input": 1.1,
       "output": 4.4
-    },
-    "qwen/qwen2.5-coder-7b-instruct": {
-      "input": 0.03,
-      "output": 0.09
     },
     "openai/gpt-4.1": {
       "input": 2.0,
@@ -1034,8 +1026,8 @@
       "output": 0.6
     },
     "meta-llama/llama-guard-3-8b": {
-      "input": 0.02,
-      "output": 0.06
+      "input": 0.48,
+      "output": 0.03
     },
     "openai/o3-mini-high": {
       "input": 1.1,
@@ -1280,10 +1272,6 @@
     "google/gemma-2-27b-it": {
       "input": 0.65,
       "output": 0.65
-    },
-    "google/gemma-2-9b-it": {
-      "input": 0.03,
-      "output": 0.09
     },
     "sao10k/l3-euryale-70b": {
       "input": 1.48,
