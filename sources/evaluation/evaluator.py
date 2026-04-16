@@ -163,14 +163,16 @@ class BaseEvaluator:
 
             result = workflow_info.answers
 
+            res = json.dumps(result, indent=2)
+            success = not "[]" in res
             return f"""
                    GOAL:
                     The workflow's goal was to achieve the following scientific/research objective:
                    {goal}
                    FINAL ANSWER FROM AGENT(S) EXECUTION:
                    The final answer produced by the agent(s) at the end of the workflow execution was:
-                   {json.dumps(result, indent=2)}
-                   """, True
+                   {res}
+                   """, success 
         except Exception as e:
             raise e
 
