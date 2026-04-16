@@ -32,7 +32,7 @@ DIM     = "\033[2m"
 RESET   = "\033[0m"
 
 # Default column width used for banners/summaries
-_W = 80
+_W = 120
 
 
 # ── Status lines ──────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ def print_info(msg: str) -> None:
 
 # ── Step header (used by onboarding CLI) ──────────────────────────────────────
 
-def print_step(step: int, total: int, title: str, width: int = 60) -> None:
+def print_step(step: int, total: int, title: str, width: int = 120) -> None:
     """
     Numbered step header used by the onboarding wizard.
 
@@ -96,7 +96,7 @@ def print_phase(
 def print_section(
     title: str,
     color: str = GREEN,
-    width: int = 80,
+    width: int = 120,
 ) -> None:
     """
     Compact inline section label.
@@ -138,7 +138,7 @@ def print_box(
     content: str,
     title: str = "",
     color: str = YELLOW,
-    width: int = 100,
+    width: int = 120,
     truncate: int = 512,
 ) -> None:
     """
@@ -192,7 +192,7 @@ def print_kv_row(
     key: str,
     value: str,
     color: str = YELLOW,
-    key_width: int = 20,
+    key_width: int = 30,
 ) -> None:
     """Print a single ``key → value`` row with aligned columns."""
     print(f"  {BOLD}{key:<{key_width}}{RESET}  {color}{value}{RESET}")

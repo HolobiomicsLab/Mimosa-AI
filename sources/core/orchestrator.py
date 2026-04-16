@@ -210,7 +210,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             print_ok(f"Dependencies installed in {deps_time:.3f}s")
 
             # Execution phase
-            print_phase("▶ WORKFLOW EXECUTION PHASE")
+            print_phase("WORKFLOW EXECUTION PHASE")
             exec_start = time.time()
             execution_output = await self.workflow_sandbox_run(complete_code)
             exec_time = time.time() - exec_start
