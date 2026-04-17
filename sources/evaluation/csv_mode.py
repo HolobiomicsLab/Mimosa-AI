@@ -66,7 +66,6 @@ class CsvEvaluationMode:
         # Concurrency control
         self.task_start_delay = task_start_delay
         self._semaphore: asyncio.Semaphore | None = None
-        self._results_lock = asyncio.Lock()
         self._base_workspace_dir = config.workspace_dir
 
         model_name = "anthropic/claude-haiku-4-5-20251001"  # judge
@@ -1046,6 +1045,34 @@ Provide your analysis following the specified output format."""
             ]
 
         print_summary("📊 EVALUATION SUMMARY", rows)
+
+        # If launched via EvaluationCLI, append final metrics to the run notes file.
+        notes_path = getattr(self, "_evaluation_cli_notes_path", None)
+        if notes_path and Path(notes_path).exists():
+            try:
+                with open(notes_path, "r", encoding="utf-8") as fh:
+                    notes_data = json.load(fh)
+                final = {
+                    "steps_evaluated": len(current_runs),
+                    "successful_runs": len(successful_runs),
+                    "success_rate": success_rate,
+                }
+                if sab_runs:
+                    final.update({
+                        "ver_success": ver_success,
+                        "ver_total": len(sab_runs),
+                        "sr_success": sr_success,
+                        "sr_total": len(sab_runs),
+                        "avg_cbs": avg_cbs,
+                        "total_cost": total_cost,
+                    })
+                notes_data["final_results"] = final
+                notes_data["finished_at"] = datetime.now().isoformat()
+                with open(notes_path, "w", encoding="utf-8") as fh:
+                    json.dump(notes_data, fh, indent=2, ensure_ascii=False)
+                    fh.write("\n")
+            except Exception:
+                pass  # best-effort
 
     async def start_evaluation(
         self,

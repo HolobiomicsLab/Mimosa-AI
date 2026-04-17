@@ -340,8 +340,8 @@ class DarwinMachine:
         if template_uuid is None:
             candidates = self.workflow_selector.select_best_workflows(
                 goal=goal,
-                threshold_similarity=0.8,
-                threshold_score=0.0,
+                threshold_similarity=0.9,
+                threshold_score=0.1,
             )
             print_section("🎯 WORKFLOW SELECTION")
             print_info(f"Selected {len(candidates)} candidate(s)")

@@ -4,6 +4,7 @@ Guides users through setup and launches the appropriate execution mode.
 """
 
 from .onboard_cli import OnboardCLI
+from .evaluation_cli import EvaluationCLI
 from .pretty_print import (
     print_ok,
     print_warn,
@@ -23,6 +24,7 @@ from .pretty_print import (
 
 __all__ = [
     "OnboardCLI",
+    "EvaluationCLI",
     "print_ok",
     "print_warn",
     "print_err",

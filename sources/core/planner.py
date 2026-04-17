@@ -636,7 +636,7 @@ Original request:
 
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
-                lookup_task, threshold_similarity=0.8, threshold_score=0.85
+                lookup_task, threshold_similarity=0.98, threshold_score=0.99
             ) if cached_wf_allow else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:

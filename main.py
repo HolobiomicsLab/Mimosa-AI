@@ -25,7 +25,7 @@ from config import Config
 from sources.core.dgm import DarwinMachine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.cli import OnboardCLI
+from sources.cli import OnboardCLI, EvaluationCLI
 from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.evaluation.eval_workflow_generation import WorkflowEval
@@ -248,6 +248,9 @@ async def main():
     parser.add_argument(
         "--max_evolve_iterations", type=int, help="Maximum number of learning iterations. Used for retrying/learning a task."
     )
+    parser.add_argument(
+        "--evaluation_cli", action="store_true", help="Interactive evaluation CLI for ScienceAgentBench (guided model, workspace, and mode selection)"
+    )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
@@ -271,7 +274,17 @@ async def main():
         args.goal,
         args.scenario,
         args.workflow_eval_mode,
+        args.evaluation_cli,
     ])
+
+    if args.evaluation_cli:
+        # Interactive evaluation CLI — handles its own config/validation flow.
+        try:
+            cli = EvaluationCLI(config)
+            await cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        return
 
     if no_mode_selected:
         # Interactive onboarding CLI for full setup flow.
