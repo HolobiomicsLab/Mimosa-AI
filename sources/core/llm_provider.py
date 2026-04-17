@@ -14,7 +14,7 @@ def extract_model_pattern(llm_model: str) -> tuple[str, str]:
         provider, model = llm_model.split("/", 1)
     else:
         # Fallback for backward compatibility
-        provider = "openai"
+        provider = "anthropic"
         model = llm_model
     return provider, model
 
@@ -23,7 +23,7 @@ def extract_model_pattern(llm_model: str) -> tuple[str, str]:
 class LLMConfig:
     """Configuration for Large Language Model interactions."""
 
-    model: str = "claude-3-7-sonnet-20250219"
+    model: str = "anthropic/claude-sonnet-4-5"
     provider: str = "anthropic"
     temperature: float = 1.0
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
@@ -76,8 +76,8 @@ class LLMConfig:
         """Alternative constructor from dictionary (maintains backward compatibility)."""
         config = config or {}
         return cls(
-            model=config.get("model", "o3-2025-04-16"),
-            provider=config.get("provider", "openai"),
+            model=config.get("model", "anthropic/claude-sonnet-4-5"),
+            provider=config.get("provider", "anthropic"),
             temperature=config.get("temperature", 1.0),
             key=config.get("key", ""),
             reasoning_effort=config.get("reasoning_effort", "medium"),
