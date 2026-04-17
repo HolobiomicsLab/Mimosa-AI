@@ -38,7 +38,7 @@ class CsvEvaluationMode:
         self.run_notes_dir.mkdir(exist_ok=True)
         self.done_rows = []
 
-        model_name = "anthropic/claude-haiku-4-5-20251001"  # judge 
+        model_name = "anthropic/claude-haiku-4-5-20251001"  # judge
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(
@@ -87,23 +87,23 @@ agent 3: <answer from agent 3>
 OUTPUT FORMAT:
 Provide a structured analysis with:
 1. SUCCESS_LEVEL: (High/Medium/Low/Incomplete/Failed/Error)
-2. COMMENTS: Comments on what the multi-agents workflow tried to do, what worked, what failed and why. 
+2. COMMENTS: Comments on what the multi-agents workflow tried to do, what worked, what failed and why.
 """
 
     def _load_previous_run_notes(self) -> dict | None:
         """
         Load the run notes file with the highest total_eval count.
         This allows recovery of previous execution statistics.
-        
+
         Returns:
             Dictionary with previous run data, or None if no valid notes found
         """
         if not self.run_notes_dir.exists():
             return None
-        
+
         best_notes = None
         max_total_eval = 0
-        
+
         for notes_file in self.run_notes_dir.glob("*.json"):
             try:
                 with open(notes_file, 'r', encoding='utf-8') as f:
@@ -121,24 +121,24 @@ Provide a structured analysis with:
             except (json.JSONDecodeError, IOError) as e:
                 self.logger.warning(f"[CACHE RECOVERY] Could not load {notes_file}: {e}")
                 continue
-        
+
         if best_notes:
             self.logger.info(
                 f"[CACHE RECOVERY] Loaded previous run with {max_total_eval} evaluations"
             )
         return best_notes
-    
+
     def _restore_execution_history_from_cache(self, cached_notes: dict) -> None:
         """
         Restore execution history statistics from cached run notes.
         This reconstructs aggregate metrics for continued evaluation runs.
-        
+
         Args:
             cached_notes: Dictionary containing previous run statistics
         """
         if not cached_notes or 'total_eval' not in cached_notes:
             return
-        
+
         # Create synthetic execution_history entries to represent cached runs
         # We create one entry per evaluation from cache to maintain count accuracy
         total_eval = cached_notes.get('total_eval', 0)
@@ -146,11 +146,11 @@ Provide a structured analysis with:
         sr_success = cached_notes.get('sr_success', 0)
         avg_cbs = cached_notes.get('avg_cbs', 0.0)
         total_cost = cached_notes.get('total_cost', 0.0)
-        
+
         if total_eval > 0:
             # Calculate per-run averages
             avg_cost_per_run = total_cost / total_eval
-            
+
             # Create synthetic entries representing cached runs
             # We distribute VER/SR successes across the entries
             for i in range(total_eval):
@@ -166,13 +166,13 @@ Provide a structured analysis with:
                     "eval_cost": avg_cost_per_run
                 }
                 self.execution_history.append(synthetic_entry)
-            
+
             self.logger.info(
                 f"[CACHE RECOVERY] Restored {total_eval} evaluations: "
                 f"VER={ver_success}, SR={sr_success}, CBS={avg_cbs:.3f}"
             )
             print(f"\033[95mRestored {total_eval} previous evaluations from cache\033[0m")
-    
+
     def _save_run_notes(self, capsule_name: str, goal: str,
                        analysis: dict, execution_time: float) -> None:
         """Save detailed notes about the run."""
@@ -201,7 +201,7 @@ Provide a structured analysis with:
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
-    
+
     def _generate_task_default(self, row):
         paper_title = row.get('Title', '').strip() if row.get('Title') else ''
         url = row.get('URLS', '').strip() if row.get('URLS') else ''
@@ -213,7 +213,7 @@ Provide a structured analysis with:
     Url to paper: {url}
     Goal to achieve: {prompt}
         """.strip()
-    
+
     def _generate_task_science_agent_bench(self, row):
         task_inst = row.get('task_inst', '').strip()
         domain_knowledge = row.get('domain_knowledge', '').strip()
@@ -277,7 +277,7 @@ Provide your analysis following the specified output format."""
             "key_insight": "Analysis completed"
         }
         return analysis
-    
+
     def sab_files_transfer(self, sab_loader, file_transfer, row):
         """Transfer dataset files to workspace with validation."""
         file_transfer.clean_workspace()
@@ -289,15 +289,15 @@ Provide your analysis following the specified output format."""
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[95m✓ Transferred {files_transferred} files to workspace\033[0m")
         print(f"\033[95m📊 Verification: {workspace_files_after} files present in workspace\033[0m")
-        
+
         if workspace_files_after == 0:
             raise ValueError(
                 f"Files disappeared after transfer! "
                 f"Transferred {files_transferred} but workspace now has 0 files."
             )
-        
+
         self.logger.info(f"[PAPERS DATASET MODE] Successfully transferred {files_transferred} files")
-    
+
     def _evaluate_with_science_agent_bench(
         self,
         capsule_name: str,
@@ -308,20 +308,20 @@ Provide your analysis following the specified output format."""
     ) -> dict:
         """
         Evaluate results using ScienceAgentBench metrics.
-        
+
         Args:
             capsule_name: Name of the capsule directory containing results
             row: CSV row data with task information
             runs: List of IndividualRun objects from execution
             sab_loader: ScienceAgentBenchLoader instance
             execution_data: Dictionary to update with evaluation results
-            
+
         Returns:
             Updated execution_data dictionary with evaluation metrics
         """
         try:
             print("\033[95m📊 Evaluating results with ScienceAgentBench metrics...\033[0m")
-            
+
             api_cost = runs[-1].cost if runs and hasattr(runs[-1], 'cost') else 0.0
             evaluator = CapsuleEvaluator(
                 capsule_path=Path(self.config.runs_capsule_dir) / capsule_name,
@@ -329,7 +329,7 @@ Provide your analysis following the specified output format."""
                 sab_loader=sab_loader,
                 api_cost=api_cost
             )
-            
+
             eval_results = evaluator.evaluate_all()
             evaluator.save_results()
             execution_data.update({
@@ -349,7 +349,7 @@ Provide your analysis following the specified output format."""
                 f"CBS={eval_results['CBS']:.3f}, "
                 f"eval_cost={eval_results['cost']:.3f}"
             )
-            
+
         except Exception as eval_error:
             self.logger.error(f"[SAB EVAL] Evaluation error: {str(eval_error)}")
             print(f"\033[91m⚠️ Evaluation failed: {str(eval_error)}\033[0m")
@@ -359,7 +359,7 @@ Provide your analysis following the specified output format."""
                 'CBS': 0.0,
                 'eval_error': str(eval_error)
             })
-        
+
         return execution_data
 
     async def run_autonomous_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
@@ -370,14 +370,14 @@ Provide your analysis following the specified output format."""
         papers_csv_path = Path(dataset_path)
         user_input = input("Enter starting row ([Enter] 0 by default): ")
         start_row = int(user_input)-1 if user_input.strip() else 0
-        
+
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
             restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
             if restore_input.strip().lower() != 'n':
                 self._restore_execution_history_from_cache(cached_notes)
-        
+
         sab_loader = None
         if dataset_type == "science_agent_bench":
             sab_loader = ScienceAgentBenchLoader()
@@ -385,9 +385,10 @@ Provide your analysis following the specified output format."""
 
         file_transfer = LocalTransfer(
             workspace_path=self.config.workspace_dir,
-            runs_capsule_dir=self.config.runs_capsule_dir
+            runs_capsule_dir=self.config.runs_capsule_dir,
+            config=self.config
         )
-        
+
         with open(papers_csv_path, encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             total_rows = sum(1 for _ in reader)
@@ -424,7 +425,7 @@ Provide your analysis following the specified output format."""
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
                     print("\033[95m📊 Transfering results files...\033[0m")
-                    trs = LocalTransfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
+                    trs = LocalTransfer(workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir, config=self.config)
                     capsule_name = trs.transfer_workspace_files_to_capsule(goal)
                     print("\033[95m📊 Analyzing results...\033[0m")
                     execution_time = time.time() - iteration_start_time
@@ -451,7 +452,7 @@ Provide your analysis following the specified output format."""
                         capsule_name, goal,
                         analysis, execution_time
                     )
-                    
+
                     print(f"\033[95m✅ Iteration {i + 1} completed\033[0m")
                     print(f"\033[95m   Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
                     print(f"\033[95m   Time: {execution_time:.2f}s\033[0m")
@@ -467,7 +468,7 @@ Provide your analysis following the specified output format."""
         # Filter out cached entries to count only actual runs from this session
         current_runs = [exec_data for exec_data in self.execution_history
                        if exec_data.get("success_level") != "Cached"]
-        
+
         successful_runs = [exec_data for exec_data in current_runs
                           if exec_data.get("success_level") in ["High", "Medium"]]
         print(f"\n\033[95mSUMMARY step: {len(current_runs)}\033[0m")
@@ -475,9 +476,9 @@ Provide your analysis following the specified output format."""
         print(f"\033[95mSuccessful runs: {len(successful_runs)}\033[0m")
         if len(current_runs) > 0:
             print(f"\033[95mSuccess rate: {len(successful_runs)/len(current_runs)*100:.1f}%\033[0m")
-        
+
         # For SAB metrics, also exclude cached entries
-        sab_runs = [exec_data for exec_data in current_runs 
+        sab_runs = [exec_data for exec_data in current_runs
                     if 'VER' in exec_data]
         if sab_runs:
             print(f"\033[95m\n{'ScienceAgentBench Metrics':^80}\033[0m")
@@ -486,7 +487,7 @@ Provide your analysis following the specified output format."""
             sr_success = sum(1 for run in sab_runs if run.get('SR', False))
             avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
             total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
-            
+
             print(f"\033[95mVER (Valid Execution Rate): {ver_success}/{len(sab_runs)} ({ver_success/len(sab_runs)*100:.1f}%)\033[0m")
             print(f"\033[95mSR (Success Rate): {sr_success}/{len(sab_runs)} ({sr_success/len(sab_runs)*100:.1f}%)\033[0m")
             print(f"\033[95mCBS (CodeBERT Score) Average: {avg_cbs:.3f}\033[0m")
