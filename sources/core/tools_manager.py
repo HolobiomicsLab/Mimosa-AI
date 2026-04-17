@@ -11,6 +11,13 @@ from urllib.parse import urlparse, urlunparse
 from fastmcp import Client
 
 from config import Config
+from sources.cli.pretty_print import (
+    print_ok, print_warn, print_err, print_info,
+    print_phase, print_section,
+    print_iteration_header, print_box,
+    print_summary, print_agent_answers,
+    CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
+)
 
 def normalize_mcp_endpoint(
     raw_url: str, transport: str
@@ -65,7 +72,7 @@ def normalize_mcp_endpoint(
     # Store container hint for logging/debugging
     if container:
         extras["container_hint"] = container
-        print(
+        print_warn(
             f"⚠️ ToolHive container fragment '{container}' detected but fragments are not sent over HTTP."
         )
 
@@ -196,7 +203,7 @@ class ToolManager:
             )
 
             if result.returncode != 0:
-                print(f"❌ Failed to get tools from {server_url}: {result.stderr}")
+                print_err(f"❌ Failed to get tools from {server_url}: {result.stderr}")
                 return []
 
             try:
@@ -206,25 +213,25 @@ class ToolManager:
                     try:
                         name = tool_data.get("name", "")
                     except Exception as e:
-                        print(f"❌ Cannot get name from {server_url}: {e}")
+                        print_err(f"❌ Cannot get name from {server_url}: {e}")
                         continue
                     try:
                         description = tool_data.get("description", "")
                     except Exception as e:
-                        print(f"❌ Cannot get description from {server_url}: {e}")
+                        print_err(f"❌ Cannot get description from {server_url}: {e}")
                         continue
                     if name:
                         tools.append(Tool(name, description))
                 return tools
             except json.JSONDecodeError as e:
-                print(f"❌ Failed to parse JSON response from {server_url}: {e}")
+                print_err(f"❌ Failed to parse JSON response from {server_url}: {e}")
                 return []
 
         except subprocess.TimeoutExpired:
-            print(f"❌ Timeout getting tools from {server_url}")
+            print_err(f"❌ Timeout getting tools from {server_url}")
             return []
         except Exception as e:
-            print(f"❌ Error getting tools from {server_url}: {e}")
+            print_err(f"❌ Error getting tools from {server_url}: {e}")
             return []
 
     async def discover_toolhive_servers(self) -> list[MCP]:
@@ -238,7 +245,7 @@ class ToolManager:
             )
 
             if result.returncode != 0:
-                print(f"❌ Failed to get ToolHive server list: {result.stderr}")
+                print_err(f"❌ Failed to get ToolHive server list: {result.stderr}")
                 return []
 
             servers_data = json.loads(result.stdout)
@@ -249,13 +256,13 @@ class ToolManager:
                 status = server.get("status", "")
 
                 if status != "running":
-                    print(f"⚠️ ToolHive server {name} is not running (status: {status})")
+                    print_warn(f"⚠️ ToolHive server {name} is not running (status: {status})")
                     continue
 
                 # Extract connection info
                 url = server.get("url", "")
                 if not url:
-                    print(f"⚠️ No URL found for ToolHive server {name}")
+                    print_warn(f"⚠️ No URL found for ToolHive server {name}")
                     continue
 
                 # Parse URL to extract address and port
@@ -267,7 +274,7 @@ class ToolManager:
                 port = parsed.port
 
                 if not port:
-                    print(f"⚠️ Could not extract port from URL {url} for server {name}")
+                    print_warn(f"⚠️ Could not extract port from URL {url} for server {name}")
                     continue
 
                 # For ToolHive servers, auto-detect transport from URL path
@@ -294,12 +301,12 @@ class ToolManager:
                     # Use readable name based on toolhive server name - no need for MCP client
                     server_name = name.replace("-", " ").title() + " MCP"
 
-                    print(f"✅ Found ToolHive MCP server {name} ({server_name})")
-                    print(
-                        f"📋 Available tools: {[tool.name for tool in tools]} with descriptions"
+                    print_ok(f"Found ToolHive MCP server {name} ({server_name})")
+                    print_info(
+                        f"Available tools: {[tool.name for tool in tools]} with descriptions"
                     )
                     if extras.get("container_hint"):
-                        print(f"🏷️ Container: {extras['container_hint']}")
+                        print_info(f"🏷️ Container: {extras['container_hint']}")
 
                     mcps.append(
                         MCP(
@@ -314,28 +321,28 @@ class ToolManager:
                         )
                     )
                 else:
-                    print(f"⚠️ Attempting full restart for ToolHive server {name}...")
+                    print_warn(f"⚠️ Attempting full restart for ToolHive server {name}...")
                     if self._attempt_full_mcp_restart(name):
-                        print(f"✅ Successfully restarted ToolHive server {name}")
+                        print_ok(f"✅ Successfully restarted ToolHive server {name}")
                         return await self.discover_toolhive_servers()
                     else:
-                        print(f"❌ Failed to restart ToolHive server {name}")
+                        print_err(f"❌ Failed to restart ToolHive server {name}")
             return mcps
 
         except subprocess.TimeoutExpired:
-            print("❌ ToolHive command timed out")
+            print_err("❌ ToolHive command timed out")
             return []
         except json.JSONDecodeError as e:
-            print(f"❌ Failed to parse ToolHive JSON output: {e}")
+            print_err(f"❌ Failed to parse ToolHive JSON output: {e}")
             return []
         except Exception as e:
-            print(f"❌ Error discovering ToolHive servers: {e}")
+            print_err(f"❌ Error discovering ToolHive servers: {e}")
             return []
 
    ###################################
    #   METHODS FOR NETWORK BASED MCP #
    ###################################
-    
+
     async def discover_mcp_at_address(
         self,
         address: str,
@@ -354,8 +361,8 @@ class ToolManager:
                     tools = await client.list_tools()
                     name = f"mcp_{port}"
                     if tools:
-                        print(f"✅ Found MCP server on {address} port {port} with name {name}")
-                        print(f"📋 Available tools: {[tool.name for tool in tools]}")
+                        print_ok(f"Found MCP server on {address} port {port} with name {name}")
+                        print_info(f"Available tools: {[tool.name for tool in tools]}")
                         mcps.append(
                             MCP(
                                 name=name,
@@ -365,7 +372,7 @@ class ToolManager:
                             )
                         )
             except asyncio.TimeoutError:
-                print(f"❌ MCP server on port {port} timed out after {timeout}s")
+                print_err(f"❌ MCP server on port {port} timed out after {timeout}s")
                 continue
             except Exception:
                 continue
@@ -380,10 +387,10 @@ class ToolManager:
                 if mcps_server:
                     mcps.extend(mcps_server)
             except Exception as e:
-                print(f"❌ Failed to discover MCP servers on {addr}: {e}")
+                print_err(f"❌ Failed to discover MCP servers on {addr}: {e}")
                 continue
         return mcps
-    
+
     async def verify_tools(self) -> bool:
         """Verify that at least a bash tool (execute_command) is available."""
         bash_found = False
@@ -395,7 +402,7 @@ class ToolManager:
             except AttributeError as e:
                 return False
         if not bash_found:
-            print("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
+            print_warn("\n⚠️ No execute_command for shell use found among MCP servers.\nPlease deploy shell MCP.")
             time.sleep(2)
             return False
         return True
@@ -406,23 +413,23 @@ class ToolManager:
         Due to freezing issue of toolhive based MCP we currently use only network based MCPs.
         """
         try:
-            print("🔍 Discovering MCP servers via ToolHive...")
+            print_info("🔍 Discovering MCP servers via ToolHive...")
             #mcps_thv = await self.discover_toolhive_servers()
             mcps_thv = []
-            print("🔍 Discovering MCP servers on network...")
+            print_info("🔍 Discovering MCP servers on network...")
             mcps_net = await self.discover_network_mcp_servers()
 
             if mcps_net or mcps_thv:
-                print(f"✅ Found {len(mcps_thv)} MCP server(s) via ToolHive.")
+                print_ok(f"Found {len(mcps_thv)} MCP server(s) via ToolHive.")
                 self.mcps.extend(mcps_thv)
-                print(f"✅ Found {len(mcps_net)} MCP server(s) via network scan.")
+                print_ok(f"Found {len(mcps_net)} MCP server(s) via network scan.")
                 self.mcps.extend(mcps_net)
                 return self.mcps
             else:
-                print("⚠️ No running MCP servers found via ToolHive.")
+                print_warn("⚠️ No running MCP servers found via ToolHive.")
                 return []
         except Exception as e:
-            print(f"❌ ToolHive discovery failed: {e}")
+            print_err(f"❌ ToolHive discovery failed: {e}")
             raise RuntimeError(
                 f"Failed to discover MCP servers via ToolHive: {e}"
             ) from e

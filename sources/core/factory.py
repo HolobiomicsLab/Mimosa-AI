@@ -12,6 +12,7 @@ import re
 
 from .tools_manager import ToolManager
 
+
 class Factory:
     """Base factory class both for single agent and workflow generation. Handles common tasks like loading tools, creating folders, and saving files."""
 
@@ -56,7 +57,6 @@ class Factory:
             client_prompt = tool_manager.get_client_prompt(mcp)
             tools_code += client_code + "\n"
             existing_tool_prompt += client_prompt + "\n"
-        print(f"🔧 Discovered {len(mcps)} MCP servers capabilities. Workflow generation can start.")
         return tools_code, existing_tool_prompt
 
     async def load_single_agent_system_prompt(self) -> str:

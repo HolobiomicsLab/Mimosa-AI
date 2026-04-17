@@ -256,7 +256,7 @@ class Mutagen:
         lines.append("Take a genuinely different direction this time.\n")
         return "\n".join(lines)
 
-    def _get_temperature_phase(self, iteration_count: int, max_iterations: int = 10) -> str:
+    def _get_temperature_phase(self, iteration_count: int, max_iterations: int = 10, score: float = 0.0, alpha: float = 0.5) -> str:
         """
         Combined simulated-annealing + complexity-curriculum schedule.
 
@@ -269,7 +269,7 @@ class Mutagen:
         if max_iterations <= 1:
             progress = 0.5
         else:
-            progress = iteration_count / max(max_iterations - 1, 1)
+            progress = (iteration_count / max(max_iterations - 1, 1)) ** (1 - alpha * score)
 
         if progress < 0.10:
             return (
@@ -367,6 +367,7 @@ class Mutagen:
         agents_answers = None
         wf_state = wf_info.state_result if wf_info else None
         judge_eval = wf_info.judge_evaluation if wf_info else None
+        score = wf_info.overall_score if wf_info else 0.0
 
         # Compose multi-dimensional perturbation
         perturbation = self._compose_perturbation(seed=self.rn_seed)
@@ -376,7 +377,7 @@ class Mutagen:
         voice_opening, voice_closing = self._get_voice_framing(perturbation["voice"])
         perturbation_block = self._format_perturbation_block(perturbation)
         tried_block = self._format_tried_strategies_block()
-        temperature_phase = self._get_temperature_phase(iteration_count, max_iterations)
+        temperature_phase = self._get_temperature_phase(iteration_count, max_iterations, score)
 
         if wf_state:
             agents_answers = self.get_flow_answers(wf_state)
