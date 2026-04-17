@@ -639,7 +639,6 @@ class EvaluationCLI:
         run_config = spec.config
 
         # Isolate mutable directories per run to prevent race conditions
-        # when multiple runs execute concurrently (see report §3.1–§3.3).
         run_config.workflow_dir = f"sources/workflows/run_{spec.run_id}"
         run_config.memory_dir = f"sources/memory/run_{spec.run_id}"
         run_config.runner_temp_dir = f"./tmp/run_{spec.run_id}"

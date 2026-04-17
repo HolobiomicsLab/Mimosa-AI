@@ -116,7 +116,7 @@ async def papers_mode(args, config):
 
 async def science_bench_papers_mode(args, config):
     # Use concurrent evaluation by default for science_agent_bench
-    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 4)
+    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 1)
     task_start_delay = getattr(config, 'task_start_delay', 30.0)
     papers = CsvEvaluationMode(
         config,

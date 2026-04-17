@@ -30,7 +30,7 @@ from .improvement_validator import (
     SelectionStrategy,
     PopulationMember,
 )
-from .dgm import DarwinMachine, PromptGradient
+from .dgm import DarwinMachine, Mutagen
 
 __all__ = [
     # LLM provider
@@ -72,5 +72,5 @@ __all__ = [
     "PopulationMember",
     # Darwin / DGM
     "DarwinMachine",
-    "PromptGradient",
+    "Mutagen",
 ]
