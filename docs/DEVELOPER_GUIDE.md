@@ -83,14 +83,14 @@ mimosa-ai/
 │   ├── core/                           # Core orchestration logic
 │   │   ├── orchestrator.py             # Workflow execution manager
 │   │   ├── planner.py                  # Goal → Task decomposition
-│   │   ├── dgm.py                      # Iterative-Learning (learning loop)
+│   │   ├── evolution_engine.py                      # Iterative-Learning (learning loop)
 │   │   ├── workflow_factory.py         # Workflow synthesis from LLM
 │   │   ├── workflow_runner.py          # Code execution runtime
 │   │   ├── workflow_selection.py       # Similarity-based template matching
 │   │   ├── workflow_info.py            # Workflow metadata & state
 │   │   ├── llm_provider.py             # Multi-provider LLM abstraction
 │   │   ├── tools_manager.py            # MCP tool discovery & management
-│   │   ├── improvement_validator.py    # Improvement validation
+│   │   ├── selection.py    # Improvement validation
 │   │   └── schema.py                   # Data classes (IndividualRun, Task, Plan, etc.)
 │   │
 │   ├── evaluation/                     # Performance assessment
@@ -177,7 +177,7 @@ mimosa-ai/
 
 ---
 
-### 2. **Iterative-Learning (IL)** (`sources/core/dgm.py`)
+### 2. **Iterative-Learning (IL)** (`sources/core/evolution_engine.py`)
 **Purpose**: Execute and iteratively improve task solutions through self-optimization
 
 **Key Responsibilities**:
@@ -202,7 +202,7 @@ mimosa-ai/
    ├─ Execute workflow via Orchestrator
    └─ Evaluate results
 
-3. IMPROVEMENT VALIDATION (if learning_mode)
+3. IMPROVEMENT VALIDATION (if enable_evolution)
    ├─ Propose modifications to workflow
    ├─ Re-execute modified workflow
    ├─ Validate improvement (reward delta)
@@ -308,7 +308,7 @@ Planner.start_planner(goal)
     ├─ Generate multi-step plan
     ├─ Request human approval
     └─ For each step:
-        ├─ start_dgm(step_task)
+        ├─ start_workflow_evolution(step_task)
         │   ├─ Check workflow cache
         │   ├─ Synthesize workflow (if new)
         │   ├─ Execute workflow
@@ -324,12 +324,12 @@ Generate Capsule with results
 ```
 main.py --task "Task description" --learn
     ↓
-start_dgm(task, learning_mode=True, max_iterations=10)
+start_workflow_evolution(task, enable_evolution=True, max_iterations=10)
     ├─ Check workflow cache (similarity > 0.8)
     ├─ If found & successful: use cached workflow as inspiration
     ├─ Else: Synthesize workflow
     ├─ Execute and evaluate
-    ├─ If learning_mode:
+    ├─ If enable_evolution:
     │   ├─ Propose improvements
     │   ├─ Validate improvements
     │   └─ Iterate until threshold reached

@@ -10,7 +10,7 @@ from .llm_provider import LLMConfig, LLMProvider
 from .schema import (
     TaskStatus,
     TaskComplexity,
-    ImprovementLog,
+    SelectionLog,
     IndividualRun,
     PlanStep,
     Plan,
@@ -25,12 +25,13 @@ from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import WorkflowRunner, ExecutionStatus, ExecutionResult, RuntimeConfig
 from .workflow_selection import WorkflowSelector
 from .tools_manager import Tool, MCP, ToolManager
-from .improvement_validator import (
-    ImprovementValidator,
+from .selection import (
+    SelectionPressure,
     SelectionStrategy,
     PopulationMember,
 )
-from .dgm import DarwinMachine, Mutagen
+from .evolution_engine import EvolutionEngine
+from .variation_engine import VariationEngine
 
 __all__ = [
     # LLM provider
@@ -39,7 +40,7 @@ __all__ = [
     # Data schemas
     "TaskStatus",
     "TaskComplexity",
-    "ImprovementLog",
+    "SelectionLog",
     "IndividualRun",
     "PlanStep",
     "Plan",
@@ -67,10 +68,10 @@ __all__ = [
     "MCP",
     "ToolManager",
     # Improvement / evolution
-    "ImprovementValidator",
+    "SelectionPressure",
     "SelectionStrategy",
     "PopulationMember",
-    # Darwin / DGM
-    "DarwinMachine",
-    "Mutagen",
+    # Darwin / evolution engine
+    "EvolutionEngine",
+    "VariationEngine",
 ]

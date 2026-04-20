@@ -113,7 +113,7 @@ The manuscript describes Mimosa as a five-layer architecture numbered `0` throug
 │  ┌───────────────────────────────────────────────┐  │
 │  │ Self-Improvement Loop                         │  │
 │  │ - Execution → Evaluation → Mutation           │  │
-│  │ - Source: sources/core/dgm.py                 │  │
+│  │ - Source: sources/core/evolution_engine.py                 │  │
 │  └───────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────┘
                         ↓
@@ -273,7 +273,7 @@ uv run main.py --single_agent ...               # Baseline comparison
 
 # Key Files to Modify
 sources/prompts/workflow_v8.md                  # Workflow generation
-sources/core/dgm.py                             # Self-improvement loop
+sources/core/evolution_engine.py                             # Self-improvement loop
 sources/evaluation/evaluator.py                 # Judge system
 sources/core/workflow_selection.py              # Similarity threshold
 

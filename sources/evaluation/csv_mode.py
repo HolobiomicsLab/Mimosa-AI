@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sources.core.dgm import DarwinMachine
+from sources.core.evolution_engine import EvolutionEngine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
 from sources.core.schema import Task, IndividualRun
@@ -57,7 +57,7 @@ class CsvEvaluationMode:
         self.config = config
         self.csv_runs_limit = csv_runs_limit
         self.max_concurrent_tasks = max_concurrent_tasks
-        self.dgm = DarwinMachine(config)
+        self.evolve = EvolutionEngine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
@@ -639,8 +639,8 @@ Provide your analysis following the specified output format."""
                 print(f"\033[96m[Worker {workspace_name}] 📋 GOAL: {goal[:100]}...\033[0m")
                 print(f"\033[96m[Worker {workspace_name}] 📄 Scenario Rubric: {scenario_rubric_filename}\033[0m")
 
-                # Create isolated DGM/Planner instances
-                isolated_dgm = DarwinMachine(isolated_config)
+                # Create isolated evolution engine/Planner instances
+                isolated_dgm = EvolutionEngine(isolated_config)
                 isolated_planner = Planner(isolated_config)
 
                 # Create file transfer with isolated workspace
@@ -650,7 +650,7 @@ Provide your analysis following the specified output format."""
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
-                # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                # When learning is disabled, run only 1 iteration (no evolution loop)
                 max_iter = self.config.max_learning_evolve_iterations if learning else 1
 
                 runs = None
@@ -658,10 +658,10 @@ Provide your analysis following the specified output format."""
                     # Transfer files to isolated workspace
                     self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
 
-                    runs = await isolated_dgm.start_dgm(
+                    runs = await isolated_dgm.start_workflow_evolution(
                         goal=goal,
                         judge=True,
-                        learning_mode=learning,
+                        enable_evolution=learning,
                         scenario_rubric=None,
                         max_iteration=max_iter,
                         single_agent_mode=single_agent_mode
@@ -950,14 +950,14 @@ Provide your analysis following the specified output format."""
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
-                    # When learning is disabled, run only 1 iteration (no self-improvement loop)
+                    # When learning is disabled, run only 1 iteration (no evolution loop)
                     max_iter = self.config.max_learning_evolve_iterations if learning else 1
 
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal,
+                        runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
-                                                        learning_mode=learning,
+                                                        enable_evolution=learning,
                                                         scenario_rubric=None,
                                                         max_iteration=max_iter,
                                                         single_agent_mode=single_agent_mode

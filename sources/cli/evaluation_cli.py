@@ -349,7 +349,7 @@ class EvaluationCLI:
         print()
         print(f"  {CYAN}[1]{RESET}  Single-agent       – one agent per task (baseline comparison)")
         print(f"  {CYAN}[2]{RESET}  One-shot            – multi-agent workflow, no learning")
-        print(f"  {CYAN}[3]{RESET}  Iterative learning  – multi-agent with self-improvement loop")
+        print(f"  {CYAN}[3]{RESET}  Iterative learning  – multi-agent with evolution loop")
         print()
 
         choice = _ask("Select mode", default="2")

@@ -1,5 +1,5 @@
 """
-Evolution Strategy for Darwin Gödel Machine.
+Evolution Strategy
 
 Supports two modes:
   1. Greedy (current default): validates that the latest run improved over recent history.
@@ -7,8 +7,7 @@ Supports two modes:
      to decide which individuals survive — giving low-performers a chance if they
      explore a novel region of workflow-space.
 
-The public API is intentionally simple so the DGM can switch strategies via config
-without changing its own code.
+The public API is intentionally simple so the evolution engine can switch strategies
 """
 
 import logging
@@ -41,7 +40,7 @@ class PopulationMember:
     created_at: datetime = field(default_factory=datetime.now)
 
 
-class ImprovementValidator:
+class SelectionPressure:
     """Evaluates whether a new run should be kept or discarded.
 
     In **greedy** mode (default) this behaves identically to the previous
@@ -84,26 +83,19 @@ class ImprovementValidator:
         # Population archive for open-ended modes
         self._archive: list[PopulationMember] = []
 
-    # ------------------------------------------------------------------
-    # Public API — called by DGM
-    # ------------------------------------------------------------------
-
-    def validate_improvement(
+    def validate_survivor(
         self,
         baseline_runs: list[Any] | Any,
         new_runs: list[Any] | Any,
         threshold: float | None = None,
     ) -> dict[str, Any]:
         """Validate whether the new run(s) represent a meaningful step forward.
-
         Accepts both single ``IndividualRun`` objects **and** lists of runs
         for population-aware evaluation.
-
         Args:
             baseline_runs: One or more previous runs (list or single IndividualRun).
             new_runs: One or more candidate runs (list or single IndividualRun).
             threshold: Override for min_improvement_threshold.
-
         Returns:
             dict with keys: valid, relative_improvement, absolute_improvement,
             baseline_reward, new_reward, confidence, threshold_used, strategy,
@@ -125,7 +117,7 @@ class ImprovementValidator:
             # Fallback to greedy
             return self._validate_greedy(baseline_list, new_list, threshold)
 
-    def should_continue_iteration(
+    def stopping_criterion(
         self,
         current_reward: float,
         best_reward: float,
@@ -133,7 +125,6 @@ class ImprovementValidator:
         max_iterations_without_improvement: int = 3,
     ) -> bool:
         """Determine whether the evolution loop should keep iterating.
-
         In open-ended mode this is more permissive — it allows continued
         exploration even without reward improvement, as long as the archive
         is still gaining novel members.
@@ -178,7 +169,7 @@ class ImprovementValidator:
         return "none"
 
     def select_parent(self, runs: list[Any]) -> Any:
-        """Select a parent for the next mutation from the run history.
+        """Select a single parent for mutation from the run history.
 
         In greedy mode: always returns the best-scoring run.
         In tournament mode: probabilistic tournament among a random subset.
@@ -207,6 +198,67 @@ class ImprovementValidator:
             return runs[-1]
 
         return max(runs, key=lambda r: _safe_attr(r, "reward", 0.0))
+
+    def select_parents(
+        self,
+        candidates: list[Any],
+        n_parents: int = 2,
+        crossover_rate: float = 0.3,
+    ) -> tuple[list[Any], bool]:
+        """Select one or more parents from a candidate pool, simulating
+        evolutionary parent-selection pressure.
+
+        Returns a tuple of (selected_parents, use_crossover):
+          - If the roll triggers crossover (probability = crossover_rate) **and**
+            there are at least two distinct candidates, ``n_parents`` parents are
+            returned together with ``use_crossover=True``.
+          - Otherwise a single parent is returned with ``use_crossover=False``
+            (mutation-only path).
+
+        The per-strategy selection logic reuses :meth:`select_parent` internally
+        so that greedy / tournament / novelty / QD biases are respected.
+
+        Args:
+            candidates: Pool of objects with a ``reward`` (or ``overall_score``)
+                        attribute (IndividualRun, WorkflowInfo, …).
+            n_parents:  Number of parents to pick when crossover fires (≥2).
+            crossover_rate: Probability ∈ [0, 1] of choosing crossover over mutation.
+
+        Returns:
+            (list[parent], bool) — selected parents and whether to crossover.
+        """
+        if not candidates:
+            return [], False
+
+        n_parents = max(n_parents, 2)
+
+        # Decide crossover vs mutation
+        do_crossover = (
+            len(candidates) >= 2
+            and random.random() < crossover_rate
+        )
+
+        if not do_crossover:
+            # Single-parent (mutation) path
+            parent = self.select_parent(candidates)
+            return [parent], False
+
+        # Multi-parent (crossover) path — draw n_parents *distinct* parents.
+        selected: list[Any] = []
+        pool = list(candidates)  # shallow copy so we can remove picked items
+
+        for _ in range(min(n_parents, len(pool))):
+            parent = self.select_parent(pool)
+            if parent is None:
+                break
+            selected.append(parent)
+            pool = [c for c in pool if c is not parent]
+
+        # Safety: if we ended up with < 2, fall back to mutation
+        if len(selected) < 2:
+            return selected or [self.select_parent(candidates)], False
+
+        return selected, True
 
     @property
     def archive(self) -> list[PopulationMember]:
@@ -475,33 +527,33 @@ if __name__ == "__main__":
 
     # ── Greedy (backward-compatible) ──────────────────────────────
     print("=== GREEDY strategy ===")
-    validator = ImprovementValidator(min_improvement_threshold=0.05, strategy="greedy")
+    validator = SelectionPressure(min_improvement_threshold=0.05, strategy="greedy")
 
     print("Test 1: Valid improvement (list input)")
-    result = validator.validate_improvement([baseline], [improved])
+    result = validator.validate_survivor([baseline], [improved])
     print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
 
     print("Test 2: Marginal improvement")
-    result = validator.validate_improvement([baseline, baseline], [marginal])
+    result = validator.validate_survivor([baseline, baseline], [marginal])
     print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
 
     print("Test 3: Single-object input (backward compat)")
-    result = validator.validate_improvement(baseline, improved)
+    result = validator.validate_survivor(baseline, improved)
     print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
 
     # ── Tournament ────────────────────────────────────────────────
     print("\n=== TOURNAMENT strategy ===")
-    validator_t = ImprovementValidator(strategy="tournament")
-    result = validator_t.validate_improvement([baseline, baseline], [marginal])
+    validator_t = SelectionPressure(strategy="tournament")
+    result = validator_t.validate_survivor([baseline, baseline], [marginal])
     print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
 
     # ── Quality-Diversity ─────────────────────────────────────────
     print("\n=== QUALITY-DIVERSITY strategy ===")
-    validator_qd = ImprovementValidator(strategy="qd", novelty_weight=0.4)
+    validator_qd = SelectionPressure(strategy="qd", novelty_weight=0.4)
     for i in range(5):
         run = IndividualRun(goal="test", prompt="test", reward=0.3 + i * 0.1, cost=1.0 - i * 0.1)
         run.iteration_count = i
-        result = validator_qd.validate_improvement([baseline], [run])
+        result = validator_qd.validate_survivor([baseline], [run])
         print(f"  Iter {i}: valid={result['valid']}, qd={result.get('qd_score', 'N/A'):.3f}, "
               f"archive={result.get('archive_size', 0)}")
 

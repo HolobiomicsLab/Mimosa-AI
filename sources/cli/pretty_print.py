@@ -120,7 +120,7 @@ def print_iteration_header(
     width: int = _W,
 ) -> None:
     """
-    Prominent iteration counter banner shown at the start of each DGM loop.
+    Prominent iteration counter banner shown at the start of each evolution engine loop.
     """
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")

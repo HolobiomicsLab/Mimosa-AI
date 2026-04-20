@@ -20,10 +20,10 @@ class TaskComplexity(Enum):
     MEDIUM = "medium"
     HIGH = "high"
 
-# ImprovementLog class for tracking validated improvements in Darwin Gödel Machine
+# class for tracking validated improvements
 @dataclass
-class ImprovementLog:
-    """Tracks validated improvements in the Darwin Gödel Machine."""
+class SelectionLog:
+    """Tracks validated improvements during evolution."""
     from_iteration: int
     to_iteration: int
     improvement_type: str
@@ -34,7 +34,7 @@ class ImprovementLog:
 
     def __str__(self) -> str:
         status = "✅ VALIDATED" if self.is_validated else "⚠️ NOT VALIDATED"
-        return (f"ImprovementLog({status}, type={self.improvement_type}, "
+        return (f"SelectionLog({status}, type={self.improvement_type}, "
                 f"delta={self.delta_reward:+.3f}, confidence={self.confidence:.0%})")
 
 @dataclass

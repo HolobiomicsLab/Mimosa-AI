@@ -5,7 +5,7 @@ import re
 import sys
 import threading
 from pathlib import Path
-from .dgm import DarwinMachine
+from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, IndividualRun
 from .workflow_selection import WorkflowSelector
@@ -47,7 +47,7 @@ class Planner:
 
         self.config = config
         self.workspace_path = config.workspace_dir
-        self.dgm = DarwinMachine(config)
+        self.evolve = EvolutionEngine(config)
         self.task_history: list[Task] = []
         self.current_plan: Plan | None = None
         self.wf_selector = WorkflowSelector(self.config)
@@ -661,14 +661,14 @@ Original request:
             # Generate new workflows via Evolution
             print_info(f"No cached run found, starting task learning (max_iter: {max_evolve_iteration})")
 
-            if self.dgm is None:
+            if self.evolve is None:
                 raise ValueError("❌ Planner: instance is None")
 
-            runs = await self.dgm.start_dgm(
+            runs = await self.evolve.start_workflow_evolution(
                 goal=task,
                 template_uuid=None,
                 judge=judge,
-                learning_mode=True,
+                enable_evolution=True,
                 max_iteration=max_evolve_iteration,
                 original_task=original_task
             )

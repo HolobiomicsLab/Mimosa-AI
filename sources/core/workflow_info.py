@@ -130,13 +130,13 @@ class WorkflowInfo:
 
     def load_code(self) -> str:
         """Load workflow code file."""
-        code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
-        if not code_file.exists():
-            print(f"❌ Workflow code file {code_file} does not exist for UUID {self.uuid}.")
+        genotype_file = self.workflow_folder / f"workflow_genotype_{self.uuid}.py"
+        if not genotype_file.exists():
+            print(f"❌ Workflow code file {genotype_file} does not exist for UUID {self.uuid}.")
             return ""
 
         try:
-            with open(code_file) as f:
+            with open(genotype_file) as f:
                 return f.read()
         except Exception as e:
             print(f"❌ Can't read workflow code for UUID {self.uuid}: {e}")
@@ -163,8 +163,8 @@ class WorkflowInfo:
     def is_valid(self) -> bool:
         """Check if workflow has all required files."""
         state_file = self.workflow_folder / "state_result.json"
-        code_file = self.workflow_folder / f"workflow_code_{self.uuid}.py"
-        return state_file.exists() and code_file.exists()
+        genotype_file = self.workflow_folder / f"workflow_genotype_{self.uuid}.py"
+        return state_file.exists() and genotype_file.exists()
 
     def __str__(self) -> str:
         """Return a string representation of the WorkflowInfo."""

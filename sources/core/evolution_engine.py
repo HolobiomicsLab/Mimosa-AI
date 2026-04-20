@@ -1,5 +1,5 @@
 """
-Darwinian Evolution of multi-agent workflows improvements.
+Darwinian Evolution of multi-agent workflows.
 """
 
 import json
@@ -19,11 +19,11 @@ from sources.utils.visualization import VisualizationUtils
 from sources.evaluation.scenario_loader import ScenarioLoader
 
 from .orchestrator import WorkflowOrchestrator
-from .mutagen import Mutagen
+from .variation_engine import VariationEngine
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
-from .schema import IndividualRun, ImprovementLog
-from .improvement_validator import ImprovementValidator
+from .schema import IndividualRun, SelectionLog
+from .selection import SelectionPressure
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_section,
@@ -69,7 +69,7 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
         return check_answer_success(answers[-1])
     return False
 
-class DarwinMachine:
+class EvolutionEngine:
     """Darwin Machine for evolution of workflow workflows."""
     def __init__(
         self,
@@ -84,15 +84,44 @@ class DarwinMachine:
         self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
         self.judge = WorkflowEvaluator(config)
-        self.improvement_validator = ImprovementValidator(min_improvement_threshold=0.05)
-        self.mutagen = Mutagen()
+        self.selection = SelectionPressure(min_improvement_threshold=0.05)
+        self.variation = VariationEngine()
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         self.viz_utils = viz_utils or VisualizationUtils()
         self.process_id = process_id
         self.pricing = PricingCalculator(config)
         self.logger = logging.getLogger(__name__)
 
-    def load_wf_state_result(self, uuid: str) -> any:
+    def mockup(self, wf, goal):
+        """
+        Mockup mode: use existing workflow data without calling orchestrate_workflow
+        """
+        if wf is None:
+            raise ValueError("❌ Mockup mode requires a valid workflow template. "
+                             "Please provide a template_uuid or ensure workflows exist in the workflow directory.")
+        print_phase("MOCKUP MODE", color="\033[93m")
+        print_info(f"Using existing workflow data from: {wf.uuid}")
+        mock_run = IndividualRun(
+            goal=wf.goal or goal,
+            prompt=wf.code or goal,
+            template_uuid=wf.uuid,
+            workflow_template=wf,
+            max_depth=1,
+            judge=True,
+            scenario_rubric=None,
+            original_task=wf.original_task,
+            current_uuid=wf.uuid,
+            answers=wf.answers,
+            state_result=wf.state_result,
+            reward=wf.overall_score,
+            iteration_count=1
+        )
+        flow_answers = self.extract_agents_behavior(wf.state_result)
+        self.show_answers(flow_answers)
+        print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
+        return [mock_run]
+
+    def load_phenotype_result(self, uuid: str) -> any:
         """Load the result of a previously executed workflow state.
         Args:
             uuid: UUID of the workflow state to load
@@ -108,7 +137,7 @@ class DarwinMachine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
 
-    def load_workflow_code(self, workflow_id: str) -> str:
+    def load_workflow_genotype_code(self, workflow_id: str) -> str:
         """
         Load the workflow code for a given workflow ID.
         """
@@ -119,7 +148,7 @@ class DarwinMachine:
             )
 
         try:
-            with open(f"{workflow_path}/workflow_code_{workflow_id}.py") as f:
+            with open(f"{workflow_path}/workflow_genotype_{workflow_id}.py") as f:
                 return f.read()
         except FileNotFoundError as e:
             raise ValueError(
@@ -139,7 +168,7 @@ class DarwinMachine:
         else:
             return 0.0
 
-    def get_flow_answers(self, wf_state: any) -> str:
+    def extract_agents_behavior(self, wf_state: any) -> str:
         """Extract the answers from the workflow state."""
         if not wf_state or "answers" not in wf_state:
             return ""
@@ -151,54 +180,82 @@ class DarwinMachine:
         )
         return flow_answers
 
-    def show_answers(self, flow_answers):
+    def show_answers(self, flow_answers) -> None:
         print_box(flow_answers, title="Workflow Agents Answers", color=YELLOW)
 
+    def select_parent_workflow(
+        self,
+        goal: str,
+        template_uuid: str = None,
+        crossover_rate: float = 0.3,
+        n_parents: int = 2,
+    ) -> tuple[list[WorkflowInfo], bool]:
+        """Select one or more parent workflows under evolutionary pressure.
 
-    def select_workflow_template(self, goal, template_uuid: str = None) -> WorkflowInfo:
-        """Select and load a workflow template from the workflow directory or by UUID.
         Args:
-            template_uuid: Optional UUID of workflow template to load
+            goal: Task description for similarity matching.
+            template_uuid: If provided, skip selection and load this workflow
+                directly (single-parent mutation path).
+            crossover_rate: Probability ∈ [0, 1] that crossover is attempted
+                when multiple candidate workflows exist.
+            n_parents: Number of parents to select when crossover fires.
+
         Returns:
-            str: The workflow template content if found, None otherwise
+            (list[WorkflowInfo], use_crossover) — selected parent(s) and
+            a flag telling the caller whether to apply crossover or mutation.
         """
         if not os.path.exists(self.workflow_dir):
             print(f"Workflow directory {self.workflow_dir} does not exist.")
-            return None
+            return [], False
+
         workflows = [f for f in os.listdir(self.workflow_dir)]
         if not workflows:
             print(f"No workflows found in {self.workflow_dir}.")
-            return None
+            return [], False
 
-        # default to selecting best workflow if no template UUID provided
-        if template_uuid is None:
-            candidates = self.workflow_selector.select_best_workflows(
-                goal=goal,
-                threshold_similarity=0.9,
-                threshold_score=0.1,
-            )
-            print_section("🎯 WORKFLOW SELECTION")
-            print_info(f"Selected {len(candidates)} candidate(s)")
-            print_info(f"Top candidate: {candidates[0].uuid if candidates else 'None'}")
-            return WorkflowInfo(candidates[0].uuid, Path(f"{self.workflow_dir}/{candidates[0].uuid}")) if candidates else None
-        return WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
+        # Explicit template → single parent, mutation only
+        if template_uuid is not None:
+            wf = WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
+            return [wf], False
 
-    def get_craft_instructions(self, goal, wf, max_iterations: int = 10):
+        # Evolutionary selection via SelectionPressure
+        selected, use_crossover = self.workflow_selector.select_parent_workflows(
+            goal=goal,
+            selection_pressure=self.selection,
+            n_parents=n_parents,
+            crossover_rate=crossover_rate,
+            threshold_similarity=0.9,
+            threshold_score=0.1,
+        )
+
+        mode = "CROSSOVER" if use_crossover else "MUTATION"
+        print_section("PARENTS SELECTION")
+        print_info(f"Strategy: {self.selection.strategy.value} — Mode: {mode}")
+        print_info(f"Selected {len(selected)} parent(s) from workflow pool")
+        for i, wf in enumerate(selected):
+            print_info(f"  Parent {i+1}: {wf.uuid}  (score={wf.overall_score:.2f})")
+
+        return selected, use_crossover
+
+    def get_genotype_instructions(self, goal, wf, max_iterations: int = 10) -> str:
+        """
+        Get the genotype prompt for either mutation workflow or generating the first individual.
+        """
         if wf:
-            return self.mutagen.improvement_prompt(
+            return self.variation.mutation_prompt(
                 goal, wf, wf.code, "", 0, max_iterations=max_iterations
             )
         else:
-            return goal
-
-    async def start_dgm(
+            return self.variation.seed_genome_prompt(goal)
+    
+    async def start_workflow_evolution(
         self,
         goal: str,
         template_uuid: str | None = None,
         judge: bool = True,
         scenario_rubric: str = None,
         max_iteration: int = 1,
-        learning_mode: bool = False,
+        enable_evolution: bool = False,
         original_task: str = None,
         single_agent_mode: bool = False,
         mockup_mode: bool = False
@@ -211,48 +268,26 @@ class DarwinMachine:
         - judge (bool, optional): Whether to enable judging mode for evaluation.
         - scenario_rubric (str, optional): ID of scenario for evaluation.
         - max_iteration (int): Maximum number of iterations.
-        - learning_mode (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
+        - enable_evolution (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
         - original_task (str, optional): Original unwrapped task for similarity matching.
-        - mockup_mode (bool, optional): If True, use existing workflow data from select_workflow_template
+        - mockup_mode (bool, optional): If True, use existing workflow data from select_parent_workflow
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
         if max_iteration is None:
             max_iteration = 1
-        if learning_mode:
+        if enable_evolution:
             max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
 
-        wf = self.select_workflow_template(
+        parents, _use_crossover = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
+        # For the initial run we always use the primary (best) parent
+        wf = parents[0] if parents else None
 
-        # Mockup mode: use existing workflow data without calling orchestrate_workflow
         if mockup_mode:
-            if wf is None:
-                raise ValueError("❌ Mockup mode requires a valid workflow template. "
-                                 "Please provide a template_uuid or ensure workflows exist in the workflow directory.")
-            print_phase("MOCKUP MODE", color="\033[93m")
-            print_info(f"Using existing workflow data from: {wf.uuid}")
-            mock_run = IndividualRun(
-                goal=wf.goal or goal,
-                prompt=wf.code or goal,
-                template_uuid=template_uuid or wf.uuid,
-                workflow_template=wf,
-                max_depth=max_iteration,
-                judge=judge,
-                scenario_rubric=scenario_rubric,
-                original_task=original_task or wf.original_task,
-                current_uuid=wf.uuid,
-                answers=wf.answers,
-                state_result=wf.state_result,
-                reward=wf.overall_score,
-                iteration_count=1
-            )
-            flow_answers = self.get_flow_answers(wf.state_result)
-            self.show_answers(flow_answers)
-            print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
-            return [mock_run]
+            return self.mockup(wf, goal)
 
-        craft_instructions = self.get_craft_instructions(goal, wf, max_iterations=max_iteration)
+        craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
@@ -269,23 +304,23 @@ class DarwinMachine:
             original_task=original_task
         )
 
-        return await self.recursive_self_evolution(
+        return await self.evolve_generation(
             [run0],
             rewards_history=rewards_history,
             assertion_history=assertion_history,
-            learning_mode=learning_mode,
+            enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode
         )
 
-    async def recursive_self_evolution(
+    async def evolve_generation(
         self,
         runs: list[IndividualRun],
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
-        learning_mode: bool = False,
+        enable_evolution: bool = False,
         single_agent_mode: bool = False
     ):
-        """Run a self-improvement loop for the workflow."""
+        """Run a evolution loop for the workflow."""
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
 
         iteration_start_time = time.time()
@@ -295,7 +330,7 @@ class DarwinMachine:
 
         # Execute workflow
         print_info(f"Run {runs[-1].iteration_count + 1} of {runs[-1].max_depth}")
-        run_stdout, uuid, workflow_code, executed = await self.orchestrator.orchestrate_workflow(
+        run_stdout, uuid, workflow_genotype_code, executed = await self.orchestrator.orchestrate_workflow(
             goal=runs[-1].goal,
             craft_instructions=runs[-1].prompt,
             original_task=runs[-1].original_task,
@@ -305,7 +340,7 @@ class DarwinMachine:
         if "WORKFLOW_GENERATION_ERROR" in run_stdout:
             print_err(f"Workflow generation failed:\n{run_stdout[256:]}")
             on_error = True
-        if workflow_code:
+        if workflow_genotype_code:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
@@ -315,31 +350,9 @@ class DarwinMachine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
-        flow_answers = self.get_flow_answers(wf_info.state_result)
+        flow_answers = self.extract_agents_behavior(wf_info.state_result)
         self.show_answers(flow_answers)
         rewards_history.append(wf_info.overall_score)
-
-        if runs[-1].iteration_count > 0:
-            validation_result = self.improvement_validator.validate_improvement(
-                baseline_runs=runs[-5:],
-                new_runs=runs[-1:],
-                threshold=0.05  # 5% improvement threshold
-            )
-
-            improvement_log = ImprovementLog(
-                from_iteration=runs[-2].iteration_count,
-                to_iteration=runs[-1].iteration_count,
-                improvement_type=self.improvement_validator.get_improvement_type(runs[-2], runs[-1]),
-                delta_reward=validation_result["absolute_improvement"],
-                is_validated=validation_result["valid"],
-                confidence=validation_result["confidence"]
-            )
-
-            if not hasattr(runs[-1], 'improvement_history'):
-                runs[-1].improvement_history = []
-            runs[-1].improvement_history.append(improvement_log)
-
-            self.logger.info(f"[IMPROVEMENT VALIDATION] {improvement_log}")
 
         # Update visualizations
         self._update_visualizations(
@@ -362,9 +375,9 @@ class DarwinMachine:
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
-        if learning_mode and wf_info.overall_score > self.config.learned_score_threshold:
+        if enable_evolution and wf_info.overall_score > self.config.learned_score_threshold:
             # reach learning threshold
-            print_ok("DGM done learning task.")
+            print_ok("Evolution engine done learning task.")
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
                 f"Done learning task: {wf_info.goal[:256]} \n"
@@ -375,9 +388,9 @@ class DarwinMachine:
             )
             return runs
         elif not on_error:
-            if not learning_mode and all_success:
+            if not enable_evolution and all_success:
                 self._save_final_plots(assertion_history, rewards_history, uuid)
-                print_ok("DGM completed task successfully.")
+                print_ok("evolution engine completed task successfully.")
                 self.notifier.send_message(
                     f"Task completed successfully!\n"
                     f"Goal: {runs[-1].goal[:128]}...\n"
@@ -389,15 +402,33 @@ class DarwinMachine:
                 )
                 return runs
 
-        # select and use best scoring workflow
-        wf_info_best = self.select_workflow_template(
+        # ── Evolutionary parent selection: mutation or crossover ──────
+        parent_workflows, use_crossover = self.select_parent_workflow(
             runs[-1].goal, template_uuid=None
         )
-        code = wf_info_best.code if wf_info_best else ""
-        runs[-1].prompt = self.mutagen.improvement_prompt(
-            runs[-1].original_task or runs[-1].goal, wf_info_best, code, run_stdout,
-            runs[-1].iteration_count, max_iterations=runs[-1].max_depth
-        )
+
+        task_goal = runs[-1].original_task or runs[-1].goal
+
+        if use_crossover and len(parent_workflows) >= 2:
+            # CROSSOVER — recombine multiple parent genotypes
+            print_phase("CROSSOVER VARIATION", color=CYAN)
+            runs[-1].prompt = self.variation.crossover_prompt(
+                goal=task_goal,
+                wf_infos=parent_workflows,
+                genotypes=[pw.code or "" for pw in parent_workflows],
+                run_stderrs=[run_stdout] * len(parent_workflows),
+                iteration_count=runs[-1].iteration_count,
+                max_iterations=runs[-1].max_depth,
+            )
+        else:
+            # MUTATION — perturb the single best parent
+            print_phase("MUTATION VARIATION", color=YELLOW)
+            primary_parent = parent_workflows[0] if parent_workflows else None
+            code = primary_parent.code if primary_parent else ""
+            runs[-1].prompt = self.variation.mutation_prompt(
+                task_goal, primary_parent, code, run_stdout,
+                runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
+            )
 
         runs.append(IndividualRun(
             goal=runs[-1].goal,
@@ -415,11 +446,11 @@ class DarwinMachine:
             original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
         ))
 
-        runs = await self.recursive_self_evolution(
+        runs = await self.evolve_generation(
             runs,
             rewards_history=rewards_history,
             assertion_history=assertion_history,
-            learning_mode=learning_mode,
+            enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode
         )
 
@@ -430,7 +461,7 @@ class DarwinMachine:
         """Get human validation for continuing the workflow."""
         human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
         if human_validation not in ["yes", "y"]:
-            print("Exiting self-improvement loop.")
+            print("Exiting evolution loop.")
             return False
         return True
 
@@ -452,7 +483,7 @@ class DarwinMachine:
 
         if judge and uuid:
             agent_answers = agent_answers if executed else "workflow failed to execute."
-            eval_type = await self._evaluate_workflow(uuid, agent_answers, scenario_rubric, assertion_history)
+            eval_type = await self._evaluate_workflow_phenotype(uuid, agent_answers, scenario_rubric, assertion_history)
         # Calculate cost regardless of execution success
         cost_start = time.time()
         exec_cost = self.pricing.calculate_cost(uuid)
@@ -461,7 +492,7 @@ class DarwinMachine:
 
         return eval_type, exec_cost
 
-    async def _evaluate_workflow(
+    async def _evaluate_workflow_phenotype(
         self, uuid: str, agent_answers: str, scenario_rubric: str, assertion_history: list
     ) -> str:
         """Evaluate the workflow and update assertion history."""
@@ -537,7 +568,7 @@ class DarwinMachine:
             f"Goal: {goal[:128]}...\n"
             f"Cost: {exec_cost:.6f} USD.\n"
             f"Rewards history: {rewards_history}"
-            f"Answers: {self.get_flow_answers(wf_state)}\n",
+            f"Answers: {self.extract_agents_behavior(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
 

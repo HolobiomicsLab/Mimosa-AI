@@ -1,6 +1,3 @@
-"""
-Mutagen: Multi-dimensional prompt perturbations for LLM workflow improvement.
-"""
 
 import random
 import time
@@ -12,20 +9,80 @@ from sources.cli.pretty_print import (
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
+"""
+Mutagen: self-contained perturbation sampler for LLM-guided neuroevolution.
+"""
+
+import random
+import time
+
+
+class Perturbation:
+    """
+    A fully composed, prompt-ready perturbation sampled across all axes.
+    Immutable value object — VariationEngine reads it.
+    """
+
+    def __init__(self, combo: dict[str, tuple[str, str]]):
+        self._combo = combo
+
+    @property
+    def signature(self) -> dict[str, str]:
+        """Hashable identity of this combo (axis → name, not description)."""
+        return {k: v[0] for k, v in self._combo.items()}
+
+    def format_block(self) -> str:
+        """
+        Render the structural/analytical axes as a prompt section.
+        """
+        sections = [
+            ("THINKING LENS",      self._combo["lens"]),
+            ("STRUCTURAL PRESSURE", self._combo["structure"]),
+            ("CONSTRAINT",         self._combo["constraint"]),
+            ("DECOMPOSITION ANGLE", self._combo["decomposition"]),
+        ]
+        return "\n".join(
+            f"**{title}** [{name}]: {desc}"
+            for title, (name, desc) in sections
+        )
+
+    def get_voice_framing(self) -> tuple[str, str]:
+        """
+        Return (opening_frame, closing_frame) that set the LLM's tone for
+        the entire prompt.
+        """
+        name, desc = self._combo["voice"]
+        opening = (
+            f"**YOUR APPROACH THIS ROUND** [{name}]: {desc}\n"
+            f"Adopt this mindset for your entire analysis below. "
+            f"Let it shape what you notice and what you change.\n"
+        )
+        closing = f"Remember: stay in [{name}] mode. {desc.split('.')[0]}."
+        return opening, closing
+
+    @property
+    def voice_name(self) -> str:
+        return self._combo["voice"][0]
+
+
 class Mutagen:
     """
-    Artificially induce diversity in LLM-guided workflow search using multi-dimensional prompt perturbations.
-    The point is not whenever the sampled perturbation really make sense but to push the LLM to explore different regions of the workflow design space, escaping local minima.
-    Each axis is sampled independently, yielding combinatorial diversity even with small pools per axis.
+    Perturbation sampler: owns the axis pools and the sampling/dedup logic.
+
+    Each axis is sampled independently → combinatorial diversity grows
+    multiplicatively even with small per-axis pools.  A sliding-window
+    deduplication buffer prevents the same combination from being retried
+    in close succession, nudging the search away from local minima.
     """
 
-    def __init__(self):
-        self.rn_seed = int(time.time() * 1000) % 2**32
+    def __init__(self, max_memory: int = 25):
+        self._rn_seed: int = int(time.time() * 1000) % 2**32
         self._tried_combinations: list[dict[str, str]] = []
-        self._max_memory = 25  # remember last N tried combinations
+        self._max_memory = max_memory  # sliding window size for dedup
 
-        # HOW to reason about the problem (not what to build)
-        self.thinking_lenses = [
+        # ── Axis 1: HOW to reason about the problem ──────────────────────────
+        # These are epistemic stances, not prescriptions for what to build.
+        self.thinking_lenses: list[tuple[str, str]] = [
             ("first_principles",
              "Reason from first principles. Forget all conventional multi-agent patterns. "
              "Ask: what is the minimal information flow that solves this task? Build up from there."),
@@ -58,8 +115,9 @@ class Mutagen:
              "The one before that? Design the pipeline in reverse — you may find the forward order was wrong."),
         ]
 
-        # WHAT property the topology should change toward (abstract, not prescriptive)
-        self.structural_mutations = [
+        # ── Axis 2: WHAT topological property to change toward ───────────────
+        # Abstract pressures, not prescriptions.  The LLM decides how to honour them.
+        self.structural_mutations: list[tuple[str, str]] = [
             ("widen_before_narrow",
              "The workflow should explore more before committing. "
              "Generate multiple candidate paths early, then converge late."),
@@ -92,8 +150,9 @@ class Mutagen:
              "richer prompts outperform many agents with thin prompts?"),
         ]
 
-        # HOW the improvement prompt itself is worded — changes LLM starting manifold
-        self.prompt_voices = [
+        # ── Axis 3: HOW the prompt is voiced ────────────────────────────────
+        # Changes the LLM's starting manifold — same facts, different aperture.
+        self.prompt_voices: list[tuple[str, str]] = [
             ("surgical",
              "Be extremely precise. Identify the single weakest link in the chain. "
              "Make the minimum viable change that addresses it. No flourish, no extra agents."),
@@ -120,8 +179,9 @@ class Mutagen:
              "Sometimes a crude solution that works beats a beautiful one that doesn't."),
         ]
 
-        # What to STOP doing, REMOVE, or QUESTION (triggers lateral thinking)
-        self.constraint_inversions = [
+        # ── Axis 4: WHAT to stop / question / remove ────────────────────────
+        # Constraint inversions trigger lateral thinking by banning a default move.
+        self.constraint_inversions: list[tuple[str, str]] = [
             ("ban_sequential",
              "CONSTRAINT: Do NOT use a purely sequential pipeline this time. "
              "At least two agents must operate on the same input independently."),
@@ -151,8 +211,8 @@ class Mutagen:
              "the right tools? Would swapping tool assignments between agents help?"),
         ]
 
-        # HOW to break the problem apart conceptually
-        self.decomposition_strategies = [
+        # ── Axis 5: HOW to conceptually decompose the problem ────────────────
+        self.decomposition_strategies: list[tuple[str, str]] = [
             ("by_uncertainty",
              "Decompose by uncertainty: separate what you know from what you don't. "
              "Agents that gather information vs. agents that reason about it."),
@@ -179,76 +239,32 @@ class Mutagen:
              "agents vs. verification agents. Don't mix levels."),
         ]
 
-    def get_flow_answers(self, wf_state: any) -> str:
-        """Extract the answers from the workflow state."""
-        if not wf_state or "answers" not in wf_state:
-            return ""
-        flow_answers = (
-            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
-            if isinstance(wf_state["answers"], list)
-            else wf_state["answers"]
-        )
-        return flow_answers
-
-    def _sample_one(self, axis: list[tuple[str, str]], rng: random.Random) -> tuple[str, str]:
-        """Sample one item from an axis."""
-        return rng.choice(axis)
-
-    def _compose_perturbation(self, seed: int | None = None) -> dict[str, tuple[str, str]]:
+    def compose(self, seed: int | None = None) -> Perturbation:
         """
-        Sample one item from each orthogonal axis to compose a unique
-        multi-dimensional perturbation. Avoids recently-tried combinations.
+        Sample one item from every axis and return a ready-to-use Perturbation.
+
+        Tries up to 10 times to avoid a recently-seen combination.  If all
+        retries are exhausted (unlikely with 5 independent axes), the last
+        generated combo is returned anyway — diversity is a soft constraint.
+
+        Args:
+            seed: explicit RNG seed; if None, uses and increments internal seed.
         """
-        rng = random.Random(seed)
-        max_retries = 10
+        effective_seed = seed if seed is not None else self._rn_seed
+        self._rn_seed += 1
 
-        for _ in range(max_retries):
-            combo = {
-                "lens": self._sample_one(self.thinking_lenses, rng),
-                "structure": self._sample_one(self.structural_mutations, rng),
-                "voice": self._sample_one(self.prompt_voices, rng),
-                "constraint": self._sample_one(self.constraint_inversions, rng),
-                "decomposition": self._sample_one(self.decomposition_strategies, rng),
-            }
-            # Check if this combination was recently tried (by axis keys)
-            combo_signature = {k: v[0] for k, v in combo.items()}
-            if combo_signature not in self._tried_combinations:
-                self._tried_combinations.append(combo_signature)
-                if len(self._tried_combinations) > self._max_memory:
-                    self._tried_combinations.pop(0)
-                return combo
-        # If all retries exhausted (unlikely), return last generated
-        return combo
+        rng = random.Random(effective_seed)
+        combo = self._sample_unique(rng)
+        return Perturbation(combo)
 
-    def _format_perturbation_block(self, perturbation: dict[str, tuple[str, str]]) -> str:
-        """Format the multi-dimensional perturbation as a prompt section."""
-        sections = [
-            ("THINKING LENS", perturbation["lens"]),
-            ("STRUCTURAL PRESSURE", perturbation["structure"]),
-            ("CONSTRAINT", perturbation["constraint"]),
-            ("DECOMPOSITION ANGLE", perturbation["decomposition"]),
-        ]
-        lines = []
-        for title, (name, desc) in sections:
-            lines.append(f"**{title}** [{name}]: {desc}")
-        return "\n".join(lines)
-
-    def _get_voice_framing(self, voice: tuple[str, str]) -> tuple[str, str]:
-        """Return (opening_frame, closing_frame) that reshape the prompt's tone."""
-        name, desc = voice
-        opening = (
-            f"**YOUR APPROACH THIS ROUND** [{name}]: {desc}\n"
-            f"Adopt this mindset for your entire analysis below. "
-            f"Let it shape what you notice and what you change.\n"
-        )
-        closing = f"Remember: stay in [{name}] mode. {desc.split('.')[0]}."
-        return opening, closing
-
-    def _format_tried_strategies_block(self) -> str:
-        """Format recently tried strategies so the LLM can avoid them."""
+    def format_tried_strategies_block(self, n: int = 5) -> str:
+        """
+        Render the last *n* tried combinations as a prompt section so the LLM
+        can consciously avoid retreading the same ground.
+        """
         if not self._tried_combinations:
             return ""
-        recent = self._tried_combinations[-5:]  # show last 5
+        recent = self._tried_combinations[-n:]
         lines = ["## PREVIOUSLY TRIED DIRECTIONS (avoid repeating these):"]
         for i, combo in enumerate(recent, 1):
             tags = ", ".join(f"{k}={v}" for k, v in combo.items())
@@ -256,188 +272,27 @@ class Mutagen:
         lines.append("Take a genuinely different direction this time.\n")
         return "\n".join(lines)
 
-    def _get_temperature_phase(self, iteration_count: int, max_iterations: int = 10, score: float = 0.0, alpha: float = 0.5) -> str:
-        """
-        Combined simulated-annealing + complexity-curriculum schedule.
+    def _sample_unique(self, rng: random.Random, max_retries: int = 10) -> dict[str, tuple[str, str]]:
+        """Sample axis values, retrying if the signature was recently tried."""
+        combo: dict[str, tuple[str, str]] = {}
+        for _ in range(max_retries):
+            combo = {
+                "lens":         rng.choice(self.thinking_lenses),
+                "structure":    rng.choice(self.structural_mutations),
+                "voice":        rng.choice(self.prompt_voices),
+                "constraint":   rng.choice(self.constraint_inversions),
+                "decomposition": rng.choice(self.decomposition_strategies),
+            }
+            sig = {k: v[0] for k, v in combo.items()}
+            if sig not in self._tried_combinations:
+                self._register(sig)
+                return combo
+        # Exhausted retries — register and return whatever we have
+        self._register({k: v[0] for k, v in combo.items()})
+        return combo
 
-        Two forces act simultaneously as iteration progress increases:
-          - Temperature (exploration → exploitation): how bold/divergent to be.
-          - Complexity budget (simple → rich): how many agents / how deep a topology
-            is permitted. Complexity is earned — early iterations must prove that a
-            simple baseline works before the search is allowed to grow the workflow.
-        """
-        if max_iterations <= 1:
-            progress = 0.5
-        else:
-            progress = (iteration_count / max(max_iterations - 1, 1)) ** (1 - alpha * score)
-
-        if progress < 0.10:
-            return (
-                "## PHASE: SEED  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 2–3 agents maximum.\n"
-                "Objective: prove the task is solvable at all with the minimum viable workflow.\n"
-                "Rules:\n"
-                "  • Build the simplest possible chain that could plausibly produce the answer.\n"
-                "  • No error-handling agents, no validators, no critics — just the core transformation.\n"
-                "  • If a single agent can attempt the whole task, do that first.\n"
-                "Why: debugging a 1-agent failure is 5× faster than a 5-agent one. "
-                "Earn complexity by demonstrating that simple approaches are genuinely insufficient."
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-        elif progress < 0.25:
-            return (
-                "## PHASE: BOOTSTRAP  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 3–5 agents maximum.\n"
-                "Objective: establish a working linear baseline — one that produces an answer, "
-                "Rules:\n"
-                "  • Add at most ONE agent compared to last iteration.\n"
-                "  • Each new agent must address a specific failure observed in the SEED phase.\n"
-                "  • Topology must be sequential (A → B → C). No branching yet.\n"
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-        elif progress < 0.40:
-            return (
-                "## PHASE: DIVERGE  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 4–7 agents. Branching and loops are now permitted.\n"
-                "Objective: explore structurally different approaches to see which topology "
-                "is most promising — breadth of search, not depth of refinement.\n"
-                "Rules:\n"
-                "  • Try a topology that is qualitatively different from all previous attempts "
-                "  (e.g., if you tried linear, try parallel fan-out; if you tried fan-out, try debate).\n"
-                "  • Keep agent prompts short and focused. Complexity should come from structure, "
-                "  not from lengthy per-agent instructions.\n"
-                "  • Do NOT polish an approach you've already tried — the goal is diversity.\n"
-                "Why: the search space is still largely unexplored. "
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-        elif progress < 0.60:
-            return (
-                "## PHASE: SCALE  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 5+ agents. Additional layer of depth could now be justified.\n"
-                "Objective: take the most promising topology found so far and add ONE purposeful "
-                "layer — a validator, a critic, a fallback path, or a specialised sub-agent.\n"
-                "Rules:\n"
-                "  • Identify the single weakest link in the best workflow seen so far.\n"
-                "  • Add exactly one new agent (or structural feature) that directly addresses "
-                "  that weakness. Do not add agents 'just in case'.\n"
-                "  • Each agent must justify its existence: if you cannot state in one sentence "
-                "  what unique transformation it performs, remove it.\n"
-                "Why: complexity now has a proven foundation. "
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-        elif progress < 0.80:
-            return (
-                "## PHASE: CONVERGE  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: keep the current agent count. Do not add new agents.\n"
-                "Objective: make the existing structure work better — tighten agent prompts, "
-                "fix handoff contracts, improve routing conditions.\n"
-                "Rules:\n"
-                "  • No new agents. No structural changes.\n"
-                "  • Pick the one agent whose output quality is lowest and rewrite its prompt.\n"
-                "  • If the workflow is failing due to error propagation, add a guard condition\n"
-                "  • Prefer precision over addition: a sharper prompt outperforms an extra step.\n"
-                "Why: the topology is likely correct. "
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-        else:
-            return (
-                "## PHASE: POLISH  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: frozen. The architecture is final.\n"
-                "Objective: micro-improvements only — wording, output format, edge-case handling.\n"
-                "Rules:\n"
-                "  • Do not change the workflow topology or agent count.\n"
-                "  • Fix the single most concrete failure visible in the evaluation results.\n"
-                "  • If the judge evaluation mentions a specific assertion that failed, "
-                "  trace which agent is responsible and fix its prompt for that case.\n"
-                "  • If there are no clear failures, improve output formatting or add "
-                "  an explicit success/failure status to the final agent's output.\n"
-                "Why: you are near the optimum for this topology. "
-            ).format(i=iteration_count + 1, n=max_iterations, p=progress)
-
-    def improvement_prompt(
-        self,
-        goal: str,
-        wf_info: WorkflowInfo,
-        flow_code: str,
-        run_stderr: str,
-        iteration_count: int,
-        max_iterations: int = 10
-    ) -> str:
-        exec_result = ""
-        agents_answers = None
-        wf_state = wf_info.state_result if wf_info else None
-        judge_eval = wf_info.judge_evaluation if wf_info else None
-        score = wf_info.overall_score if wf_info else 0.0
-
-        # Compose multi-dimensional perturbation
-        perturbation = self._compose_perturbation(seed=self.rn_seed)
-        self.rn_seed += 1
-
-        # Extract voice for prompt framing
-        voice_opening, voice_closing = self._get_voice_framing(perturbation["voice"])
-        perturbation_block = self._format_perturbation_block(perturbation)
-        tried_block = self._format_tried_strategies_block()
-        temperature_phase = self._get_temperature_phase(iteration_count, max_iterations, score)
-
-        if wf_state:
-            agents_answers = self.get_flow_answers(wf_state)
-
-        if judge_eval:
-            exec_result = judge_eval
-        else:
-            exec_result = run_stderr.strip()
-
-        # Log the perturbation for debugging
-        combo_sig = {k: v[0] for k, v in perturbation.items()}
-        print_info(f"DIVERSITY PERTURBATION")
-        for k, v in combo_sig.items():
-            print_info(f"  {k:>15}: {v}")
-
-        improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
-        if flow_code is not None:
-            improv_prompt = "\n".join([
-                "## WORKFLOW EVOLUTION STEP",
-                "",
-                voice_opening,
-                temperature_phase,
-                "",
-                "Your previous workflow attempt did not reach the success threshold.",
-                "Goal: " + goal,
-                "",
-                "## Previous workflow code:",
-                "<python>",
-                flow_code,
-                "</python>",
-                "",
-                "## EXECUTION RESULTS:",
-                "<agents_answers>",
-                agents_answers if wf_state else "No agent answers captured.",
-                "</agents_answers>",
-                "<evaluation>",
-                exec_result,
-                "</evaluation>",
-                "",
-                "## CHANGE PRESSURES:",
-                "The following pressures are randomly sampled to push you away from local minima.",
-                "You don't have to follow all of them literally, but let them *influence* your thinking.",
-                "",
-                perturbation_block,
-                "",
-                tried_block,
-                "## YOUR TASK:",
-                "1. Diagnose what went wrong (code bug? wrong approach? bad decomposition? weak agent prompts?).",
-                "2. Let the change pressures above shift your perspective on the problem.",
-                "3. Generate an improved workflow that is meaningfully different from the previous one.",
-                "   Not a cosmetic tweak — a structural or strategic change.",
-                "",
-                voice_closing,
-            ])
-
-        return "".join(
-            [
-                f"Attempt {iteration_count + 1} of workflow generation.\n",
-                improv_prompt,
-                "\nTarget goal:\n",
-                goal,
-            ]
-        )
+    def _register(self, sig: dict[str, str]) -> None:
+        """Add a signature to the sliding window, evicting the oldest if full."""
+        self._tried_combinations.append(sig)
+        if len(self._tried_combinations) > self._max_memory:
+            self._tried_combinations.pop(0)

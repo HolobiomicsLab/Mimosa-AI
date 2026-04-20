@@ -5,7 +5,7 @@ Guides new users through setup step-by-step (Claude-code style),
 checks that Toolomics is online, clarifies and refines the user's
 objective using an LLM conversation loop, classifies it as Goal-mode
 or Task-mode, then hands off to the appropriate execution entry-point
-(planner.start_planner or dgm.start_dgm).
+(planner.start_planner or evolve.start_workflow_evolution).
 """
 
 from __future__ import annotations
@@ -932,7 +932,7 @@ class OnboardCLI:
                 "Goal mode  → Mimosa decomposes the objective into a plan of tasks "
                 "and executes them sequentially (planner).\n"
                 "  ℹ️    Task mode  → Mimosa directly synthesises and runs a single "
-                "multi-agent workflow for the objective (DGM)."
+                "multi-agent workflow for the objective (evolution engine)."
             )
 
             confirmed = _ask_yn(f"Accept '{mode}' mode?", default=True)
@@ -943,8 +943,8 @@ class OnboardCLI:
         # Manual fallback / override
         print()
         print(f"  {BOLD}Available modes:{RESET}")
-        print(f"    {CYAN}goal{RESET}  – high-level research objective (planner + DGM)")
-        print(f"    {CYAN}task{RESET}  – single focused operation (DGM only)")
+        print(f"    {CYAN}goal{RESET}  – high-level research objective (planner + evolution engine)")
+        print(f"    {CYAN}task{RESET}  – single focused operation (evolution engine only)")
         choice = _ask("Choose mode", default="task").lower()
         self._mode = "goal" if choice.startswith("g") else "task"
         _ok(f"Mode set to: {self._mode.upper()}")
@@ -1019,14 +1019,14 @@ class OnboardCLI:
         )
 
     async def _launch_task(self) -> None:
-        """Start DGM task mode (single operation)."""
-        from sources.core.dgm import DarwinMachine
+        """Start evolution engine task mode (single operation)."""
+        from sources.core.evolution_engine import EvolutionEngine
 
         print(f"\n{GREEN}{BOLD}  Launching in TASK mode …{RESET}\n")
-        dgm = DarwinMachine(self.config)
-        await dgm.start_dgm(
+        evolve = EvolutionEngine(self.config)
+        await evolve.start_workflow_evolution(
             goal=self._objective,
             judge=True,
-            learning_mode=self._learn,
+            enable_evolution=self._learn,
             max_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
         )

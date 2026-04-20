@@ -232,7 +232,7 @@ Edit `my_config.json`. Key parameters:
 | `smolagent_model_id` | Model for SmolAgents execution subtasks |
 | `judge_model` | LLM for output self-evaluation and scoring |
 | `learned_score_threshold` | Minimum score to accept a result and stop iterating |
-| `max_learning_evolve_iterations` | Maximum self-improvement iterations before accepting the result |
+| `max_learning_evolve_iterations` | Maximum evolution iterations before accepting the result |
 
 **2. Choose a mode `task` or `goal` depending on the complexity of your objective.**
 

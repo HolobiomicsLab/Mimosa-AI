@@ -107,22 +107,22 @@ class Factory:
         return goal
 
     def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_code: str, goal: str, original_task: str = None
+        self, path: str, uuid_str: str, workflow_genotype_code: str, goal: str, original_task: str = None
     ) -> None:
         """Save workflow code and metadata to files.
 
         Args:
             path: Directory path to save files
             uuid_str: Unique workflow identifier
-            workflow_code: Generated workflow code
+            workflow_genotype_code: Generated workflow code
             goal: The goal description (may be knowledge-wrapped)
             original_task: The original unwrapped task for similarity matching
         """
         try:
-            with open(os.path.join(path, f"workflow_code_{uuid_str}.py"), "w") as f:
-                f.write(workflow_code)
+            with open(os.path.join(path, f"workflow_genotype_{uuid_str}.py"), "w") as f:
+                f.write(workflow_genotype_code)
             self.logger.info(
-                f"Saved workflow code to: {path}/workflow_code_{uuid_str}.py"
+                f"Saved workflow code to: {path}/workflow_genotype_{uuid_str}.py"
             )
         except Exception as e:
             self.logger.error(f"Failed to save workflow code: {str(e)}")

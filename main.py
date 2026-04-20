@@ -22,7 +22,7 @@ os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
 from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
 
 from config import Config
-from sources.core.dgm import DarwinMachine
+from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.cli import OnboardCLI, EvaluationCLI
@@ -164,7 +164,7 @@ def load_goal_from_file_or_string(goal_input: str) -> str:
     return goal_input
 
 async def normal_execution_mode(args, config):
-    dgm = DarwinMachine(config)
+    evolve = EvolutionEngine(config)
     planner = Planner(config)
     if args.scenario:
         scenario_file = ScenarioLoader().load_scenario(args.scenario)
@@ -174,11 +174,11 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.task)
         if args.single_agent:
             print_info("Starting in single agent mode")
-        await dgm.start_dgm(goal=goal_content,
+        await evolve.start_workflow_evolution(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_rubric=args.scenario,
                             max_iteration=args.max_evolve_iterations,
-                            learning_mode=args.learn,
+                            enable_evolution=args.learn,
                             single_agent_mode=args.single_agent
                            )
     elif args.goal:
@@ -237,7 +237,7 @@ async def main():
         "--disable_judge", action="store_true", default=False, help="Disable judge for workflow evaluation"
     )
     parser.add_argument(
-        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
+        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and evolution"
     )
     parser.add_argument(
         "--debug", action="store_true", help="Enable advanced debug logging to console"

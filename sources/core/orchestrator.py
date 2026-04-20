@@ -52,7 +52,7 @@ class WorkflowOrchestrator:
         if dep_result.status != ExecutionStatus.COMPLETED:
             raise RuntimeError(f"Dependency installation failed: {dep_result.stderr}")
 
-    async def workflow_sandbox_run(self, workflow_code: str) -> str:
+    async def workflow_sandbox_run(self, workflow_genotype_code: str) -> str:
         """Run the workflow code in a sandboxed environment."""
         logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class WorkflowOrchestrator:
 
         print_info("▶ Executing workflow in Python sandbox…")
         result = await self.workflow_runner.execute(
-            workflow_code, progress_callback=progress_handler
+            workflow_genotype_code, progress_callback=progress_handler
         )
         if result.status == ExecutionStatus.COMPLETED:
             print_ok(f"Workflow execution completed in {result.execution_time:.3f}s")
@@ -116,7 +116,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             craft_instructions: Instructions for crafting the workflow, usually output from previous failed attempt
             original_task: Original unwrapped task for similarity matching
         Returns:
-            tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_code, success_flag)
+            tuple[str, str, str, bool]: (execution_output, workflow_uuid, workflow_genotype_code, success_flag)
         """
         logger = logging.getLogger(__name__)
 
@@ -152,14 +152,14 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         generation_start = time.time()
         try:
             if not single_agent_mode:
-                complete_code, workflow_code, uuid = await self.workflow_factory.craft_workflow(
+                complete_code, workflow_genotype_code, uuid = await self.workflow_factory.craft_workflow(
                     goal,
                     craft_instructions,
                     save_workflow=True,
                     original_task=original_task
                 )
             else:
-                complete_code, workflow_code, uuid = await self.single_agent_factory.craft_single_agent(
+                complete_code, workflow_genotype_code, uuid = await self.single_agent_factory.craft_single_agent(
                     goal,
                     original_task=original_task
                 )
@@ -197,7 +197,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         print_ok(f"Workflow {uuid} generated in {generation_time:.3f}s")
 
         if no_run:
-            return "", uuid, workflow_code, True
+            return "", uuid, workflow_genotype_code, True
         try:
             # Dependencies installation phase
             print_phase("DEPENDENCIES INSTALLATION PHASE")
@@ -234,7 +234,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
                 title=f"Workflow {uuid} execution failed",
                 priority=1
             )
-            return str(e), uuid, workflow_code, False
+            return str(e), uuid, workflow_genotype_code, False
         finally:
             print_info("Cleaning up sandbox…")
 
@@ -257,7 +257,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             if execution_output
             else "Workflow executed successfully with no output."
         )
-        return output, uuid, workflow_code, True
+        return output, uuid, workflow_genotype_code, True
 
     async def __aenter__(self):
         """Async context manager entry."""

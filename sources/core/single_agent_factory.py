@@ -34,7 +34,7 @@ class SingleAgentFactory(Factory):
             original_task: The original unwrapped task for similarity matching
 
         Returns:
-            tuple[str, str, str]: (complete_code, workflow_code, uuid)
+            tuple[str, str, str]: (complete_code, workflow_genotype_code, uuid)
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]

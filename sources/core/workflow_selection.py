@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
@@ -5,7 +6,28 @@ from sentence_transformers import SentenceTransformer
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config import Config
+from sources.core.selection import SelectionPressure
 from sources.core.workflow_info import WorkflowInfo
+
+
+logger = logging.getLogger(__name__)
+
+
+class _WorkflowScoreAdapter:
+    """Lightweight wrapper so that :class:`SelectionPressure.select_parent(s)`
+    can rank :class:`WorkflowInfo` objects via their ``overall_score``.
+
+    ``SelectionPressure`` looks for a ``reward`` attribute; WorkflowInfo
+    exposes ``overall_score`` instead.  This adapter bridges the gap without
+    touching either class.
+    """
+
+    __slots__ = ("workflow_info", "reward")
+
+    def __init__(self, wf: WorkflowInfo):
+        self.workflow_info = wf
+        self.reward = wf.overall_score
+
 
 class WorkflowSelector:
     def __init__(self, config: Config) -> None:
@@ -114,6 +136,89 @@ class WorkflowSelector:
         best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
 
+    # ------------------------------------------------------------------
+    # Evolutionary multi-parent selection
+    # ------------------------------------------------------------------
+
+    def select_parent_workflows(
+        self,
+        goal: str,
+        selection_pressure: SelectionPressure,
+        n_parents: int = 2,
+        crossover_rate: float = 0.3,
+        threshold_similarity: float = 0.9,
+        threshold_score: float = 0.1,
+    ) -> tuple[list[WorkflowInfo], bool]:
+        """Select one or more parent workflows under evolutionary pressure.
+
+        This method bridges :class:`WorkflowSelector` (which discovers and
+        ranks existing workflows by similarity/score) with
+        :class:`SelectionPressure` (which applies strategy-aware selection —
+        greedy, tournament, novelty, QD — and decides whether to crossover
+        or mutate).
+
+        Workflow:
+          1. Discover candidate workflows matching ``goal`` via
+             :meth:`select_best_workflows`.
+          2. Wrap them in lightweight adapters so ``SelectionPressure`` can
+             rank them by ``reward`` (== ``overall_score``).
+          3. Delegate to :meth:`SelectionPressure.select_parents` which
+             probabilistically picks one parent (mutation) or multiple
+             parents (crossover) according to strategy + ``crossover_rate``.
+
+        Args:
+            goal: Task description to match against stored workflows.
+            selection_pressure: The :class:`SelectionPressure` instance that
+                governs strategy (greedy / tournament / novelty / qd) and
+                decides crossover vs mutation.
+            n_parents: Maximum number of parents when crossover fires (≥ 2).
+            crossover_rate: Probability ∈ [0, 1] that crossover is attempted.
+                Actual crossover only happens when there are ≥ 2 distinct
+                candidates in the pool.
+            threshold_similarity: Cosine-similarity floor for candidate
+                discovery (passed through to :meth:`select_best_workflows`).
+            threshold_score: Minimum workflow score for candidate discovery.
+
+        Returns:
+            ``(list[WorkflowInfo], use_crossover)``
+            — One or more parent workflows and a flag indicating whether
+            the caller should apply crossover (True) or mutation (False).
+            Returns ``([], False)`` when no suitable candidate is found.
+        """
+        candidates = self.select_best_workflows(
+            goal=goal,
+            threshold_similarity=threshold_similarity,
+            threshold_score=threshold_score,
+        )
+
+        if not candidates:
+            logger.info("No candidate workflows found for parent selection.")
+            return [], False
+
+        # Wrap WorkflowInfo objects so SelectionPressure can use .reward
+        adapters = [_WorkflowScoreAdapter(wf) for wf in candidates]
+
+        selected_adapters, use_crossover = selection_pressure.select_parents(
+            candidates=adapters,
+            n_parents=n_parents,
+            crossover_rate=crossover_rate,
+        )
+
+        # Unwrap back to WorkflowInfo
+        selected_workflows = [a.workflow_info for a in selected_adapters]
+
+        # Log selection outcome
+        uuids = [wf.uuid for wf in selected_workflows]
+        scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
+        mode = "CROSSOVER" if use_crossover else "MUTATION"
+        logger.info(
+            f"🧬 Parent selection ({mode}, strategy={selection_pressure.strategy.value}): "
+            f"{len(selected_workflows)} parent(s) from {len(candidates)} candidates "
+            f"— UUIDs={uuids}, scores={scores}"
+        )
+
+        return selected_workflows, use_crossover
+
 
 if __name__ == "__main__":
     config = Config()
@@ -124,3 +229,17 @@ if __name__ == "__main__":
     print("Best matching workflow:")
     for wf in matching_workflow:
         print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
+
+    # ── Demonstrate evolutionary multi-parent selection ────────────
+    print("\n=== Evolutionary parent selection ===")
+    sp = SelectionPressure(strategy="tournament")
+    selected, crossover = mcts.select_parent_workflows(
+        goal=goal,
+        selection_pressure=sp,
+        n_parents=2,
+        crossover_rate=0.5,
+    )
+    mode = "CROSSOVER" if crossover else "MUTATION"
+    print(f"  Mode: {mode}, Parents: {len(selected)}")
+    for wf in selected:
+        print(f"    UUID: {wf.uuid}, Score: {wf.overall_score:.4f}")
