@@ -18,6 +18,7 @@ from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
 from sources.evaluation.scenario_loader import ScenarioLoader
 
+from sources.utils.workspace_management import WorkspaceManager
 from .orchestrator import WorkflowOrchestrator
 from .variation_engine import VariationEngine
 from .workflow_info import WorkflowInfo
@@ -247,7 +248,7 @@ class EvolutionEngine:
             )
         else:
             return self.variation.seed_genome_prompt(goal)
-    
+
     async def start_workflow_evolution(
         self,
         goal: str,
@@ -287,6 +288,10 @@ class EvolutionEngine:
         if mockup_mode:
             return self.mockup(wf, goal)
 
+        # ── Workspace lifecycle: snapshot → clean → restore before first run ─
+        workspace_mgr = WorkspaceManager(self.config, self.logger)
+        workspace_mgr.begin_session()
+
         craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
         rewards_history = []
@@ -304,13 +309,35 @@ class EvolutionEngine:
             original_task=original_task
         )
 
-        return await self.evolve_generation(
+        runs = await self.evolve_generation(
             [run0],
             rewards_history=rewards_history,
             assertion_history=assertion_history,
             enable_evolution=enable_evolution,
-            single_agent_mode=single_agent_mode
+            single_agent_mode=single_agent_mode,
+            workspace_mgr=workspace_mgr,
         )
+
+        # ── Restore workspace to the best run's saved state ──────────────────
+        try:
+            best_run = max(
+                (r for r in runs if r.current_uuid),
+                key=lambda r: r.reward if r.reward is not None else 0.0,
+                default=None,
+            )
+            if best_run and best_run.current_uuid:
+                print_info(
+                    f"Best run: {best_run.current_uuid} "
+                    f"(score={best_run.reward:.3f if best_run.reward is not None else 'N/A'})"
+                )
+                workspace_mgr.restore_best(best_run.current_uuid)
+            else:
+                print_warn("No successful run found; workspace restored to initial state.")
+                workspace_mgr.restore_best("")  # triggers fallback inside WorkspaceManager
+        finally:
+            workspace_mgr.cleanup()
+
+        return runs
 
     async def evolve_generation(
         self,
@@ -318,7 +345,8 @@ class EvolutionEngine:
         rewards_history: list[float] = None,
         assertion_history: list[list[int]] = None,
         enable_evolution: bool = False,
-        single_agent_mode: bool = False
+        single_agent_mode: bool = False,
+        workspace_mgr: WorkspaceManager = None,
     ):
         """Run a evolution loop for the workflow."""
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
@@ -327,6 +355,10 @@ class EvolutionEngine:
         on_error = False
         uuid = None
         current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
+
+        # ── Reset workspace to the initial state before each run ─────
+        if workspace_mgr is not None:
+            workspace_mgr.reset_for_run()
 
         # Execute workflow
         print_info(f"Run {runs[-1].iteration_count + 1} of {runs[-1].max_depth}")
@@ -340,6 +372,10 @@ class EvolutionEngine:
         if "WORKFLOW_GENERATION_ERROR" in run_stdout:
             print_err(f"Workflow generation failed:\n{run_stdout[256:]}")
             on_error = True
+        # ── Snapshot workspace results produced by this run ───────────────────
+        if workspace_mgr is not None and uuid:
+            workspace_mgr.save_run_snapshot(uuid)
+
         if workflow_genotype_code:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
@@ -451,7 +487,8 @@ class EvolutionEngine:
             rewards_history=rewards_history,
             assertion_history=assertion_history,
             enable_evolution=enable_evolution,
-            single_agent_mode=single_agent_mode
+            single_agent_mode=single_agent_mode,
+            workspace_mgr=workspace_mgr,
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
