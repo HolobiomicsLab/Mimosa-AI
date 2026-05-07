@@ -56,6 +56,7 @@ class IndividualRun:
     state_result: dict | None = None
     plot: str | None = ""
     original_task: str | None = None  # Original unwrapped task for similarity matching
+    selection_log: "SelectionLog | None" = None
 
     def __str__(self) -> str:
         return (f"IndividualRun(goal='{self.goal}', prompt='{self.prompt}', "

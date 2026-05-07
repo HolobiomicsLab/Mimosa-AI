@@ -280,6 +280,10 @@ class EvolutionEngine:
         if enable_evolution:
             max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
 
+        # Reset archive at session start: archive is per-task, disk scan
+        # supplies cross-task transfer at cold start.
+        self.selection._archive = []
+
         parents, _use_crossover = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
@@ -390,6 +394,22 @@ class EvolutionEngine:
         agents_answers = self.extract_agents_behavior(wf_info.state_result)
         self.show_answers(agents_answers)
         rewards_history.append(wf_info.overall_score)
+
+        # ── Survivor validation: gate + populate _archive (steady-state population)
+        if uuid and not on_error:
+            baseline_runs = runs[:-1] if len(runs) > 1 else [runs[-1]]
+            verdict = self.selection.validate_survivor(
+                baseline_runs=baseline_runs,
+                new_runs=[runs[-1]],
+            )
+            runs[-1].selection_log = SelectionLog(
+                from_iteration=max(runs[-1].iteration_count - 1, 0),
+                to_iteration=runs[-1].iteration_count,
+                improvement_type=self.selection.strategy.value,
+                delta_reward=verdict["absolute_improvement"],
+                is_validated=verdict["valid"],
+                confidence=verdict["confidence"],
+            )
 
         # Update visualizations
         self._update_visualizations(
