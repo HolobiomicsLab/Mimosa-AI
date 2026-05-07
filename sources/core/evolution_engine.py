@@ -9,12 +9,8 @@ import re
 import time
 from pathlib import Path
 
-import random
-
-
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
-from sources.utils.shared_visualization import SharedVisualizationData
 from sources.utils.visualization import VisualizationUtils
 from sources.evaluation.scenario_loader import ScenarioLoader
 
@@ -29,7 +25,7 @@ from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_section,
     print_iteration_header, print_box,
-    print_summary, print_agent_answers,
+    print_summary,
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
@@ -123,8 +119,8 @@ class EvolutionEngine:
             reward=wf.overall_score,
             iteration_count=1
         )
-        flow_answers = self.extract_agents_behavior(wf.state_result)
-        self.show_answers(flow_answers)
+        agents_answers = self.extract_agents_behavior(wf.state_result)
+        self.show_answers(agents_answers)
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
@@ -180,15 +176,15 @@ class EvolutionEngine:
         if not wf_state or "answers" not in wf_state:
             return ""
 
-        flow_answers = (
+        agents_answers = (
             "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
             if isinstance(wf_state["answers"], list)
             else wf_state["answers"]
         )
-        return flow_answers
+        return agents_answers
 
-    def show_answers(self, flow_answers) -> None:
-        print_box(flow_answers, title="Workflow Agents Answers", color=YELLOW)
+    def show_answers(self, agents_answers) -> None:
+        print_box(agents_answers, title="Workflow Agents Answers", color=YELLOW)
 
     def select_parent_workflow(
         self,
@@ -391,8 +387,8 @@ class EvolutionEngine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
-        flow_answers = self.extract_agents_behavior(wf_info.state_result)
-        self.show_answers(flow_answers)
+        agents_answers = self.extract_agents_behavior(wf_info.state_result)
+        self.show_answers(agents_answers)
         rewards_history.append(wf_info.overall_score)
 
         # Update visualizations
@@ -442,6 +438,7 @@ class EvolutionEngine:
                     priority=0
                 )
                 return runs
+        # continue on error: use evolution as recovery for when failed to execute
 
         # ── Evolutionary parent selection: mutation or crossover ──────
         parent_workflows, use_crossover = self.select_parent_workflow(
