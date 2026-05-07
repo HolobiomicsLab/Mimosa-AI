@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config import Config
-from sources.core.selection import SelectionPressure
+from sources.core.selection import PopulationMember, SelectionPressure
 from sources.core.workflow_info import WorkflowInfo
 
 
@@ -132,6 +132,41 @@ class WorkflowSelector:
         best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
 
+    def _rehydrate_workflow_info(self, uuid: str) -> WorkflowInfo | None:
+        """Materialize a WorkflowInfo from disk by UUID. Returns None if invalid."""
+        if not uuid:
+            return None
+        wf = WorkflowInfo(uuid, self.workflows_folder / uuid)
+        return wf if wf.is_valid() else None
+
+    def _select_from_archive(
+        self,
+        selection_pressure: SelectionPressure,
+        n_parents: int,
+        crossover_rate: float,
+    ) -> tuple[list[WorkflowInfo], bool]:
+        """Archive-driven parent selection (steady-state, current session)."""
+        archive = selection_pressure._archive
+        selected_members, use_crossover = selection_pressure.select_parents(
+            candidates=archive,
+            n_parents=n_parents,
+            crossover_rate=crossover_rate,
+        )
+        # Rehydrate PopulationMember -> WorkflowInfo
+        selected_workflows: list[WorkflowInfo] = []
+        for m in selected_members:
+            uuid = m.uuid if isinstance(m, PopulationMember) else None
+            wf = self._rehydrate_workflow_info(uuid)
+            if wf is not None:
+                selected_workflows.append(wf)
+        # If rehydration failed for everyone, treat as cold start (caller falls back)
+        if not selected_workflows:
+            return [], False
+        # Crossover requires ≥ 2 parents post-rehydration
+        if use_crossover and len(selected_workflows) < 2:
+            use_crossover = False
+        return selected_workflows, use_crossover
+
     def select_parent_workflows(
         self,
         goal: str,
@@ -143,20 +178,40 @@ class WorkflowSelector:
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
 
+        Steady-state path: when `selection_pressure._archive` is populated,
+        sample parents from the live archive (current-session population).
+        Cold-start path: fall back to similarity-filtered disk scan for
+        cross-task transfer when the archive is empty.
+
         Args:
             goal: Task description to match against stored workflows.
             selection_pressure: The SelectionPressure instance that governs strategy and
                 decides crossover vs mutation.
             n_parents: Maximum number of parents when crossover fires (≥ 2).
             crossover_rate: Probability ∈ [0, 1] that crossover is attempted.
-            threshold_similarity: Cosine-similarity floor for candidate
-            threshold_score: Minimum workflow score for candidate discovery.
+            threshold_similarity: Cosine-similarity floor for cold-start candidates.
+            threshold_score: Minimum workflow score for cold-start candidates.
 
         Returns:
             (list[WorkflowInfo], use_crossover)
-            — One or more parent workflows
-            - a flag indicating whether the caller should apply crossover (True) or mutation (False).
         """
+        # Steady-state: archive-driven selection
+        if selection_pressure._archive:
+            selected_workflows, use_crossover = self._select_from_archive(
+                selection_pressure, n_parents, crossover_rate
+            )
+            if selected_workflows:
+                uuids = [wf.uuid for wf in selected_workflows]
+                scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
+                mode = "CROSSOVER" if use_crossover else "MUTATION"
+                logger.info(
+                    f"🧬 Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
+                    f"{len(selected_workflows)} parent(s) from archive size={len(selection_pressure._archive)} "
+                    f"— UUIDs={uuids}, scores={scores}"
+                )
+                return selected_workflows, use_crossover
+
+        # Cold start: similarity-filtered disk scan
         candidates = self.select_best_workflows(
             goal=goal,
             threshold_similarity=threshold_similarity,
@@ -173,15 +228,13 @@ class WorkflowSelector:
             n_parents=n_parents,
             crossover_rate=crossover_rate,
         )
-        # Unwrap back to WorkflowInfo
         selected_workflows = [a.workflow_info for a in selected_adapters]
-        # Log selection outcome
         uuids = [wf.uuid for wf in selected_workflows]
         scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
         mode = "CROSSOVER" if use_crossover else "MUTATION"
         logger.info(
-            f"🧬 Parent selection ({mode}, strategy={selection_pressure.strategy.value}): "
-            f"{len(selected_workflows)} parent(s) from {len(candidates)} candidates "
+            f"🧬 Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
+            f"{len(selected_workflows)} parent(s) from {len(candidates)} disk candidates "
             f"— UUIDs={uuids}, scores={scores}"
         )
 

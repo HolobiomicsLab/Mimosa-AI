@@ -123,8 +123,8 @@ class EvolutionEngine:
             reward=wf.overall_score,
             iteration_count=1
         )
-        flow_answers = self.extract_agents_behavior(wf.state_result)
-        self.show_answers(flow_answers)
+        agents_answers = self.extract_agents_behavior(wf.state_result)
+        self.show_answers(agents_answers)
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
@@ -180,15 +180,15 @@ class EvolutionEngine:
         if not wf_state or "answers" not in wf_state:
             return ""
 
-        flow_answers = (
+        agents_answers = (
             "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
             if isinstance(wf_state["answers"], list)
             else wf_state["answers"]
         )
-        return flow_answers
+        return agents_answers
 
-    def show_answers(self, flow_answers) -> None:
-        print_box(flow_answers, title="Workflow Agents Answers", color=YELLOW)
+    def show_answers(self, agents_answers) -> None:
+        print_box(agents_answers, title="Workflow Agents Answers", color=YELLOW)
 
     def select_parent_workflow(
         self,
@@ -283,6 +283,10 @@ class EvolutionEngine:
             max_iteration = 1
         if enable_evolution:
             max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
+
+        # Reset archive at session start: archive is per-task, disk scan
+        # supplies cross-task transfer at cold start.
+        self.selection._archive = []
 
         parents, _use_crossover = self.select_parent_workflow(
             goal, template_uuid=template_uuid
@@ -391,9 +395,25 @@ class EvolutionEngine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result
-        flow_answers = self.extract_agents_behavior(wf_info.state_result)
-        self.show_answers(flow_answers)
+        agents_answers = self.extract_agents_behavior(wf_info.state_result)
+        self.show_answers(agents_answers)
         rewards_history.append(wf_info.overall_score)
+
+        # ── Survivor validation: gate + populate _archive (steady-state population)
+        if uuid and not on_error:
+            baseline_runs = runs[:-1] if len(runs) > 1 else [runs[-1]]
+            verdict = self.selection.validate_survivor(
+                baseline_runs=baseline_runs,
+                new_runs=[runs[-1]],
+            )
+            runs[-1].selection_log = SelectionLog(
+                from_iteration=max(runs[-1].iteration_count - 1, 0),
+                to_iteration=runs[-1].iteration_count,
+                improvement_type=self.selection.strategy.value,
+                delta_reward=verdict["absolute_improvement"],
+                is_validated=verdict["valid"],
+                confidence=verdict["confidence"],
+            )
 
         # Update visualizations
         self._update_visualizations(

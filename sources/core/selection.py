@@ -110,13 +110,17 @@ class SelectionPressure:
             return self._validate_greedy(baseline_list, new_list, threshold)
 
     def select_parent(self, runs: list[Any]) -> Any:
-        """Select a single parent for mutation from the run history.
+        """Select a single parent for mutation.
 
-        In greedy mode: always returns the best-scoring run.
-        In tournament mode: probabilistic tournament among a random subset.
-        In novelty/QD mode: selects from archive biased toward high QD-score.
+        In greedy mode: always returns the best-scoring run from `runs`.
+        In tournament mode: probabilistic tournament among a random subset of `runs`.
+        In novelty/QD mode: samples a `PopulationMember` from `_archive`
+            biased toward high QD-score, falling back to greedy over `runs`
+            when the archive is empty (cold start).
+        Callers driving from archive must rehydrate the chosen member's
+        UUID into their domain object (e.g., WorkflowInfo).
         """
-        if not runs:
+        if not runs and not self._archive:
             return None
 
         if self.strategy == SelectionStrategy.GREEDY:
@@ -127,18 +131,19 @@ class SelectionPressure:
             candidates = random.sample(runs, k)
             return max(candidates, key=lambda r: _safe_attr(r, "reward", 0.0))
 
-        # Novelty / QD: use archive if populated, else fallback
+        # Novelty / QD: archive-driven if populated.
+        # If the caller passed PopulationMember items (multi-parent draw),
+        # sample from those so pool-exclusion is respected. Else sample
+        # from the global archive.
         if self._archive:
-            weights = [max(m.qd_score, 0.01) for m in self._archive]
-            chosen = random.choices(self._archive, weights=weights, k=1)[0]
-            # Find the matching run (by iteration or uuid)
-            for r in runs:
-                if _safe_attr(r, "current_uuid", None) == chosen.uuid:
-                    return r
-            # Fallback: return most novel from archive mapped to runs
-            return runs[-1]
+            members = [c for c in (runs or []) if isinstance(c, PopulationMember)]
+            if not members:
+                members = self._archive
+            weights = [max(m.qd_score, 0.01) for m in members]
+            return random.choices(members, weights=weights, k=1)[0]
 
-        return max(runs, key=lambda r: _safe_attr(r, "reward", 0.0))
+        # Cold start fallback
+        return max(runs, key=lambda r: _safe_attr(r, "reward", 0.0)) if runs else None
 
     def select_parents(
         self,
