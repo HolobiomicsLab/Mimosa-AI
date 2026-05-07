@@ -1,13 +1,8 @@
 """
 Evolution Strategy
-
 Supports two modes:
-  1. Greedy (current default): validates that the latest run improved over recent history.
-  2. Open-ended (future): maintains a population archive, uses novelty + quality
-     to decide which individuals survive — giving low-performers a chance if they
-     explore a novel region of workflow-space.
-
-The public API is intentionally simple so the evolution engine can switch strategies
+  1. Greedy : validates that the latest run improved over recent history.
+  2. Open-ended : maintains a population archive, uses novelty + quality to decide which individuals survive
 """
 
 import logging
@@ -55,9 +50,9 @@ class SelectionPressure:
 
     def __init__(
         self,
-        min_improvement_threshold: float = 0.05,
-        strategy: str | SelectionStrategy = SelectionStrategy.GREEDY,
-        population_size: int = 20,
+        min_improvement_threshold: float = 0.01,
+        strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
+        population_size: int = 25,
         novelty_k_neighbours: int = 5,
         novelty_weight: float = 0.4,
     ):
@@ -90,8 +85,6 @@ class SelectionPressure:
         threshold: float | None = None,
     ) -> dict[str, Any]:
         """Validate whether the new run(s) represent a meaningful step forward.
-        Accepts both single ``IndividualRun`` objects **and** lists of runs
-        for population-aware evaluation.
         Args:
             baseline_runs: One or more previous runs (list or single IndividualRun).
             new_runs: One or more candidate runs (list or single IndividualRun).
@@ -114,59 +107,7 @@ class SelectionPressure:
         elif self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
             return self._validate_open_ended(baseline_list, new_list, threshold)
         else:
-            # Fallback to greedy
             return self._validate_greedy(baseline_list, new_list, threshold)
-
-    def stopping_criterion(
-        self,
-        current_reward: float,
-        best_reward: float,
-        iterations_without_improvement: int,
-        max_iterations_without_improvement: int = 3,
-    ) -> bool:
-        """Determine whether the evolution loop should keep iterating.
-        In open-ended mode this is more permissive — it allows continued
-        exploration even without reward improvement, as long as the archive
-        is still gaining novel members.
-        """
-        if current_reward > best_reward:
-            return True
-
-        if self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
-            # Open-ended: allow more patience (2× the greedy budget)
-            effective_max = max_iterations_without_improvement * 2
-        else:
-            effective_max = max_iterations_without_improvement
-
-        if iterations_without_improvement >= effective_max:
-            self.logger.warning(
-                f"⏹️ Stopping: {iterations_without_improvement} iterations "
-                f"without improvement (max: {effective_max}, strategy: {self.strategy.value})"
-            )
-            return False
-        return True
-
-    def get_improvement_type(
-        self,
-        baseline_run: Any,
-        new_run: Any,
-    ) -> str:
-        """Classify the type of improvement: performance, cost, both, or none."""
-        baseline_reward = _safe_attr(baseline_run, "reward", 0.0)
-        new_reward = _safe_attr(new_run, "reward", 0.0)
-        baseline_cost = _safe_attr(baseline_run, "cost", 0.0)
-        new_cost = _safe_attr(new_run, "cost", 0.0)
-
-        reward_improved = new_reward > baseline_reward * 1.01
-        cost_improved = new_cost < baseline_cost * 0.99
-
-        if reward_improved and cost_improved:
-            return "both"
-        elif reward_improved:
-            return "performance"
-        elif cost_improved:
-            return "cost"
-        return "none"
 
     def select_parent(self, runs: list[Any]) -> Any:
         """Select a single parent for mutation from the run history.
@@ -205,25 +146,14 @@ class SelectionPressure:
         n_parents: int = 2,
         crossover_rate: float = 0.3,
     ) -> tuple[list[Any], bool]:
-        """Select one or more parents from a candidate pool, simulating
-        evolutionary parent-selection pressure.
+        """Select one or more parents from a candidate pool
 
-        Returns a tuple of (selected_parents, use_crossover):
-          - If the roll triggers crossover (probability = crossover_rate) **and**
-            there are at least two distinct candidates, ``n_parents`` parents are
-            returned together with ``use_crossover=True``.
-          - Otherwise a single parent is returned with ``use_crossover=False``
-            (mutation-only path).
-
-        The per-strategy selection logic reuses :meth:`select_parent` internally
+        The per-strategy selection logic reuses `select_parent` internally
         so that greedy / tournament / novelty / QD biases are respected.
-
         Args:
-            candidates: Pool of objects with a ``reward`` (or ``overall_score``)
-                        attribute (IndividualRun, WorkflowInfo, …).
+            candidates: Pool of objects with a reward (or overall_score) attribute
             n_parents:  Number of parents to pick when crossover fires (≥2).
             crossover_rate: Probability ∈ [0, 1] of choosing crossover over mutation.
-
         Returns:
             (list[parent], bool) — selected parents and whether to crossover.
         """
@@ -237,13 +167,9 @@ class SelectionPressure:
             len(candidates) >= 2
             and random.random() < crossover_rate
         )
-
         if not do_crossover:
-            # Single-parent (mutation) path
             parent = self.select_parent(candidates)
             return [parent], False
-
-        # Multi-parent (crossover) path — draw n_parents *distinct* parents.
         selected: list[Any] = []
         pool = list(candidates)  # shallow copy so we can remove picked items
 
@@ -253,11 +179,9 @@ class SelectionPressure:
                 break
             selected.append(parent)
             pool = [c for c in pool if c is not parent]
-
         # Safety: if we ended up with < 2, fall back to mutation
         if len(selected) < 2:
             return selected or [self.select_parent(candidates)], False
-
         return selected, True
 
     @property
@@ -512,63 +436,3 @@ def _euclidean(a: list[float], b: list[float]) -> float:
     if len(a) != len(b):
         return float("inf")
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
-
-
-# ------------------------------------------------------------------
-# Self-test
-# ------------------------------------------------------------------
-
-if __name__ == "__main__":
-    from sources.core.schema import IndividualRun
-
-    baseline = IndividualRun(goal="test", prompt="test", reward=0.50)
-    improved = IndividualRun(goal="test", prompt="test", reward=0.65)
-    marginal = IndividualRun(goal="test", prompt="test", reward=0.51)
-
-    # ── Greedy (backward-compatible) ──────────────────────────────
-    print("=== GREEDY strategy ===")
-    validator = SelectionPressure(min_improvement_threshold=0.05, strategy="greedy")
-
-    print("Test 1: Valid improvement (list input)")
-    result = validator.validate_survivor([baseline], [improved])
-    print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
-
-    print("Test 2: Marginal improvement")
-    result = validator.validate_survivor([baseline, baseline], [marginal])
-    print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
-
-    print("Test 3: Single-object input (backward compat)")
-    result = validator.validate_survivor(baseline, improved)
-    print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
-
-    # ── Tournament ────────────────────────────────────────────────
-    print("\n=== TOURNAMENT strategy ===")
-    validator_t = SelectionPressure(strategy="tournament")
-    result = validator_t.validate_survivor([baseline, baseline], [marginal])
-    print(f"  Valid: {result['valid']}, Improvement: {result['relative_improvement']:.1%}")
-
-    # ── Quality-Diversity ─────────────────────────────────────────
-    print("\n=== QUALITY-DIVERSITY strategy ===")
-    validator_qd = SelectionPressure(strategy="qd", novelty_weight=0.4)
-    for i in range(5):
-        run = IndividualRun(goal="test", prompt="test", reward=0.3 + i * 0.1, cost=1.0 - i * 0.1)
-        run.iteration_count = i
-        result = validator_qd.validate_survivor([baseline], [run])
-        print(f"  Iter {i}: valid={result['valid']}, qd={result.get('qd_score', 'N/A'):.3f}, "
-              f"archive={result.get('archive_size', 0)}")
-
-    print(f"\n  Archive contents ({len(validator_qd.archive)} members):")
-    for m in validator_qd.archive:
-        print(f"    reward={m.reward:.2f}, novelty={m.novelty_score:.3f}, qd={m.qd_score:.3f}")
-
-    # ── Improvement type ──────────────────────────────────────────
-    print("\n=== Improvement type ===")
-    baseline_cost = IndividualRun(goal="test", prompt="test", reward=0.50, cost=1.00)
-    improved_both = IndividualRun(goal="test", prompt="test", reward=0.65, cost=0.80)
-    print(f"  Type: {validator.get_improvement_type(baseline_cost, improved_both)}")
-
-    # ── Parent selection ──────────────────────────────────────────
-    print("\n=== Parent selection ===")
-    runs = [baseline, marginal, improved]
-    print(f"  Greedy parent: reward={validator.select_parent(runs).reward}")
-    print(f"  Tournament parent: reward={validator_t.select_parent(runs).reward}")

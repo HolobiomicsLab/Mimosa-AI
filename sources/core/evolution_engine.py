@@ -82,16 +82,22 @@ class EvolutionEngine:
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
-        self.workflow_selector = WorkflowSelector(config)
-        self.orchestrator = WorkflowOrchestrator(config)
-        self.judge = WorkflowEvaluator(config)
-        self.selection = SelectionPressure(min_improvement_threshold=0.05)
-        self.variation = VariationEngine()
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         self.viz_utils = viz_utils or VisualizationUtils()
         self.process_id = process_id
         self.pricing = PricingCalculator(config)
         self.logger = logging.getLogger(__name__)
+        self.workflow_selector = WorkflowSelector(config)
+        self.orchestrator = WorkflowOrchestrator(config)
+        self.variation = VariationEngine()
+        self.judge = WorkflowEvaluator(config)
+        self.selection = SelectionPressure(
+            min_improvement_threshold=0.01,
+            strategy="qd", # quality-diversity selection
+            population_size=100, # max individuals to keep in the selection pool
+            novelty_k_neighbours=5,
+            novelty_weight=0.4
+        )
 
     def mockup(self, wf, goal):
         """
@@ -188,7 +194,7 @@ class EvolutionEngine:
         self,
         goal: str,
         template_uuid: str = None,
-        crossover_rate: float = 0.3,
+        crossover_rate: float = 0.4,
         n_parents: int = 2,
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
@@ -219,14 +225,13 @@ class EvolutionEngine:
             wf = WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
             return [wf], False
 
-        # Evolutionary selection via SelectionPressure
         selected, use_crossover = self.workflow_selector.select_parent_workflows(
             goal=goal,
             selection_pressure=self.selection,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
-            threshold_similarity=0.9,
-            threshold_score=0.1,
+            threshold_similarity=0.5,
+            threshold_score=0.05,
         )
 
         mode = "CROSSOVER" if use_crossover else "MUTATION"

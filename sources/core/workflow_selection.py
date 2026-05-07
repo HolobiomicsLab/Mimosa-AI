@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 class _WorkflowScoreAdapter:
     """Lightweight wrapper so that :class:`SelectionPressure.select_parent(s)`
     can rank :class:`WorkflowInfo` objects via their ``overall_score``.
-
-    ``SelectionPressure`` looks for a ``reward`` attribute; WorkflowInfo
-    exposes ``overall_score`` instead.  This adapter bridges the gap without
-    touching either class.
     """
 
     __slots__ = ("workflow_info", "reward")
@@ -136,10 +132,6 @@ class WorkflowSelector:
         best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
 
-    # ------------------------------------------------------------------
-    # Evolutionary multi-parent selection
-    # ------------------------------------------------------------------
-
     def select_parent_workflows(
         self,
         goal: str,
@@ -151,39 +143,19 @@ class WorkflowSelector:
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
 
-        This method bridges :class:`WorkflowSelector` (which discovers and
-        ranks existing workflows by similarity/score) with
-        :class:`SelectionPressure` (which applies strategy-aware selection —
-        greedy, tournament, novelty, QD — and decides whether to crossover
-        or mutate).
-
-        Workflow:
-          1. Discover candidate workflows matching ``goal`` via
-             :meth:`select_best_workflows`.
-          2. Wrap them in lightweight adapters so ``SelectionPressure`` can
-             rank them by ``reward`` (== ``overall_score``).
-          3. Delegate to :meth:`SelectionPressure.select_parents` which
-             probabilistically picks one parent (mutation) or multiple
-             parents (crossover) according to strategy + ``crossover_rate``.
-
         Args:
             goal: Task description to match against stored workflows.
-            selection_pressure: The :class:`SelectionPressure` instance that
-                governs strategy (greedy / tournament / novelty / qd) and
+            selection_pressure: The SelectionPressure instance that governs strategy and
                 decides crossover vs mutation.
             n_parents: Maximum number of parents when crossover fires (≥ 2).
             crossover_rate: Probability ∈ [0, 1] that crossover is attempted.
-                Actual crossover only happens when there are ≥ 2 distinct
-                candidates in the pool.
             threshold_similarity: Cosine-similarity floor for candidate
-                discovery (passed through to :meth:`select_best_workflows`).
             threshold_score: Minimum workflow score for candidate discovery.
 
         Returns:
-            ``(list[WorkflowInfo], use_crossover)``
-            — One or more parent workflows and a flag indicating whether
-            the caller should apply crossover (True) or mutation (False).
-            Returns ``([], False)`` when no suitable candidate is found.
+            (list[WorkflowInfo], use_crossover)
+            — One or more parent workflows
+            - a flag indicating whether the caller should apply crossover (True) or mutation (False).
         """
         candidates = self.select_best_workflows(
             goal=goal,
@@ -195,18 +167,14 @@ class WorkflowSelector:
             logger.info("No candidate workflows found for parent selection.")
             return [], False
 
-        # Wrap WorkflowInfo objects so SelectionPressure can use .reward
         adapters = [_WorkflowScoreAdapter(wf) for wf in candidates]
-
         selected_adapters, use_crossover = selection_pressure.select_parents(
             candidates=adapters,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
         )
-
         # Unwrap back to WorkflowInfo
         selected_workflows = [a.workflow_info for a in selected_adapters]
-
         # Log selection outcome
         uuids = [wf.uuid for wf in selected_workflows]
         scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
@@ -224,13 +192,11 @@ if __name__ == "__main__":
     config = Config()
     config.workflow_dir = "../workflows"
     mcts = WorkflowSelector(config)
-    goal = "Compare reproduction results with original paper results and generate comprehensive validation report. Steps: (1) Load all evaluation metrics from results/metrics/ JSON files, (2) Extract original paper results from reproduction_gernermed.md (all tables with F1, precision, recall by dataset and entity type), (3) Create detailed comparison tables matching paper's format: overall performance table, per-entity-type performance table, per-dataset performance table, (4) Calculate absolute and relative differences between reproduced and original results for each metric, (5) Perform statistical significance tests where appropriate if multiple runs were conducted, (6) Generate visualizations: bar charts comparing F1-scores across models and datasets, confusion matrices if possible, entity-type performance heatmaps, (7) Create 'validation_report.html' in results/ directory with: executive summary (reproduction success percentage), side-by-side comparison tables (original vs reproduced), visualization plots embedded, detailed metric breakdowns, assessment of reproduction fidelity (successful/partial/failed), (8) Analyze and document any significant discrepancies (>5% difference in F1) in 'results/discrepancies_analysis.md' including: specific metrics that differ, potential explanations (dataset version differences, random seed variations, implementation details, hardware differences), (9) Document model behavior on different medical entity types (medication vs diagnosis vs symptoms, etc.), (10) Create summary statistics in 'results/summary_statistics.csv' with columns: dataset, entity_type, original_f1, reproduced_f1, absolute_diff, relative_diff, status. Include overall assessment of whether GERNERMED's claimed performance on German medical NER was successfully validated."
+    goal = "Given the HP sequence HPHPPHHPHPPHPHHPPHPH, find a conformation with energy ≤ −7"
     matching_workflow = mcts.select_best_workflows(goal)
     print("Best matching workflow:")
     for wf in matching_workflow:
         print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
-
-    # ── Demonstrate evolutionary multi-parent selection ────────────
     print("\n=== Evolutionary parent selection ===")
     sp = SelectionPressure(strategy="tournament")
     selected, crossover = mcts.select_parent_workflows(
