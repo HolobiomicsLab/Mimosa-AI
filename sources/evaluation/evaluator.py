@@ -651,7 +651,7 @@ Respond in this exact JSON format:
                 scores[cr['category']] = cr['score']
 
             # Calculate overall score (excluding answer_plausibility, same as before)
-            score_keys = ['goal_alignment', 'agent_collaboration', 'output_quality']
+            score_keys = ['goal_alignment', 'agent_collaboration', 'output_quality', 'answer_plausibility']
             available_keys = [k for k in score_keys if k in scores]
             if available_keys:
                 scores['overall_score'] = sum(scores[k] for k in available_keys) / len(available_keys)
@@ -686,60 +686,41 @@ Respond in this exact JSON format:
         except Exception as e:
             raise LLMEvaluationError(f"Generic evaluation failed: {str(e)}") from e
 
+    """
+    # UNUSED ?
     def _extract_scores(self, evaluation_text: str) -> dict[str, float]:
-        """Extract scores from the evaluation text.
-
-        Args:
-            evaluation_text: The evaluation text containing the JSON scores
-
-        Returns:
-            Dictionary containing the extracted scores
-
-        Raises:
-            ScoreExtractionError: If scores cannot be extracted or are invalid
-        """
         if not evaluation_text or not isinstance(evaluation_text, str):
             raise ScoreExtractionError("Evaluation text is empty or invalid")
 
         try:
-            # Look for JSON array in the evaluation text
             cleaned_text = evaluation_text.strip()
             match = re.search(r'\[.*\]', cleaned_text, re.DOTALL)
-
             if not match:
                 raise ScoreExtractionError("No JSON array found in evaluation response")
-
             try:
                 evaluations = json.loads(match.group(0))
             except json.JSONDecodeError as e:
                 raise ScoreExtractionError(f"Invalid JSON format in evaluation response: {str(e)}") from e
-
             if not isinstance(evaluations, list):
                 raise ScoreExtractionError(f"Expected JSON array, got {type(evaluations)}")
-
             if not evaluations:
                 raise ScoreExtractionError("Evaluation array is empty")
-            # Validate evaluation structure
             required_fields = {'category', 'score', 'evidence'}
             valid_categories = {
                 'goal_alignment',
                 'agent_collaboration',
                 'output_quality',
                 'answer_plausibility',
-                # Backward compatibility with older saved judge outputs.
                 'answer_correctness',
             }
 
-            # Convert list of evaluations to a dictionary
             result = {}
             for i, eval_dict in enumerate(evaluations):
                 if not isinstance(eval_dict, dict):
                     raise ScoreExtractionError(f"Evaluation entry {i} is not a dictionary")
-                # Check required fields
                 missing_fields = required_fields - set(eval_dict.keys())
                 if missing_fields:
                     raise ScoreExtractionError(f"Missing fields {missing_fields} in evaluation entry {i}")
-                # Validate category
                 category = eval_dict['category']
                 if not isinstance(category, str):
                     raise ScoreExtractionError(f"Category must be a string, got {type(category)} in entry {i}")
@@ -747,7 +728,6 @@ Respond in this exact JSON format:
                     raise ScoreExtractionError(f"Invalid category '{category}' in entry {i}")
                 if category == 'answer_correctness':
                     category = 'answer_plausibility'
-                # Validate score
                 try:
                     score = float(eval_dict['score'])
                     if not 0.0 <= score <= 1.0:
@@ -755,11 +735,9 @@ Respond in this exact JSON format:
                     result[category] = score
                 except (TypeError, ValueError) as e:
                     raise ScoreExtractionError(f"Invalid score for {category}: {str(e)}") from e
-                # Validate evidence
                 if not isinstance(eval_dict['evidence'], str):
                     raise ScoreExtractionError(f"Evidence must be a string for {category}")
-            # Calculate overall score
-            score_keys = ['goal_alignment', 'agent_collaboration', 'output_quality']
+            score_keys = ['goal_alignment', 'agent_collaboration', 'output_quality', 'answer_plausibility']
             available_keys = [k for k in score_keys if k in result]
 
             if available_keys:
@@ -773,7 +751,7 @@ Respond in this exact JSON format:
             raise
         except Exception as e:
             raise ScoreExtractionError(f"Unexpected error extracting scores: {str(e)}") from e
-
+    """
 
 class ScenarioEvaluator(BaseEvaluator):
     """Evaluator for scenario-based workflow evaluation."""

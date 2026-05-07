@@ -328,7 +328,7 @@ class EvolutionEngine:
             if best_run and best_run.current_uuid:
                 print_info(
                     f"Best run: {best_run.current_uuid} "
-                    f"(score={best_run.reward:.3f if best_run.reward is not None else 'N/A'})"
+                    f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
                 workspace_mgr.restore_best(best_run.current_uuid)
             else:
