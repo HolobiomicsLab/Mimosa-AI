@@ -43,6 +43,10 @@ class RuntimeConfig:
     max_cpu_percent: int = 100
     temp_dir: Path | None = None
     requirements_file: Path | None = "requirements.txt"
+    # When False, the runner skips the PTY/color path and uses plain pipes.
+    # Useful for short, non-interactive scripts (e.g. verifier checks) where
+    # ANSI colour propagation and TTY emulation are pure overhead.
+    use_pty: bool = True
 
     def __post_init__(self):
         if self.temp_dir is None:
@@ -221,7 +225,7 @@ class WorkflowRunner:
 
     def _pty_available(self) -> bool:
         """Return True when pseudo-terminal support can be used."""
-        return sys.platform != "win32"
+        return sys.platform != "win32" and getattr(self.config, "use_pty", True)
 
     async def _run_command(
         self,

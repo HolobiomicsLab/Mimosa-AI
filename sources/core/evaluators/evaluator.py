@@ -13,15 +13,18 @@ if __name__ == "__main__":
 from .base import BaseEvaluator, EvaluatorError, WorkflowDataError
 from .generic import GenericEvaluator, LLMEvaluationError, ScoreExtractionError
 from .scenario import ScenarioEvaluator, ScenarioError
+from .verifier import VerifierEvaluator
 
 class WorkflowEvaluator:
-    """Combined workflow evaluator with both judge and scenario-based evaluation capabilities.
+    """Combined workflow evaluator: generic judge, scenario rubric, and verifier.
 
-    This is a facade class that delegates to GenericEvaluator and ScenarioEvaluator.
+    Facade over GenericEvaluator, ScenarioEvaluator and VerifierEvaluator. The
+    three evaluators are independent and can be invoked separately.
     """
 
     def __init__(self, config, scenarios_dir="datasets/scenarios",
-                 use_bs_penalty: bool = True, bs_fraud_threshold: float = 5.0):
+                 use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0,
+                 verifier_workspace_dir: str | None = None):
         """Initialize the WorkflowEvaluator with configuration.
 
         Args:
@@ -42,6 +45,7 @@ class WorkflowEvaluator:
                 bs_fraud_threshold=bs_fraud_threshold,
             )
             self.scenario_evaluator = ScenarioEvaluator(config, scenarios_dir=scenarios_dir)
+            self.verifier_evaluator = VerifierEvaluator(config, workspace_dir=verifier_workspace_dir)
             self.logger = logging.getLogger(__name__)
             self.logger.info("WorkflowEvaluator initialized successfully")
         except Exception as e:
@@ -49,39 +53,65 @@ class WorkflowEvaluator:
                 raise
             raise EvaluatorError(f"Failed to initialize WorkflowEvaluator: {str(e)}") from e
 
-    def evaluate(self, uuid: str, agent_answers: str = None, scenario_rubric: str = None) -> dict[str, Any]:
-        """Evaluate the workflow results.
+    def evaluate(
+        self,
+        uuid: str,
+        agent_answers: str = None,
+        evaluator_type: str = "verifier",
+        scenario_rubric: str = None,
+    ) -> dict[str, Any]:
+        """Route to the requested evaluator.
 
         Args:
-            uuid: UUID of the workflow run to evaluate
-            agent_answers: Optional list of answers from agents for evaluation
-            scenario_rubric: Optional scenario ID for scenario-based evaluation
+            uuid: UUID of the workflow run to evaluate.
+            agent_answers: Optional answers from agents (forwarded to generic).
+            evaluator_type: One of {"generic", "scenario", "verifier"}.
+                - "generic":  4-criterion LLM judge with optional bs penalty.
+                - "scenario": rubric-based scoring; requires `scenario_rubric`.
+                - "verifier": atomic-claim verification pipeline.
+            scenario_rubric: Scenario ID, required when `evaluator_type="scenario"`.
 
         Returns:
-            Dictionary containing evaluation results
+            Dictionary containing evaluation results.
 
         Raises:
-            EvaluatorError: If evaluation fails
+            EvaluatorError: If evaluation fails or arguments are invalid.
         """
-        try:
-            # Validate inputs
-            if not uuid or not isinstance(uuid, str):
-                raise EvaluatorError("Invalid uuid: must be a non-empty string")
+        if not uuid or not isinstance(uuid, str):
+            raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
-            # If scenario_rubric is provided, use scenario-based evaluation
-            if scenario_rubric:
+        evaluator_type = (evaluator_type or "generic").lower()
+        if evaluator_type not in {"generic", "scenario", "verifier"}:
+            raise EvaluatorError(
+                f"Unknown evaluator_type '{evaluator_type}'. "
+                "Expected one of: generic, scenario, verifier."
+            )
+
+        try:
+            if evaluator_type == "scenario":
+                if not scenario_rubric:
+                    raise EvaluatorError(
+                        "evaluator_type='scenario' requires scenario_rubric."
+                    )
                 try:
                     return self.scenario_evaluator.evaluate(uuid, scenario_rubric)
                 except ScenarioError as e:
-                    self.logger.error(f"Scenario evaluation failed for {uuid} with rubric {scenario_rubric}: {str(e)}")
+                    self.logger.error(
+                        f"Scenario evaluation failed for {uuid} with rubric "
+                        f"{scenario_rubric}: {str(e)} — falling back to generic."
+                    )
                     self.generic_evaluator.evaluate(uuid, agent_answers)
-                    return {'evaluation_type': 'generic', 'uuid': uuid}
-            else:
-                self.generic_evaluator.evaluate(uuid, agent_answers)
-                return {'evaluation_type': 'generic', 'uuid': uuid}
+                    return {"evaluation_type": "generic", "uuid": uuid}
 
-        except (WorkflowDataError, ScenarioError, LLMEvaluationError) as _:
-            # Re-raise specific evaluator errors
+            if evaluator_type == "verifier":
+                result = self.verifier_evaluator.evaluate(uuid)
+                return {"evaluation_type": "verifier", "uuid": uuid, **result}
+
+            # Default: generic
+            self.generic_evaluator.evaluate(uuid, agent_answers)
+            return {"evaluation_type": "generic", "uuid": uuid}
+
+        except (EvaluatorError, WorkflowDataError, ScenarioError, LLMEvaluationError):
             raise
         except Exception as e:
             raise EvaluatorError(f"Evaluation failed for {uuid}: {str(e)}") from e
