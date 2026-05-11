@@ -20,7 +20,7 @@ from .scenario_loader import ScenarioLoader
 from .science_agent_bench import ScienceAgentBenchLoader
 from .capsule_evaluator import CapsuleEvaluator
 from .execution_sandbox import ExecutionSandbox
-from .bs_detection import BullshitDetectorNumerical, MemoryExtraction
+from ..core.evaluators.bs_detection import BullshitDetectorNumerical, MemoryExtraction
 
 __all__ = [
     # Evaluators

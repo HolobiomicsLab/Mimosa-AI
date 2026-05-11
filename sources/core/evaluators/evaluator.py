@@ -20,17 +20,27 @@ class WorkflowEvaluator:
     This is a facade class that delegates to GenericEvaluator and ScenarioEvaluator.
     """
 
-    def __init__(self, config, scenarios_dir="datasets/scenarios"):
+    def __init__(self, config, scenarios_dir="datasets/scenarios",
+                 use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0):
         """Initialize the WorkflowEvaluator with configuration.
 
         Args:
             config: Configuration object containing memory_dir, workflow_dir, model_pricing, and reasoning_effort
+            scenarios_dir: Directory containing scenario rubric files
+            use_bs_penalty: Forwarded to GenericEvaluator — enables the
+                BullshitDetectorNumerical penalty on the generic overall score.
+            bs_fraud_threshold: Per-value fraud-score threshold (0-10) for the
+                short fraud report.
 
         Raises:
             EvaluatorError: If configuration is invalid or required directories don't exist
         """
         try:
-            self.generic_evaluator = GenericEvaluator(config)
+            self.generic_evaluator = GenericEvaluator(
+                config,
+                use_bs_penalty=use_bs_penalty,
+                bs_fraud_threshold=bs_fraud_threshold,
+            )
             self.scenario_evaluator = ScenarioEvaluator(config, scenarios_dir=scenarios_dir)
             self.logger = logging.getLogger(__name__)
             self.logger.info("WorkflowEvaluator initialized successfully")

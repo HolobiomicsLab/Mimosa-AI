@@ -18,18 +18,34 @@ from sources.cli.pretty_print import (
 
 from .base import *
 from .grounding import get_perspicacite_grounding
+from .bs_detection import BullshitDetectorNumerical
 
 class GenericEvaluator(BaseEvaluator):
     """Evaluator for generic workflow evaluation using LLM judgment."""
 
-    def __init__(self, config):
+    # Bind the grounding helper as a method (defined in grounding.py with `self` arg).
+    get_perspicacite_grounding = get_perspicacite_grounding
+
+    def __init__(self, config, use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0):
         """Initialize the GenericEvaluator.
 
         Args:
             config: Configuration object
+            use_bs_penalty: If True, run BullshitDetectorNumerical on agent memories
+                and subtract a penalty (0-1) from the overall score.
+            bs_fraud_threshold: Per-value fraud-score threshold (0-10) used when
+                building the short fraud report.
         """
         super().__init__(config)
-        self.logger.info("GenericEvaluator initialized successfully")
+        self.use_bs_penalty = use_bs_penalty
+        self.bs_fraud_threshold = bs_fraud_threshold
+        self._bs_detector = (
+            BullshitDetectorNumerical(llm_config=self.llm_config, memory_dir=self.memory_dir)
+            if use_bs_penalty else None
+        )
+        self.logger.info(
+            f"GenericEvaluator initialized (use_bs_penalty={use_bs_penalty}, threshold={bs_fraud_threshold})"
+        )
 
     def _evaluate_single_criterion(self, uuid: str, execution_text: str, category: str,
                                     criterion_prompt: str) -> dict[str, Any]:
@@ -379,6 +395,29 @@ Respond in this exact JSON format:
                 scores['overall_score'] = sum(scores[k] for k in available_keys) / len(available_keys)
             else:
                 self.logger.warning("No standard score categories found for overall score calculation")
+
+            # Optional BS-detection penalty: subtract a 0-1 penalty (clamped) from overall_score.
+            if self.use_bs_penalty and self._bs_detector is not None:
+                try:
+                    fraud_results = self._bs_detector.analyze_all_agents_numerical(uuid)
+                    short_report = self._bs_detector.generate_short_fraud_report(
+                        fraud_results, threshold=self.bs_fraud_threshold
+                    )
+                    penalty_info = self._bs_detector.propose_penalty_score(short_report)
+                    penalty = float(penalty_info.get('penalty', 0.0))
+                    scores['bs_penalty'] = penalty
+                    scores['bs_penalty_rationale'] = penalty_info.get('rationale', '')
+                    if 'overall_score' in scores:
+                        scores['overall_score_pre_penalty'] = scores['overall_score']
+                        scores['overall_score'] = max(0.0, scores['overall_score'] - penalty)
+                    all_outputs.append(
+                        f"[BS PENALTY] penalty={penalty:.2f}\n{penalty_info.get('rationale', '')}"
+                    )
+                    self.logger.info(f"BS-detection penalty applied: {penalty:.2f}")
+                except Exception as e:
+                    self.logger.error(f"BS-detection penalty failed for {uuid}: {str(e)}")
+                    scores['bs_penalty'] = 0.0
+                    scores['bs_penalty_rationale'] = f"BS-detection failed: {str(e)}"
 
             # Save the combined evaluation to a file
             try:

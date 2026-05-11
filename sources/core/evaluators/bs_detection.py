@@ -18,10 +18,8 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 
 dotenv.load_dotenv()
 
-MEMORY_DIR = Path("./sources/memory")
+DEFAULT_MEMORY_DIR = Path("./sources/memory")
 default_llm = LLMConfig.from_dict({"model": "z-ai/glm-4.7-flash", "provider": "openrouter"})
-
-assert os.path.exists(MEMORY_DIR)
 
 def extract_json(code: str) -> str:
     """Extract Python code blocks from text.
@@ -44,8 +42,9 @@ def extract_json(code: str) -> str:
     return "\n".join(code_blocks)
 
 class MemoryExtraction:
-    def __init__(self, uuid):
+    def __init__(self, uuid, memory_dir: Path | str = DEFAULT_MEMORY_DIR):
         self.uuid = uuid
+        self.memory_dir = Path(memory_dir)
 
     def get_agent_memories(self, target: list[str]) -> tuple[str, dict]:
         """
@@ -57,7 +56,7 @@ class MemoryExtraction:
         """
         agents_memory = []
         for p in self._load_path_memories(self.uuid):
-            abs_path = MEMORY_DIR / self.uuid / p
+            abs_path = self.memory_dir / self.uuid / p
             agent_name = p.split(".json")[0]
             memory = self._load_agent_memory(abs_path)
             memory_selected = self.get_memories_by_role(memory=memory, target=target)
@@ -66,10 +65,10 @@ class MemoryExtraction:
 
     def _load_path_memories(self, uuid):
         paths = []
-        if not os.path.exists(MEMORY_DIR / uuid):
+        if not os.path.exists(self.memory_dir / uuid):
             raise FileNotFoundError(f"Error: No memory file with uuid: {uuid}.\n")
         try:
-            for f in os.walk(MEMORY_DIR / uuid):
+            for f in os.walk(self.memory_dir / uuid):
                 paths.append(f)
         except Exception as e:
             raise e
@@ -114,17 +113,19 @@ class BullshitDetectorNumerical:
     of numerical values and analyzing their evolution through the conversation history.
     """
 
-    def __init__(self, llm_config: LLMConfig = None):
+    def __init__(self, llm_config: LLMConfig = None, memory_dir: Path | str = DEFAULT_MEMORY_DIR):
         """
         Initialize the BullshitDetectorNumerical.
 
         Args:
-            llm_config: Configuration for the LLM judge. If None, uses default gpt-4o-mini.
+            llm_config: Configuration for the LLM judge. If None, uses default.
+            memory_dir: Root directory containing per-uuid agent memory folders.
         """
         if llm_config is None:
             llm_config = default_llm
 
         self.llm_config = llm_config
+        self.memory_dir = Path(memory_dir)
         self.numerical_judge_system_prompt = self._create_numerical_judge_system_prompt()
         self.values_already_found = []
 
@@ -466,7 +467,7 @@ Provide your analysis in JSON format:
         Returns:
             Comprehensive numerical fraud analysis results
         """
-        memory_extraction = MemoryExtraction(uuid)
+        memory_extraction = MemoryExtraction(uuid, memory_dir=self.memory_dir)
         if target_roles is None:
             target_roles = ["assistant", "tool-call", "tool-response", "code_action", "observations", "user"]
 
@@ -615,6 +616,80 @@ Provide your analysis in JSON format:
             report_lines.append("-" * 40)
 
         return "\n".join(report_lines)
+
+
+    def propose_penalty_score(self, short_fraud_report: str) -> dict:
+        """Convert a short fraud report into a penalty score in [0.0, 1.0].
+
+        Uses the LLM judge to weigh severity, count and credibility of the
+        flagged fraudulent values and produce a single penalty meant to be
+        subtracted from a workflow's overall score.
+
+        Args:
+            short_fraud_report: Output of `generate_short_fraud_report`.
+
+        Returns:
+            Dict with keys:
+              - penalty: float in [0.0, 1.0] (0.0 = no fraud, 1.0 = pervasive fabrication)
+              - rationale: short justification string
+        """
+        if not short_fraud_report or not isinstance(short_fraud_report, str):
+            return {"penalty": 0.0, "rationale": "Empty or invalid fraud report."}
+
+        # Fast path: explicit no-fraud marker emitted by generate_short_fraud_report.
+        if "No high-risk fraudulent values detected" in short_fraud_report:
+            return {"penalty": 0.0, "rationale": "No high-risk fraudulent values detected."}
+
+        prompt = f"""
+You are scoring how much a workflow's final result should be penalized given a
+short fraud report on numerical values produced by its agents.
+
+SHORT FRAUD REPORT:
+{short_fraud_report}
+
+TASK:
+Return a single penalty score in [0.0, 1.0] to be subtracted from the workflow's
+overall quality score. Consider:
+- Number of distinct fraudulent values and how many agents are affected.
+- Per-value fraud_score severity (closer to 10/10 = clearer fabrication).
+- Whether the flagged values look load-bearing (final metrics, headline numbers)
+  versus incidental (intermediate sanity checks, descriptive figures).
+- Plausibility of the issues / evidence cited.
+
+Calibration:
+- 0.0  = no credible fraud / report is empty.
+- 0.1-0.2 = a couple of low-severity values, unlikely to affect the final answer.
+- 0.3-0.5 = several flagged values or one clearly fabricated headline number.
+- 0.6-0.8 = pervasive fabrication across multiple agents.
+- 0.9-1.0 = the final answer is essentially built on fabricated values.
+
+Respond ONLY with a JSON object on a single line:
+{{"penalty": <float 0.0-1.0>, "rationale": "<one short sentence>"}}
+"""
+        llm_provider = LLMProvider(
+            agent_name="numerical_bs_penalty_judge",
+            system_msg=self.numerical_judge_system_prompt,
+            config=self.llm_config,
+        )
+        try:
+            response = llm_provider(prompt)
+        except Exception as e:
+            return {"penalty": 0.0, "rationale": f"LLM call failed: {e}"}
+
+        # Try fenced JSON first, then fall back to a loose regex.
+        raw = extract_json(response) or response or ""
+        match = re.search(r"\{.*?\}", raw, re.DOTALL)
+        if not match:
+            return {"penalty": 0.0, "rationale": "Penalty judge returned no JSON."}
+        try:
+            data = json.loads(match.group(0))
+            penalty = float(data.get("penalty", 0.0))
+        except (ValueError, json.JSONDecodeError) as e:
+            return {"penalty": 0.0, "rationale": f"Failed to parse penalty JSON: {e}"}
+
+        penalty = max(0.0, min(1.0, penalty))
+        rationale = data.get("rationale", "")
+        return {"penalty": penalty, "rationale": rationale}
 
 
 if __name__ == "__main__":
