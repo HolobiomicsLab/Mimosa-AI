@@ -18,6 +18,7 @@ import asyncio
 import copy
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -186,7 +187,7 @@ class EvaluationCLI:
 
         # Step 3 – Port range & workspace
         _print_step(3, TOTAL_STEPS, f"Toolomics / Workspace (Run #{run_id})")
-        mcp_list = await self._setup_connectivity(run_config)
+        mcp_list = await self._setup_connectivity(run_config, run_id)
 
         # Step 4 – Evaluation mode
         _print_step(4, TOTAL_STEPS, f"Evaluation Mode (Run #{run_id})")
@@ -272,28 +273,146 @@ class EvaluationCLI:
     # Step 3 – Toolomics connectivity & workspace
     # ------------------------------------------------------------------
 
-    async def _setup_connectivity(self, run_config: Config) -> list[str]:
+    # ------------------------------------------------------------------
+    # Port-range helpers (for auto-suggestion & conflict checking)
+    # ------------------------------------------------------------------
+
+    def _queued_port_sets(self) -> list[tuple[int, set[int]]]:
+        """Return ``(run_id, port_set)`` for every run already in the queue."""
+        result: list[tuple[int, set[int]]] = []
+        for spec in self._queue:
+            ports: set[int] = set()
+            for addr in spec.config.discovery_addresses:
+                ports.update(range(addr.port_min, addr.port_max + 1))
+            result.append((spec.run_id, ports))
+        return result
+
+    def _suggest_port_range(self, run_config: Config) -> tuple[str, str, str]:
+        """
+        Return ``(ip, port_min_str, port_max_str)`` that do not overlap
+        with any run already in the queue.  Falls back to the config
+        defaults when there is no conflict.
+        """
+        if not self._queue:
+            addr = run_config.discovery_addresses[0]
+            return addr.ip, str(addr.port_min), str(addr.port_max)
+
+        # Gather every port already claimed
+        claimed: set[int] = set()
+        for _, pset in self._queued_port_sets():
+            claimed |= pset
+
+        # Use the same IP & range width as the base config
+        base = run_config.discovery_addresses[0]
+        ip = base.ip
+        width = base.port_max - base.port_min  # e.g. 200
+
+        # Walk upward from the last queued range's max+1
+        highest = max(claimed) if claimed else base.port_min
+        candidate_min = highest + 1
+        candidate_max = candidate_min + width
+
+        # Clamp to valid port numbers
+        if candidate_max > 65535:
+            candidate_min = max(1024, base.port_min)
+            candidate_max = candidate_min + width
+
+        return ip, str(candidate_min), str(candidate_max)
+
+    def _ports_conflict_with_queue(self, port_min: int, port_max: int) -> list[str]:
+        """
+        Check whether ``[port_min, port_max]`` overlaps with any queued run.
+        Returns a list of human-readable conflict messages (empty = OK).
+        """
+        new_ports = set(range(port_min, port_max + 1))
+        conflicts: list[str] = []
+        for rid, pset in self._queued_port_sets():
+            overlap = new_ports & pset
+            if overlap:
+                sample = sorted(overlap)[:5]
+                conflicts.append(
+                    f"Run #{rid}: {len(overlap)} overlapping port(s) (e.g. {sample})"
+                )
+        return conflicts
+
+    # ------------------------------------------------------------------
+    # Workspace helpers
+    # ------------------------------------------------------------------
+
+    def _queued_workspaces(self) -> list[tuple[int, str]]:
+        """Return ``(run_id, resolved_workspace)`` for every queued run."""
+        return [
+            (spec.run_id, os.path.realpath(spec.config.workspace_dir))
+            for spec in self._queue
+        ]
+
+    def _suggest_workspace(self, run_config: Config, run_id: int) -> str:
+        """
+        Suggest a workspace path that doesn't collide with any queued run.
+        For run #1 the current config value is returned as-is; for later
+        runs a ``_runN`` suffix is appended.
+        """
+        base_ws = os.path.realpath(run_config.workspace_dir)
+        if not self._queue:
+            return base_ws
+
+        taken = {ws for _, ws in self._queued_workspaces()}
+        if base_ws not in taken:
+            return base_ws
+
+        # Append _run<N> suffix; strip any existing _run<M> suffix first
+        stripped = re.sub(r"_run\d+$", "", base_ws)
+        candidate = f"{stripped}_run{run_id}"
+        while candidate in taken:
+            run_id += 1
+            candidate = f"{stripped}_run{run_id}"
+        return candidate
+
+    # ------------------------------------------------------------------
+    # Step 3 – Toolomics connectivity & workspace
+    # ------------------------------------------------------------------
+
+    async def _setup_connectivity(self, run_config: Config, run_id: int) -> list[str]:
         """Configure port range, discover MCPs, set workspace. Returns MCP list."""
-        # Port range
+
+        # ---- Port range ------------------------------------------------
+        sug_ip, sug_pmin, sug_pmax = self._suggest_port_range(run_config)
+
         current = run_config.discovery_addresses
         _info(
             f"Current discovery addresses: "
             f"{', '.join(f'{a.ip}:{a.port_min}-{a.port_max}' for a in current)}"
         )
-        change = _ask_yn("Change port range?", default=False)
-        if change:
-            ip = _ask("IP address", default="0.0.0.0")
-            port_min = _ask("Port min", default="5000")
-            port_max = _ask("Port max", default="5200")
-            try:
-                run_config.discovery_addresses = [
-                    AddressMCP(ip=ip, port_min=int(port_min), port_max=int(port_max))
-                ]
-                _ok(f"Discovery: {ip}:{port_min}-{port_max}")
-            except Exception as exc:
-                _warn(f"Invalid address ({exc}). Keeping previous value.")
 
-        # Discover MCPs
+        if self._queue:
+            _info(f"Suggested non-conflicting range: {sug_ip}:{sug_pmin}-{sug_pmax}")
+
+        change = self._queue or _ask_yn("Change port range?", default=False)
+        if change:
+            while True:
+                ip = _ask("IP address", default=sug_ip)
+                port_min = _ask("Port min", default=sug_pmin)
+                port_max = _ask("Port max", default=sug_pmax)
+                try:
+                    pmin_int, pmax_int = int(port_min), int(port_max)
+                    # Validate against queued runs
+                    conflicts = self._ports_conflict_with_queue(pmin_int, pmax_int)
+                    if conflicts:
+                        for c in conflicts:
+                            _err(f"Port conflict with {c}")
+                        _warn("Please choose a different range.")
+                        # Re-suggest
+                        sug_ip, sug_pmin, sug_pmax = ip, str(pmax_int + 1), str(pmax_int + 1 + (pmax_int - pmin_int))
+                        continue
+                    run_config.discovery_addresses = [
+                        AddressMCP(ip=ip, port_min=pmin_int, port_max=pmax_int)
+                    ]
+                    _ok(f"Discovery: {ip}:{port_min}-{port_max}")
+                    break
+                except Exception as exc:
+                    _warn(f"Invalid address ({exc}). Please try again.")
+
+        # ---- Discover MCPs ---------------------------------------------
         tool_manager = ToolManager(config=run_config)
         mcp_list: list[str] = []
         try:
@@ -310,30 +429,53 @@ class EvaluationCLI:
         else:
             _err("No MCP servers found. Evaluation may fail at runtime.")
 
-        # Workspace — loop until we have a valid directory
-        while True:
-            ws = run_config.workspace_dir
-            if os.path.isdir(ws):
-                _ok(f"Workspace directory found: {ws}")
-                break
+        # ---- Workspace -------------------------------------------------
+        suggested_ws = self._suggest_workspace(run_config, run_id)
+        ws_is_new_suggestion = (os.path.realpath(run_config.workspace_dir) != suggested_ws)
 
-            _err(f"Workspace directory not found: {ws}")
-            print(_wrap(
-                "This path must point to the Toolomics workspace folder — the shared "
-                "directory where Mimosa reads and writes task artifacts. "
-                "Please enter the correct absolute path.",
-                width=70, indent=2,
-            ))
-            new_ws = _ask("Workspace directory path")
-            if not new_ws:
-                _warn("No path provided. Workspace must be set for evaluation to work.")
+        print(_wrap(
+            "Workspace directory — the Toolomics folder where Mimosa reads "
+            "and writes task artifacts. Each queued run must use a unique workspace.",
+            width=70, indent=2,
+        ))
+
+        if ws_is_new_suggestion:
+            _info(f"Suggested workspace (avoids conflict): {suggested_ws}")
+
+        while True:
+            new_ws = _ask("Workspace directory path", default=suggested_ws)
+            new_ws = os.path.expanduser(new_ws.strip()) if new_ws.strip() else suggested_ws
+            resolved = os.path.realpath(new_ws)
+
+            # Check uniqueness against queue
+            conflict = False
+            for rid, qws in self._queued_workspaces():
+                if resolved == qws:
+                    _err(f"Workspace already used by Run #{rid}: {qws}")
+                    conflict = True
+                    break
+            if conflict:
+                _warn("Please choose a different workspace directory.")
                 continue
-            new_ws = os.path.expanduser(new_ws.strip())
+
             if os.path.isdir(new_ws):
                 run_config.workspace_dir = new_ws
-                _ok(f"Workspace set to: {new_ws}")
+                _ok(f"Workspace: {new_ws}")
                 break
-            _err(f"Directory does not exist: {new_ws}. Please try again.")
+
+            # Directory doesn't exist — offer to create it
+            _warn(f"Directory does not exist: {new_ws}")
+            create = _ask_yn("Create it now?", default=True)
+            if create:
+                try:
+                    os.makedirs(new_ws, exist_ok=True)
+                    run_config.workspace_dir = new_ws
+                    _ok(f"Created & set workspace: {new_ws}")
+                    break
+                except OSError as exc:
+                    _err(f"Could not create directory: {exc}")
+            else:
+                _info("Please enter a different path.")
 
         return mcp_list
 

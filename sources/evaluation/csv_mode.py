@@ -29,6 +29,37 @@ from sources.cli.pretty_print import (
 )
 
 
+_INPUT_TIMEOUT = 10  # seconds before auto-accepting the default
+
+
+async def _input_with_timeout(prompt: str, default: str = "0", timeout: float = _INPUT_TIMEOUT) -> str:
+    """
+    Non-blocking input prompt with a countdown timeout.
+
+    Displays a prompt and waits up to *timeout* seconds for user input.
+    If no input is provided within the timeout, *default* is returned.
+
+    Args:
+        prompt: The text shown to the user.
+        default: Value returned on timeout or empty input.
+        timeout: Seconds to wait before auto-accepting *default*.
+
+    Returns:
+        The user's input string, or *default* on timeout / empty input.
+    """
+    loop = asyncio.get_running_loop()
+    print(f"{prompt} (auto-accept '{default}' in {timeout:.0f}s): ", end="", flush=True)
+    try:
+        raw = await asyncio.wait_for(
+            loop.run_in_executor(None, input),
+            timeout=timeout,
+        )
+        return raw.strip() if raw.strip() else default
+    except asyncio.TimeoutError:
+        print(f"\n  ⏱  Timeout – using default: {default}")
+        return default
+
+
 @dataclass
 class TaskContext:
     """Context for a single concurrent task evaluation."""
@@ -796,14 +827,11 @@ Provide your analysis following the specified output format."""
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
+        # Get starting row from user (with timeout)
         while True:
-            user_input = input("Enter starting row ([Enter] 0 by default): ")
-            if not user_input.strip():
-                start_row = 0
-                break
+            user_input = await _input_with_timeout("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1
+                start_row = int(user_input) - 1 if user_input != "0" else 0
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
@@ -811,8 +839,10 @@ Provide your analysis following the specified output format."""
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
-            if restore_input.strip().lower() != 'n':
+            restore_input = await _input_with_timeout(
+                "Restore previous run statistics from cache? (y/n)", default="y"
+            )
+            if restore_input.lower() != 'n':
                 self._restore_execution_history_from_cache(cached_notes)
 
         # Initialize semaphore for concurrency control
@@ -902,13 +932,12 @@ Provide your analysis following the specified output format."""
         Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
+
+        # Get starting row from user (with timeout)
         while True:
-            user_input = input("Enter starting row ([Enter] 0 by default): ")
-            if not user_input.strip():
-                start_row = 0
-                break
+            user_input = await _input_with_timeout("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1
+                start_row = int(user_input) - 1 if user_input != "0" else 0
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
@@ -916,8 +945,10 @@ Provide your analysis following the specified output format."""
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
-            if restore_input.strip().lower() != 'n':
+            restore_input = await _input_with_timeout(
+                "Restore previous run statistics from cache? (y/n)", default="y"
+            )
+            if restore_input.lower() != 'n':
                 self._restore_execution_history_from_cache(cached_notes)
 
         sab_loader = None
