@@ -49,7 +49,7 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
-        self.smolagent_model_id: str = "anthropic/claude-sonnet-4-5"
+        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5"
         self.judge_model = "anthropic/claude-sonnet-4-5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent

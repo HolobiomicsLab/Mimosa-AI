@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 # Add the parent directory to the path so we can import from sources
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from sources.evaluation.evaluator import WorkflowEvaluator
+from sources.core.evaluators.evaluator import WorkflowEvaluator
 
 # Load environment variables
 load_dotenv()
