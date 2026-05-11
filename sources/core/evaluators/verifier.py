@@ -42,6 +42,10 @@ from .base import (
     WorkflowDataError,
 )
 
+from sources.cli.pretty_print import (
+    print_box, print_info,
+    CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
+)
 
 # ----- Default per-script execution limits ------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
@@ -294,6 +298,7 @@ ones first. Do not invent claims that the workflow did not make.
             scored = self._score_soft(uuid, claim, execution_text, workspace_listing, spec.get("reason", ""))
         scored["claim"] = claim
         scored["spec"] = spec
+        print_box(scored['claim'], title=f"Claim status: {scored["status"]}", color=GREEN if scored.get("score", 0) >= 0.5 else RED)
         return scored
 
     def _generate_verifier(
