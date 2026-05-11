@@ -292,7 +292,6 @@ Specificity = 0.9 ✓
             if role not in ["tool-call", "tool-response"]:
                 relevant_code = None
 
-        print(f"[DEBUG] Final timeline contains {len(value_timeline)} values with full history")
         return value_timeline
 
     def _extract_content_text(self, entry: dict) -> str:

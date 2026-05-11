@@ -21,7 +21,7 @@ class WorkflowEvaluator:
     """
 
     def __init__(self, config, scenarios_dir="datasets/scenarios",
-                 use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0):
+                 use_bs_penalty: bool = True, bs_fraud_threshold: float = 5.0):
         """Initialize the WorkflowEvaluator with configuration.
 
         Args:

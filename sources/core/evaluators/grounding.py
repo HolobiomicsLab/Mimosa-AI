@@ -1,7 +1,7 @@
 
 from sources.utils.perspicacite_client import query_perspicacite
 
-def get_perspicacite_grounding(self, execution_text: str) -> str:
+def get_perspicacite_grounding(execution_text: str) -> str:
     """Query Perspicacite for citation grounded verification of workflow execution.
     Args:
         execution_text: The execution text to send to Perspicacite
@@ -30,5 +30,4 @@ RULES:
         response = query_perspicacite(prompt)
         return response
     except Exception as e:
-        self.logger.error(f"Failed to query Perspicacite: {str(e)}")
         return "Perspicacite query failed, unable to provide grounded verification. Estimating plausibility based on available evidence without external grounding."

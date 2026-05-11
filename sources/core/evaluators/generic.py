@@ -23,10 +23,7 @@ from .bs_detection import BullshitDetectorNumerical
 class GenericEvaluator(BaseEvaluator):
     """Evaluator for generic workflow evaluation using LLM judgment."""
 
-    # Bind the grounding helper as a method (defined in grounding.py with `self` arg).
-    get_perspicacite_grounding = get_perspicacite_grounding
-
-    def __init__(self, config, use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0):
+    def __init__(self, config, use_bs_penalty: bool = True, bs_fraud_threshold: float = 5.0):
         """Initialize the GenericEvaluator.
 
         Args:
@@ -330,7 +327,7 @@ Respond in this exact JSON format:
                 raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
 
             if success:
-                litterature_grounding = self.get_perspicacite_grounding(execution_text)
+                litterature_grounding = get_perspicacite_grounding(execution_text)
                 print_box(litterature_grounding, title=f"Perspicacite scientific grounding", color=GREEN)
 
             self.logger.info(f"Evaluating workflow {uuid} with independent LLM judges per criterion")
@@ -397,6 +394,7 @@ Respond in this exact JSON format:
                 self.logger.warning("No standard score categories found for overall score calculation")
 
             # Optional BS-detection penalty: subtract a 0-1 penalty (clamped) from overall_score.
+            short_report = None
             if self.use_bs_penalty and self._bs_detector is not None:
                 try:
                     fraud_results = self._bs_detector.analyze_all_agents_numerical(uuid)
@@ -431,6 +429,9 @@ Respond in this exact JSON format:
                         file.write(f"  Evidence: {cr['evidence']}\n\n")
                     if 'overall_score' in scores:
                         file.write(f"Overall Score: {scores['overall_score']:.2f}\n")
+                    if self.use_bs_penalty:
+                        file.write(f"BS Penalty: {scores.get('bs_penalty', 0.0):.2f}\n")
+                        file.write(f"BS Penalty Rationale: {scores.get('bs_penalty_rationale', '')}\n")
                 self.logger.info(f"Evaluation completed for {uuid}. Results saved to: {evaluation_path}")
             except OSError as e:
                 self.logger.error(f"Failed to save evaluation to file: {str(e)}")
