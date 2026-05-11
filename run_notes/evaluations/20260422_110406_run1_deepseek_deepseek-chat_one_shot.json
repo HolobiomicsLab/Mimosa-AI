@@ -1,0 +1,31 @@
+{
+  "started_at": "2026-04-22T11:04:06.354041",
+  "run_id": 1,
+  "smolagent_model_id": "deepseek/deepseek-chat",
+  "workflow_llm_model": "anthropic/claude-opus-4-5",
+  "eval_mode": "one_shot",
+  "csv_runs_limit": 10,
+  "discovery_addresses": [
+    {
+      "ip": "0.0.0.0",
+      "port_min": 5000,
+      "port_max": 5200
+    }
+  ],
+  "workspace_dir": "/home/martin/Projects/CNRS/Toolomics/workspace",
+  "detected_mcps": [
+    "mcp_5000: 4 tools available | running on 0.0.0.0:5000",
+    "mcp_5001: 5 tools available | running on 0.0.0.0:5001",
+    "mcp_5002: 12 tools available | running on 0.0.0.0:5002",
+    "mcp_5003: 3 tools available | running on 0.0.0.0:5003",
+    "mcp_5004: 10 tools available | running on 0.0.0.0:5004",
+    "mcp_5005: 5 tools available | running on 0.0.0.0:5005",
+    "mcp_5006: 10 tools available | running on 0.0.0.0:5006",
+    "mcp_5007: 3 tools available | running on 0.0.0.0:5007",
+    "mcp_5008: 6 tools available | running on 0.0.0.0:5008",
+    "mcp_5200: 4 tools available | running on 0.0.0.0:5200"
+  ],
+  "dataset": "datasets/ScienceAgentBench.csv",
+  "status": "running",
+  "queue_size": 2
+}
