@@ -9,6 +9,7 @@ from ..core.evaluators.evaluator import (
     BaseEvaluator,
     GenericEvaluator,
     ScenarioEvaluator,
+    VerifierEvaluator,
     WorkflowEvaluator,
     EvaluatorError,
     WorkflowDataError,
@@ -27,6 +28,7 @@ __all__ = [
     "BaseEvaluator",
     "GenericEvaluator",
     "ScenarioEvaluator",
+    "VerifierEvaluator",
     "WorkflowEvaluator",
     # Evaluator exceptions
     "EvaluatorError",
