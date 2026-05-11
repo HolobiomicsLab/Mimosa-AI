@@ -5,7 +5,7 @@ Provides tools for assessing workflow outputs, scoring generated code,
 detecting numerical inconsistencies, and running benchmark datasets.
 """
 
-from .evaluator import (
+from ..core.evaluators.evaluator import (
     BaseEvaluator,
     GenericEvaluator,
     ScenarioEvaluator,

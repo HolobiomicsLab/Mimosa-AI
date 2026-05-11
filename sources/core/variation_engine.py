@@ -1,11 +1,6 @@
 
 """
 VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evolution.
-
-Owns three concerns:
-  1. Annealing schedule  — _get_temperature_phase()  decides what to do each iteration
-  2. Prompt construction — seed_genome_prompt / mutation_prompt / crossover_prompt
-  3. Mutagen delegation  — all perturbation sampling is done by self.mutagen
 """
 
 from .mutagen import Mutagen
@@ -23,8 +18,7 @@ class VariationEngine:
 
     Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
       - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
-      - Injects a freshly-sampled multi-dimensional perturbation (via Mutagen) to
-        escape local minima.
+      - Injects a freshly-sampled multi-dimensional perturbation (via Mutagen)
       - Applies a phase-aware annealing schedule that governs exploration breadth
         and permitted topology complexity as iterations progress.
     """
@@ -52,14 +46,6 @@ class VariationEngine:
         The progress exponent is modulated by the current best score (alpha):
           - High score → slower progress → stay exploratory longer.
           - Low score  → faster progress → commit to convergence sooner.
-
-        Phases (by progress ∈ [0, 1]):
-          [0.00, 0.10) SEED       — 2-3 agents, prove solvability.
-          [0.10, 0.25) BOOTSTRAP  — 3-5 agents, establish linear baseline.
-          [0.25, 0.40) DIVERGE    — 4-7 agents, explore structural diversity.
-          [0.40, 0.60) SCALE      — 5+ agents, purposeful depth addition.
-          [0.60, 0.80) CONVERGE   — freeze count, tighten prompts.
-          [0.80, 1.00] POLISH     — frozen architecture, micro-improvements only.
         """
         if max_iterations <= 1:
             progress = 0.5
@@ -93,7 +79,7 @@ class VariationEngine:
         elif progress < 0.40:
             return (
                 f"## PHASE: DIVERGE  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 4–7 agents. Branching and loops are now permitted.\n"
+                "Complexity budget: 4–7 agents maximum. Branching and loops are now permitted.\n"
                 "Objective: explore structurally different approaches — breadth of search, not depth of refinement.\n"
                 "Rules:\n"
                 "  • Try a topology qualitatively different from all previous attempts\n"
@@ -105,7 +91,7 @@ class VariationEngine:
         elif progress < 0.60:
             return (
                 f"## PHASE: SCALE  [iteration {i}/{n}  |  progress {p:.0%}]\n"
-                "Complexity budget: 5+ agents. Additional depth is now justified.\n"
+                "Complexity budget: 5+ agents maximum. Additional depth can now be justified.\n"
                 "Objective: take the most promising topology and add ONE purposeful layer —\n"
                 "  a validator, a critic, a fallback path, or a specialised sub-agent.\n"
                 "Rules:\n"
@@ -187,11 +173,7 @@ class VariationEngine:
         The prompt has three layers:
           1. Voice framing   — sets the LLM's reasoning tone for this iteration.
           2. Execution grounding — previous code, agent answers, and judge eval.
-          3. Change pressures — a freshly-sampled Perturbation from Mutagen that
-             nudges the LLM away from local minima without being prescriptive.
-
-        The annealing schedule (_get_temperature_phase) constrains complexity
-        budget so the search obeys a simple-to-complex curriculum.
+          3. Change pressures — a freshly-sampled perturbation from Mutagen that drives the LLM away from local minima.
         """
         score      = wf_info.overall_score      if wf_info else 0.0
         judge_eval = wf_info.judge_evaluation   if wf_info else None
@@ -274,15 +256,7 @@ class VariationEngine:
     ) -> str:
         """
         Build a prompt for a crossover step: recombine N parent workflows into one offspring.
-
-        Parents are sorted best → worst so the LLM sees the strongest candidates
-        first (primacy bias works in our favour here).  The LLM is explicitly
-        instructed to *recombine*, not to pick-and-patch one parent — genuine
-        structural inheritance is the goal.
-
-        Unlike mutation_prompt(), crossover does not inject a Mutagen perturbation.
-        The structural diversity already comes from the parent pool; adding random
-        pressures on top would risk obscuring the recombination signal.
+        Parents are sorted best → worst so the LLM sees the strongest candidates first.
         """
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []

@@ -74,7 +74,7 @@ class EvolutionEngine:
         viz_utils: VisualizationUtils = None,
         process_id: int = None,
     ) -> None:
-        from sources.evaluation.evaluator import WorkflowEvaluator
+        from sources.core.evaluators.evaluator import WorkflowEvaluator
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
