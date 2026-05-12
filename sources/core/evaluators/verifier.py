@@ -24,8 +24,9 @@ import asyncio
 import json
 import os
 import re
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Coroutine, TypeVar
 
 from sources.core.llm_provider import LLMProvider
 from sources.core.workflow_runner import (
@@ -51,6 +52,69 @@ from sources.cli.pretty_print import (
 _VERIFIER_TIMEOUT_SECONDS = 60
 _VERIFIER_MAX_CLAIMS = 12
 _HARD_FAIL_CAP = 0.5
+
+
+T = TypeVar("T")
+
+
+def _run_coro_sync(
+    coro_factory: Callable[[], Coroutine[Any, Any, T]],
+    thread_timeout: float | None = None,
+) -> T:
+    """Run an async coroutine to completion from a sync caller.
+
+    Crucially, the coroutine is *not* constructed unless we are sure we can
+    await it. Constructing a coroutine and then handing it to a failing
+    ``asyncio.run`` orphans it and produces the dreaded
+    ``coroutine '...' was never awaited`` RuntimeWarning at GC time.
+
+    Strategy:
+      - No running loop in this thread → ``asyncio.run`` directly.
+      - Already inside a running loop (we're called from ``async def``) →
+        spin a one-shot worker thread with its own fresh loop and join.
+
+    Args:
+        coro_factory: zero-arg callable that returns a fresh coroutine.
+        thread_timeout: optional join timeout for the worker thread. ``None``
+            means wait forever (caller is responsible for inner timeouts).
+
+    Returns:
+        Whatever the coroutine returns.
+
+    Raises:
+        TimeoutError: if the worker thread did not complete in time.
+        Any exception raised by the coroutine itself.
+    """
+    try:
+        asyncio.get_running_loop()
+        in_loop = True
+    except RuntimeError:
+        in_loop = False
+
+    if not in_loop:
+        # Safe to build + await here; one shot, no orphan possible.
+        return asyncio.run(coro_factory())
+
+    # Nested case: a daemon worker with its own loop owns the coroutine
+    # end-to-end, so it cannot be orphaned.
+    holder: dict[str, Any] = {}
+
+    def _target() -> None:
+        try:
+            holder["result"] = asyncio.run(coro_factory())
+        except BaseException as exc:  # noqa: BLE001 — re-raised below
+            holder["error"] = exc
+
+    t = threading.Thread(target=_target, daemon=True)
+    t.start()
+    t.join(timeout=thread_timeout)
+    if t.is_alive():
+        raise TimeoutError(
+            f"Worker thread did not finish within {thread_timeout}s"
+        )
+    if "error" in holder:
+        raise holder["error"]
+    return holder["result"]
 
 
 def _extract_json_payload(text: str) -> str:
@@ -289,16 +353,82 @@ ones first. Do not invent claims that the workflow did not make.
         execution_text: str,
         workspace_listing: str,
     ) -> dict[str, Any]:
-        """Generate, execute (if executable) and score a single claim."""
+        """Generate, execute (if executable) and score a single claim.
+
+        Emits diagnostic ``print_box`` panels around each stage so the user
+        can see, at a glance:
+          - which claim is being checked,
+          - the verifier code (or reason for being marked non-executable),
+          - the script's stdout/stderr/exit status,
+          - the final verdict.
+        """
+        # 1. Header — the claim being verified
+        claim_text = (
+            f"id:          {claim.get('id')}\n"
+            f"criticality: {claim.get('criticality')}\n"
+            f"description: {claim.get('description')}"
+        )
+        print_box(claim_text, title=f"Verifying claim {claim.get('id')}", color=CYAN)
+
+        # 2. Generate the verifier spec (executable code OR soft reason)
         spec = self._generate_verifier(uuid, claim, execution_text, workspace_listing)
+
         if spec.get("executable") and spec.get("code"):
-            exec_result = self._run_verifier(uuid, claim["id"], spec["code"])
+            code = spec["code"]
+            print_box(code, title=f"Verifier code · {claim.get('id')}", color=YELLOW, truncate=4000)
+
+            # 3. Run it and surface what actually happened
+            exec_result = self._run_verifier(uuid, claim["id"], code)
+
+            exit_status = exec_result.get("exit_status", "?")
+            run_status = exec_result.get("status", "?")
+            details = exec_result.get("details", "") or ""
+            stdout = exec_result.get("raw_stdout", "") or ""
+            stderr = exec_result.get("raw_stderr", "") or ""
+
+            run_color = GREEN if run_status == "pass" else (YELLOW if run_status == "fail" else RED)
+            summary = (
+                f"status:      {run_status}\n"
+                f"exit_status: {exit_status}\n"
+                f"details:     {details}"
+            )
+            print_box(summary, title=f"Verifier run · {claim.get('id')}", color=run_color)
+
+            if stdout.strip():
+                print_box(stdout, title=f"stdout · {claim.get('id')}", color=DIM, truncate=4000)
+            if stderr.strip():
+                print_box(stderr, title=f"stderr · {claim.get('id')}", color=RED, truncate=4000)
+
             scored = self._score_executable(claim, spec, exec_result)
         else:
-            scored = self._score_soft(uuid, claim, execution_text, workspace_listing, spec.get("reason", ""))
+            reason = spec.get("reason", "")
+            print_box(
+                f"Marked non-executable.\nreason: {reason or '(none provided)'}",
+                title=f"Verifier spec · {claim.get('id')}",
+                color=YELLOW,
+            )
+            scored = self._score_soft(uuid, claim, execution_text, workspace_listing, reason)
+            print_box(
+                f"verdict:   {scored.get('status')}\nrationale: {scored.get('rationale', '')}",
+                title=f"Soft check · {claim.get('id')}",
+                color=GREEN if scored.get("score", 0) >= 0.5 else RED,
+            )
+
         scored["claim"] = claim
         scored["spec"] = spec
-        print_box(scored['claim'], title=f"Claim status: {scored['status']}", color=GREEN if scored.get("score", 0) >= 0.5 else RED)
+
+        # 4. Final verdict panel — green on pass-ish, red otherwise.
+        final = (
+            f"id:     {claim.get('id')}\n"
+            f"kind:   {scored.get('verifier_kind')}\n"
+            f"status: {scored.get('status')}\n"
+            f"score:  {scored.get('score')}"
+        )
+        print_box(
+            final,
+            title=f"Claim verdict · {claim.get('id')}",
+            color=GREEN if scored.get("score", 0) >= 0.5 else RED,
+        )
         return scored
 
     def _generate_verifier(
@@ -360,7 +490,12 @@ Return STRICT JSON only, in one of these two shapes:
         return spec
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
-        """Execute a single verifier script in the agents' workspace."""
+        """Execute a single verifier script in the agents' workspace.
+
+        Uses ``_run_coro_sync`` so the WorkflowRunner coroutines are always
+        awaited — both ``execute`` and ``cleanup`` — whether we are called
+        from a plain sync context or from inside a running asyncio loop.
+        """
         scratch = self._runner_temp_root / uuid
         scratch.mkdir(parents=True, exist_ok=True)
         # Disable PTY + don't auto-install requirements — verifier scripts are
@@ -373,34 +508,43 @@ Return STRICT JSON only, in one of these two shapes:
         )
         runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
         execution_id = f"verify_{claim_id}"
+
+        # Give the worker thread a bit of slack beyond the per-script timeout
+        # so the runner itself can return a TIMEOUT result rather than us
+        # killing the thread blindly.
+        thread_timeout = self.verifier_timeout + 10
+        result = None
         try:
-            result = asyncio.run(runner.execute(code, execution_id=execution_id))
-        except RuntimeError:
-            # Already inside an event loop — fall back to a fresh loop in a thread.
-            import threading
-            holder: dict[str, Any] = {}
-
-            def _runner():
-                holder["result"] = asyncio.run(runner.execute(code, execution_id=execution_id))
-
-            t = threading.Thread(target=_runner, daemon=True)
-            t.start()
-            t.join(timeout=self.verifier_timeout + 5)
-            if "result" not in holder:
-                return {
-                    "status": "error",
-                    "actual": None,
-                    "details": "verifier execution thread did not return in time",
-                    "raw_stdout": "",
-                    "raw_stderr": "",
-                    "exit_status": "timeout",
-                }
-            result = holder["result"]
+            result = _run_coro_sync(
+                lambda: runner.execute(code, execution_id=execution_id),
+                thread_timeout=thread_timeout,
+            )
+        except TimeoutError as e:
+            return {
+                "status": "error",
+                "actual": None,
+                "details": f"verifier execution did not return in time: {e}",
+                "raw_stdout": "",
+                "raw_stderr": "",
+                "exit_status": "timeout",
+            }
+        except Exception as e:  # surface the underlying failure
+            return {
+                "status": "error",
+                "actual": None,
+                "details": f"verifier execution raised: {type(e).__name__}: {e}",
+                "raw_stdout": "",
+                "raw_stderr": "",
+                "exit_status": "error",
+            }
         finally:
+            # Cleanup MUST also be awaited via the helper; calling
+            # asyncio.run() directly from inside a running loop would leak
+            # the cleanup coroutine.
             try:
-                asyncio.run(runner.cleanup())
-            except Exception:
-                pass
+                _run_coro_sync(runner.cleanup, thread_timeout=15)
+            except Exception as e:
+                self.logger.debug(f"verifier runner cleanup failed: {e}")
 
         parsed = self._parse_verifier_stdout(result.stdout, claim_id)
         parsed.update({
