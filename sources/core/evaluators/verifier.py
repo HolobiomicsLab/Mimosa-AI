@@ -68,11 +68,6 @@ def _run_coro_sync(
     ``asyncio.run`` orphans it and produces the dreaded
     ``coroutine '...' was never awaited`` RuntimeWarning at GC time.
 
-    Strategy:
-      - No running loop in this thread → ``asyncio.run`` directly.
-      - Already inside a running loop (we're called from ``async def``) →
-        spin a one-shot worker thread with its own fresh loop and join.
-
     Args:
         coro_factory: zero-arg callable that returns a fresh coroutine.
         thread_timeout: optional join timeout for the worker thread. ``None``

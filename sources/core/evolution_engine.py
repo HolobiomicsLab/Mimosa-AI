@@ -95,7 +95,7 @@ class EvolutionEngine:
             novelty_weight=0.4
         )
 
-    def mockup(self, wf, goal):
+    async def mockup(self, wf, goal):
         """
         Mockup mode: use existing workflow data without calling orchestrate_workflow
         """
@@ -121,6 +121,9 @@ class EvolutionEngine:
         )
         agents_answers = self.extract_agents_behavior(wf.state_result)
         self.show_answers(agents_answers)
+        _, _ = await self._evaluate_and_calculate_cost(
+            True, mock_run.judge, wf.uuid, mock_run.answers, mock_run.scenario_rubric, []
+        )
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
@@ -253,7 +256,7 @@ class EvolutionEngine:
     async def start_workflow_evolution(
         self,
         goal: str,
-        template_uuid: str | None = None,
+        template_uuid: str | None = "20260512_162504_70ccefbf",
         judge: bool = True,
         scenario_rubric: str = None,
         max_iteration: int = 1,
@@ -291,7 +294,7 @@ class EvolutionEngine:
         wf = parents[0] if parents else None
 
         if mockup_mode:
-            return self.mockup(wf, goal)
+            return await self.mockup(wf, goal)
 
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
         workspace_mgr = WorkspaceManager(self.config, self.logger)
