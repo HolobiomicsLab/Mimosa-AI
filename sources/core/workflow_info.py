@@ -154,6 +154,8 @@ class WorkflowInfo:
             try:
                 if "generic" in evaluation:
                         scores.append(evaluation["generic"]["overall_score"])
+                elif "verifier" in evaluation:
+                        scores.append(evaluation["verifier"]["overall_score"])
                 elif "scenario" in evaluation:
                     scores.append(evaluation["scenario"]["score"])
             except Exception as _:

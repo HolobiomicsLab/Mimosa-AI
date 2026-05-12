@@ -370,7 +370,7 @@ ones first. Do not invent claims that the workflow did not make.
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
-            print_box(code, title=f"Verifier code · {claim.get('id')}", color=YELLOW, truncate=4000)
+            print_box(code[:2048], title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=4000)
 
             # 3. Run it and surface what actually happened
             exec_result = self._run_verifier(uuid, claim["id"], code)
@@ -459,6 +459,7 @@ RULES FOR YOUR SCRIPT:
   property and emit "pass"/"fail" accordingly.
 - Catch your own exceptions and emit status="error" with the error message in
   details — never let the script raise.
+- Never make assumptions about file content.
 
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
@@ -612,10 +613,10 @@ Return STRICT JSON only, in one of these two shapes:
         reason: str,
     ) -> dict[str, Any]:
         """Narrow LLM check for non-executable claims.
-
         The LLM is asked one targeted question (does this single claim hold
         given this concrete context?), not an aggregate vibes score.
         """
+
         prompt = f"""
 You are checking ONE claim from a multi-agent workflow. The claim is not
 executable in code; please judge it against the concrete context below.

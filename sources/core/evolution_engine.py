@@ -58,10 +58,13 @@ def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
         if 'scenario' in eval_data and eval_data['scenario']:
             passed = eval_data['scenario'].get('passed_assertions', 0)
             total = eval_data['scenario'].get('total_assertions', 1)
-            return (passed / total) >= 0.8
+            return (passed / total) >= 0.9
         if 'generic' in eval_data and eval_data['generic']:
             score = eval_data['generic'].get('overall_score', 0.0)
-            return score >= 0.7
+            return score >= 0.9
+        if 'verifier' in eval_data and eval_data['verifier']:
+            score = eval_data['verifier'].get('overall_score', 0.0)
+            return score >= 0.9
     if answers:
         return check_answer_success(answers[-1])
     return False
@@ -561,8 +564,11 @@ class EvolutionEngine:
         logger = logging.getLogger(__name__)
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
-        eval_result = self.judge.evaluate(uuid=uuid, agent_answers=agent_answers, scenario_rubric=scenario_rubric)
-        eval_type = 'scenario' if scenario_rubric else 'generic'
+        eval_result = self.judge.evaluate(uuid=uuid,
+                                          agent_answers=agent_answers,
+                                          evaluator_type="verifier",
+                                          scenario_rubric=scenario_rubric)
+        eval_type = eval_result['evaluation_type'] 
         eval_time = time.time() - eval_start
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
         print_ok(f"Workflow evaluation completed in {eval_time:.3f}s")
