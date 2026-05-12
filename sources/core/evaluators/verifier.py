@@ -229,12 +229,19 @@ class VerifierEvaluator(BaseEvaluator):
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
 
         # Short-circuit: workflow generation/execution totally failed.
+        # Use the *artefact-existence* signal here, NOT the brittle
+        # `success` flag from workflow_execution_text — that flag does
+        # `not "[]" in json.dumps(answers)` and falsely flips False for
+        # any successful run whose answer JSON happens to contain an
+        # empty list (e.g. `{"warnings": [], "verdict": "PASS"}`).
         # The workspace_dir is shared across evolution generations, so
-        # running verifier scripts now would silently score against
-        # whatever the previous generation left behind. Return 0.0
-        # immediately while still emitting the report + state files so
-        # downstream readers see a real-but-zero entry.
-        if not success:
+        # running verifier scripts on a run that produced no code AND no
+        # state_result would silently score against whatever the previous
+        # generation left behind. Return 0.0 immediately while still
+        # emitting the report + state files so downstream readers see a
+        # real-but-zero entry.
+        wf_info = self._load_workflow_data(uuid)
+        if not wf_info.state_result and not wf_info.code:
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
