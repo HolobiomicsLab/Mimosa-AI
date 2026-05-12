@@ -370,7 +370,7 @@ ones first. Do not invent claims that the workflow did not make.
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
-            print_box(code[:2048], title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=4000)
+            print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=512)
 
             # 3. Run it and surface what actually happened
             exec_result = self._run_verifier(uuid, claim["id"], code)
