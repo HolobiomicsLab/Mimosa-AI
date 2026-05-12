@@ -229,11 +229,6 @@ class VerifierEvaluator(BaseEvaluator):
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
 
         # Short-circuit: workflow generation/execution totally failed.
-        # The workspace_dir is shared across evolution generations, so
-        # running verifier scripts now would silently score against
-        # whatever the previous generation left behind. Return 0.0
-        # immediately while still emitting the report + state files so
-        # downstream readers see a real-but-zero entry.
         if not success:
             return self._short_circuit_failed_run(uuid)
 
@@ -261,11 +256,7 @@ class VerifierEvaluator(BaseEvaluator):
 
     def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
         """Return a 0.0 verifier score without running any scripts.
-
-        Used when the workflow produced no code AND no state_result of
-        its own. Writes the standard evaluation.txt and updates
-        state_result.json so downstream readers (selection, reporting)
-        see a real-but-zero entry instead of a missing one.
+        Used when the workflow produced no code AND no state_result.
         """
         print_box(
             f"workflow {uuid} produced no code and no state_result; "
