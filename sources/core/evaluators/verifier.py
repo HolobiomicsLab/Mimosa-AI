@@ -228,6 +228,15 @@ class VerifierEvaluator(BaseEvaluator):
         if not execution_text:
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
 
+        # Short-circuit: workflow generation/execution totally failed.
+        # The workspace_dir is shared across evolution generations, so
+        # running verifier scripts now would silently score against
+        # whatever the previous generation left behind. Return 0.0
+        # immediately while still emitting the report + state files so
+        # downstream readers see a real-but-zero entry.
+        if not success:
+            return self._short_circuit_failed_run(uuid)
+
         workspace_listing = self._list_workspace()
         claims = self._extract_claims(uuid, execution_text, workspace_listing, success)
         if not claims:
@@ -249,6 +258,42 @@ class VerifierEvaluator(BaseEvaluator):
             self.logger.error(f"Failed to persist verifier scores for {uuid}: {e}")
 
         return {"uuid": uuid, "claims": per_claim, **scores}
+
+    def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
+        """Return a 0.0 verifier score without running any scripts.
+
+        Used when the workflow produced no code AND no state_result of
+        its own. Writes the standard evaluation.txt and updates
+        state_result.json so downstream readers (selection, reporting)
+        see a real-but-zero entry instead of a missing one.
+        """
+        print_box(
+            f"workflow {uuid} produced no code and no state_result; "
+            f"verifier returns 0.0 without running scripts. "
+            f"(Avoids scoring against stale workspace from prior generations.)",
+            title="Verifier short-circuit — generation failed",
+            color=RED,
+        )
+        scores = {
+            "overall_score": 0.0,
+            "overall_score_uncapped": 0.0,
+            "hard_fail_capped": True,
+            "n_claims": 0,
+            "n_pass": 0,
+            "n_fail": 0,
+            "n_error": 0,
+            "n_unsure": 0,
+            "skipped_reason": "workflow_generation_or_execution_failed",
+        }
+        try:
+            self._write_report(uuid, [], [], scores)
+        except Exception as e:
+            self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
+        try:
+            self._save_results(scores, uuid, "verifier")
+        except Exception as e:
+            self.logger.error(f"Failed to persist short-circuit scores for {uuid}: {e}")
+        return {"uuid": uuid, "claims": [], **scores}
 
     # ------------------------------------------------------------------
     # Stage 1 — claim extraction
