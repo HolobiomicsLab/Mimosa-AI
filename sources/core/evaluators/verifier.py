@@ -341,9 +341,13 @@ TASK:
 Extract a list of ATOMIC CLAIMS the workflow makes. A good claim is:
 - a single, checkable statement (a number, a file existence, a dataset shape,
   a structural property, a comparison against a constraint, a derivation step),
-- specific enough that a small Python script could potentially verify it
-  against the workspace,
+- ideally specific enough that a small Python script could potentially verify it
+  against the workspace, or that can be verified against scientific literature if it concerns a methodological choice or a conclusion's defensibility,
 - not a meta-comment about the workflow ("the analysis was thorough").
+- not a vague statement about the workflow's overall performance ("the workflow successfully identified the key drivers of the system")
+- not claims about what was created but rather about what was achieved.
+- not claims about reported status or that are obviously just restatements of the workflow output ("the answer is X").
+
 
 For each claim, also estimate `criticality`:
 - "hard": load-bearing for the answer (final metrics, headline files,
