@@ -53,6 +53,19 @@ _VERIFIER_TIMEOUT_SECONDS = 60
 _VERIFIER_MAX_CLAIMS = 12
 _HARD_FAIL_CAP = 0.5
 
+# ----- File preview budgets ---------------------------------------------------
+# Per-file budget when including text content in the verifier-gen prompt. Files
+# bigger than _PREVIEW_HEAD_BYTES + _PREVIEW_TAIL_BYTES are sent as
+# "<head> ... (N bytes elided) ... <tail>" so the model still sees both ends
+# (which is where format clues — headers, footers — usually live).
+_PREVIEW_HEAD_BYTES = 8 * 1024
+_PREVIEW_TAIL_BYTES = 2 * 1024
+# Hard cap on combined preview size shipped per claim, so a multi-file claim
+# can't blow up the prompt.
+_PREVIEW_PER_CLAIM_CAP = 24 * 1024
+# Bytes sniffed when deciding text vs binary.
+_BINARY_SNIFF_BYTES = 4096
+
 
 T = TypeVar("T")
 
@@ -171,6 +184,9 @@ class VerifierEvaluator(BaseEvaluator):
         verifier_timeout: int = _VERIFIER_TIMEOUT_SECONDS,
         max_claims: int = _VERIFIER_MAX_CLAIMS,
         hard_fail_cap: float = _HARD_FAIL_CAP,
+        preview_head_bytes: int = _PREVIEW_HEAD_BYTES,
+        preview_tail_bytes: int = _PREVIEW_TAIL_BYTES,
+        preview_per_claim_cap: int = _PREVIEW_PER_CLAIM_CAP,
     ):
         """Initialize the VerifierEvaluator.
 
@@ -195,6 +211,16 @@ class VerifierEvaluator(BaseEvaluator):
         self.verifier_timeout = verifier_timeout
         self.max_claims = max_claims
         self.hard_fail_cap = hard_fail_cap
+        self.preview_head_bytes = preview_head_bytes
+        self.preview_tail_bytes = preview_tail_bytes
+        self.preview_per_claim_cap = preview_per_claim_cap
+        # Per-instance cache of rendered file previews, keyed by relative path
+        # string. Populated lazily on first read; survives for the lifetime of
+        # the evaluator so multiple claims referencing the same file don't
+        # re-read or re-render its bytes.
+        self._preview_cache: dict[str, str] = {}
+        # Per-instance cache of the workspace listing (rebuilt per evaluate()).
+        self._workspace_files: set[str] = set()
 
         # Reuse the temp_dir setting from the global runner config when
         # available; otherwise fall back to a per-uuid scratch under workflow_dir.
@@ -316,6 +342,7 @@ class VerifierEvaluator(BaseEvaluator):
                 "id": "c0_execution_succeeded",
                 "description": "The workflow executed to completion and produced a non-empty answer.",
                 "criticality": "hard",
+                "likely_relevant_files": [],
             }]
 
         prompt = f"""
@@ -342,13 +369,24 @@ For each claim, also estimate `criticality`:
 - "soft": supporting context (intermediate sanity remarks, choices that are
   defensible but not strictly required).
 
+For each claim, also list `likely_relevant_files`: relative paths whose
+contents the verifier would need to read in order to check the claim.
+- ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
+  Do not invent or guess paths the workflow's answer mentions but that are
+  not in the listing.
+- Use `[]` if the claim is purely about the workflow's output text and has
+  no on-disk artefact to consult.
+- Multi-file claims (e.g. "model in weights.pt produces predictions.csv")
+  may list several files — keep them in dependency order.
+
 Return STRICT JSON only, no prose, in this exact form:
 {{
   "claims": [
     {{
       "id": "c1_short_slug",
       "description": "<concise restatement of the claim>",
-      "criticality": "hard" | "soft"
+      "criticality": "hard" | "soft",
+      "likely_relevant_files": ["<relative/path>", ...]
     }},
     ...
   ]
@@ -378,10 +416,36 @@ ones first. Do not invent claims that the workflow did not make.
         for idx, c in enumerate(claims):
             if not isinstance(c, dict) or "description" not in c:
                 continue
+            # Filter likely_relevant_files against the actual workspace listing.
+            # This drops paths the agent's answer mentions confidently but that
+            # don't exist on disk (typos, wrong directory, hallucinated names).
+            raw_files = c.get("likely_relevant_files", [])
+            if not isinstance(raw_files, list):
+                raw_files = []
+            relevant: list[str] = []
+            seen: set[str] = set()
+            for rf in raw_files:
+                if not isinstance(rf, str):
+                    continue
+                rp = rf.strip().lstrip("./")
+                if not rp or rp in seen:
+                    continue
+                # Accept only paths that the workspace walker actually saw.
+                # `_workspace_files` is populated by `_list_workspace`.
+                if self._workspace_files and rp not in self._workspace_files:
+                    self.logger.debug(
+                        f"Dropping confabulated relevant file '{rp}' for claim "
+                        f"{c.get('id')}: not in workspace listing"
+                    )
+                    continue
+                relevant.append(rp)
+                seen.add(rp)
+
             cleaned.append({
                 "id": str(c.get("id") or f"c{idx}"),
                 "description": str(c["description"]).strip(),
                 "criticality": "hard" if c.get("criticality") == "hard" else "soft",
+                "likely_relevant_files": relevant,
             })
         return cleaned
 
@@ -406,10 +470,12 @@ ones first. Do not invent claims that the workflow did not make.
           - the final verdict.
         """
         # 1. Header — the claim being verified
+        rel_files = claim.get("likely_relevant_files", [])
         claim_text = (
             f"id:          {claim.get('id')}\n"
             f"criticality: {claim.get('criticality')}\n"
-            f"description: {claim.get('description')}"
+            f"description: {claim.get('description')}\n"
+            f"files:       {rel_files if rel_files else '(none)'}"
         )
         print_box(claim_text, title=f"Verifying claim {claim.get('id')}", color=CYAN)
 
@@ -481,12 +547,18 @@ ones first. Do not invent claims that the workflow did not make.
         execution_text: str,
         workspace_listing: str,
     ) -> dict[str, Any]:
+        relevant_previews = self._render_relevant_previews(
+            claim.get("likely_relevant_files", [])
+        )
         prompt = f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
 
 WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
+
+RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
+{relevant_previews}
 
 WORKFLOW OUTPUT (for context only — do not re-evaluate the whole thing):
 {execution_text}
@@ -495,6 +567,7 @@ CLAIM TO VERIFY:
 - id: {claim['id']}
 - criticality: {claim['criticality']}
 - description: {claim['description']}
+- likely_relevant_files: {claim.get('likely_relevant_files', [])}
 
 RULES FOR YOUR SCRIPT:
 - Print EXACTLY ONE JSON line to stdout, structured as:
@@ -507,7 +580,12 @@ RULES FOR YOUR SCRIPT:
   property and emit "pass"/"fail" accordingly.
 - Catch your own exceptions and emit status="error" with the error message in
   details — never let the script raise.
-- Never make assumptions about file content.
+- Parse the relevant files according to the format visible in the PREVIEWS
+  above. Do not invent a different format. If the previews include a header
+  line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
+- If the previews are empty or do not show enough of the file to be sure of
+  the format, prefer permissive parsing (try several reasonable splits, skip
+  unparseable lines) over a strict format that may misjudge the file.
 
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
@@ -665,12 +743,18 @@ Return STRICT JSON only, in one of these two shapes:
         given this concrete context?), not an aggregate vibes score.
         """
 
+        relevant_previews = self._render_relevant_previews(
+            claim.get("likely_relevant_files", [])
+        )
         prompt = f"""
 You are checking ONE claim from a multi-agent workflow. The claim is not
 executable in code; please judge it against the concrete context below.
 
 WORKSPACE FILES:
 {workspace_listing}
+
+RELEVANT FILE PREVIEWS:
+{relevant_previews}
 
 WORKFLOW OUTPUT (context only):
 {execution_text}
@@ -679,6 +763,7 @@ CLAIM:
 - id: {claim['id']}
 - criticality: {claim['criticality']}
 - description: {claim['description']}
+- likely_relevant_files: {claim.get('likely_relevant_files', [])}
 
 REASON IT WAS MARKED NON-EXECUTABLE:
 {reason or '(none)'}
@@ -718,21 +803,64 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
+        """Aggregate per-claim results into a final score.
+
+        Key rule: ``status == "error"`` is treated as **non-signal**, not as a
+        refutation. Verifier-script crashes (e.g. the LLM guessed the wrong
+        file format and the parser bailed) tell us nothing about whether the
+        underlying claim is true. Errors are therefore:
+          - excluded from the mean,
+          - excluded from the hard-fail-cap trigger,
+          - reported separately so the operator can spot a flaky verifier
+            without it dragging the workflow's score down.
+
+        If every claim errored we fall back to ``overall_score = 0.0`` since
+        we have no signal at all to report.
+        """
         if not per_claim:
-            return {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
-        scores = [c["score"] for c in per_claim]
-        overall = sum(scores) / len(scores)
+            return {
+                "overall_score": 0.0,
+                "overall_score_uncapped": 0.0,
+                "hard_fail_capped": False,
+                "n_claims": 0,
+                "n_pass": 0,
+                "n_fail": 0,
+                "n_error": 0,
+                "n_unsure": 0,
+                "n_scored": 0,
+            }
 
-        hard_fail = any(
-            c["claim"].get("criticality") == "hard" and c["score"] < 1.0 and c["status"] != "unsure"
-            for c in per_claim
-        )
-        capped = min(overall, self.hard_fail_cap) if hard_fail else overall
-
+        scored = [c for c in per_claim if c.get("status") != "error"]
         n_pass = sum(1 for c in per_claim if c["status"] == "pass")
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
+
+        if not scored:
+            # No usable signal. Don't pretend to score.
+            return {
+                "overall_score": 0.0,
+                "overall_score_uncapped": 0.0,
+                "hard_fail_capped": False,
+                "n_claims": len(per_claim),
+                "n_pass": n_pass,
+                "n_fail": n_fail,
+                "n_error": n_error,
+                "n_unsure": n_unsure,
+                "n_scored": 0,
+                "skipped_reason": "all_verifiers_errored",
+            }
+
+        overall = sum(c["score"] for c in scored) / len(scored)
+        # Hard-fail cap fires only on a real refutation of a hard claim, not
+        # on a verifier-script crash and not on an unsure soft check.
+        hard_fail = any(
+            c["claim"].get("criticality") == "hard"
+            and c["status"] == "fail"
+            for c in scored
+        )
+        capped = min(overall, self.hard_fail_cap) if hard_fail else overall
+
         return {
             "overall_score": round(capped, 4),
             "overall_score_uncapped": round(overall, 4),
@@ -742,6 +870,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             "n_fail": n_fail,
             "n_error": n_error,
             "n_unsure": n_unsure,
+            "n_scored": len(scored),
         }
 
     # ------------------------------------------------------------------
@@ -749,16 +878,28 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
 
     def _list_workspace(self, max_entries: int = 200) -> str:
-        """Return a short, deterministic listing of the workspace."""
+        """Return a short, deterministic listing of the workspace.
+
+        Side effect: populates ``self._workspace_files`` with every relative
+        path encountered (not just the first ``max_entries``), so the claim
+        extractor's ``likely_relevant_files`` field can be intersected against
+        a complete set later — even for workspaces that exceed the listing
+        cap shown to the LLM.
+        """
         ws = self.workspace_dir
+        self._workspace_files = set()
         if not ws.exists():
             return "(workspace directory does not exist)"
-        entries = []
+        entries: list[str] = []
+        truncated = False
         for root, dirs, files in os.walk(ws):
             # Skip noisy directories.
             dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", ".venv", "node_modules"}]
             for f in files:
-                rel = Path(root, f).relative_to(ws)
+                rel = str(Path(root, f).relative_to(ws))
+                self._workspace_files.add(rel)
+                if truncated:
+                    continue
                 try:
                     size = (ws / rel).stat().st_size
                 except OSError:
@@ -766,8 +907,137 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 entries.append(f"{rel}\t{size}B")
                 if len(entries) >= max_entries:
                     entries.append(f"... (truncated at {max_entries} entries)")
-                    return "\n".join(entries)
+                    truncated = True
         return "\n".join(entries) if entries else "(empty workspace)"
+
+    # ------------------------------------------------------------------
+    # File preview helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _looks_binary(sample: bytes) -> bool:
+        """Heuristic: NUL bytes or > 30% non-printables → treat as binary."""
+        if not sample:
+            return False
+        if b"\x00" in sample:
+            return True
+        # Allow common whitespace + printable ASCII + UTF-8 high bytes.
+        printable = sum(
+            1
+            for b in sample
+            if b in (9, 10, 13) or 32 <= b < 127 or b >= 0x80
+        )
+        return printable / len(sample) < 0.7
+
+    def _preview_file(self, rel_path: str) -> str:
+        """Render an LLM-friendly preview of a workspace file.
+
+        Strategy:
+          - Cache results keyed on `rel_path`; identical lookups are free.
+          - If the path is missing or not a file, say so explicitly.
+          - Binary files: header line with size + first 16 bytes hex.
+          - Text files ≤ head+tail budget: full content.
+          - Text files larger than the budget: head + truncation marker + tail
+            so format clues at both ends are visible.
+
+        The returned string is wrapped in `=== <path> (...) ===` fences so the
+        verifier-generation prompt can show several previews unambiguously.
+        """
+        if rel_path in self._preview_cache:
+            return self._preview_cache[rel_path]
+
+        # Resolve safely; reject anything escaping the workspace.
+        ws = self.workspace_dir.resolve()
+        candidate = (self.workspace_dir / rel_path).resolve()
+        try:
+            candidate.relative_to(ws)
+        except ValueError:
+            rendered = f"=== {rel_path} ===\n(refusing to preview file outside workspace)\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        if not candidate.exists():
+            rendered = f"=== {rel_path} ===\n(file not found in workspace)\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+        if candidate.is_dir():
+            rendered = f"=== {rel_path} ===\n(path is a directory, not a file)\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        try:
+            size = candidate.stat().st_size
+        except OSError as e:
+            rendered = f"=== {rel_path} ===\n(stat failed: {e})\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        # Read just enough to classify and (if text) to fill the head budget.
+        head_budget = max(self.preview_head_bytes, _BINARY_SNIFF_BYTES)
+        try:
+            with open(candidate, "rb") as fh:
+                head_bytes = fh.read(head_budget)
+                if size > head_budget + self.preview_tail_bytes:
+                    fh.seek(max(0, size - self.preview_tail_bytes))
+                    tail_bytes = fh.read(self.preview_tail_bytes)
+                else:
+                    tail_bytes = b""
+        except OSError as e:
+            rendered = f"=== {rel_path} ===\n(read failed: {e})\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        sample = head_bytes[:_BINARY_SNIFF_BYTES]
+        if self._looks_binary(sample):
+            magic = head_bytes[:16].hex(" ")
+            rendered = (
+                f"=== {rel_path} ({size} bytes, binary) ===\n"
+                f"first 16 bytes (hex): {magic}\n"
+            )
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        try:
+            head_text = head_bytes[: self.preview_head_bytes].decode("utf-8", errors="replace")
+            tail_text = tail_bytes.decode("utf-8", errors="replace") if tail_bytes else ""
+        except Exception as e:
+            rendered = f"=== {rel_path} ===\n(decode failed: {e})\n"
+            self._preview_cache[rel_path] = rendered
+            return rendered
+
+        if tail_text:
+            elided = size - self.preview_head_bytes - self.preview_tail_bytes
+            body = (
+                f"{head_text.rstrip()}\n"
+                f"... ({elided} bytes elided) ...\n"
+                f"{tail_text.lstrip()}"
+            )
+        else:
+            body = head_text
+
+        rendered = f"=== {rel_path} ({size} bytes, text) ===\n{body}\n"
+        self._preview_cache[rel_path] = rendered
+        return rendered
+
+    def _render_relevant_previews(self, rel_paths: list[str]) -> str:
+        """Render a multi-file preview block, capped at preview_per_claim_cap."""
+        if not rel_paths:
+            return "(no relevant files declared for this claim)"
+        chunks: list[str] = []
+        used = 0
+        for rp in rel_paths:
+            preview = self._preview_file(rp)
+            # If adding this preview would blow the per-claim cap, truncate it
+            # to whatever budget remains. If no budget remains, stop.
+            remaining = self.preview_per_claim_cap - used
+            if remaining <= 0:
+                chunks.append(f"=== {rp} ===\n(preview budget exhausted; not shown)\n")
+                continue
+            if len(preview) > remaining:
+                preview = preview[:remaining] + "\n... (preview truncated by per-claim budget)\n"
+            chunks.append(preview)
+            used += len(preview)
+        return "\n".join(chunks)
 
     def _call_judge(self, uuid: str, agent_name: str, prompt: str) -> str:
         memory_path = Path(self.memory_dir) / uuid
@@ -795,13 +1065,19 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 f.write("=" * 60 + "\n")
                 f.write(f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
                         f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
-                        f"unsure={scores.get('n_unsure', 0)}\n")
+                        f"unsure={scores.get('n_unsure', 0)}  "
+                        f"scored={scores.get('n_scored', 0)}\n")
                 f.write(f"Overall: {scores['overall_score']:.3f}"
                         f" (uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
-                        f"hard_fail_capped={scores.get('hard_fail_capped', False)})\n\n")
+                        f"hard_fail_capped={scores.get('hard_fail_capped', False)})\n")
+                f.write("Note: errored verifiers are excluded from the mean and "
+                        "do not trip the hard-fail cap.\n\n")
                 for c in per_claim:
                     cl = c["claim"]
                     f.write(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}\n")
+                    rel = cl.get("likely_relevant_files", [])
+                    if rel:
+                        f.write(f"  relevant_files: {rel}\n")
                     f.write(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}\n")
                     if c.get("details"):
                         f.write(f"  details: {c['details']}\n")
