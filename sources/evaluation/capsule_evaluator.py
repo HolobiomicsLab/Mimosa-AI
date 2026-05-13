@@ -30,7 +30,8 @@ class CapsuleEvaluator:
         capsule_path: Path,
         task_data: dict[str, str],
         sab_loader: ScienceAgentBenchLoader,
-        api_cost: float = 0.000
+        api_cost: float = 0.000,
+        cpu_only: bool = True
     ):
         """
         Initialize CapsuleEvaluator.
@@ -40,13 +41,16 @@ class CapsuleEvaluator:
             task_data: Dictionary containing task information from CSV row
             sab_loader: ScienceAgentBenchLoader instance for accessing eval scripts
             api_cost: API cost tracked from IndividualRun
+            cpu_only: If True (default), the sandbox forces CPU execution by
+                hiding any GPU from generated scripts. Avoids CUDA/XLA failures
+                (e.g. missing libdevice.10.bc) that would otherwise fail VER.
         """
         self.capsule_path = Path(capsule_path)
         self.task_data = task_data
         self.sab_loader = sab_loader
         self.api_cost = api_cost
         self.logger = logging.getLogger(__name__)
-        self.sandbox = ExecutionSandbox(self.capsule_path)
+        self.sandbox = ExecutionSandbox(self.capsule_path, cpu_only=cpu_only)
 
         # Extract key task information
         self.instance_id = task_data.get('instance_id', 'unknown')

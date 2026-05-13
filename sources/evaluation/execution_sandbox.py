@@ -43,14 +43,19 @@ class ExecutionSandbox:
         "openai"
     ]
 
-    def __init__(self, capsule_path: Path):
+    def __init__(self, capsule_path: Path, cpu_only: bool = True):
         """
         Initialize execution sandbox and set up virtual environment with dependencies.
 
         Args:
             capsule_path: Path to capsule directory containing generated code
+            cpu_only: If True (default), force CPU execution by hiding any GPU
+                from the spawned scripts. Sidesteps CUDA/XLA plumbing issues
+                (e.g. missing libdevice) that would otherwise fail VER on
+                machines with a partial CUDA install.
         """
         self.capsule_path = Path(capsule_path)
+        self.cpu_only = cpu_only
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
         # Create a single temporary directory for this sandbox instance
@@ -76,19 +81,19 @@ class ExecutionSandbox:
             venv.create(venv_path, with_pip=True)
         except Exception as e:
             raise RuntimeError(f"Failed to create virtual environment at {venv_path}: {e}")
-        
+
         # Verify the venv was created successfully
         if sys.platform == "win32":
             python_exe = venv_path / "Scripts" / "python.exe"
         else:
             python_exe = venv_path / "bin" / "python"
-        
+
         if not python_exe.exists():
             raise RuntimeError(
                 f"Virtual environment created but Python executable not found at {python_exe}. "
                 f"This may indicate a problem with the Python installation or venv module."
             )
-        
+
         self.logger.info(f"[SANDBOX] Virtual environment created successfully at {venv_path}")
         return venv_path
 
@@ -175,12 +180,12 @@ class ExecutionSandbox:
                 shutil.copy2(file_path, temp_path / file_path.name)
             # Run pipreqs (installed as console script in venv)
             pipreqs_exe = self.venv_path / "bin" / "pipreqs"
-            
+
             # Check if pipreqs is available (may not be if basic package installation failed)
             if not pipreqs_exe.exists():
                 self.logger.warning("[SANDBOX] pipreqs not found in venv, skipping dependency analysis")
                 return
-            
+
             cmd_pipreqs = [
                 str(pipreqs_exe),
                 "--savepath", str(temp_path / "requirements.in"),
@@ -196,7 +201,7 @@ class ExecutionSandbox:
             )
 
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:200]}")
+                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:512]}")
                 return
 
             requirements_in = temp_path / "requirements.in"
@@ -219,7 +224,7 @@ class ExecutionSandbox:
             )
 
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:200]}")
+                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:512]}")
                 # Fall back to direct installation from .in file
                 requirements_txt = requirements_in
 
@@ -242,6 +247,14 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Dependency analysis/installation failed: {e}")
             # Continue execution even if dependency installation fails
+
+    def _subprocess_env(self) -> dict:
+        """Build the env dict for spawned scripts, applying cpu_only if set."""
+        env = os.environ.copy()
+        if self.cpu_only:
+            env["CUDA_VISIBLE_DEVICES"] = ""
+            env["TF_CPP_MIN_LOG_LEVEL"] = env.get("TF_CPP_MIN_LOG_LEVEL", "2")
+        return env
 
     def run_generated_code(
         self,
@@ -291,13 +304,13 @@ class ExecutionSandbox:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=os.environ.copy()
+                env=self._subprocess_env()
             )
 
             if result.returncode != 0:
                 error_msg = f"Generated code failed with code {result.returncode}"
                 if result.stderr:
-                    error_msg += f": {result.stderr[:2048]}"
+                    error_msg += f": {result.stderr[:100000]}"
                 self.logger.error(f"[SANDBOX] {error_msg}")
                 return False, error_msg
 
@@ -510,13 +523,13 @@ class ExecutionSandbox:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=os.environ.copy()
+                env=self._subprocess_env()
             )
 
             if result.returncode != 0:
                 error_msg = f"Eval script failed with code {result.returncode}"
                 if result.stderr:
-                    error_msg += f": {result.stderr[:4096]}"
+                    error_msg += f": {result.stderr[:100000]}"
                 self.logger.error(f"[SANDBOX] {error_msg}")
                 return False, error_msg
             output = result.stdout.strip()
