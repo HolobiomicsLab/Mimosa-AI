@@ -281,12 +281,6 @@ class VerifierEvaluator(BaseEvaluator):
         concrete workspace context.
     """
 
-    # `get_perspicacite_grounding` is defined as a free function in
-    # `.grounding` taking ``self`` as first argument (same pattern used by
-    # GenericEvaluator). Bind it as a class attribute so descriptor lookup
-    # turns it into a real method on the instance.
-    get_perspicacite_grounding = get_perspicacite_grounding
-
     def __init__(
         self,
         config,
@@ -1183,7 +1177,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         if uuid in self._grounding_cache:
             return self._grounding_cache[uuid]
         try:
-            grounding = self.get_perspicacite_grounding(execution_text)
+            # Free function (no `self`); see sources/core/evaluators/grounding.py
+            grounding = get_perspicacite_grounding(execution_text)
         except Exception as e:
             # Defensive: get_perspicacite_grounding already catches its own
             # errors, but we belt-and-suspenders so a Perspicacite outage
