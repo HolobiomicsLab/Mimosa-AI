@@ -52,6 +52,12 @@ _PREVIEW_TAIL_BYTES = 2 * 1024
 _PREVIEW_PER_CLAIM_CAP = 24 * 1024
 _BINARY_SNIFF_BYTES = 4096
 
+# ----- Empty-run marker -------------------------------------------------------
+# Emitted by base.workflow_execution_text when no state_result and no code exist.
+# We use this as the precise empty-run signal, NOT the brittle `success` flag
+# (which trips False on any successful run whose answers JSON contains "[]").
+_EMPTY_RUN_MARKER = "workflow execution fully failed"
+
 # ----- Anti-cheat thresholds --------------------------------------------------
 _CHEAT_MIN_LITERAL_LEN = 80
 _CHEAT_OVERLAP_WINDOW = 60
@@ -263,8 +269,20 @@ class VerifierEvaluator(BaseEvaluator):
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
-        grounding = self._get_grounding(uuid, execution_text) if success else self._GROUNDING_DISABLED
-        claims = self._extract_claims(uuid, execution_text, workspace_listing, success, grounding)
+        # Use explicit empty-run marker rather than the brittle `success` flag
+        # — `success` is `not "[]" in json.dumps(answers)`, which mis-fires
+        # whenever an answer payload contains a (possibly nested) empty list.
+        is_truly_empty = (
+            not execution_text or _EMPTY_RUN_MARKER in execution_text
+        )
+        grounding = (
+            self._get_grounding(uuid, execution_text)
+            if not is_truly_empty
+            else self._GROUNDING_DISABLED
+        )
+        claims = self._extract_claims(
+            uuid, execution_text, workspace_listing, is_truly_empty, grounding
+        )
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
             scores = {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
@@ -323,11 +341,17 @@ class VerifierEvaluator(BaseEvaluator):
         uuid: str,
         execution_text: str,
         workspace_listing: str,
-        success: bool,
+        is_truly_empty: bool,
         grounding: str = "",
     ) -> list[dict[str, Any]]:
-        """Ask the LLM to break the workflow output into atomic, typed claims."""
-        if not success:
+        """Ask the LLM to break the workflow output into atomic, typed claims.
+
+        The c0 fallback only fires when the upstream execution text is the
+        literal "workflow execution fully failed" marker — not on the brittle
+        legacy `success` flag, which mis-fired any time an answer payload
+        contained an empty list.
+        """
+        if is_truly_empty:
             return [{
                 "id": "c0_execution_succeeded",
                 "description": "The workflow executed to completion and produced a non-empty answer.",
