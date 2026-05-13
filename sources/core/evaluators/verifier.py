@@ -20,6 +20,7 @@ The unit of evaluation is a specific claim, not a whole trace. The LLM is only
 ever asked narrow questions against concrete context.
 """
 
+import ast
 import asyncio
 import json
 import os
@@ -42,6 +43,7 @@ from .base import (
     ScoreExtractionError,
     WorkflowDataError,
 )
+from .grounding import get_perspicacite_grounding
 
 from sources.cli.pretty_print import (
     print_box, print_info,
@@ -65,6 +67,108 @@ _PREVIEW_TAIL_BYTES = 2 * 1024
 _PREVIEW_PER_CLAIM_CAP = 24 * 1024
 # Bytes sniffed when deciding text vs binary.
 _BINARY_SNIFF_BYTES = 4096
+
+# ----- Anti-cheat thresholds --------------------------------------------------
+# Minimum length of a string literal in the verifier code that we will bother
+# checking against the workflow output. Anything shorter is too small to
+# encode the agent's answer payload meaningfully.
+_CHEAT_MIN_LITERAL_LEN = 80
+# Length of the sliding window used to detect verbatim overlap between a
+# verifier's string literals and the workflow output. 60 chars is large
+# enough that legitimate constants ("HPHPPHHPHPPHPHHPPHPH", short JSON keys)
+# don't trigger, but small enough to catch any real attempt to inline the
+# agent's answer payload.
+_CHEAT_OVERLAP_WINDOW = 60
+# Tokens whose presence in the verifier code indicates real workspace I/O.
+# Used to enforce "if you declared relevant files, you must read them."
+_IO_MARKERS = (
+    "open(",
+    "Path(",
+    ".read_text(",
+    ".read_bytes(",
+    "json.load",
+    "csv.reader",
+    "csv.DictReader",
+    "pd.read_",
+    "pandas.read_",
+    "np.load",
+    "np.loadtxt",
+    "np.genfromtxt",
+    "numpy.load",
+    "numpy.loadtxt",
+    "numpy.genfromtxt",
+    "subprocess.",
+    "os.path.exists",
+    "os.path.isfile",
+    "os.stat",
+    "Path.exists",
+    "Path.is_file",
+    "glob.glob",
+)
+
+
+def _verifier_appears_to_cheat(
+    code: str,
+    execution_text: str,
+    requires_io: bool,
+) -> tuple[bool, str]:
+    """Static scan of generated verifier code for tautology smells.
+
+    Two distinct red flags, each independently sufficient:
+
+    1. Large string literals lifted from the workflow output. If the verifier
+       pastes a >=``_CHEAT_MIN_LITERAL_LEN``-char chunk of the agent's
+       reported answer into a string and parses that, it is checking the
+       answer against itself. We detect this with a sliding window of width
+       ``_CHEAT_OVERLAP_WINDOW`` over each string literal and look for any
+       window verbatim-present in the (whitespace-normalised) execution_text.
+
+    2. Missing I/O. If the claim declared at least one relevant file but the
+       verifier code contains no recognisable read primitive
+       (``open(``, ``pd.read_``, ``json.load``, ...), it cannot possibly be
+       grounded in workspace state.
+
+    Returns ``(is_cheating, reason)``. ``reason`` is short, human-readable,
+    and safe to feed back to the LLM as retry instructions.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        # Let the runner surface the syntax error itself; not our concern.
+        return False, ""
+
+    # Whitespace-normalise the workflow output once.
+    exec_norm = " ".join(execution_text.split())
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            continue
+        lit = node.value
+        if len(lit) < _CHEAT_MIN_LITERAL_LEN:
+            continue
+        lit_norm = " ".join(lit.split())
+        # Sliding window with a step that covers all positions cheaply.
+        step = max(1, _CHEAT_OVERLAP_WINDOW // 3)
+        for i in range(0, max(1, len(lit_norm) - _CHEAT_OVERLAP_WINDOW + 1), step):
+            window = lit_norm[i : i + _CHEAT_OVERLAP_WINDOW]
+            if len(window) < _CHEAT_OVERLAP_WINDOW:
+                break
+            if window in exec_norm:
+                return (
+                    True,
+                    f"verifier embeds {len(lit)} chars of the workflow output "
+                    f"as a string literal and parses that instead of reading "
+                    f"the workspace",
+                )
+
+    if requires_io and not any(marker in code for marker in _IO_MARKERS):
+        return (
+            True,
+            "claim declares likely_relevant_files but the verifier performs no "
+            "file I/O — it cannot be grounded in workspace state",
+        )
+
+    return False, ""
 
 
 T = TypeVar("T")
@@ -177,6 +281,12 @@ class VerifierEvaluator(BaseEvaluator):
         concrete workspace context.
     """
 
+    # `get_perspicacite_grounding` is defined as a free function in
+    # `.grounding` taking ``self`` as first argument (same pattern used by
+    # GenericEvaluator). Bind it as a class attribute so descriptor lookup
+    # turns it into a real method on the instance.
+    get_perspicacite_grounding = get_perspicacite_grounding
+
     def __init__(
         self,
         config,
@@ -187,6 +297,7 @@ class VerifierEvaluator(BaseEvaluator):
         preview_head_bytes: int = _PREVIEW_HEAD_BYTES,
         preview_tail_bytes: int = _PREVIEW_TAIL_BYTES,
         preview_per_claim_cap: int = _PREVIEW_PER_CLAIM_CAP,
+        use_grounding: bool = True,
     ):
         """Initialize the VerifierEvaluator.
 
@@ -214,6 +325,7 @@ class VerifierEvaluator(BaseEvaluator):
         self.preview_head_bytes = preview_head_bytes
         self.preview_tail_bytes = preview_tail_bytes
         self.preview_per_claim_cap = preview_per_claim_cap
+        self.use_grounding = use_grounding
         # Per-instance cache of rendered file previews, keyed by relative path
         # string. Populated lazily on first read; survives for the lifetime of
         # the evaluator so multiple claims referencing the same file don't
@@ -221,6 +333,9 @@ class VerifierEvaluator(BaseEvaluator):
         self._preview_cache: dict[str, str] = {}
         # Per-instance cache of the workspace listing (rebuilt per evaluate()).
         self._workspace_files: set[str] = set()
+        # Per-uuid Perspicacite grounding cache. One round-trip per workflow,
+        # reused across Stage 1 (claim selection) and the soft check (Stage 4).
+        self._grounding_cache: dict[str, str] = {}
 
         # Reuse the temp_dir setting from the global runner config when
         # available; otherwise fall back to a per-uuid scratch under workflow_dir.
@@ -229,7 +344,8 @@ class VerifierEvaluator(BaseEvaluator):
         )
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
-            f"timeout={verifier_timeout}s, max_claims={max_claims})"
+            f"timeout={verifier_timeout}s, max_claims={max_claims}, "
+            f"use_grounding={use_grounding})"
         )
 
     # ------------------------------------------------------------------
@@ -271,7 +387,9 @@ class VerifierEvaluator(BaseEvaluator):
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
-        claims = self._extract_claims(uuid, execution_text, workspace_listing, success)
+        # Single Perspicacite round-trip per workflow; reused below.
+        grounding = self._get_grounding(uuid, execution_text) if success else self._GROUNDING_DISABLED
+        claims = self._extract_claims(uuid, execution_text, workspace_listing, success, grounding)
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
             scores = {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
@@ -280,7 +398,7 @@ class VerifierEvaluator(BaseEvaluator):
 
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
-            result = self._verify_claim(uuid, claim, execution_text, workspace_listing)
+            result = self._verify_claim(uuid, claim, execution_text, workspace_listing, grounding)
             per_claim.append(result)
 
         scores = self._aggregate(per_claim)
@@ -334,6 +452,7 @@ class VerifierEvaluator(BaseEvaluator):
         execution_text: str,
         workspace_listing: str,
         success: bool,
+        grounding: str = "",
     ) -> list[dict[str, Any]]:
         """Ask the LLM to break the workflow output into atomic, typed claims."""
         if not success:
@@ -345,15 +464,21 @@ class VerifierEvaluator(BaseEvaluator):
                 "likely_relevant_files": [],
             }]
 
+        grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
         prompt = f"""
-You will receive the final state of a multi-agent workflow and a listing of
-files present in the agents' workspace.
+You will receive the final state of a multi-agent workflow, a listing of
+files present in the agents' workspace, and peer-reviewed scientific
+literature grounding for the task at hand.
 
 WORKFLOW OUTPUT:
 {execution_text}
 
 WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
+
+LITERATURE GROUNDING (peer-reviewed context — what the literature says about
+this kind of task; use it to know what is scientifically load-bearing):
+{grounding_block}
 
 TASK:
 Extract a list of ATOMIC CLAIMS the workflow makes. A good claim is:
@@ -365,9 +490,22 @@ Extract a list of ATOMIC CLAIMS the workflow makes. A good claim is:
 
 For each claim, also estimate `criticality`:
 - "hard": load-bearing for the answer (final metrics, headline files,
-  required computations, claimed satisfaction of the user goal).
+  required computations, claimed satisfaction of the user goal). Use the
+  literature grounding to recognise which steps are scientifically
+  load-bearing for this task — those are "hard" by default.
 - "soft": supporting context (intermediate sanity remarks, choices that are
-  defensible but not strictly required).
+  defensible but not strictly required, decisions the literature treats as
+  trivial or auxiliary).
+
+Use the literature grounding to **prioritise** claims:
+- Prefer claims that map onto the methodology the literature considers
+  standard for this task (e.g. expected metrics, required preprocessing,
+  established constraints).
+- Avoid extracting claims about steps the literature considers irrelevant
+  or trivial. Don't pad the claim list with cosmetic statements.
+- If the workflow skipped a step the literature considers required, you
+  may add a claim asserting the workflow performed that step (it will
+  likely fail verification, which is the correct signal).
 
 For each claim, also list `likely_relevant_files`: relative paths whose
 contents the verifier would need to read in order to check the claim.
@@ -459,6 +597,7 @@ ones first. Do not invent claims that the workflow did not make.
         claim: dict[str, Any],
         execution_text: str,
         workspace_listing: str,
+        grounding: str = "",
     ) -> dict[str, Any]:
         """Generate, execute (if executable) and score a single claim.
 
@@ -516,7 +655,7 @@ ones first. Do not invent claims that the workflow did not make.
                 title=f"Verifier spec · {claim.get('id')}",
                 color=YELLOW,
             )
-            scored = self._score_soft(uuid, claim, execution_text, workspace_listing, reason)
+            scored = self._score_soft(uuid, claim, execution_text, workspace_listing, reason, grounding)
             print_box(
                 f"verdict:   {scored.get('status')}\nrationale: {scored.get('rationale', '')}",
                 title=f"Soft check · {claim.get('id')}",
@@ -587,6 +726,24 @@ RULES FOR YOUR SCRIPT:
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
 
+ANTI-PATTERNS — your verifier will be REJECTED if it does any of these:
+- Embeds the workflow output, the agent's final answer, or any large
+  fragment thereof as a string literal and then parses that literal. This
+  is a tautology: comparing the answer to itself proves nothing.
+- Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
+  inlined JSON blob) instead of recomputing it from workspace files.
+- Returns "pass" without ever opening a file or running a real computation
+  derived from on-disk state.
+- Declares ``likely_relevant_files`` but performs no file I/O.
+
+What a legitimate verifier does:
+- Opens the file(s) in ``likely_relevant_files`` from the workspace cwd.
+- Re-derives the value the claim asserts (recompute the energy, recount the
+  contacts, re-walk the chain, re-read the metric).
+- Compares the recomputed value to the small target taken from the claim
+  description (e.g. "-6", "20 residues") — targets are short numeric/string
+  constants, not embedded answer payloads.
+
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
 defensibility of a conclusion), set "executable": false and explain briefly.
@@ -595,8 +752,82 @@ Return STRICT JSON only, in one of these two shapes:
   {{"executable": true,  "code": "<full python script as one string>"}}
   {{"executable": false, "reason": "<one sentence>"}}
 """
+        spec = self._call_and_parse_verifier(uuid, claim, prompt, attempt=1)
+        if not (spec.get("executable") and spec.get("code")):
+            return spec
+
+        # Static cheat-check. If the LLM hard-coded the answer or skipped I/O,
+        # demand a retry with explicit feedback. Cheats are common enough that
+        # one retry is worth the LLM call; persistent cheats fall back to the
+        # soft check (which is now grounded by file previews).
+        requires_io = bool(claim.get("likely_relevant_files"))
+        cheating, cheat_reason = _verifier_appears_to_cheat(
+            spec["code"], execution_text, requires_io=requires_io
+        )
+        if not cheating:
+            return spec
+
+        self.logger.warning(
+            f"[verifier {claim['id']}] cheat detected, retrying once: {cheat_reason}"
+        )
+        retry_prompt = prompt + f"""
+
+YOUR PREVIOUS ATTEMPT WAS REJECTED for the following reason:
+  {cheat_reason}
+
+Rewrite the verifier so that:
+  - it does NOT contain any large string literal copied from the workflow
+    output or the agent's answer,
+  - it OPENS and reads the file(s) listed in likely_relevant_files,
+  - it RECOMPUTES the value the claim asserts from the file contents,
+  - it compares the recomputed value to the small, scalar target taken from
+    the claim description (not to a pasted answer payload).
+
+Return STRICT JSON in the same format as before.
+"""
+        retry_spec = self._call_and_parse_verifier(uuid, claim, retry_prompt, attempt=2)
+        if not (retry_spec.get("executable") and retry_spec.get("code")):
+            # Retry produced no executable code — keep the rejection reason.
+            return {
+                "executable": False,
+                "reason": f"rejected as tautology (retry failed): {cheat_reason}",
+            }
+        cheating2, cheat_reason2 = _verifier_appears_to_cheat(
+            retry_spec["code"], execution_text, requires_io=requires_io
+        )
+        if cheating2:
+            self.logger.warning(
+                f"[verifier {claim['id']}] retry also cheats ({cheat_reason2}); "
+                f"falling back to soft check"
+            )
+            return {
+                "executable": False,
+                "reason": (
+                    f"rejected as tautology after one retry; original: "
+                    f"{cheat_reason}; retry: {cheat_reason2}"
+                ),
+            }
+        return retry_spec
+
+    def _call_and_parse_verifier(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        prompt: str,
+        attempt: int,
+    ) -> dict[str, Any]:
+        """Single round-trip: call the judge, parse its JSON spec, return it.
+
+        Errors are returned as ``{"executable": False, "reason": ...}`` rather
+        than raised, so the caller can decide whether to retry or demote.
+        """
+        agent_name = (
+            f"verifier_gen_{claim['id']}"
+            if attempt == 1
+            else f"verifier_gen_{claim['id']}_retry"
+        )
         try:
-            raw = self._call_judge(uuid, f"verifier_gen_{claim['id']}", prompt)
+            raw = self._call_judge(uuid, agent_name, prompt)
         except Exception as e:
             return {"executable": False, "reason": f"verifier generation failed: {e}"}
 
@@ -737,15 +968,23 @@ Return STRICT JSON only, in one of these two shapes:
         execution_text: str,
         workspace_listing: str,
         reason: str,
+        grounding: str = "",
     ) -> dict[str, Any]:
         """Narrow LLM check for non-executable claims.
         The LLM is asked one targeted question (does this single claim hold
         given this concrete context?), not an aggregate vibes score.
+
+        When ``grounding`` is available, the verdict is anchored against
+        peer-reviewed literature in addition to the workspace context — the
+        soft check is where literature has the most leverage, since these
+        claims often concern methodological appropriateness rather than
+        recomputable values.
         """
 
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
+        grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
         prompt = f"""
 You are checking ONE claim from a multi-agent workflow. The claim is not
 executable in code; please judge it against the concrete context below.
@@ -755,6 +994,9 @@ WORKSPACE FILES:
 
 RELEVANT FILE PREVIEWS:
 {relevant_previews}
+
+LITERATURE GROUNDING (peer-reviewed evidence relevant to this task):
+{grounding_block}
 
 WORKFLOW OUTPUT (context only):
 {execution_text}
@@ -768,11 +1010,18 @@ CLAIM:
 REASON IT WAS MARKED NON-EXECUTABLE:
 {reason or '(none)'}
 
-Answer ONLY this question: given the workspace and output above, does the
-claim hold? Use one of three verdicts:
-- "pass"   : the claim is well supported by the visible context.
-- "unsure" : context is insufficient to decide either way.
-- "fail"   : the claim is contradicted or clearly unsupported.
+Answer ONLY this question: given the workspace, output, and literature
+grounding above, does the claim hold? Use one of three verdicts:
+- "pass"   : the claim is well supported by the visible context AND
+             consistent with the literature grounding (when applicable).
+- "unsure" : context is insufficient to decide either way, or the
+             literature gives no clear guidance.
+- "fail"   : the claim is contradicted by the workspace context OR by the
+             literature grounding.
+
+If the literature grounding is missing or marked as unavailable, fall back
+to judging against the workspace context alone — do not penalise the claim
+for the absence of grounding.
 
 Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one sentence>"}}
 """
@@ -909,6 +1158,53 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                     entries.append(f"... (truncated at {max_entries} entries)")
                     truncated = True
         return "\n".join(entries) if entries else "(empty workspace)"
+
+    # ------------------------------------------------------------------
+    # Literature grounding (Perspicacite)
+    # ------------------------------------------------------------------
+
+    _GROUNDING_DISABLED = "(literature grounding disabled for this run)"
+    _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
+
+    def _get_grounding(self, uuid: str, execution_text: str) -> str:
+        """Return the (cached) literature grounding for *uuid*.
+
+        Strategy:
+          - Short-circuit when ``use_grounding`` is False (cheap dev runs).
+          - One Perspicacite round-trip per uuid; reused for Stage 1 (claim
+            selection) and the soft check.
+          - Failures are absorbed by ``get_perspicacite_grounding`` itself
+            (returns a fallback string), so the caller never has to handle
+            an exception. We cache the fallback too — retrying within the
+            same evaluator instance is unlikely to help.
+        """
+        if not self.use_grounding:
+            return self._GROUNDING_DISABLED
+        if uuid in self._grounding_cache:
+            return self._grounding_cache[uuid]
+        try:
+            grounding = self.get_perspicacite_grounding(execution_text)
+        except Exception as e:
+            # Defensive: get_perspicacite_grounding already catches its own
+            # errors, but we belt-and-suspenders so a Perspicacite outage
+            # never sinks the whole verifier evaluation.
+            self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
+            grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"
+        self._grounding_cache[uuid] = grounding
+        # Surface grounding to the operator — green when it looks usable, red
+        # when it's a failure marker. Truncated so it doesn't dominate logs.
+        is_usable = (
+            grounding
+            and self._GROUNDING_FAILED_MARKER not in grounding
+            and grounding != self._GROUNDING_DISABLED
+        )
+        print_box(
+            grounding,
+            title=f"Perspicacite grounding · {uuid}",
+            color=GREEN if is_usable else YELLOW,
+            truncate=2000,
+        )
+        return grounding
 
     # ------------------------------------------------------------------
     # File preview helpers
