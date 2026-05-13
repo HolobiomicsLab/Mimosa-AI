@@ -1,23 +1,7 @@
-"""
-Verifier-based workflow evaluator.
+"""Per-claim verifier-based workflow evaluator.
 
-Replaces the "judge a whole trace with one LLM and one number" pattern with a
-deterministic verification pipeline:
-
-    1. Extract atomic claims from the workflow output (LLM, structured output).
-    2. For each claim, generate a tiny verifier program (LLM) — or mark the
-       claim as non-executable.
-    3. Execute every verifier in a sandbox sharing the agents' workspace,
-       using `WorkflowRunner` with PTY/colour disabled.
-    4. Score each verifier:
-         - executable claim → pass=1.0, fail/error=0.0
-         - non-executable  → narrow LLM check (single claim + workspace
-                              context) returning 0.0 / 0.5 / 1.0
-    5. Aggregate. Failing a claim flagged as `criticality: hard` caps the
-       overall score so a broken artefact cannot be rescued by good prose.
-
-The unit of evaluation is a specific claim, not a whole trace. The LLM is only
-ever asked narrow questions against concrete context.
+Pipeline: extract atomic claims → generate a verifier script per claim →
+execute in the agents' workspace → score per claim → aggregate.
 """
 
 import ast
@@ -50,37 +34,20 @@ from sources.cli.pretty_print import (
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
-# ----- Default per-script execution limits ------------------------------------
+# ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
 _VERIFIER_MAX_CLAIMS = 12
 _HARD_FAIL_CAP = 0.5
 
 # ----- File preview budgets ---------------------------------------------------
-# Per-file budget when including text content in the verifier-gen prompt. Files
-# bigger than _PREVIEW_HEAD_BYTES + _PREVIEW_TAIL_BYTES are sent as
-# "<head> ... (N bytes elided) ... <tail>" so the model still sees both ends
-# (which is where format clues — headers, footers — usually live).
 _PREVIEW_HEAD_BYTES = 8 * 1024
 _PREVIEW_TAIL_BYTES = 2 * 1024
-# Hard cap on combined preview size shipped per claim, so a multi-file claim
-# can't blow up the prompt.
 _PREVIEW_PER_CLAIM_CAP = 24 * 1024
-# Bytes sniffed when deciding text vs binary.
 _BINARY_SNIFF_BYTES = 4096
 
 # ----- Anti-cheat thresholds --------------------------------------------------
-# Minimum length of a string literal in the verifier code that we will bother
-# checking against the workflow output. Anything shorter is too small to
-# encode the agent's answer payload meaningfully.
 _CHEAT_MIN_LITERAL_LEN = 80
-# Length of the sliding window used to detect verbatim overlap between a
-# verifier's string literals and the workflow output. 60 chars is large
-# enough that legitimate constants ("HPHPPHHPHPPHPHHPPHPH", short JSON keys)
-# don't trigger, but small enough to catch any real attempt to inline the
-# agent's answer payload.
 _CHEAT_OVERLAP_WINDOW = 60
-# Tokens whose presence in the verifier code indicates real workspace I/O.
-# Used to enforce "if you declared relevant files, you must read them."
 _IO_MARKERS = (
     "open(",
     "Path(",
@@ -112,34 +79,13 @@ def _verifier_appears_to_cheat(
     execution_text: str,
     requires_io: bool,
 ) -> tuple[bool, str]:
-    """Static scan of generated verifier code for tautology smells.
-
-    Two distinct red flags, each independently sufficient:
-
-    1. Large string literals lifted from the workflow output. If the verifier
-       pastes a >=``_CHEAT_MIN_LITERAL_LEN``-char chunk of the agent's
-       reported answer into a string and parses that, it is checking the
-       answer against itself. We detect this with a sliding window of width
-       ``_CHEAT_OVERLAP_WINDOW`` over each string literal and look for any
-       window verbatim-present in the (whitespace-normalised) execution_text.
-
-    2. Missing I/O. If the claim declared at least one relevant file but the
-       verifier code contains no recognisable read primitive
-       (``open(``, ``pd.read_``, ``json.load``, ...), it cannot possibly be
-       grounded in workspace state.
-
-    Returns ``(is_cheating, reason)``. ``reason`` is short, human-readable,
-    and safe to feed back to the LLM as retry instructions.
-    """
+    """Reject verifiers that inline the agent's answer or skip workspace I/O."""
     try:
         tree = ast.parse(code)
     except SyntaxError:
-        # Let the runner surface the syntax error itself; not our concern.
         return False, ""
 
-    # Whitespace-normalise the workflow output once.
     exec_norm = " ".join(execution_text.split())
-
     for node in ast.walk(tree):
         if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
             continue
@@ -147,7 +93,6 @@ def _verifier_appears_to_cheat(
         if len(lit) < _CHEAT_MIN_LITERAL_LEN:
             continue
         lit_norm = " ".join(lit.split())
-        # Sliding window with a step that covers all positions cheaply.
         step = max(1, _CHEAT_OVERLAP_WINDOW // 3)
         for i in range(0, max(1, len(lit_norm) - _CHEAT_OVERLAP_WINDOW + 1), step):
             window = lit_norm[i : i + _CHEAT_OVERLAP_WINDOW]
@@ -167,7 +112,6 @@ def _verifier_appears_to_cheat(
             "claim declares likely_relevant_files but the verifier performs no "
             "file I/O — it cannot be grounded in workspace state",
         )
-
     return False, ""
 
 
@@ -178,24 +122,9 @@ def _run_coro_sync(
     coro_factory: Callable[[], Coroutine[Any, Any, T]],
     thread_timeout: float | None = None,
 ) -> T:
-    """Run an async coroutine to completion from a sync caller.
+    """Run an async coroutine from sync code, even if a loop is already running.
 
-    Crucially, the coroutine is *not* constructed unless we are sure we can
-    await it. Constructing a coroutine and then handing it to a failing
-    ``asyncio.run`` orphans it and produces the dreaded
-    ``coroutine '...' was never awaited`` RuntimeWarning at GC time.
-
-    Args:
-        coro_factory: zero-arg callable that returns a fresh coroutine.
-        thread_timeout: optional join timeout for the worker thread. ``None``
-            means wait forever (caller is responsible for inner timeouts).
-
-    Returns:
-        Whatever the coroutine returns.
-
-    Raises:
-        TimeoutError: if the worker thread did not complete in time.
-        Any exception raised by the coroutine itself.
+    The coroutine is built lazily so it can never be orphaned on a failed run.
     """
     try:
         asyncio.get_running_loop()
@@ -204,44 +133,33 @@ def _run_coro_sync(
         in_loop = False
 
     if not in_loop:
-        # Safe to build + await here; one shot, no orphan possible.
         return asyncio.run(coro_factory())
 
-    # Nested case: a daemon worker with its own loop owns the coroutine
-    # end-to-end, so it cannot be orphaned.
     holder: dict[str, Any] = {}
 
     def _target() -> None:
         try:
             holder["result"] = asyncio.run(coro_factory())
-        except BaseException as exc:  # noqa: BLE001 — re-raised below
+        except BaseException as exc:
             holder["error"] = exc
 
     t = threading.Thread(target=_target, daemon=True)
     t.start()
     t.join(timeout=thread_timeout)
     if t.is_alive():
-        raise TimeoutError(
-            f"Worker thread did not finish within {thread_timeout}s"
-        )
+        raise TimeoutError(f"Worker thread did not finish within {thread_timeout}s")
     if "error" in holder:
         raise holder["error"]
     return holder["result"]
 
 
 def _extract_json_payload(text: str) -> str:
-    """Return the first balanced JSON object/array literal found in *text*.
-
-    Tolerant of fenced code blocks (```json ... ```), surrounding prose, and
-    trailing commentary the LLM sometimes appends after the JSON.
-    """
+    """First balanced JSON object/array in *text*, tolerant of fences and prose."""
     if not text:
         return ""
-    # Strip markdown fences if present.
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
     if fence:
         text = fence.group(1)
-    # Find the first { or [ and walk to its matching close.
     for opener, closer in (("{", "}"), ("[", "]")):
         start = text.find(opener)
         if start == -1:
@@ -271,15 +189,7 @@ def _extract_json_payload(text: str) -> str:
 
 
 class VerifierEvaluator(BaseEvaluator):
-    """Per-claim verifier-based evaluator.
-
-    The judge LLM never assigns a vibes-based 0–1 score across the whole
-    workflow. It only:
-      - extracts discrete claims,
-      - writes a verifier program for each,
-      - or, for soft claims, answers a narrow yes/maybe/no question against
-        concrete workspace context.
-    """
+    """Per-claim verifier-based evaluator."""
 
     def __init__(
         self,
@@ -293,20 +203,7 @@ class VerifierEvaluator(BaseEvaluator):
         preview_per_claim_cap: int = _PREVIEW_PER_CLAIM_CAP,
         use_grounding: bool = True,
     ):
-        """Initialize the VerifierEvaluator.
-
-        Args:
-            config: Standard evaluator config (memory_dir, workflow_dir,
-                judge_model, ...). `config.workspace_dir` is used as the
-                default sandbox cwd if `workspace_dir` is not given.
-            workspace_dir: Directory the verifier scripts run in. Should match
-                the directory the agents wrote their artefacts to.
-            verifier_timeout: Per-script timeout (seconds).
-            max_claims: Hard cap on number of claims considered, to bound LLM
-                and sandbox cost on long traces.
-            hard_fail_cap: Upper bound on `overall_score` when any claim
-                marked `criticality: hard` fails.
-        """
+        """Initialise; workspace_dir defaults to ``config.workspace_dir``."""
         super().__init__(config)
         self.workspace_dir = Path(
             workspace_dir
@@ -320,19 +217,9 @@ class VerifierEvaluator(BaseEvaluator):
         self.preview_tail_bytes = preview_tail_bytes
         self.preview_per_claim_cap = preview_per_claim_cap
         self.use_grounding = use_grounding
-        # Per-instance cache of rendered file previews, keyed by relative path
-        # string. Populated lazily on first read; survives for the lifetime of
-        # the evaluator so multiple claims referencing the same file don't
-        # re-read or re-render its bytes.
         self._preview_cache: dict[str, str] = {}
-        # Per-instance cache of the workspace listing (rebuilt per evaluate()).
         self._workspace_files: set[str] = set()
-        # Per-uuid Perspicacite grounding cache. One round-trip per workflow,
-        # reused across Stage 1 (claim selection) and the soft check (Stage 4).
         self._grounding_cache: dict[str, str] = {}
-
-        # Reuse the temp_dir setting from the global runner config when
-        # available; otherwise fall back to a per-uuid scratch under workflow_dir.
         self._runner_temp_root = Path(
             getattr(config, "temp_dir", None) or self.workflow_dir / "_verifier_tmp"
         )
@@ -347,16 +234,7 @@ class VerifierEvaluator(BaseEvaluator):
     # ------------------------------------------------------------------
 
     def evaluate(self, uuid: str) -> dict[str, Any]:
-        """Run the verifier pipeline for a workflow run.
-
-        Args:
-            uuid: UUID of the workflow run.
-
-        Returns:
-            A dict with per-claim results and aggregated scores. Also
-            persisted via `_save_results(scores, uuid, 'verifier')` and
-            written to `<workflow_dir>/<uuid>/verifier_evaluation.txt`.
-        """
+        """Run the verifier pipeline; persists scores under ``evaluation.verifier``."""
         if not uuid or not isinstance(uuid, str):
             raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
@@ -364,24 +242,13 @@ class VerifierEvaluator(BaseEvaluator):
         if not execution_text:
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
 
-        # Short-circuit: workflow generation/execution totally failed.
-        # Use the *artefact-existence* signal here, NOT the brittle
-        # `success` flag from workflow_execution_text — that flag does
-        # `not "[]" in json.dumps(answers)` and falsely flips False for
-        # any successful run whose answer JSON happens to contain an
-        # empty list (e.g. `{"warnings": [], "verdict": "PASS"}`).
-        # The workspace_dir is shared across evolution generations, so
-        # running verifier scripts on a run that produced no code AND no
-        # state_result would silently score against whatever the previous
-        # generation left behind. Return 0.0 immediately while still
-        # emitting the report + state files so downstream readers see a
-        # real-but-zero entry.
+        # Short-circuit when the workflow produced no artefacts: avoids scoring
+        # against stale state from a prior generation in a shared workspace.
         wf_info = self._load_workflow_data(uuid)
         if not wf_info.state_result and not wf_info.code:
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
-        # Single Perspicacite round-trip per workflow; reused below.
         grounding = self._get_grounding(uuid, execution_text) if success else self._GROUNDING_DISABLED
         claims = self._extract_claims(uuid, execution_text, workspace_listing, success, grounding)
         if not claims:
@@ -405,13 +272,10 @@ class VerifierEvaluator(BaseEvaluator):
         return {"uuid": uuid, "claims": per_claim, **scores}
 
     def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
-        """Return a 0.0 verifier score without running any scripts.
-        Used when the workflow produced no code AND no state_result.
-        """
+        """Return 0.0 without running scripts when the workflow produced nothing."""
         print_box(
-            f"workflow {uuid} produced no code and no state_result; "
-            f"verifier returns 0.0 without running scripts. "
-            f"(Avoids scoring against stale workspace from prior generations.)",
+            f"workflow {uuid} produced no code and no state_result; verifier "
+            f"returns 0.0 without running scripts.",
             title="Verifier short-circuit — generation failed",
             color=RED,
         )
@@ -450,7 +314,6 @@ class VerifierEvaluator(BaseEvaluator):
     ) -> list[dict[str, Any]]:
         """Ask the LLM to break the workflow output into atomic, typed claims."""
         if not success:
-            # Failed runs have no artefacts to verify; record one hard claim.
             return [{
                 "id": "c0_execution_succeeded",
                 "description": "The workflow executed to completion and produced a non-empty answer.",
@@ -527,18 +390,9 @@ Return STRICT JSON only, no prose, in this exact form:
 Aim for at most {self.max_claims} claims, prioritising the most load-bearing
 ones first. Do not invent claims that the workflow did not make.
 """
-        try:
-            output = self._call_judge(uuid, "verifier_extract_claims", prompt)
-        except Exception as e:
-            raise LLMEvaluationError(f"Claim extraction failed for {uuid}: {e}") from e
-
-        payload = _extract_json_payload(output)
-        if not payload:
-            raise LLMEvaluationError(f"Claim extractor returned no JSON for {uuid}")
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError as e:
-            raise LLMEvaluationError(f"Claim extractor returned invalid JSON for {uuid}: {e}") from e
+        data, err = self._call_judge_for_json(uuid, "verifier_extract_claims", prompt)
+        if err is not None:
+            raise LLMEvaluationError(f"Claim extraction failed for {uuid}: {err}")
 
         claims = data.get("claims", []) if isinstance(data, dict) else data
         if not isinstance(claims, list):
@@ -548,9 +402,7 @@ ones first. Do not invent claims that the workflow did not make.
         for idx, c in enumerate(claims):
             if not isinstance(c, dict) or "description" not in c:
                 continue
-            # Filter likely_relevant_files against the actual workspace listing.
-            # This drops paths the agent's answer mentions confidently but that
-            # don't exist on disk (typos, wrong directory, hallucinated names).
+            # Drop confabulated paths: keep only files the workspace walker saw.
             raw_files = c.get("likely_relevant_files", [])
             if not isinstance(raw_files, list):
                 raw_files = []
@@ -562,12 +414,9 @@ ones first. Do not invent claims that the workflow did not make.
                 rp = rf.strip().lstrip("./")
                 if not rp or rp in seen:
                     continue
-                # Accept only paths that the workspace walker actually saw.
-                # `_workspace_files` is populated by `_list_workspace`.
                 if self._workspace_files and rp not in self._workspace_files:
                     self.logger.debug(
-                        f"Dropping confabulated relevant file '{rp}' for claim "
-                        f"{c.get('id')}: not in workspace listing"
+                        f"Dropping confabulated file '{rp}' for {c.get('id')}"
                     )
                     continue
                 relevant.append(rp)
@@ -593,16 +442,7 @@ ones first. Do not invent claims that the workflow did not make.
         workspace_listing: str,
         grounding: str = "",
     ) -> dict[str, Any]:
-        """Generate, execute (if executable) and score a single claim.
-
-        Emits diagnostic ``print_box`` panels around each stage so the user
-        can see, at a glance:
-          - which claim is being checked,
-          - the verifier code (or reason for being marked non-executable),
-          - the script's stdout/stderr/exit status,
-          - the final verdict.
-        """
-        # 1. Header — the claim being verified
+        """Generate, execute (if executable) and score a single claim."""
         rel_files = claim.get("likely_relevant_files", [])
         claim_text = (
             f"id:          {claim.get('id')}\n"
@@ -612,14 +452,11 @@ ones first. Do not invent claims that the workflow did not make.
         )
         print_box(claim_text, title=f"Verifying claim {claim.get('id')}", color=CYAN)
 
-        # 2. Generate the verifier spec (executable code OR soft reason)
         spec = self._generate_verifier(uuid, claim, execution_text, workspace_listing)
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
             print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=512)
-
-            # 3. Run it and surface what actually happened
             exec_result = self._run_verifier(uuid, claim["id"], code)
 
             exit_status = exec_result.get("exit_status", "?")
@@ -659,7 +496,6 @@ ones first. Do not invent claims that the workflow did not make.
         scored["claim"] = claim
         scored["spec"] = spec
 
-        # 4. Final verdict panel — green on pass-ish, red otherwise.
         final = (
             f"id:     {claim.get('id')}\n"
             f"kind:   {scored.get('verifier_kind')}\n"
@@ -750,10 +586,6 @@ Return STRICT JSON only, in one of these two shapes:
         if not (spec.get("executable") and spec.get("code")):
             return spec
 
-        # Static cheat-check. If the LLM hard-coded the answer or skipped I/O,
-        # demand a retry with explicit feedback. Cheats are common enough that
-        # one retry is worth the LLM call; persistent cheats fall back to the
-        # soft check (which is now grounded by file previews).
         requires_io = bool(claim.get("likely_relevant_files"))
         cheating, cheat_reason = _verifier_appears_to_cheat(
             spec["code"], execution_text, requires_io=requires_io
@@ -781,7 +613,6 @@ Return STRICT JSON in the same format as before.
 """
         retry_spec = self._call_and_parse_verifier(uuid, claim, retry_prompt, attempt=2)
         if not (retry_spec.get("executable") and retry_spec.get("code")):
-            # Retry produced no executable code — keep the rejection reason.
             return {
                 "executable": False,
                 "reason": f"rejected as tautology (retry failed): {cheat_reason}",
@@ -810,43 +641,23 @@ Return STRICT JSON in the same format as before.
         prompt: str,
         attempt: int,
     ) -> dict[str, Any]:
-        """Single round-trip: call the judge, parse its JSON spec, return it.
-
-        Errors are returned as ``{"executable": False, "reason": ...}`` rather
-        than raised, so the caller can decide whether to retry or demote.
-        """
+        """Call the judge for a verifier spec; soft-fail to ``executable: False``."""
         agent_name = (
             f"verifier_gen_{claim['id']}"
             if attempt == 1
             else f"verifier_gen_{claim['id']}_retry"
         )
-        try:
-            raw = self._call_judge(uuid, agent_name, prompt)
-        except Exception as e:
-            return {"executable": False, "reason": f"verifier generation failed: {e}"}
-
-        payload = _extract_json_payload(raw)
-        if not payload:
-            return {"executable": False, "reason": "verifier generator returned no JSON"}
-        try:
-            spec = json.loads(payload)
-        except json.JSONDecodeError as e:
-            return {"executable": False, "reason": f"verifier JSON invalid: {e}"}
+        spec, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        if err is not None:
+            return {"executable": False, "reason": err}
         if not isinstance(spec, dict):
             return {"executable": False, "reason": "verifier JSON not an object"}
         return spec
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
-        """Execute a single verifier script in the agents' workspace.
-
-        Uses ``_run_coro_sync`` so the WorkflowRunner coroutines are always
-        awaited — both ``execute`` and ``cleanup`` — whether we are called
-        from a plain sync context or from inside a running asyncio loop.
-        """
+        """Execute a single verifier script in the agents' workspace."""
         scratch = self._runner_temp_root / uuid
         scratch.mkdir(parents=True, exist_ok=True)
-        # Disable PTY + don't auto-install requirements — verifier scripts are
-        # short, non-interactive checks.
         runner_config = RuntimeConfig(
             timeout=self.verifier_timeout,
             temp_dir=scratch,
@@ -855,10 +666,6 @@ Return STRICT JSON in the same format as before.
         )
         runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
         execution_id = f"verify_{claim_id}"
-
-        # Give the worker thread a bit of slack beyond the per-script timeout
-        # so the runner itself can return a TIMEOUT result rather than us
-        # killing the thread blindly.
         thread_timeout = self.verifier_timeout + 10
         result = None
         try:
@@ -875,7 +682,7 @@ Return STRICT JSON in the same format as before.
                 "raw_stderr": "",
                 "exit_status": "timeout",
             }
-        except Exception as e:  # surface the underlying failure
+        except Exception as e:
             return {
                 "status": "error",
                 "actual": None,
@@ -885,9 +692,6 @@ Return STRICT JSON in the same format as before.
                 "exit_status": "error",
             }
         finally:
-            # Cleanup MUST also be awaited via the helper; calling
-            # asyncio.run() directly from inside a running loop would leak
-            # the cleanup coroutine.
             try:
                 _run_coro_sync(runner.cleanup, thread_timeout=15)
             except Exception as e:
@@ -909,10 +713,9 @@ Return STRICT JSON in the same format as before.
 
     @staticmethod
     def _parse_verifier_stdout(stdout: str, claim_id: str) -> dict[str, Any]:
-        """Pull the last JSON line matching `claim_id` out of the script stdout."""
+        """Pull the last JSON line matching ``claim_id`` from the script stdout."""
         if not stdout:
             return {"status": "error", "actual": None, "details": "no stdout from verifier"}
-        # Walk lines from the end so trailing print-statements take precedence.
         for line in reversed(stdout.splitlines()):
             line = line.strip()
             if not line.startswith("{"):
@@ -964,17 +767,7 @@ Return STRICT JSON in the same format as before.
         reason: str,
         grounding: str = "",
     ) -> dict[str, Any]:
-        """Narrow LLM check for non-executable claims.
-        The LLM is asked one targeted question (does this single claim hold
-        given this concrete context?), not an aggregate vibes score.
-
-        When ``grounding`` is available, the verdict is anchored against
-        peer-reviewed literature in addition to the workspace context — the
-        soft check is where literature has the most leverage, since these
-        claims often concern methodological appropriateness rather than
-        recomputable values.
-        """
-
+        """Narrow LLM verdict for one non-executable claim, anchored on grounding."""
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
@@ -1019,16 +812,17 @@ for the absence of grounding.
 
 Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one sentence>"}}
 """
-        try:
-            raw = self._call_judge(uuid, f"verifier_soft_{claim['id']}", prompt)
-            payload = _extract_json_payload(raw)
-            data = json.loads(payload) if payload else {}
-        except Exception as e:
+        data, err = self._call_judge_for_json(
+            uuid, f"verifier_soft_{claim['id']}", prompt
+        )
+        if err is not None or not isinstance(data, dict):
+            # No usable verdict — treat as non-signal so it neither rewards nor
+            # punishes the workflow. Aggregator excludes errors from the mean.
             return {
                 "score": 0.0,
                 "verifier_kind": "soft",
                 "status": "error",
-                "details": f"soft check failed: {e}",
+                "details": f"soft check failed: {err or 'verdict JSON not an object'}",
                 "rationale": "",
             }
         verdict = data.get("verdict", "unsure")
@@ -1046,20 +840,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Aggregate per-claim results into a final score.
-
-        Key rule: ``status == "error"`` is treated as **non-signal**, not as a
-        refutation. Verifier-script crashes (e.g. the LLM guessed the wrong
-        file format and the parser bailed) tell us nothing about whether the
-        underlying claim is true. Errors are therefore:
-          - excluded from the mean,
-          - excluded from the hard-fail-cap trigger,
-          - reported separately so the operator can spot a flaky verifier
-            without it dragging the workflow's score down.
-
-        If every claim errored we fall back to ``overall_score = 0.0`` since
-        we have no signal at all to report.
-        """
+        """Mean over scored claims; errors excluded; hard-fail caps the result."""
         if not per_claim:
             return {
                 "overall_score": 0.0,
@@ -1080,7 +861,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
 
         if not scored:
-            # No usable signal. Don't pretend to score.
             return {
                 "overall_score": 0.0,
                 "overall_score_uncapped": 0.0,
@@ -1095,8 +875,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             }
 
         overall = sum(c["score"] for c in scored) / len(scored)
-        # Hard-fail cap fires only on a real refutation of a hard claim, not
-        # on a verifier-script crash and not on an unsure soft check.
+        # Hard-fail cap fires only on a real refutation, not on errors or unsure.
         hard_fail = any(
             c["claim"].get("criticality") == "hard"
             and c["status"] == "fail"
@@ -1121,14 +900,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
 
     def _list_workspace(self, max_entries: int = 200) -> str:
-        """Return a short, deterministic listing of the workspace.
-
-        Side effect: populates ``self._workspace_files`` with every relative
-        path encountered (not just the first ``max_entries``), so the claim
-        extractor's ``likely_relevant_files`` field can be intersected against
-        a complete set later — even for workspaces that exceed the listing
-        cap shown to the LLM.
-        """
+        """Workspace listing for the prompt; also populates ``_workspace_files``."""
         ws = self.workspace_dir
         self._workspace_files = set()
         if not ws.exists():
@@ -1136,7 +908,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         entries: list[str] = []
         truncated = False
         for root, dirs, files in os.walk(ws):
-            # Skip noisy directories.
             dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", ".venv", "node_modules"}]
             for f in files:
                 rel = str(Path(root, f).relative_to(ws))
@@ -1161,33 +932,17 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
 
     def _get_grounding(self, uuid: str, execution_text: str) -> str:
-        """Return the (cached) literature grounding for *uuid*.
-
-        Strategy:
-          - Short-circuit when ``use_grounding`` is False (cheap dev runs).
-          - One Perspicacite round-trip per uuid; reused for Stage 1 (claim
-            selection) and the soft check.
-          - Failures are absorbed by ``get_perspicacite_grounding`` itself
-            (returns a fallback string), so the caller never has to handle
-            an exception. We cache the fallback too — retrying within the
-            same evaluator instance is unlikely to help.
-        """
+        """One Perspicacite round-trip per uuid; cached + opt-out."""
         if not self.use_grounding:
             return self._GROUNDING_DISABLED
         if uuid in self._grounding_cache:
             return self._grounding_cache[uuid]
         try:
-            # Free function (no `self`); see sources/core/evaluators/grounding.py
             grounding = get_perspicacite_grounding(execution_text)
         except Exception as e:
-            # Defensive: get_perspicacite_grounding already catches its own
-            # errors, but we belt-and-suspenders so a Perspicacite outage
-            # never sinks the whole verifier evaluation.
             self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
             grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"
         self._grounding_cache[uuid] = grounding
-        # Surface grounding to the operator — green when it looks usable, red
-        # when it's a failure marker. Truncated so it doesn't dominate logs.
         is_usable = (
             grounding
             and self._GROUNDING_FAILED_MARKER not in grounding
@@ -1221,23 +976,11 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return printable / len(sample) < 0.7
 
     def _preview_file(self, rel_path: str) -> str:
-        """Render an LLM-friendly preview of a workspace file.
-
-        Strategy:
-          - Cache results keyed on `rel_path`; identical lookups are free.
-          - If the path is missing or not a file, say so explicitly.
-          - Binary files: header line with size + first 16 bytes hex.
-          - Text files ≤ head+tail budget: full content.
-          - Text files larger than the budget: head + truncation marker + tail
-            so format clues at both ends are visible.
-
-        The returned string is wrapped in `=== <path> (...) ===` fences so the
-        verifier-generation prompt can show several previews unambiguously.
-        """
+        """Cached LLM-friendly preview: text head+tail, binary magic bytes, fenced."""
         if rel_path in self._preview_cache:
             return self._preview_cache[rel_path]
 
-        # Resolve safely; reject anything escaping the workspace.
+        # Reject anything escaping the workspace.
         ws = self.workspace_dir.resolve()
         candidate = (self.workspace_dir / rel_path).resolve()
         try:
@@ -1263,7 +1006,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             self._preview_cache[rel_path] = rendered
             return rendered
 
-        # Read just enough to classify and (if text) to fill the head budget.
         head_budget = max(self.preview_head_bytes, _BINARY_SNIFF_BYTES)
         try:
             with open(candidate, "rb") as fh:
@@ -1311,15 +1053,13 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return rendered
 
     def _render_relevant_previews(self, rel_paths: list[str]) -> str:
-        """Render a multi-file preview block, capped at preview_per_claim_cap."""
+        """Concatenate file previews under ``preview_per_claim_cap``."""
         if not rel_paths:
             return "(no relevant files declared for this claim)"
         chunks: list[str] = []
         used = 0
         for rp in rel_paths:
             preview = self._preview_file(rp)
-            # If adding this preview would blow the per-claim cap, truncate it
-            # to whatever budget remains. If no budget remains, stop.
             remaining = self.preview_per_claim_cap - used
             if remaining <= 0:
                 chunks.append(f"=== {rp} ===\n(preview budget exhausted; not shown)\n")
@@ -1331,6 +1071,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return "\n".join(chunks)
 
     def _call_judge(self, uuid: str, agent_name: str, prompt: str) -> str:
+        """One judge round-trip; raises whatever the LLM provider raises."""
         memory_path = Path(self.memory_dir) / uuid
         memory_path.mkdir(parents=True, exist_ok=True)
         provider = LLMProvider(
@@ -1340,6 +1081,54 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             config=self.llm_config,
         )
         return provider(prompt)
+
+    _JSON_RETRY_FEEDBACK = (
+        "Your previous response could not be parsed as JSON. Reply with ONLY "
+        "the JSON object, no prose, no markdown fences, no commentary."
+    )
+
+    def _call_judge_for_json(
+        self,
+        uuid: str,
+        agent_name: str,
+        prompt: str,
+    ) -> tuple[Any, str | None]:
+        """Call the judge expecting JSON; one retry on parse failure.
+
+        Returns ``(parsed, None)`` on success or ``(None, error_str)`` on
+        terminal failure. Both call exceptions and JSON-parse errors are
+        absorbed so callers never have to wrap in try/except.
+        """
+        last_err: str | None = None
+        cur_prompt = prompt
+        for attempt in (1, 2):
+            agent = agent_name if attempt == 1 else f"{agent_name}_retry"
+            try:
+                raw = self._call_judge(uuid, agent, cur_prompt)
+            except Exception as e:
+                last_err = f"judge call failed: {type(e).__name__}: {e}"
+                self.logger.warning(f"[{agent}] {last_err}")
+                # Retrying when the call itself raised is unlikely to help; bail.
+                return None, last_err
+
+            payload = _extract_json_payload(raw or "")
+            if payload:
+                try:
+                    return json.loads(payload), None
+                except json.JSONDecodeError as e:
+                    last_err = f"invalid JSON: {e}"
+            else:
+                last_err = "no JSON object found in response"
+
+            if attempt == 1:
+                self.logger.warning(
+                    f"[{agent}] JSON parse failed ({last_err}); retrying once"
+                )
+                cur_prompt = (
+                    f"{prompt}\n\nPREVIOUS ATTEMPT FAILED: {last_err}\n"
+                    f"{self._JSON_RETRY_FEEDBACK}\n"
+                )
+        return None, last_err
 
     def _write_report(
         self,
