@@ -7,6 +7,7 @@ execute in the agents' workspace → score per claim → aggregate.
 import ast
 import asyncio
 import json
+import math
 import os
 import re
 import threading
@@ -37,7 +38,13 @@ from sources.cli.pretty_print import (
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
 _VERIFIER_MAX_CLAIMS = 24
+_VERIFIER_MIN_CLAIMS = 3
 _HARD_FAIL_CAP = 0.5
+
+# ----- Information bonus (rewards thoroughness; saturates) --------------------
+# bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
+_INFO_BONUS_ALPHA = 0.15
+_INFO_BONUS_BETA = 4.0
 
 # ----- File preview budgets ---------------------------------------------------
 _PREVIEW_HEAD_BYTES = 8 * 1024
@@ -197,11 +204,14 @@ class VerifierEvaluator(BaseEvaluator):
         workspace_dir: str | Path | None = None,
         verifier_timeout: int = _VERIFIER_TIMEOUT_SECONDS,
         max_claims: int = _VERIFIER_MAX_CLAIMS,
+        min_claims: int = _VERIFIER_MIN_CLAIMS,
         hard_fail_cap: float = _HARD_FAIL_CAP,
         preview_head_bytes: int = _PREVIEW_HEAD_BYTES,
         preview_tail_bytes: int = _PREVIEW_TAIL_BYTES,
         preview_per_claim_cap: int = _PREVIEW_PER_CLAIM_CAP,
         use_grounding: bool = True,
+        info_bonus_alpha: float = _INFO_BONUS_ALPHA,
+        info_bonus_beta: float = _INFO_BONUS_BETA,
     ):
         """Initialise; workspace_dir defaults to ``config.workspace_dir``."""
         super().__init__(config)
@@ -212,11 +222,14 @@ class VerifierEvaluator(BaseEvaluator):
         )
         self.verifier_timeout = verifier_timeout
         self.max_claims = max_claims
+        self.min_claims = max(0, min_claims)
         self.hard_fail_cap = hard_fail_cap
         self.preview_head_bytes = preview_head_bytes
         self.preview_tail_bytes = preview_tail_bytes
         self.preview_per_claim_cap = preview_per_claim_cap
         self.use_grounding = use_grounding
+        self.info_bonus_alpha = max(0.0, info_bonus_alpha)
+        self.info_bonus_beta = max(1e-6, info_bonus_beta)
         self._preview_cache: dict[str, str] = {}
         self._workspace_files: set[str] = set()
         self._grounding_cache: dict[str, str] = {}
@@ -225,8 +238,9 @@ class VerifierEvaluator(BaseEvaluator):
         )
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
-            f"timeout={verifier_timeout}s, max_claims={max_claims}, "
-            f"use_grounding={use_grounding})"
+            f"timeout={verifier_timeout}s, claims={self.min_claims}–{max_claims}, "
+            f"use_grounding={use_grounding}, "
+            f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
 
     # ------------------------------------------------------------------
@@ -391,13 +405,55 @@ Return STRICT JSON only, no prose, in this exact form:
   ]
 }}
 
-Aim for at most {self.max_claims} claims, prioritising the most load-bearing
-ones first. Do not invent claims that the workflow did not make.
+Aim for {self.min_claims}–{self.max_claims} claims (target at least {self.min_claims}),
+prioritising the most load-bearing first. Do not invent claims that the workflow
+did not make.
 """
-        data, err = self._call_judge_for_json(uuid, "verifier_extract_claims", prompt)
-        if err is not None:
-            raise LLMEvaluationError(f"Claim extraction failed for {uuid}: {err}")
+        # Two outer attempts: first call, then one retry if fewer than min_claims
+        # were returned. Each attempt also has the JSON-parse retry inside
+        # _call_judge_for_json, so worst case is 4 LLM calls.
+        attempts_for_count = 2
+        extra_feedback = ""
+        cleaned: list[dict[str, Any]] = []
+        for count_attempt in range(attempts_for_count):
+            full_prompt = prompt + extra_feedback
+            data, err = self._call_judge_for_json(
+                uuid, "verifier_extract_claims", full_prompt
+            )
+            if err is not None:
+                raise LLMEvaluationError(f"Claim extraction failed for {uuid}: {err}")
 
+            cleaned = self._parse_and_filter_claims(uuid, data)
+            if len(cleaned) >= self.min_claims:
+                return cleaned
+            if count_attempt == attempts_for_count - 1:
+                self.logger.warning(
+                    f"Claim extractor returned only {len(cleaned)} claims after "
+                    f"retry (min_claims={self.min_claims}); proceeding with "
+                    f"{len(cleaned)}"
+                )
+                return cleaned
+            self.logger.warning(
+                f"Claim extractor returned only {len(cleaned)} claims "
+                f"(min_claims={self.min_claims}); retrying once with feedback"
+            )
+            extra_feedback = (
+                f"\n\nYOUR PREVIOUS RESPONSE RETURNED ONLY {len(cleaned)} CLAIMS. "
+                f"The verifier requires at least {self.min_claims} atomic claims. "
+                f"The workflow output likely contains more verifiable claims — "
+                f"re-read it and extract additional load-bearing claims (specific "
+                f"numbers, file properties, structural assertions, methodological "
+                f"steps). Aim for {self.min_claims}–{self.max_claims} claims, "
+                f"prioritising the most load-bearing first."
+            )
+        return cleaned
+
+    def _parse_and_filter_claims(
+        self,
+        uuid: str,
+        data: Any,
+    ) -> list[dict[str, Any]]:
+        """Validate the LLM JSON, normalise each claim, drop confabulated paths."""
         claims = data.get("claims", []) if isinstance(data, dict) else data
         if not isinstance(claims, list):
             raise LLMEvaluationError(f"Claim extractor JSON has no 'claims' list for {uuid}")
@@ -406,7 +462,6 @@ ones first. Do not invent claims that the workflow did not make.
         for idx, c in enumerate(claims):
             if not isinstance(c, dict) or "description" not in c:
                 continue
-            # Drop confabulated paths: keep only files the workspace walker saw.
             raw_files = c.get("likely_relevant_files", [])
             if not isinstance(raw_files, list):
                 raw_files = []
@@ -843,12 +898,28 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # Stage 5 — aggregation
     # ------------------------------------------------------------------
 
+    def _information_bonus(self, n_hard_pass: int) -> float:
+        """Saturating reward for thoroughness; gameable spam yields no extra credit.
+
+        bonus(n) = α · (1 − exp(−n / β)). Bounded above by α, monotonic in n,
+        and conditional on the *passing hard* claim count so trivial or failed
+        claims contribute nothing.
+        """
+        if n_hard_pass <= 0 or self.info_bonus_alpha <= 0.0:
+            return 0.0
+        return self.info_bonus_alpha * (
+            1.0 - math.exp(-n_hard_pass / self.info_bonus_beta)
+        )
+
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Mean over scored claims; errors excluded; hard-fail caps the result."""
+        """Mean over scored claims + information bonus; hard-fail caps the result."""
         if not per_claim:
             return {
                 "overall_score": 0.0,
                 "overall_score_uncapped": 0.0,
+                "base_mean": 0.0,
+                "information_bonus": 0.0,
+                "n_hard_pass": 0,
                 "hard_fail_capped": False,
                 "n_claims": 0,
                 "n_pass": 0,
@@ -863,11 +934,18 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
+        n_hard_pass = sum(
+            1 for c in scored
+            if c["claim"].get("criticality") == "hard" and c["status"] == "pass"
+        )
 
         if not scored:
             return {
                 "overall_score": 0.0,
                 "overall_score_uncapped": 0.0,
+                "base_mean": 0.0,
+                "information_bonus": 0.0,
+                "n_hard_pass": 0,
                 "hard_fail_capped": False,
                 "n_claims": len(per_claim),
                 "n_pass": n_pass,
@@ -878,18 +956,25 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "skipped_reason": "all_verifiers_errored",
             }
 
-        overall = sum(c["score"] for c in scored) / len(scored)
+        base_mean = sum(c["score"] for c in scored) / len(scored)
+        bonus = self._information_bonus(n_hard_pass)
+        # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
+        # bonus can never push past 1.0 nor rescue a broken run.
+        pre_cap = max(0.0, min(1.0, base_mean + bonus))
         # Hard-fail cap fires only on a real refutation, not on errors or unsure.
         hard_fail = any(
             c["claim"].get("criticality") == "hard"
             and c["status"] == "fail"
             for c in scored
         )
-        capped = min(overall, self.hard_fail_cap) if hard_fail else overall
+        overall = min(pre_cap, self.hard_fail_cap) if hard_fail else pre_cap
 
         return {
-            "overall_score": round(capped, 4),
-            "overall_score_uncapped": round(overall, 4),
+            "overall_score": round(overall, 4),
+            "overall_score_uncapped": round(pre_cap, 4),
+            "base_mean": round(base_mean, 4),
+            "information_bonus": round(bonus, 4),
+            "n_hard_pass": n_hard_pass,
             "hard_fail_capped": hard_fail,
             "n_claims": len(per_claim),
             "n_pass": n_pass,
@@ -1154,8 +1239,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 f.write(f"Overall: {scores['overall_score']:.3f}"
                         f" (uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
                         f"hard_fail_capped={scores.get('hard_fail_capped', False)})\n")
+                f.write(f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
+                        f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
+                        f"n_hard_pass={scores.get('n_hard_pass', 0)}\n")
                 f.write("Note: errored verifiers are excluded from the mean and "
-                        "do not trip the hard-fail cap.\n\n")
+                        "do not trip the hard-fail cap.\n")
+                f.write("Information bonus rewards thoroughness (passing hard "
+                        "claims) with a saturating curve; gameable spam yields "
+                        "no extra credit.\n\n")
                 for c in per_claim:
                     cl = c["claim"]
                     f.write(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}\n")
