@@ -52,7 +52,7 @@ from sources.cli.pretty_print import (
 
 # ----- Default per-script execution limits ------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
-_VERIFIER_MAX_CLAIMS = 12
+_VERIFIER_MAX_CLAIMS = 24
 _HARD_FAIL_CAP = 0.5
 
 # ----- File preview budgets ---------------------------------------------------
