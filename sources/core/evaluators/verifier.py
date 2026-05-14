@@ -28,6 +28,7 @@ from .base import (
     ScoreExtractionError,
     WorkflowDataError,
 )
+from .cheat_detector import CheatVerdict, cheat_penalty
 from .grounding import get_perspicacite_grounding
 
 from sources.cli.pretty_print import (
@@ -218,6 +219,7 @@ class VerifierEvaluator(BaseEvaluator):
         use_grounding: bool = True,
         info_bonus_alpha: float = _INFO_BONUS_ALPHA,
         info_bonus_beta: float = _INFO_BONUS_BETA,
+        use_cheat_detector: bool = True,
     ):
         """Initialise; workspace_dir defaults to ``config.workspace_dir``."""
         super().__init__(config)
@@ -236,17 +238,51 @@ class VerifierEvaluator(BaseEvaluator):
         self.use_grounding = use_grounding
         self.info_bonus_alpha = max(0.0, info_bonus_alpha)
         self.info_bonus_beta = max(1e-6, info_bonus_beta)
+        self.use_cheat_detector = use_cheat_detector
         self._preview_cache: dict[str, str] = {}
         self._workspace_files: set[str] = set()
         self._grounding_cache: dict[str, str] = {}
         self._runner_temp_root = Path(
             getattr(config, "temp_dir", None) or self.workflow_dir / "_verifier_tmp"
         )
+        # Layer 2: per-task verification checklist (set externally before
+        # evolution starts). When present, drives claim extraction in place of
+        # the workflow's self-narration so the workflow can't author its own
+        # exam. None ⇒ fall back to the legacy execution-text extractor.
+        self._task_checklist: list[dict[str, Any]] | None = None
+        self._task_spec: str = ""
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
             f"timeout={verifier_timeout}s, claims={self.min_claims}–{max_claims}, "
             f"use_grounding={use_grounding}, "
+            f"use_cheat_detector={use_cheat_detector}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
+        )
+
+    # ------------------------------------------------------------------
+    # External hooks (Layer 2 — pre-evolution task checklist)
+    # ------------------------------------------------------------------
+
+    def set_task_checklist(
+        self,
+        items: list[dict[str, Any]] | None,
+        task_spec: str = "",
+    ) -> None:
+        """Install a task-locked checklist used by ``_extract_claims``.
+
+        Items are expected to follow the schema produced by
+        ``TaskChecklistBuilder.build`` (description, criticality,
+        expected_artifact_kind, acceptable_variation, …). Passing ``None``
+        or ``[]`` reverts to the legacy narration-driven extractor.
+        ``task_spec`` is the canonical task text; it is also forwarded to
+        the cheat detector so it never has to read the agent's narration.
+        """
+        self._task_checklist = items or None
+        self._task_spec = (task_spec or "").strip()
+        n = len(self._task_checklist) if self._task_checklist else 0
+        self.logger.info(
+            f"VerifierEvaluator task checklist set: {n} item(s), "
+            f"task_spec_len={len(self._task_spec)}"
         )
 
     # ------------------------------------------------------------------
@@ -280,6 +316,11 @@ class VerifierEvaluator(BaseEvaluator):
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
+        # When a checklist is installed, verifier-generation must not see the
+        # agent narration: closing that loop is what produced the original
+        # Goodhart leak. We still keep `execution_text` for empty-run detection
+        # and the soft-check anchor for non-checklist claims.
+        use_checklist = bool(self._task_checklist) and not is_truly_empty
         claims = self._extract_claims(
             uuid, execution_text, workspace_listing, is_truly_empty, grounding
         )
@@ -290,12 +331,36 @@ class VerifierEvaluator(BaseEvaluator):
             return {"uuid": uuid, "claims": [], **scores}
 
         per_claim: list[dict[str, Any]] = []
+        # Layer 2: hide narration from the verifier generator when checklist
+        # mode is active. The workspace listing is still passed so verifiers
+        # can find artefacts; only the agent's self-report is withheld.
+        verifier_context = (
+            "(agent narration withheld in checklist mode — derive the check "
+            "from the claim description and the workspace files only)"
+            if use_checklist
+            else execution_text
+        )
         for claim in claims[: self.max_claims]:
-            result = self._verify_claim(uuid, claim, execution_text, workspace_listing, grounding)
+            result = self._verify_claim(
+                uuid, claim, verifier_context, workspace_listing, grounding
+            )
             per_claim.append(result)
 
         scores = self._aggregate(per_claim)
-        self._write_report(uuid, claims, per_claim, scores)
+
+        # Layer 3: independent cheat audit over the agents' produced script.
+        cheat = self._run_cheat_detector(uuid)
+        scores = self._apply_cheat_penalty(scores, cheat)
+
+        # Layer 1: derive a behavioral diagnosis for the mutator. Sees the
+        # eval summary + Layer 3 behavioral findings, NOT mechanism findings.
+        diagnosis = self._build_abstracted_diagnosis(
+            uuid, scores, per_claim, cheat
+        )
+        scores["abstracted_diagnosis"] = diagnosis
+
+        self._write_report(uuid, claims, per_claim, scores, cheat=cheat, diagnosis=diagnosis)
+        self._persist_diagnosis(uuid, diagnosis)
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -311,6 +376,11 @@ class VerifierEvaluator(BaseEvaluator):
             title="Verifier short-circuit — generation failed",
             color=RED,
         )
+        diagnosis = (
+            "The workflow did not produce any executable code or recorded "
+            "state, so nothing could be verified. The next iteration must "
+            "actually generate and run a workflow."
+        )
         scores = {
             "overall_score": 0.0,
             "overall_score_uncapped": 0.0,
@@ -321,11 +391,14 @@ class VerifierEvaluator(BaseEvaluator):
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
+            "abstracted_diagnosis": diagnosis,
+            "cheat_penalty": 0.0,
         }
         try:
-            self._write_report(uuid, [], [], scores)
+            self._write_report(uuid, [], [], scores, cheat=None, diagnosis=diagnosis)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
+        self._persist_diagnosis(uuid, diagnosis)
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -358,6 +431,12 @@ class VerifierEvaluator(BaseEvaluator):
                 "criticality": "hard",
                 "likely_relevant_files": [],
             }]
+
+        # Layer 2: when a task-locked checklist is installed, derive claims
+        # from it directly. This bypasses execution-text extraction entirely
+        # so the workflow cannot author its own exam.
+        if self._task_checklist:
+            return self._claims_from_checklist(self._task_checklist)
 
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
         prompt = f"""
@@ -513,6 +592,33 @@ did not make.
             })
         return cleaned
 
+    def _claims_from_checklist(
+        self, items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Promote a pre-built task checklist to verifier claims.
+
+        We deliberately do NOT prefill ``likely_relevant_files`` — the
+        verifier-generation stage looks at the live workspace listing and
+        picks an artifact matching ``expected_artifact_kind``. Hard-coding
+        a file name here would re-introduce the brittleness the checklist
+        was designed to avoid (legitimate variation in artifact naming).
+        """
+        cleaned: list[dict[str, Any]] = []
+        for idx, it in enumerate(items):
+            if not isinstance(it, dict) or "description" not in it:
+                continue
+            cleaned.append({
+                "id": str(it.get("id") or f"chk_{idx}"),
+                "description": str(it["description"]).strip(),
+                "criticality": "hard" if it.get("criticality") == "hard" else "soft",
+                "likely_relevant_files": [],
+                "expected_artifact_kind": str(it.get("expected_artifact_kind") or "").strip(),
+                "acceptable_variation": str(it.get("acceptable_variation") or "").strip(),
+                "checkable_via": str(it.get("checkable_via") or "file").strip(),
+                "source": "task_checklist",
+            })
+        return cleaned
+
     # ------------------------------------------------------------------
     # Stage 2 + 3 + 4 — generate, run and score one verifier
     # ------------------------------------------------------------------
@@ -602,6 +708,18 @@ did not make.
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
+        checklist_hints = ""
+        if claim.get("source") == "task_checklist":
+            checklist_hints = (
+                "\nCHECKLIST CONTEXT (claim came from a task-locked rubric, "
+                "not from agent narration — find the artefact in the workspace):"
+                f"\n- expected_artifact_kind: {claim.get('expected_artifact_kind') or '(unspecified)'}"
+                f"\n- acceptable_variation:   {claim.get('acceptable_variation') or '(unspecified)'}"
+                f"\n- checkable_via:          {claim.get('checkable_via') or 'file'}\n"
+                "Inspect the workspace listing and pick the file whose name or "
+                "content best matches the expected_artifact_kind. Do NOT rely "
+                "on the agent's self-report to identify the file.\n"
+            )
         prompt = f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
@@ -614,7 +732,7 @@ RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 
 WORKFLOW OUTPUT (for context only — do not re-evaluate the whole thing):
 {execution_text}
-
+{checklist_hints}
 CLAIM TO VERIFY:
 - id: {claim['id']}
 - criticality: {claim['criticality']}
@@ -1243,12 +1361,190 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 )
         return None, last_err
 
+    # ------------------------------------------------------------------
+    # Layer 3 — cheat detector (independent epistemology)
+    # ------------------------------------------------------------------
+
+    def _run_cheat_detector(self, uuid: str) -> CheatVerdict | None:
+        """Audit the agents' produced script; never sees claims or evaluation."""
+        if not self.use_cheat_detector:
+            return None
+        if not self._task_spec:
+            self.logger.debug(
+                f"cheat detector skipped for {uuid}: no task_spec installed"
+            )
+            return None
+        script_path = (
+            self.workflow_dir / uuid / f"workflow_genotype_{uuid}.py"
+        )
+        if not script_path.exists():
+            self.logger.debug(
+                f"cheat detector skipped for {uuid}: script not found at {script_path}"
+            )
+            return None
+        verdict = cheat_penalty(
+            script_path=script_path,
+            task_spec=self._task_spec,
+            llm_config=self.llm_config,
+            memory_dir=self.memory_dir,
+            agent_name=f"cheat_detector_{uuid}",
+        )
+        color = GREEN if verdict.penalty == 0.0 else (YELLOW if verdict.penalty < 0.5 else RED)
+        summary_lines = [f"penalty: {verdict.penalty:.2f}"]
+        if verdict.error:
+            summary_lines.append(f"error:   {verdict.error}")
+        if verdict.behavioral:
+            summary_lines.append("behavioral findings:")
+            summary_lines.extend(f"  - {b}" for b in verdict.behavioral)
+        if verdict.mechanism:
+            summary_lines.append("mechanism findings (audit-only):")
+            summary_lines.extend(f"  - {m}" for m in verdict.mechanism)
+        print_box(
+            "\n".join(summary_lines),
+            title=f"Cheat detector · {uuid}",
+            color=color,
+        )
+        return verdict
+
+    @staticmethod
+    def _apply_cheat_penalty(
+        scores: dict[str, Any], cheat: CheatVerdict | None
+    ) -> dict[str, Any]:
+        """Subtract cheat penalty from the capped overall score; floor at 0.0."""
+        penalty = float(cheat.penalty) if cheat is not None else 0.0
+        capped = float(scores.get("overall_score", 0.0))
+        final = max(0.0, capped - penalty)
+        scores["overall_score_before_cheat"] = round(capped, 4)
+        scores["cheat_penalty"] = round(penalty, 4)
+        scores["overall_score"] = round(final, 4)
+        if cheat is not None:
+            scores["cheat_detector"] = cheat.to_dict()
+        return scores
+
+    # ------------------------------------------------------------------
+    # Layer 1 — abstracted diagnosis for the mutator
+    # ------------------------------------------------------------------
+
+    def _build_abstracted_diagnosis(
+        self,
+        uuid: str,
+        scores: dict[str, Any],
+        per_claim: list[dict[str, Any]],
+        cheat: CheatVerdict | None,
+    ) -> str:
+        """Produce a 2–4 sentence behavioral summary for the mutation prompt.
+
+        The summary is intentionally rubric-blind: it must not name claim IDs
+        nor describe specific check mechanisms. The goal is to keep the
+        mutator pointed at *what the workflow failed to accomplish*, not at
+        *which checks the judge ran*. Cheat detector findings are folded in
+        from the **behavioral** channel only; mechanism findings stay in the
+        report.
+        """
+        n_claims = scores.get("n_claims", 0)
+        n_pass = scores.get("n_pass", 0)
+        n_fail = scores.get("n_fail", 0)
+        n_error = scores.get("n_error", 0)
+        n_unsure = scores.get("n_unsure", 0)
+        overall = scores.get("overall_score", 0.0)
+        hard_fail = scores.get("hard_fail_capped", False)
+        cheat_pen = scores.get("cheat_penalty", 0.0)
+
+        behavioral_block = ""
+        if cheat is not None and cheat.behavioral:
+            behavioral_block = (
+                "INDEPENDENT AUDIT — BEHAVIORAL FINDINGS (rubric-blind, "
+                "safe to summarise):\n"
+                + "\n".join(f"- {b}" for b in cheat.behavioral)
+            )
+        elif cheat is not None and cheat.error:
+            behavioral_block = (
+                f"(independent audit unavailable: {cheat.error})"
+            )
+
+        prompt = f"""You are summarising the result of an evaluation pass for the
+agent that will mutate the workflow next iteration. Your summary will replace
+the raw evaluation log in the mutation prompt; it is the ONLY evaluation signal
+the mutator will see.
+
+EVALUATION SUMMARY (do NOT pass this through verbatim — abstract it):
+- overall_score: {overall:.3f}
+- claim counts:   pass={n_pass}  fail={n_fail}  error={n_error}  unsure={n_unsure}  total={n_claims}
+- hard_fail_capped: {hard_fail}
+- cheat_penalty:    {cheat_pen:.2f}
+
+{behavioral_block}
+
+WRITE 2–4 SENTENCES describing, at the BEHAVIORAL level, what the workflow
+failed to accomplish on this run. Hard rules:
+- DO NOT name claim IDs, file paths, or specific check mechanisms.
+- DO NOT use the words "grep", "header", "row count", "regex", "claim", "check".
+- DO NOT describe what the verifier did; describe what the workflow did or
+  did not do at the task level.
+- DO mention if the workflow appears to have taken shortcuts (use the
+  behavioral findings above when present).
+- If the run passed cleanly, say so in one sentence and stop.
+
+Return plain text — no JSON, no headings, no bullet list.
+"""
+        try:
+            raw = self._call_judge(uuid, "verifier_diagnosis", prompt)
+        except Exception as e:
+            self.logger.warning(f"abstractor LLM call failed for {uuid}: {e}")
+            return self._fallback_diagnosis(scores, cheat)
+        text = (raw or "").strip()
+        if not text:
+            return self._fallback_diagnosis(scores, cheat)
+        # Defensive: hard cap length so it can never balloon the mutation prompt.
+        if len(text) > 1200:
+            text = text[:1200].rstrip() + " …"
+        return text
+
+    @staticmethod
+    def _fallback_diagnosis(
+        scores: dict[str, Any], cheat: CheatVerdict | None
+    ) -> str:
+        """Deterministic fallback when the abstractor LLM is unavailable."""
+        n_pass = scores.get("n_pass", 0)
+        n_fail = scores.get("n_fail", 0)
+        n_claims = scores.get("n_claims", 0)
+        overall = scores.get("overall_score", 0.0)
+        bits = [
+            f"Run scored {overall:.2f}; "
+            f"{n_pass}/{n_claims} checks passed, {n_fail} refuted."
+        ]
+        if scores.get("hard_fail_capped"):
+            bits.append(
+                "A load-bearing requirement was not met — the next iteration "
+                "must change approach rather than refine details."
+            )
+        if cheat is not None and cheat.behavioral:
+            bits.append(
+                "An independent audit flagged shortcuts in the produced code: "
+                + "; ".join(cheat.behavioral[:3])
+                + "."
+            )
+        return " ".join(bits)
+
+    def _persist_diagnosis(self, uuid: str, diagnosis: str) -> None:
+        """Write the diagnosis to ``diagnosis.txt`` alongside the report."""
+        if not diagnosis:
+            return
+        path = self.workflow_dir / uuid / "diagnosis.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.write_text(diagnosis, encoding="utf-8")
+        except OSError as e:
+            self.logger.warning(f"could not write diagnosis.txt for {uuid}: {e}")
+
     def _write_report(
         self,
         uuid: str,
         claims: list[dict[str, Any]],
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
+        cheat: CheatVerdict | None = None,
+        diagnosis: str = "",
     ) -> None:
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1261,22 +1557,32 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                         f"unsure={scores.get('n_unsure', 0)}  "
                         f"scored={scores.get('n_scored', 0)}\n")
                 f.write(f"Overall: {scores['overall_score']:.3f}"
-                        f" (uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
+                        f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
+                        f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
                         f"hard_fail_capped={scores.get('hard_fail_capped', False)})\n")
                 f.write(f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
                         f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
-                        f"n_hard_pass={scores.get('n_hard_pass', 0)}\n")
+                        f"n_hard_pass={scores.get('n_hard_pass', 0)}  "
+                        f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}\n")
                 f.write("Note: errored verifiers are excluded from the mean and "
                         "do not trip the hard-fail cap.\n")
                 f.write("Information bonus rewards thoroughness (passing hard "
                         "claims) with a saturating curve; gameable spam yields "
-                        "no extra credit.\n\n")
+                        "no extra credit.\n")
+                f.write("Cheat penalty is computed by an independent audit that "
+                        "never sees the claim list; mechanism findings appear "
+                        "below for human review only.\n\n")
                 for c in per_claim:
                     cl = c["claim"]
                     f.write(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}\n")
                     rel = cl.get("likely_relevant_files", [])
                     if rel:
                         f.write(f"  relevant_files: {rel}\n")
+                    if cl.get("source") == "task_checklist":
+                        f.write(
+                            f"  source: task_checklist  "
+                            f"expected_artifact_kind={cl.get('expected_artifact_kind') or '(unspecified)'}\n"
+                        )
                     f.write(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}\n")
                     if c.get("details"):
                         f.write(f"  details: {c['details']}\n")
@@ -1287,6 +1593,27 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                             for line in stderr_snippet:
                                 f.write(f"    {line}\n")
                     f.write("\n")
+
+                if cheat is not None:
+                    f.write("-" * 60 + "\n")
+                    f.write("Independent cheat audit\n")
+                    f.write(f"  penalty: {cheat.penalty:.3f}\n")
+                    if cheat.error:
+                        f.write(f"  error:   {cheat.error}\n")
+                    if cheat.behavioral:
+                        f.write("  behavioral findings (also fed to mutator):\n")
+                        for b in cheat.behavioral:
+                            f.write(f"    - {b}\n")
+                    if cheat.mechanism:
+                        f.write("  mechanism findings (audit-only — NOT fed to mutator):\n")
+                        for m in cheat.mechanism:
+                            f.write(f"    - {m}\n")
+                    f.write("\n")
+
+                if diagnosis:
+                    f.write("-" * 60 + "\n")
+                    f.write("Abstracted diagnosis (fed to next mutation prompt):\n")
+                    f.write(diagnosis.rstrip() + "\n")
             self.logger.info(f"Verifier report written to {path}")
         except OSError as e:
             self.logger.error(f"Could not write verifier report for {uuid}: {e}")

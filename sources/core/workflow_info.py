@@ -112,6 +112,32 @@ class WorkflowInfo:
             print(f"❌ Can't read state_result.json for UUID {self.uuid}: {e}")
             return "No evaluation. execution failed."
 
+    @property
+    def abstracted_diagnosis(self) -> str:
+        """Behavioral diagnosis written by the verifier abstractor (Layer 1).
+
+        This is the ONLY evaluation signal the mutator should see; raw
+        ``judge_evaluation`` leaks rubric mechanism into the mutation prompt
+        and causes the workflow to learn the judge's epistemology instead of
+        the task. Resolution order: ``state_result.evaluation.verifier
+        .abstracted_diagnosis`` → sidecar ``diagnosis.txt`` → empty string
+        (callers must handle the empty case rather than fall through to the
+        raw evaluation log).
+        """
+        state = self.load_state_result()
+        if isinstance(state, dict):
+            verifier = (state.get("evaluation") or {}).get("verifier") or {}
+            text = verifier.get("abstracted_diagnosis")
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+        sidecar = self.workflow_folder / "diagnosis.txt"
+        if sidecar.exists():
+            try:
+                return sidecar.read_text(encoding="utf-8").strip()
+            except OSError:
+                return ""
+        return ""
+
     def load_state_result(self) -> dict:
         """Load state_result.json file."""
         state_file = self.workflow_folder / "state_result.json"

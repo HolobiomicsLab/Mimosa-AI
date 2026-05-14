@@ -175,9 +175,9 @@ class VariationEngine:
           2. Execution grounding — previous code, agent answers, and judge eval.
           3. Change pressures — a freshly-sampled perturbation from Mutagen that drives the LLM away from local minima.
         """
-        score      = wf_info.overall_score      if wf_info else 0.0
-        judge_eval = wf_info.judge_evaluation   if wf_info else None
-        wf_state   = wf_info.state_result       if wf_info else None
+        score      = wf_info.overall_score        if wf_info else 0.0
+        diagnosis  = wf_info.abstracted_diagnosis if wf_info else ""
+        wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Perturbation sampling ────────────────────────────────────────────
         perturbation  = self.mutagen.compose()
@@ -191,8 +191,19 @@ class VariationEngine:
             print_info(f"  {k:>15}: {v}")
 
         # ── Execution evidence ───────────────────────────────────────────────
+        # Mutator-side information hiding (Layer 1): the raw judge log used to
+        # be spliced in here, which let the LLM copy the judge's check patterns
+        # into the child workflow's own internal logic. We now feed only the
+        # behavioral diagnosis (rubric-blind) plus agent answers (task-aligned
+        # tracebacks/outputs). Falls back to a short stderr tail only when no
+        # diagnosis exists (e.g. older runs before this evaluator ran).
         agent_answers = self._extract_agent_answers(wf_state)
-        exec_result   = (judge_eval or run_stderr)[-2048:].strip()
+        diagnosis_block = (
+            diagnosis.strip()
+            if diagnosis and diagnosis.strip()
+            else (run_stderr or "")[-1024:].strip()
+            or "No diagnosis captured."
+        )
         phase_block   = self._get_temperature_phase(iteration_count, max_iterations, score)
 
         if genotype is None:
@@ -218,9 +229,14 @@ class VariationEngine:
                 "<agents_answers>",
                 agent_answers,
                 "</agents_answers>",
-                "<evaluation>",
-                exec_result or "No evaluation captured.",
-                "</evaluation>",
+                "<diagnosis>",
+                "Behavioral summary of the previous run. Intentionally rubric-blind:",
+                "it describes what the workflow failed to accomplish, not which",
+                "specific checks ran. Do NOT bake check-shaped patterns into the new",
+                "workflow to satisfy a hypothetical verifier.",
+                "",
+                diagnosis_block,
+                "</diagnosis>",
                 "",
                 "## CHANGE PRESSURES:",
                 "Randomly sampled to push you away from local minima.",
@@ -263,15 +279,18 @@ class VariationEngine:
         for i, (wf_info, genotype, stderr) in enumerate(
             zip(wf_infos, genotypes, run_stderrs)
         ):
-            score     = wf_info.overall_score    if wf_info else 0.0
-            judge_eval = (wf_info.judge_evaluation if wf_info else None) or stderr.strip()
+            score     = wf_info.overall_score        if wf_info else 0.0
+            diagnosis = wf_info.abstracted_diagnosis if wf_info else ""
+            # Layer 1: rubric-blind diagnosis instead of raw judge log.
+            # Fall back to stderr tail only when no diagnosis exists.
+            diagnosis = diagnosis.strip() or (stderr or "").strip()[-1024:]
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
-                "index":   i + 1,
-                "score":   score,
-                "code":    genotype,
-                "eval":    judge_eval,
-                "answers": answers,
+                "index":     i + 1,
+                "score":     score,
+                "code":      genotype,
+                "diagnosis": diagnosis,
+                "answers":   answers,
             })
 
         # Best parents first — LLM primacy bias helps inherit strong traits
@@ -293,9 +312,10 @@ class VariationEngine:
                 "<agents_answers>",
                 p["answers"],
                 "</agents_answers>",
-                "<evaluation>",
-                p["eval"] or "None.",
-                "</evaluation>",
+                "<diagnosis>",
+                "Rubric-blind behavioral summary of this parent's run.",
+                p["diagnosis"] or "No diagnosis captured.",
+                "</diagnosis>",
             ]))
 
         return "\n".join([

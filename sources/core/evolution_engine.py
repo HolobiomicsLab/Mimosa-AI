@@ -290,6 +290,12 @@ class EvolutionEngine:
         # supplies cross-task transfer at cold start.
         self.selection._archive = []
 
+        # ── Layer 2: install a task-locked verification checklist ────────────
+        # Built once per task (cached on disk by task hash). The verifier then
+        # extracts claims from this rubric instead of from the agent's
+        # narration — the workflow can no longer author its own exam.
+        self._install_task_checklist(original_task or goal)
+
         parents, _use_crossover = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
@@ -556,6 +562,57 @@ class EvolutionEngine:
         logger.info(f"[WORKFLOW COST] {uuid} cost calculated in {cost_time:.3f}s")
 
         return eval_type, exec_cost
+
+    def _install_task_checklist(self, task: str) -> None:
+        """Build (or load cached) per-task checklist; install on the verifier.
+
+        Idempotent and safe to call multiple times — the builder caches on
+        disk by task hash so repeat sessions reuse the same rubric. Any
+        failure here is non-fatal: the verifier falls back to its legacy
+        narration-driven extractor, which is no worse than the pre-Layer-2
+        baseline.
+        """
+        from sources.core.evaluators.task_checklist import TaskChecklistBuilder
+
+        verifier = getattr(self.judge, "verifier_evaluator", None)
+        if verifier is None or not hasattr(verifier, "set_task_checklist"):
+            return
+        task_text = (task or "").strip()
+        if not task_text:
+            verifier.set_task_checklist(None, task_spec="")
+            return
+
+        cache_dir = Path(self.workflow_dir) / "_task_checklists"
+        try:
+            builder = TaskChecklistBuilder(
+                cache_dir=cache_dir,
+                llm_config=verifier.llm_config,
+                memory_dir=verifier.memory_dir,
+                use_grounding=getattr(verifier, "use_grounding", True),
+            )
+            record = builder.build(task_text)
+        except Exception as e:
+            self.logger.warning(f"task checklist build failed: {e}")
+            verifier.set_task_checklist(None, task_spec=task_text)
+            return
+
+        items = record.get("items") or []
+        verifier.set_task_checklist(items, task_spec=task_text)
+        if items:
+            print_box(
+                f"task_hash: {record.get('task_hash', '?')}\n"
+                f"items:     {len(items)}\n"
+                f"cached at: {cache_dir}/task_checklist_{record.get('task_hash', '?')}.json",
+                title="Layer 2: task-locked checklist installed",
+                color=GREEN,
+            )
+        else:
+            err = record.get("error", "no items produced")
+            print_box(
+                f"falling back to narration-driven extractor.\nreason: {err}",
+                title="Layer 2: task checklist UNAVAILABLE",
+                color=YELLOW,
+            )
 
     async def _evaluate_workflow_phenotype(
         self, uuid: str, agent_answers: str, scenario_rubric: str, assertion_history: list
