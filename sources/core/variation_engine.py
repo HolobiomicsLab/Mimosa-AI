@@ -311,11 +311,7 @@ class VariationEngine:
                 "</python>",
                 "<agents_answers>",
                 p["answers"],
-                "</agents_answers>",
-                "<diagnosis>",
-                "Rubric-blind behavioral summary of this parent's run.",
-                p["diagnosis"] or "No diagnosis captured.",
-                "</diagnosis>",
+                "</agents_answers>"
             ]))
 
         return "\n".join([
