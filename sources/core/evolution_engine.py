@@ -564,14 +564,7 @@ class EvolutionEngine:
         return eval_type, exec_cost
 
     def _install_task_checklist(self, task: str) -> None:
-        """Build (or load cached) per-task checklist; install on the verifier.
-
-        Idempotent and safe to call multiple times — the builder caches on
-        disk by task hash so repeat sessions reuse the same rubric. Any
-        failure here is non-fatal: the verifier falls back to its legacy
-        narration-driven extractor, which is no worse than the pre-Layer-2
-        baseline.
-        """
+        """Build (or load cached) per-task checklist; install on the verifier."""
         from sources.core.evaluators.task_checklist import TaskChecklistBuilder
 
         verifier = getattr(self.judge, "verifier_evaluator", None)
@@ -625,7 +618,7 @@ class EvolutionEngine:
                                           agent_answers=agent_answers,
                                           evaluator_type="verifier",
                                           scenario_rubric=scenario_rubric)
-        eval_type = eval_result['evaluation_type'] 
+        eval_type = eval_result['evaluation_type']
         eval_time = time.time() - eval_start
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
         print_ok(f"Workflow evaluation completed in {eval_time:.3f}s")

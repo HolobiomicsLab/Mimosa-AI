@@ -39,8 +39,8 @@ from sources.cli.pretty_print import (
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
 _VERIFIER_MAX_CLAIMS = 24
-_VERIFIER_MIN_CLAIMS = 3
-_HARD_FAIL_CAP = 0.5
+_VERIFIER_MIN_CLAIMS = 12
+_HARD_FAIL_CAP = 0.7
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
@@ -263,19 +263,26 @@ class VerifierEvaluator(BaseEvaluator):
     # External hooks (Layer 2 — pre-evolution task checklist)
     # ------------------------------------------------------------------
 
+    def _build_abstracted_diagnosis(self, uuid, report: str) -> str:
+        prompt = f"""
+        You must summarise the judge's detailed report into a concise diagnosis of the agents's behavior and failure modes, in plain language that a human user can understand.
+        The diagnosis should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
+        The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
+        Here is the verifier's detailed report for workflow {uuid}:
+        {report}
+        """
+        return self._call_judge(
+            uuid,
+            "verifier_abstract_diagnosis",
+            prompt,
+        )
+
     def set_task_checklist(
         self,
         items: list[dict[str, Any]] | None,
         task_spec: str = "",
     ) -> None:
         """Install a task-locked checklist used by ``_extract_claims``.
-
-        Items are expected to follow the schema produced by
-        ``TaskChecklistBuilder.build`` (description, criticality,
-        expected_artifact_kind, acceptable_variation, …). Passing ``None``
-        or ``[]`` reverts to the legacy narration-driven extractor.
-        ``task_spec`` is the canonical task text; it is also forwarded to
-        the cheat detector so it never has to read the agent's narration.
         """
         self._task_checklist = items or None
         self._task_spec = (task_spec or "").strip()
@@ -352,15 +359,13 @@ class VerifierEvaluator(BaseEvaluator):
         cheat = self._run_cheat_detector(uuid)
         scores = self._apply_cheat_penalty(scores, cheat)
 
-        # Layer 1: derive a behavioral diagnosis for the mutator. Sees the
-        # eval summary + Layer 3 behavioral findings, NOT mechanism findings.
-        diagnosis = self._build_abstracted_diagnosis(
-            uuid, scores, per_claim, cheat
-        )
-        scores["abstracted_diagnosis"] = diagnosis
+        self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
 
-        self._write_report(uuid, claims, per_claim, scores, cheat=cheat, diagnosis=diagnosis)
+        report = self._build_report(claims, per_claim, scores, cheat)
+        diagnosis = self._build_abstracted_diagnosis(uuid, report)
+        scores["abstracted_diagnosis"] = diagnosis
         self._persist_diagnosis(uuid, diagnosis)
+
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -376,11 +381,6 @@ class VerifierEvaluator(BaseEvaluator):
             title="Verifier short-circuit — generation failed",
             color=RED,
         )
-        diagnosis = (
-            "The workflow did not produce any executable code or recorded "
-            "state, so nothing could be verified. The next iteration must "
-            "actually generate and run a workflow."
-        )
         scores = {
             "overall_score": 0.0,
             "overall_score_uncapped": 0.0,
@@ -391,14 +391,14 @@ class VerifierEvaluator(BaseEvaluator):
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
-            "abstracted_diagnosis": diagnosis,
+            "abstracted_diagnosis": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
         }
         try:
-            self._write_report(uuid, [], [], scores, cheat=None, diagnosis=diagnosis)
+            self._write_report(uuid, [], [], scores, cheat=None)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
-        self._persist_diagnosis(uuid, diagnosis)
+        self._persist_diagnosis(uuid, "")
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -417,13 +417,7 @@ class VerifierEvaluator(BaseEvaluator):
         is_truly_empty: bool,
         grounding: str = "",
     ) -> list[dict[str, Any]]:
-        """Ask the LLM to break the workflow output into atomic, typed claims.
-
-        The c0 fallback only fires when the upstream execution text is the
-        literal "workflow execution fully failed" marker — not on the brittle
-        legacy `success` flag, which mis-fired any time an answer payload
-        contained an empty list.
-        """
+        """Ask the LLM to break the workflow output into atomic, typed claims."""
         if is_truly_empty:
             return [{
                 "id": "c0_execution_succeeded",
@@ -433,8 +427,6 @@ class VerifierEvaluator(BaseEvaluator):
             }]
 
         # Layer 2: when a task-locked checklist is installed, derive claims
-        # from it directly. This bypasses execution-text extraction entirely
-        # so the workflow cannot author its own exam.
         if self._task_checklist:
             return self._claims_from_checklist(self._task_checklist)
 
@@ -512,9 +504,7 @@ Aim for {self.min_claims}–{self.max_claims} claims (target at least {self.min_
 prioritising the most load-bearing first. Do not invent claims that the workflow
 did not make.
 """
-        # Two outer attempts: first call, then one retry if fewer than min_claims
-        # were returned. Each attempt also has the JSON-parse retry inside
-        # _call_judge_for_json, so worst case is 4 LLM calls.
+        # Two outer attempts: first call, then one retry if fewer than min_claims returned
         attempts_for_count = 2
         extra_feedback = ""
         cleaned: list[dict[str, Any]] = []
@@ -595,14 +585,7 @@ did not make.
     def _claims_from_checklist(
         self, items: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Promote a pre-built task checklist to verifier claims.
-
-        We deliberately do NOT prefill ``likely_relevant_files`` — the
-        verifier-generation stage looks at the live workspace listing and
-        picks an artifact matching ``expected_artifact_kind``. Hard-coding
-        a file name here would re-introduce the brittleness the checklist
-        was designed to avoid (legitimate variation in artifact naming).
-        """
+        """Promote a pre-built task checklist to verifier claims."""
         cleaned: list[dict[str, Any]] = []
         for idx, it in enumerate(items):
             if not isinstance(it, dict) or "description" not in it:
@@ -1425,80 +1408,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # Layer 1 — abstracted diagnosis for the mutator
     # ------------------------------------------------------------------
 
-    def _build_abstracted_diagnosis(
-        self,
-        uuid: str,
-        scores: dict[str, Any],
-        per_claim: list[dict[str, Any]],
-        cheat: CheatVerdict | None,
-    ) -> str:
-        """Produce a 2–4 sentence behavioral summary for the mutation prompt.
-
-        The summary is intentionally rubric-blind: it must not name claim IDs
-        nor describe specific check mechanisms. The goal is to keep the
-        mutator pointed at *what the workflow failed to accomplish*, not at
-        *which checks the judge ran*. Cheat detector findings are folded in
-        from the **behavioral** channel only; mechanism findings stay in the
-        report.
-        """
-        n_claims = scores.get("n_claims", 0)
-        n_pass = scores.get("n_pass", 0)
-        n_fail = scores.get("n_fail", 0)
-        n_error = scores.get("n_error", 0)
-        n_unsure = scores.get("n_unsure", 0)
-        overall = scores.get("overall_score", 0.0)
-        hard_fail = scores.get("hard_fail_capped", False)
-        cheat_pen = scores.get("cheat_penalty", 0.0)
-
-        behavioral_block = ""
-        if cheat is not None and cheat.behavioral:
-            behavioral_block = (
-                "INDEPENDENT AUDIT — BEHAVIORAL FINDINGS (rubric-blind, "
-                "safe to summarise):\n"
-                + "\n".join(f"- {b}" for b in cheat.behavioral)
-            )
-        elif cheat is not None and cheat.error:
-            behavioral_block = (
-                f"(independent audit unavailable: {cheat.error})"
-            )
-
-        prompt = f"""You are summarising the result of an evaluation pass for the
-agent that will mutate the workflow next iteration. Your summary will replace
-the raw evaluation log in the mutation prompt; it is the ONLY evaluation signal
-the mutator will see.
-
-EVALUATION SUMMARY (do NOT pass this through verbatim — abstract it):
-- overall_score: {overall:.3f}
-- claim counts:   pass={n_pass}  fail={n_fail}  error={n_error}  unsure={n_unsure}  total={n_claims}
-- hard_fail_capped: {hard_fail}
-- cheat_penalty:    {cheat_pen:.2f}
-
-{behavioral_block}
-
-WRITE 2–4 SENTENCES describing, at the BEHAVIORAL level, what the workflow
-failed to accomplish on this run. Hard rules:
-- DO NOT name claim IDs, file paths, or specific check mechanisms.
-- DO NOT use the words "grep", "header", "row count", "regex", "claim", "check".
-- DO NOT describe what the verifier did; describe what the workflow did or
-  did not do at the task level.
-- DO mention if the workflow appears to have taken shortcuts (use the
-  behavioral findings above when present).
-- If the run passed cleanly, say so in one sentence and stop.
-
-Return plain text — no JSON, no headings, no bullet list.
-"""
-        try:
-            raw = self._call_judge(uuid, "verifier_diagnosis", prompt)
-        except Exception as e:
-            self.logger.warning(f"abstractor LLM call failed for {uuid}: {e}")
-            return self._fallback_diagnosis(scores, cheat)
-        text = (raw or "").strip()
-        if not text:
-            return self._fallback_diagnosis(scores, cheat)
-        # Defensive: hard cap length so it can never balloon the mutation prompt.
-        if len(text) > 1200:
-            text = text[:1200].rstrip() + " …"
-        return text
 
     @staticmethod
     def _fallback_diagnosis(
@@ -1537,6 +1446,77 @@ Return plain text — no JSON, no headings, no bullet list.
         except OSError as e:
             self.logger.warning(f"could not write diagnosis.txt for {uuid}: {e}")
 
+    def _build_report(
+        self,
+        per_claim: list[dict[str, Any]],
+        scores: dict[str, Any],
+        cheat: CheatVerdict | None = None,
+    ) -> str:
+        lines: list[str] = []
+        w = lines.append
+
+        w("Verifier Evaluation")
+        w("=" * 60)
+        w(
+            f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
+            f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
+            f"unsure={scores.get('n_unsure', 0)}  "
+            f"scored={scores.get('n_scored', 0)}"
+        )
+        w(
+            f"Overall: {scores['overall_score']:.3f}"
+            f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
+            f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
+            f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
+        )
+        w(
+            f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
+            f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
+            f"n_hard_pass={scores.get('n_hard_pass', 0)}  "
+            f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}"
+        )
+
+        for c in per_claim:
+            cl = c["claim"]
+            w(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}")
+            rel = cl.get("likely_relevant_files", [])
+            if rel:
+                w(f"  relevant_files: {rel}")
+            if cl.get("source") == "task_checklist":
+                w(
+                    f"  source: task_checklist  "
+                    f"expected_artifact_kind={cl.get('expected_artifact_kind') or '(unspecified)'}"
+                )
+            w(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}")
+            if c.get("details"):
+                w(f"  details: {c['details']}")
+            if c.get("verifier_kind") == "executable" and c.get("raw_stderr"):
+                stderr_snippet = c["raw_stderr"].strip().splitlines()[-5:]
+                if stderr_snippet:
+                    w("  stderr (tail):")
+                    for line in stderr_snippet:
+                        w(f"    {line}")
+            w("")
+
+        if cheat is not None:
+            w("-" * 60)
+            w("Independent cheat audit")
+            w(f"  penalty: {cheat.penalty:.3f}")
+            if cheat.error:
+                w(f"  error:   {cheat.error}")
+            if cheat.behavioral:
+                w("  behavioral findings (also fed to mutator):")
+                for b in cheat.behavioral:
+                    w(f"    - {b}")
+            if cheat.mechanism:
+                w("  mechanism findings (audit-only — NOT fed to mutator):")
+                for m in cheat.mechanism:
+                    w(f"    - {m}")
+            w("")
+
+        return "\n".join(lines) + "\n"
+
+
     def _write_report(
         self,
         uuid: str,
@@ -1544,76 +1524,12 @@ Return plain text — no JSON, no headings, no bullet list.
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
         cheat: CheatVerdict | None = None,
-        diagnosis: str = "",
     ) -> None:
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
+        report = self._build_report(claims, per_claim, scores, cheat)
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("Verifier Evaluation\n")
-                f.write("=" * 60 + "\n")
-                f.write(f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
-                        f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
-                        f"unsure={scores.get('n_unsure', 0)}  "
-                        f"scored={scores.get('n_scored', 0)}\n")
-                f.write(f"Overall: {scores['overall_score']:.3f}"
-                        f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
-                        f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
-                        f"hard_fail_capped={scores.get('hard_fail_capped', False)})\n")
-                f.write(f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
-                        f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
-                        f"n_hard_pass={scores.get('n_hard_pass', 0)}  "
-                        f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}\n")
-                f.write("Note: errored verifiers are excluded from the mean and "
-                        "do not trip the hard-fail cap.\n")
-                f.write("Information bonus rewards thoroughness (passing hard "
-                        "claims) with a saturating curve; gameable spam yields "
-                        "no extra credit.\n")
-                f.write("Cheat penalty is computed by an independent audit that "
-                        "never sees the claim list; mechanism findings appear "
-                        "below for human review only.\n\n")
-                for c in per_claim:
-                    cl = c["claim"]
-                    f.write(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}\n")
-                    rel = cl.get("likely_relevant_files", [])
-                    if rel:
-                        f.write(f"  relevant_files: {rel}\n")
-                    if cl.get("source") == "task_checklist":
-                        f.write(
-                            f"  source: task_checklist  "
-                            f"expected_artifact_kind={cl.get('expected_artifact_kind') or '(unspecified)'}\n"
-                        )
-                    f.write(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}\n")
-                    if c.get("details"):
-                        f.write(f"  details: {c['details']}\n")
-                    if c.get("verifier_kind") == "executable" and c.get("raw_stderr"):
-                        stderr_snippet = c["raw_stderr"].strip().splitlines()[-5:]
-                        if stderr_snippet:
-                            f.write("  stderr (tail):\n")
-                            for line in stderr_snippet:
-                                f.write(f"    {line}\n")
-                    f.write("\n")
-
-                if cheat is not None:
-                    f.write("-" * 60 + "\n")
-                    f.write("Independent cheat audit\n")
-                    f.write(f"  penalty: {cheat.penalty:.3f}\n")
-                    if cheat.error:
-                        f.write(f"  error:   {cheat.error}\n")
-                    if cheat.behavioral:
-                        f.write("  behavioral findings (also fed to mutator):\n")
-                        for b in cheat.behavioral:
-                            f.write(f"    - {b}\n")
-                    if cheat.mechanism:
-                        f.write("  mechanism findings (audit-only — NOT fed to mutator):\n")
-                        for m in cheat.mechanism:
-                            f.write(f"    - {m}\n")
-                    f.write("\n")
-
-                if diagnosis:
-                    f.write("-" * 60 + "\n")
-                    f.write("Abstracted diagnosis (fed to next mutation prompt):\n")
-                    f.write(diagnosis.rstrip() + "\n")
+            path.write_text(report, encoding="utf-8")
             self.logger.info(f"Verifier report written to {path}")
         except OSError as e:
             self.logger.error(f"Could not write verifier report for {uuid}: {e}")

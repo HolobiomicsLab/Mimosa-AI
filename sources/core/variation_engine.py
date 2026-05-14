@@ -191,12 +191,6 @@ class VariationEngine:
             print_info(f"  {k:>15}: {v}")
 
         # ── Execution evidence ───────────────────────────────────────────────
-        # Mutator-side information hiding (Layer 1): the raw judge log used to
-        # be spliced in here, which let the LLM copy the judge's check patterns
-        # into the child workflow's own internal logic. We now feed only the
-        # behavioral diagnosis (rubric-blind) plus agent answers (task-aligned
-        # tracebacks/outputs). Falls back to a short stderr tail only when no
-        # diagnosis exists (e.g. older runs before this evaluator ran).
         agent_answers = self._extract_agent_answers(wf_state)
         diagnosis_block = (
             diagnosis.strip()
