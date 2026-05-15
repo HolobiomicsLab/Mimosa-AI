@@ -256,6 +256,45 @@ class EvolutionEngine:
         else:
             return self.variation.seed_genome_prompt(goal)
 
+    async def create_initial_population(
+        self,
+        goal: str,
+        population_size: int = 3,
+        max_iterations: int = 10
+    ) -> list[IndividualRun]:
+        """Create the initial population of workflows."""
+        population = []
+        print_phase("CREATING INITIAL POPULATION", color=CYAN)
+        for i in range(population_size):
+            prompt = self.get_genotype_instructions(goal, None, max_iterations=max_iterations)
+            run_stdout, uuid, workflow_genotype_code, executed = await self.orchestrator.orchestrate_workflow(
+                goal=goal,
+                craft_instructions=prompt,
+                original_task=goal,
+                single_agent_mode=False
+            )
+            wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+            if workflow_genotype_code:
+                answers = wf_info.answers
+                _, _ = await self._evaluate_and_calculate_cost(
+                    executed, True, uuid, answers, None, []
+                )
+                population.append(IndividualRun(
+                    goal=goal,
+                    prompt=prompt,
+                    current_uuid=uuid,
+                    workflow_template=None,
+                    iteration_count=0,
+                    max_depth=max_iterations,
+                    judge=True,
+                    answers=answers,
+                    state_result=wf_info.state_result,
+                    scenario_rubric=None,
+                    original_task=goal,
+                    reward=wf_info.overall_score
+                ))
+        return population
+
     async def start_workflow_evolution(
         self,
         goal: str,
@@ -286,21 +325,26 @@ class EvolutionEngine:
         if enable_evolution:
             max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
 
-        # Reset archive at session start: archive is per-task, disk scan
-        # supplies cross-task transfer at cold start.
+        # Reset archive at session start
         self.selection._archive = []
 
         # ── Layer 2: install a task-locked verification checklist ────────────
-        # Built once per task (cached on disk by task hash). The verifier then
-        # extracts claims from this rubric instead of from the agent's
-        # narration — the workflow can no longer author its own exam.
+        # Built once per task. The verifier extracts claims from this
         self._install_task_checklist(original_task or goal)
 
         parents, _use_crossover = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
         # For the initial run we always use the primary (best) parent
-        wf = parents[0] if parents else None
+        if parents:
+            wf = parents[0]
+        else:
+            initial_population = await self.create_initial_population(goal,
+                                                                      population_size=3,
+                                                                      max_iterations=max_iteration
+                                                                     )
+            initial_population.sort(key=lambda r: r.reward if r.reward is not None else 0.0, reverse=True)
+            wf = initial_population[0] if initial_population else None
 
         if mockup_mode:
             return await self.mockup(wf, goal)

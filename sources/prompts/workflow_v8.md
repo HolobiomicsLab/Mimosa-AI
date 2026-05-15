@@ -286,6 +286,22 @@ Above is an example, create tailored workflow for the task.
 
 ---
 
+## Exploration of Solution Space
+
+A workflow has three coupled mutation surfaces. The deep insight from latent-space geometry: **attractor capture happens in the first few tokens of each agent's response, and most errors occur at stratum boundaries between agents.** Design accordingly.
+
+**Axis 1 — Prompt as attractor selector.** Each agent's role prompt routes the model into a semantic stratum. Generic personas ("research assistant", "data analyst") land in diffuse basins and drift. Specific role priming — domain vocabulary, named tools, canonical workflow patterns from the field — pulls the agent into a tight, low-dimensional stratum where errors stay local and trajectories straighten. Frontload **induced tokens** (e.g. `SMILES`, `AlphaFold`, `GeoTIFF`, `RDKit`, `Bonferroni`, `GROMACS`) in role and task sections; they act as attractor anchors. Test variants that differ only in lexical anchoring before changing structure.
+
+**Axis 2 — Handoff format for smooth manifold transition.** An agent's `final_answer` payload is the prefix-anchor for the next agent's first tokens. Bare status envelopes (`{"status": "SUCCESS", "message": "done"}`) strip the attractor signal — the receiver restarts cold and drifts toward a generic basin, producing the classic "second agent forgets the domain" failure mode. Preserve trajectory across the boundary:
+- Carry domain vocabulary into field *names*, not just values
+- Include a short `context_handoff` summary written in the receiver's native register
+- Pass intermediate artifacts by reference (filepaths, variable names) so the receiver reads them with its own tools rather than re-parsing prose
+- End the reasoning trace with domain-anchored language, not generic acknowledgements
+
+**Axis 3 — Topology.** Reshape the DAG: split an agent that crosses domains mid-task, fuse two agents living in the same stratum, add a critic, insert a judge loop. Topology mutations are justified only when the trace shows an agent traversing a stratum boundary *in-flight* (e.g. switching from cheminformatics to statistical inference within one execution). Otherwise prefer Axes 1 and 2 — a well-anchored two-agent pipeline beats a six-agent topology of generic personas.
+
+**Mutation priority**: prompt → handoff → topology. Most workflow failures present as topology bugs but resolve via prompt or handoff fixes. Reach for new nodes last.
+
 ## Checklist
 
 - [ ] Single Python script, no imports

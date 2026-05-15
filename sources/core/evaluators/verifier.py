@@ -264,12 +264,14 @@ class VerifierEvaluator(BaseEvaluator):
     # ------------------------------------------------------------------
 
     def _build_abstracted_diagnosis(self, uuid, report: str) -> str:
+        """Goodhart-resistant residual signal passed to provide basic directional signal to orchestrator"""
         prompt = f"""
         You must summarise the judge's detailed report into a concise diagnosis of the agents's behavior and failure modes, in plain language that a human user can understand.
         The diagnosis should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
         The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
         Here is the verifier's detailed report for workflow {uuid}:
         {report}
+        Make a very short (one sentence) diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
         """
         return self._call_judge(
             uuid,
@@ -361,7 +363,7 @@ class VerifierEvaluator(BaseEvaluator):
 
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
 
-        report = self._build_report(claims, per_claim, scores, cheat)
+        report = self._build_report(per_claim, scores, cheat)
         diagnosis = self._build_abstracted_diagnosis(uuid, report)
         scores["abstracted_diagnosis"] = diagnosis
         self._persist_diagnosis(uuid, diagnosis)
@@ -1527,7 +1529,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     ) -> None:
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
-        report = self._build_report(claims, per_claim, scores, cheat)
+        report = self._build_report(per_claim, scores, cheat)
         try:
             path.write_text(report, encoding="utf-8")
             self.logger.info(f"Verifier report written to {path}")
