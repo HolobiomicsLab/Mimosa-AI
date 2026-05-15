@@ -217,7 +217,10 @@ class EvolutionEngine:
             print(f"Workflow directory {self.workflow_dir} does not exist.")
             return [], False
 
-        workflows = [f for f in os.listdir(self.workflow_dir)]
+        workflows = [
+            f for f in os.listdir(self.workflow_dir)
+            if os.path.isfile(os.path.join(self.workflow_dir, f, "state_result.json"))
+        ]
         if not workflows:
             print(f"No workflows found in {self.workflow_dir}.")
             return [], False
@@ -266,7 +269,7 @@ class EvolutionEngine:
         population = []
         print_phase("CREATING INITIAL POPULATION", color=CYAN)
         for i in range(population_size):
-            prompt = self.get_genotype_instructions(goal, None, max_iterations=max_iterations)
+            prompt =  self.variation.seed_genome_prompt(goal)
             run_stdout, uuid, workflow_genotype_code, executed = await self.orchestrator.orchestrate_workflow(
                 goal=goal,
                 craft_instructions=prompt,
@@ -332,19 +335,21 @@ class EvolutionEngine:
         # Built once per task. The verifier extracts claims from this
         self._install_task_checklist(original_task or goal)
 
-        parents, _use_crossover = self.select_parent_workflow(
+        parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
-        # For the initial run we always use the primary (best) parent
         if parents:
             wf = parents[0]
+            print("error: found parent but empty workspace")
+            exit()
         else:
             initial_population = await self.create_initial_population(goal,
-                                                                      population_size=3,
+                                                                      population_size=2,
                                                                       max_iterations=max_iteration
                                                                      )
             initial_population.sort(key=lambda r: r.reward if r.reward is not None else 0.0, reverse=True)
             wf = initial_population[0] if initial_population else None
+            print_info(f"Created initial population of {len(initial_population)} workflows.")
 
         if mockup_mode:
             return await self.mockup(wf, goal)

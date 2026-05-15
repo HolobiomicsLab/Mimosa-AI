@@ -290,12 +290,6 @@ class VariationEngine:
         # Best parents first — LLM primacy bias helps inherit strong traits
         parents.sort(key=lambda p: p["score"], reverse=True)
 
-        phase_block = self._get_temperature_phase(
-            iteration_count,
-            max_iterations,
-            score=parents[0]["score"] if parents else 0.0,
-        )
-
         parents_block = []
         for p in parents:
             parents_block.append("\n".join([
@@ -310,9 +304,6 @@ class VariationEngine:
 
         return "\n".join([
             f"Attempt {iteration_count + 1}: CROSSOVER — synthesize from {len(parents)} parent workflows.",
-            "",
-            phase_block,
-            "",
             f"Goal: {goal}",
             "",
             "## PARENT WORKFLOWS:",
