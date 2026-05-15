@@ -340,8 +340,6 @@ class EvolutionEngine:
         )
         if parents:
             wf = parents[0]
-            print("error: found parent but empty workspace")
-            exit()
         else:
             initial_population = await self.create_initial_population(goal,
                                                                       population_size=2,
