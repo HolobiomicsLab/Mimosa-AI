@@ -30,6 +30,7 @@ class SelectionLog:
     delta_reward: float
     is_validated: bool
     confidence: float = 0.0
+    admit_rejected: bool = False
     timestamp: datetime = field(default_factory=datetime.now)
 
     def __str__(self) -> str:
@@ -44,6 +45,7 @@ class IndividualRun:
     prompt: str
     cost: float = 0.0
     reward: float = 0.0
+    reward_uncapped: float = 0.0
     max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False
