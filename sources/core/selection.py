@@ -32,6 +32,7 @@ class PopulationMember:
     behaviour_descriptor: list[float] = field(default_factory=list)
     novelty_score: float = 0.0
     qd_score: float = 0.0        # combined quality-diversity score
+    reward_uncapped: float = 0.0  # base+info-bonus−cheat, no hard-fail cap
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -55,6 +56,7 @@ class SelectionPressure:
         population_size: int = 25,
         novelty_k_neighbours: int = 5,
         novelty_weight: float = 0.4,
+        admit_threshold: float = 0.3,
     ):
         """
         Args:
@@ -74,9 +76,12 @@ class SelectionPressure:
         self.population_size = population_size
         self.novelty_k = novelty_k_neighbours
         self.novelty_weight = novelty_weight
+        self.admit_threshold = admit_threshold
 
         # Population archive for open-ended modes
         self._archive: list[PopulationMember] = []
+        # Count of offspring rejected by the admit gate (S2 telemetry)
+        self._n_admit_rejected: int = 0
 
     def validate_survivor(
         self,
@@ -270,27 +275,30 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Novelty / QD validation: add new run to archive if it brings
-        either performance or behavioural novelty."""
+        """Novelty / QD validation: admit to archive if the candidate is
+        either improving or behaviourally novel.
+
+        QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat)
+        so the 0.7 hard-fail cap stops compressing the parent-draw
+        gradient. The capped ``reward`` remains the admissibility score
+        reported to callers.
+        """
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
         best_new = max(new_list, key=lambda r: _safe_attr(r, "reward", 0.0))
+        new_reward_uncapped = _safe_attr(best_new, "reward_uncapped", 0.0) or new_reward
 
-        # Build behaviour descriptor from available run features
         descriptor = self._extract_behaviour_descriptor(best_new)
         novelty = self._compute_novelty(descriptor)
 
-        # QD score = weighted combination of normalised quality + novelty
-        quality_norm = min(new_reward, 1.0)  # rewards are 0-1
+        quality_norm = min(new_reward_uncapped, 1.0)
         novelty_norm = min(novelty / max(self._novelty_range(), 1e-6), 1.0)
         qd_score = (1 - self.novelty_weight) * quality_norm + self.novelty_weight * novelty_norm
 
-        # Accept if QD score exceeds threshold OR if it improves reward
         absolute_improvement = new_reward - baseline_reward
         relative_improvement = absolute_improvement / max(abs(baseline_reward), 1e-6)
-        is_valid = relative_improvement > threshold or qd_score > 0.3
+        is_valid = relative_improvement > threshold or qd_score > self.admit_threshold
 
-        # Add to archive
         member = PopulationMember(
             iteration=_safe_attr(best_new, "iteration_count", 0),
             reward=new_reward,
@@ -299,10 +307,11 @@ class SelectionPressure:
             behaviour_descriptor=descriptor,
             novelty_score=novelty,
             qd_score=qd_score,
+            reward_uncapped=new_reward_uncapped,
         )
-        self._add_to_archive(member)
+        admit_rejected = not self._try_admit(member, is_valid)
 
-        confidence = min(1.0, qd_score / max(0.3, 1e-6))
+        confidence = min(1.0, qd_score / max(self.admit_threshold, 1e-6))
 
         result = self._build_result(
             is_valid, relative_improvement, absolute_improvement,
@@ -311,6 +320,8 @@ class SelectionPressure:
         result["novelty_score"] = novelty
         result["qd_score"] = qd_score
         result["archive_size"] = len(self._archive)
+        result["admit_rejected"] = admit_rejected
+        result["admit_rejected_total"] = self._n_admit_rejected
 
         self._log_validation(is_valid, relative_improvement, baseline_reward, new_reward, confidence, threshold)
         if self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
@@ -352,6 +363,41 @@ class SelectionPressure:
             return 1.0
         novelties = [m.novelty_score for m in self._archive if m.novelty_score > 0]
         return max(novelties) if novelties else 1.0
+
+    def _is_dominated(self, candidate: PopulationMember) -> bool:
+        """Pareto domination on (reward_uncapped, novelty_score).
+
+        ``candidate`` is dominated iff some archive member is ≥ on both
+        axes and strictly greater on at least one.
+        """
+        for m in self._archive:
+            ge_reward = m.reward_uncapped >= candidate.reward_uncapped
+            ge_novelty = m.novelty_score >= candidate.novelty_score
+            strictly = (
+                m.reward_uncapped > candidate.reward_uncapped
+                or m.novelty_score > candidate.novelty_score
+            )
+            if ge_reward and ge_novelty and strictly:
+                return True
+        return False
+
+    def _try_admit(self, member: PopulationMember, is_valid: bool) -> bool:
+        """Gate archive admission. Returns True when ``member`` is added.
+
+        Rejects regressions that are neither improving nor novel, and
+        rejects anything strictly Pareto-dominated by an existing
+        archive member. Rejections increment ``_n_admit_rejected``.
+        """
+        if not is_valid or self._is_dominated(member):
+            self._n_admit_rejected += 1
+            self.logger.info(
+                f"🚫 ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
+                f"qd={member.qd_score:.3f}, novelty={member.novelty_score:.3f}) — "
+                f"total rejected={self._n_admit_rejected}"
+            )
+            return False
+        self._add_to_archive(member)
+        return True
 
     def _add_to_archive(self, member: PopulationMember) -> None:
         """Add a member to the archive, evicting the weakest if full."""

@@ -446,6 +446,7 @@ class EvolutionEngine:
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
             runs[-1].reward = wf_info.overall_score
+            runs[-1].reward_uncapped = wf_info.overall_score_uncapped
 
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
@@ -468,6 +469,7 @@ class EvolutionEngine:
                 delta_reward=verdict["absolute_improvement"],
                 is_validated=verdict["valid"],
                 confidence=verdict["confidence"],
+                admit_rejected=verdict.get("admit_rejected", False),
             )
 
         # Update visualizations
