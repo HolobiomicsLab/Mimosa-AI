@@ -447,6 +447,7 @@ class EvolutionEngine:
             )
             runs[-1].reward = wf_info.overall_score
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
+            runs[-1].code = wf_info.code
 
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers

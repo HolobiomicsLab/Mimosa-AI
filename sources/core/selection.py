@@ -13,6 +13,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from .code_features import extract_code_features
+
 
 class SelectionStrategy(Enum):
     """Available selection strategies for the evolution loop."""
@@ -332,17 +334,14 @@ class SelectionPressure:
         return result
 
     def _extract_behaviour_descriptor(self, run: Any) -> list[float]:
-        """Extract a behaviour descriptor vector from a run.
+        """Topology-based descriptor parsed from the workflow source.
 
-        Currently uses [reward, cost, iteration_count] as a simple proxy.
-        Override or extend this to use richer descriptors (e.g., code
-        structure features, tool usage patterns, output characteristics).
+        Reads ``run.code`` (the genotype) and returns a fixed-length
+        vector of normalised structural features. Orthogonal to
+        fitness so the archive can separate "different ways of being
+        good" from "different ways of being mediocre".
         """
-        return [
-            _safe_attr(run, "reward", 0.0),
-            _safe_attr(run, "cost", 0.0),
-            float(_safe_attr(run, "iteration_count", 0)),
-        ]
+        return extract_code_features(_safe_attr(run, "code", None))
 
     def _compute_novelty(self, descriptor: list[float]) -> float:
         """Compute novelty as mean distance to k-nearest archive members."""
