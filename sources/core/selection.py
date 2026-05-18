@@ -13,6 +13,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from .code_features import extract_code_features
+
 
 class SelectionStrategy(Enum):
     """Available selection strategies for the evolution loop."""
@@ -268,13 +270,8 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Novelty / QD validation: admit to archive if the candidate is
-        either improving or behaviourally novel.
-
+        """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
         QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat)
-        so the 0.7 hard-fail cap stops compressing the parent-draw
-        gradient. The capped ``reward`` remains the admissibility score
-        reported to callers.
         """
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
@@ -325,17 +322,10 @@ class SelectionPressure:
         return result
 
     def _extract_behaviour_descriptor(self, run: Any) -> list[float]:
-        """Extract a behaviour descriptor vector from a run.
-
-        Currently uses [reward, cost, iteration_count] as a simple proxy.
-        Override or extend this to use richer descriptors (e.g., code
-        structure features, tool usage patterns, output characteristics).
+        """Topology-based descriptor parsed from the workflow source.
+           Reads run.code and returns a fixed-length vector of structural features.
         """
-        return [
-            _safe_attr(run, "reward", 0.0),
-            _safe_attr(run, "cost", 0.0),
-            float(_safe_attr(run, "iteration_count", 0)),
-        ]
+        return extract_code_features(_safe_attr(run, "code", None))
 
     def _compute_novelty(self, descriptor: list[float]) -> float:
         """Compute novelty as mean distance to k-nearest archive members."""
@@ -359,9 +349,6 @@ class SelectionPressure:
 
     def _is_dominated(self, candidate: PopulationMember) -> bool:
         """Pareto domination on (reward_uncapped, novelty_score).
-
-        ``candidate`` is dominated if some archive member is ≥ on both
-        axes and strictly greater on at least one.
         """
         for m in self._archive:
             ge_reward = m.reward_uncapped >= candidate.reward_uncapped
@@ -379,12 +366,12 @@ class SelectionPressure:
 
         Rejects regressions that are neither improving nor novel, and
         rejects anything strictly Pareto-dominated by an existing
-        archive member. Rejections increment ``_n_admit_rejected``.
+        archive member.
         """
         if not is_valid or self._is_dominated(member):
             self._n_admit_rejected += 1
             self.logger.info(
-                f"🚫 ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
+                f"ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
                 f"qd={member.qd_score:.3f}, novelty={member.novelty_score:.3f}) — "
                 f"total rejected={self._n_admit_rejected}"
             )

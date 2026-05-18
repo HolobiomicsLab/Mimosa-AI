@@ -301,6 +301,97 @@ The fact that this works from logprobs alone — no hidden state access required
 
 ---
 
+## 4. Implications for the QD Behaviour Descriptor
+
+The quality-diversity loop in [sources/core/selection.py](../sources/core/selection.py)
+needs a vector descriptor that tells the archive *what kind* of
+workflow a candidate is. Under the geometric framing of §1–§3, that
+"kind" decomposes into three independent variables, each tied to a
+specific lens above.
+
+### 4.1 The three axes the framing predicts matter
+
+| Axis | What it captures | Lens |
+|---|---|---|
+| **Granularity** | how many basins the workflow visits | §2.5 — boundary tax vs. intra-agent drift |
+| **Basin identity** | which attractor each agent operates in | §1 — stratum + attractor location |
+| **Boundary discontinuity D** | how much basin-jumping the workflow forces | §3 — surprisal-based curvature proxy |
+
+A descriptor whose axes do not project onto these variables is
+measuring something the framing predicts is *not* what determines
+performance. Two workflows with identical descriptor coordinates
+under such a descriptor can still occupy distinct basins, and the
+archive cannot tell them apart.
+
+### 4.2 What the current descriptor covers
+
+The descriptor implemented in
+[sources/core/code_features.py](../sources/core/code_features.py)
+parses the workflow AST and returns
+`[n_agents, n_edges, n_branches, prompt_chars]`. Mapping to §4.1:
+
+- `n_agents`, `n_edges`, `n_branches` are coarse proxies for
+  **granularity**. They quantify how many handoffs the workflow
+  imposes, which directly trades against the boundary tax.
+- `prompt_chars` is a degenerate stand-in for **basin identity** — it
+  conflates "long prompt" with "specifically-anchored prompt." A
+  5000-char generic instruction and a 5000-char domain-saturated
+  attractor primer (§2.2) land in entirely different basins but
+  score identically.
+- **D is absent.** Boundary discontinuity is not captured at all.
+
+So the descriptor today covers row 1 of the table credibly, row 2
+weakly, and row 3 not at all. This is acceptable as a first
+non-collinear-with-fitness descriptor — strictly better than
+`[reward, cost, iteration]` — but it is not what the framing says
+should ultimately drive selection.
+
+### 4.3 Tiered upgrade path
+
+If the framing proves load-bearing on benchmarks, three incremental
+moves bring the descriptor into alignment.
+
+**Tier 1 — Drop `prompt_chars`, add prompt-vocabulary entropy.**
+Char count is a poor proxy for prompt specificity. Token-set entropy
+over extracted prompt strings approximates "is this prompt
+domain-saturated" (high-entropy = many distinct tokens = strong
+basin anchor) without an embedding model. ~5 LoC, no new deps.
+
+**Tier 2 — Replace `prompt_chars` with prompt-content embedding.**
+Extract the string constants passed to `SmolAgentFactory(...)`,
+embed each with MiniLM (already a dependency), pool, and project to
+3 dims via a fixed random projection. Captures basin identity
+proper. ~30 LoC, deterministic across sessions, no cold-start
+problem. Descriptor becomes
+`[n_agents, n_edges, n_branches, emb_0, emb_1, emb_2]`.
+
+**Tier 3 — Add boundary discontinuity D.**
+Per §3, compute D for each adjacent agent pair via logprob surprisal
+using DeepSeek as a probe model. Append `D_mean, D_variance` to the
+descriptor. This is the geometrically-principled signal the framing
+recommends but requires execution-trace plumbing and logprob API
+access. Bigger build; paper-grade story.
+
+### 4.4 What this changes about the admit gate
+
+The admit gate in `_try_admit` is descriptor-agnostic — it
+Pareto-checks on `(reward_uncapped, novelty_score)` regardless of
+how novelty was computed. So tier-1/tier-2/tier-3 changes to the
+descriptor flow through the gate without further modifications. The
+choice of descriptor is the load-bearing decision; the gate plumbing
+is already there.
+
+### 4.5 What we are *not* claiming
+
+This section does not assert the framing is correct, only that *if*
+it is correct, the descriptor axes follow as stated. The framing
+remains theory until D-on-existing-traces is validated. The current
+implementation deliberately keeps the descriptor structural and
+cheap so the loop runs with no new dependencies while the validation
+step is pending.
+
+---
+
 ## Closing Architectural Position
 
 The three geometry papers describe what is happening *inside* a single forward pass. Mimosa orchestrates forward passes. The architectural sweet spot is not redesigning the agent execution layer — it is **instrumenting Mimosa to measure what is happening inside each forward pass and feed those measurements back into orchestration.**

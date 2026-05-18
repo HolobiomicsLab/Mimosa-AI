@@ -77,14 +77,18 @@ diagnosis, and a sampled perturbation. This sits between Promptbreeder
 (prompt-only) and DGM/ADAS (full code-space agents). It pays the price for
 expressivity in sandboxed execution cost per iteration.
 
-**Behavior descriptor**: currently
-`[reward, cost, iteration_count]`
-([selection.py:330](../sources/core/selection.py:330)). This is the
-**weakest** part of the QD pipeline — it correlates the descriptor with
-fitness (reward is *both* axes), so the archive cannot meaningfully separate
-"different ways of being good" from "different ways of being mediocre."
-This is the open research question called out in the skill ("behavior
-descriptors for scientific agent traces"); see §7.
+**Behavior descriptor**: an AST-parsed structural vector
+`[n_agents, n_edges, n_branches, prompt_chars]`, each normalised by a
+fixed scale so axes contribute comparably to k-NN Euclidean distance
+([code_features.py](../sources/core/code_features.py),
+called from [selection.py:_extract_behaviour_descriptor](../sources/core/selection.py)).
+This replaces the original `[reward, cost, iteration_count]`, which was
+collinear with fitness and made novelty collapse to "I am new because I
+came later." The new descriptor is orthogonal to reward and tracks
+**granularity** of the workflow (per §2.5 of
+[math_lens.md](math_lens.md)). It does not yet capture **basin
+identity** (prompt content) or **boundary discontinuity D** — see §4.3
+of math_lens for the tiered upgrade path.
 
 ---
 
@@ -105,12 +109,21 @@ with:
 
 1. **Survivor validation** ([selection.py:81](../sources/core/selection.py:81))
    runs after each new run. In QD mode it computes a behavior descriptor,
-   measures k-NN novelty against the archive, combines with quality into
-   `qd_score`, then unconditionally appends to the archive (evicting the
-   weakest by `qd_score` if `population_size` is exceeded). The
-   `is_valid` flag is set if `relative_improvement > threshold` **or**
-   `qd_score > 0.3` — the latter makes the loop genuinely open-ended:
-   regressions can survive when behaviorally novel.
+   measures k-NN novelty against the archive, and combines quality with
+   novelty into `qd_score`. Quality uses
+   [`reward_uncapped`](../sources/core/workflow_info.py)
+   (`max(0, base_mean + info_bonus − cheat_penalty)`) — the 0.7
+   hard-fail cap is kept for admissibility decisions but stripped from
+   the parent-draw signal so distinct refuted-but-improving runs stay
+   rank-ordered. The `is_valid` flag is set if `relative_improvement >
+   threshold` **or** `qd_score > admit_threshold` (default 0.3) — the
+   latter makes the loop genuinely open-ended: regressions can survive
+   when behaviorally novel. Admission to the archive is then gated by
+   [`_try_admit`](../sources/core/selection.py) on
+   `is_valid AND not Pareto-dominated on (reward_uncapped, novelty_score)
+   by an existing member`. Rejections increment `_n_admit_rejected` and
+   surface as a per-iteration `admit_rejected` flag on
+   [`SelectionLog`](../sources/core/schema.py).
 2. **Parent draw** ([selection.py:112](../sources/core/selection.py:112) →
    `select_parent` / `select_parents`) samples from the archive weighted by
    `qd_score` (a roulette-style pick). For crossover, the second parent is
@@ -138,10 +151,10 @@ mutation.
 
 | Principle (from the skill) | Mimosa today | Verdict |
 |---|---|---|
-| Archives beat incumbents | Archive of 100 with QD weighting | ✅ Matches DGM/ADAS pattern. |
-| QD is the default open-endedness scheme | Novelty + quality, k-NN novelty | ⚠️ The behavior descriptor is fitness-derived; not yet MAP-Elites with structural axes. |
-| Mode collapse is the default failure mode | Mutagen perturbations + tried-strategy memory | ⚠️ Diversity injected at the prompt layer, not at the population layer. |
-| Selection bias = `qd_score` roulette | `random.choices(weights=qd)` | ⚠️ No inverse-child-count term — high-`qd` parents can dominate offspring. |
+| Archives beat incumbents | Archive of 100 with QD weighting + admit gate | ✅ Matches DGM/ADAS pattern; admit gate cuts archive bloat from unconditional appends. |
+| QD is the default open-endedness scheme | Novelty + quality on AST-derived structural descriptor `[n_agents, n_edges, n_branches, prompt_chars]` | ⚠️ Descriptor is orthogonal to fitness but only covers granularity (math_lens §4.2); basin identity and boundary D are not yet captured. |
+| Mode collapse is the default failure mode | Mutagen perturbations + tried-strategy memory + admit gate Pareto check | ⚠️ Diversity injected at the prompt layer; population-layer dedup now via Pareto on `(reward_uncapped, novelty)`. |
+| Selection bias = `qd_score` roulette | `random.choices(weights=qd)` over `reward_uncapped`-driven `qd_score` | ⚠️ No inverse-child-count term — high-`qd` parents can dominate offspring. |
 | Cross-task transfer via similar tasks | Cosine ≥ 0.5 on MiniLM of `original_task` | ⚠️ Pure embedding similarity collapses behaviorally distinct solutions (the skill explicitly flags this as a V1 limitation). |
 
 ---
@@ -345,9 +358,9 @@ Cross-referencing the skill's decision heuristics:
 
 | Question | Skill default | Mimosa V2 today | Gap |
 |---|---|---|---|
-| Selection scheme | Archive + parent selection weighted by fitness × inverse-child-count | Archive + QD-weighted roulette (no child-count term) | Minor — add child-count penalty to avoid over-mining the same parent. |
-| Diversity mechanism | CVT-MAP-Elites over hybrid behavior descriptor | k-NN novelty with fitness-derived descriptor | **Material**. The descriptor needs to leave fitness-space. |
-| Behavior descriptors | Topology + execution features (graph complexity, tool diversity, …) | `[reward, cost, iteration]` | **Material**. This is the open research question in the skill. |
+| Selection scheme | Archive + parent selection weighted by fitness × inverse-child-count | Archive + QD-weighted roulette + admit gate (Pareto on `(reward_uncapped, novelty)`); no child-count term yet | Minor — add child-count penalty to avoid over-mining the same parent. |
+| Diversity mechanism | CVT-MAP-Elites over hybrid behavior descriptor | k-NN novelty with AST-derived structural descriptor | **Partial fix**. Descriptor left fitness-space; not yet MAP-Elites bins. |
+| Behavior descriptors | Topology + execution features (graph complexity, tool diversity, …) | `[n_agents, n_edges, n_branches, prompt_chars]` from AST walk | **Partial fix**. Covers granularity only; basin identity (prompt content) and boundary D not captured — see math_lens §4.3 for tiered upgrade. |
 | Mutation operators | Evolved population of mutation strategies | Fixed 5-axis pool in `Mutagen.__init__` | **Material**. Promptbreeder-style meta-mutation absent. |
 | Judge | Criteria injection + k=3 ensemble; debate for finalists | Per-claim atomic check ensemble + cheat audit + checklist | Mostly ✅. Could add debate on borderline aggregates. |
 | Memory key | Hybrid task embedding + behavior descriptors | Pure MiniLM cosine on task text | Inherits V1 limitation. Needs behavior-aware retrieval. |
@@ -362,17 +375,19 @@ Cross-referencing the skill's decision heuristics:
   pragmatic improvement on flat exploration schedules.
 
 ### Most leveraged next moves (not implementing them here — pointers only)
-1. **Replace the behavior descriptor.** Extract topology features
-   (n_agents, depth, branching factor, edge count) and execution features
-   (tool diversity entropy, agent-message ratio) from `state_result.json`,
-   feed those into `_extract_behaviour_descriptor` at
-   [selection.py:323](../sources/core/selection.py:323). The QD claim only
-   pays off when the descriptor is not collinear with reward.
-2. **MAP-Elites grid.** Bin the new descriptor and keep one elite per cell
-   instead of an unbounded-capacity archive evicting by `qd_score`.
-3. **Evolve the Mutagen pool.** Track which axes correlate with downstream
-   improvement; let high-performing combinations mutate themselves (the
-   Promptbreeder meta-mutation step).
+1. **Upgrade the behavior descriptor.** Current AST descriptor covers
+   granularity. The math_lens §4 framing argues the next axes to add are
+   *basin identity* (prompt-content embedding via MiniLM + random
+   projection — Tier 2) and eventually *boundary discontinuity D* via
+   logprob surprisal (Tier 3). Drop `prompt_chars` when prompt-content
+   axes land.
+2. **MAP-Elites grid.** Bin the structural descriptor and keep one elite
+   per cell instead of an unbounded-capacity archive evicting by
+   `qd_score`. The admit gate already filters out dominated candidates;
+   binning would replace the Pareto check with the canonical QD design.
+3. **Evolve the Mutagen pool.** Track which axes correlate with
+   downstream improvement; let high-performing combinations mutate
+   themselves (the Promptbreeder meta-mutation step).
 4. **Parent-draw child-count penalty.** Divide `qd_score` by
    `(1 + n_children_already)` in `select_parent` to spread offspring.
 5. **Skill library.** Persist code fragments (agents, tool-binding
@@ -387,8 +402,11 @@ Cross-referencing the skill's decision heuristics:
 - [evolution_engine.py](../sources/core/evolution_engine.py) — top-level
   evolutionary loop, recursion over generations, plotting, notifications.
 - [selection.py](../sources/core/selection.py) — `SelectionPressure` +
-  archive + survivor validation, four strategies (greedy, tournament,
-  novelty, QD).
+  archive + survivor validation + admit gate (`_try_admit`,
+  `_is_dominated`), four strategies (greedy, tournament, novelty, QD).
+- [code_features.py](../sources/core/code_features.py) — AST-derived
+  behaviour descriptor (`extract_code_features`) returning
+  `[n_agents, n_edges, n_branches, prompt_chars]` normalised.
 - [workflow_selection.py](../sources/core/workflow_selection.py) — parent
   retrieval; steady-state archive draw vs. cold-start disk scan with MiniLM
   similarity.
@@ -433,5 +451,5 @@ sequence is:
 
 After that, the variation pool ([mutagen.py](../sources/core/mutagen.py))
 is the highest-leverage place to tinker; the behavior descriptor
-([selection.py:323](../sources/core/selection.py:323)) is the
-highest-leverage place to *change* before adding more axes.
+([code_features.py](../sources/core/code_features.py)) is the next
+place to extend along the math_lens §4.3 tiered upgrade path.
