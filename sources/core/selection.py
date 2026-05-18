@@ -360,7 +360,7 @@ class SelectionPressure:
     def _is_dominated(self, candidate: PopulationMember) -> bool:
         """Pareto domination on (reward_uncapped, novelty_score).
 
-        ``candidate`` is dominated iff some archive member is ≥ on both
+        ``candidate`` is dominated if some archive member is ≥ on both
         axes and strictly greater on at least one.
         """
         for m in self._archive:
