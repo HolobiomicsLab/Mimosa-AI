@@ -54,6 +54,11 @@ class Config:
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
+        # Pin OpenRouter inference provider(s) to avoid quantization / serving-stack
+        # drift across providers (critical for reproducible benchmarks). None = let
+        # OpenRouter route freely. Slug is case-sensitive (e.g. "DeepSeek", "Z.AI").
+        self.openrouter_provider: list[str] | None = None
+
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
         self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
@@ -168,6 +173,7 @@ class Config:
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
             "engine_name": self.engine_name,
+            "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "reasoning_effort": self.reasoning_effort,
@@ -204,6 +210,7 @@ class Config:
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
         self.engine_name = data.get("engine_name", self.engine_name)
+        self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator

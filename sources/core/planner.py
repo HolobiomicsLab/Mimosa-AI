@@ -57,7 +57,8 @@ class Planner:
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
-            max_tokens=getattr(self.config, 'max_tokens', 8192)
+            max_tokens=getattr(self.config, 'max_tokens', 8192),
+            openrouter_provider=self.config.openrouter_provider,
         )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None

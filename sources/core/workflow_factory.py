@@ -112,7 +112,8 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
-            max_tokens=getattr(self.config, 'max_tokens', 8192)
+            max_tokens=getattr(self.config, 'max_tokens', 8192),
+            openrouter_provider=self.config.openrouter_provider,
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
@@ -268,7 +269,7 @@ MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {getattr(self.config, "openrouter_provider", None)!r}
+OPENROUTER_PROVIDER = {self.config.openrouter_provider!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 

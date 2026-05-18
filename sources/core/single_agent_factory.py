@@ -107,7 +107,7 @@ max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
-openrouter_provider = {getattr(self.config, "openrouter_provider", None)!r}
+openrouter_provider = {self.config.openrouter_provider!r}
 engine = None
 
 if engine_name == "mlx":
