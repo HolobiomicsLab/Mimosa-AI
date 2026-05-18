@@ -79,7 +79,6 @@ class SmolAgentFactory:
         self.max_tokens = 8192
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
-        # factory as the global OPENROUTER_PROVIDER (str or list[str]).
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
@@ -151,7 +150,6 @@ class SmolAgentFactory:
             )
         elif self.engine_name == "litellm":
             extra_kwargs = {}
-            # Pin OpenRouter inference provider for reproducible benchmarks.
             if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
                 order = (
                     [self.openrouter_provider]

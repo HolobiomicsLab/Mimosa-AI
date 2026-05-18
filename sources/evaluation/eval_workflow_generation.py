@@ -40,7 +40,6 @@ class WorkflowEval:
     async def run_workflow_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
         """Run evaluation loop for all models and display comparative report."""
         for model in self.model_lists:
-            self.config.prompts_llm_model = model
             self.config.workflow_llm_model = model
 
             print(f"\n{'='*80}")

@@ -75,7 +75,6 @@ _MODEL_PRESETS: list[tuple[str, str, str]] = [
 # Config keys that all share the same "main" LLM selection
 _MODEL_CFG_KEYS = [
     "planner_llm_model",
-    "prompts_llm_model",
     "workflow_llm_model",
     "judge_model",
 ]

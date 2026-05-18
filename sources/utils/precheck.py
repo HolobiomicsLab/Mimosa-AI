@@ -8,7 +8,6 @@ class PreCheck:
     def run(self):
         providers_ids = {
             "planner": self.config.planner_llm_model,
-            "prompts": self.config.prompts_llm_model,
             "workflow": self.config.workflow_llm_model,
             "smolagent": self.config.smolagent_model_id,
         }

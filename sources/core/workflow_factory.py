@@ -113,7 +113,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
             max_tokens=getattr(self.config, 'max_tokens', 8192),
-            openrouter_provider=self.config.openrouter_provider,
+            openrouter_provider=None, # use default
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 

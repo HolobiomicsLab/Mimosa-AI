@@ -53,7 +53,7 @@ class SelectionPressure:
         min_improvement_threshold: float = 0.01,
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
-        novelty_k_neighbours: int = 5,
+        novelty_k_neighbours: int = 10,
         novelty_weight: float = 0.4,
     ):
         """
@@ -132,9 +132,6 @@ class SelectionPressure:
             return max(candidates, key=lambda r: _safe_attr(r, "reward", 0.0))
 
         # Novelty / QD: archive-driven if populated.
-        # If the caller passed PopulationMember items (multi-parent draw),
-        # sample from those so pool-exclusion is respected. Else sample
-        # from the global archive.
         if self._archive:
             members = [c for c in (runs or []) if isinstance(c, PopulationMember)]
             if not members:
@@ -152,9 +149,6 @@ class SelectionPressure:
         crossover_rate: float = 0.3,
     ) -> tuple[list[Any], bool]:
         """Select one or more parents from a candidate pool
-
-        The per-strategy selection logic reuses `select_parent` internally
-        so that greedy / tournament / novelty / QD biases are respected.
         Args:
             candidates: Pool of objects with a reward (or overall_score) attribute
             n_parents:  Number of parents to pick when crossover fires (≥2).
@@ -166,7 +160,6 @@ class SelectionPressure:
             return [], False
 
         n_parents = max(n_parents, 2)
-
         # Decide crossover vs mutation
         do_crossover = (
             len(candidates) >= 2
