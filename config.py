@@ -46,12 +46,11 @@ class Config:
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
+        self.planner_llm_model: str = "anthropic/claude-opus-4-5"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
-        self.smolagent_model_id: str = "anthropic/claude-haiku-4-5"
-        self.judge_model = "anthropic/claude-sonnet-4-5"
-        self.capsule_namer_model = "deepseek/deepseek-chat"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v3.2"
         self.engine_name: str = "litellm" # for smolagent
 
         # Pin OpenRouter inference provider(s) to avoid quantization / serving-stack
@@ -168,7 +167,6 @@ class Config:
                 for addr in self.discovery_addresses
             ],
             "planner_llm_model": self.planner_llm_model,
-            "prompts_llm_model": self.prompts_llm_model,
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
@@ -201,9 +199,6 @@ class Config:
             for addr in data.get("discovery_addresses", [])
         ]
         self.planner_llm_model = data.get("planner_llm_model", self.planner_llm_model)
-        self.prompts_llm_model = data.get(
-            "prompts_llm_model", self.prompts_llm_model
-        )
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
         )
