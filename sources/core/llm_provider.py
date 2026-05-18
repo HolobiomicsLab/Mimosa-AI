@@ -29,14 +29,18 @@ class LLMConfig:
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     reasoning_effort: str = "medium"
     max_tokens = 8192
+    openrouter_provider: list[str] | None = None
 
-    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 8192):
+    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 8192, openrouter_provider=None):
         self.model = model
         self.provider = provider.lower()
         self.temperature = temperature
         self.key = key
         self.reasoning_effort = reasoning_effort
         self.max_tokens = max_tokens
+        if isinstance(openrouter_provider, str):
+            openrouter_provider = [openrouter_provider]
+        self.openrouter_provider = openrouter_provider
         self.__post_init__()
 
     def __post_init__(self):
@@ -82,6 +86,7 @@ class LLMConfig:
             key=config.get("key", ""),
             reasoning_effort=config.get("reasoning_effort", "medium"),
             max_tokens=config.get("max_tokens", 8192),
+            openrouter_provider=config.get("openrouter_provider"),
         )
 
 
@@ -294,6 +299,18 @@ class LLMProvider:
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
                     self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
+
+                # Pin OpenRouter inference provider for reproducible benchmarks.
+                # Avoids silent routing to alternative providers that may use different
+                # quantizations or serving stacks and produce divergent outputs.
+                if self.config.provider == "openrouter" and self.config.openrouter_provider:
+                    completion_params["extra_body"] = {
+                        "provider": {
+                            "order": self.config.openrouter_provider,
+                            "allow_fallbacks": False,
+                            "require_parameters": True,
+                        }
+                    }
 
                 response = litellm.completion(**completion_params)
 

@@ -78,6 +78,9 @@ class SmolAgentFactory:
         self.provider = "auto"
         self.max_tokens = 8192
         self.token = os.getenv("HF_TOKEN")
+        # Optional pin for OpenRouter routing. May be injected by the workflow
+        # factory as the global OPENROUTER_PROVIDER (str or list[str]).
+        self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.timeout = 3600
@@ -147,11 +150,27 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "litellm":
+            extra_kwargs = {}
+            # Pin OpenRouter inference provider for reproducible benchmarks.
+            if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
+                order = (
+                    [self.openrouter_provider]
+                    if isinstance(self.openrouter_provider, str)
+                    else list(self.openrouter_provider)
+                )
+                extra_kwargs["extra_body"] = {
+                    "provider": {
+                        "order": order,
+                        "allow_fallbacks": False,
+                        "require_parameters": True,
+                    }
+                }
             return LiteLLMModel(
                 model_id=self.model_id,
                 temperature=1.0,
                 max_tokens=self.max_tokens,
-                timeout=self.timeout
+                timeout=self.timeout,
+                **extra_kwargs,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(

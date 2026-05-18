@@ -107,6 +107,7 @@ max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
+openrouter_provider = {getattr(self.config, "openrouter_provider", None)!r}
 engine = None
 
 if engine_name == "mlx":
@@ -126,10 +127,21 @@ elif engine_name == "inference_client":
         max_tokens=max_tokens,
     )
 elif engine_name == "litellm":
+    _litellm_extra = {{}}
+    if openrouter_provider and str(model_id).startswith("openrouter/"):
+        _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
+        _litellm_extra["extra_body"] = {{
+            "provider": {{
+                "order": _order,
+                "allow_fallbacks": False,
+                "require_parameters": True,
+            }}
+        }}
     engine = LiteLLMModel(
         model_id=model_id,
         temperature=1.0,
         max_tokens=max_tokens,
+        **_litellm_extra,
     )
 elif engine_name == "openai":
     engine = InferenceClientModel(
