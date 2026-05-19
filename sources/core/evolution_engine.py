@@ -346,7 +346,11 @@ class EvolutionEngine:
                                                                       max_iterations=max_iteration
                                                                      )
             initial_population.sort(key=lambda r: r.reward if r.reward is not None else 0.0, reverse=True)
-            wf = initial_population[0] if initial_population else None
+            best = initial_population[0] if initial_population else None
+            wf = (
+                WorkflowInfo(best.current_uuid, Path(f"{self.workflow_dir}/{best.current_uuid}"))
+                if best and best.current_uuid else None
+            )
             print_info(f"Created initial population of {len(initial_population)} workflows.")
 
         if mockup_mode:
