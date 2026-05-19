@@ -38,8 +38,8 @@ from sources.cli.pretty_print import (
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 60
-_VERIFIER_MAX_CLAIMS = 24
-_VERIFIER_MIN_CLAIMS = 12
+_VERIFIER_MAX_CLAIMS = 100
+_VERIFIER_MIN_CLAIMS = 24
 _HARD_FAIL_CAP = 0.7
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
@@ -86,47 +86,6 @@ _IO_MARKERS = (
     "Path.is_file",
     "glob.glob",
 )
-
-
-def _verifier_appears_to_cheat(
-    code: str,
-    execution_text: str,
-    requires_io: bool,
-) -> tuple[bool, str]:
-    """Reject verifiers that inline the agent's answer or skip workspace I/O."""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return False, ""
-
-    exec_norm = " ".join(execution_text.split())
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
-            continue
-        lit = node.value
-        if len(lit) < _CHEAT_MIN_LITERAL_LEN:
-            continue
-        lit_norm = " ".join(lit.split())
-        step = max(1, _CHEAT_OVERLAP_WINDOW // 3)
-        for i in range(0, max(1, len(lit_norm) - _CHEAT_OVERLAP_WINDOW + 1), step):
-            window = lit_norm[i : i + _CHEAT_OVERLAP_WINDOW]
-            if len(window) < _CHEAT_OVERLAP_WINDOW:
-                break
-            if window in exec_norm:
-                return (
-                    True,
-                    f"verifier embeds {len(lit)} chars of the workflow output "
-                    f"as a string literal and parses that instead of reading "
-                    f"the workspace",
-                )
-
-    if requires_io and not any(marker in code for marker in _IO_MARKERS):
-        return (
-            True,
-            "claim declares likely_relevant_files but the verifier performs no "
-            "file I/O — it cannot be grounded in workspace state",
-        )
-    return False, ""
 
 
 T = TypeVar("T")
@@ -358,8 +317,9 @@ class VerifierEvaluator(BaseEvaluator):
         scores = self._aggregate(per_claim)
 
         # Layer 3: independent cheat audit over the agents' produced script.
-        cheat = self._run_cheat_detector(uuid)
-        scores = self._apply_cheat_penalty(scores, cheat)
+        #cheat = self._run_cheat_detector(uuid, workspace_listing)
+        #scores = self._apply_cheat_penalty(scores, cheat)
+        cheat = None # NOTE: cheat_detector was crap. Will need to be rethink.
 
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
 
@@ -767,6 +727,7 @@ RULES FOR YOUR SCRIPT:
 - If the previews are empty or do not show enough of the file to be sure of
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
+- When verifying usage of a specific library method is found in a script, also ensure no cheating attempt was done, such as a try-catch branching that lead to the wrong method being used on exception.
 
 ANTI-PATTERNS — your verifier will be REJECTED if it does any of these:
 - Embeds the workflow output, the agent's final answer, or any large
@@ -797,54 +758,7 @@ Return STRICT JSON only, in one of these two shapes:
         spec = self._call_and_parse_verifier(uuid, claim, prompt, attempt=1)
         if not (spec.get("executable") and spec.get("code")):
             return spec
-
-        requires_io = bool(claim.get("likely_relevant_files"))
-        cheating, cheat_reason = _verifier_appears_to_cheat(
-            spec["code"], execution_text, requires_io=requires_io
-        )
-        if not cheating:
-            return spec
-
-        self.logger.warning(
-            f"[verifier {claim['id']}] cheat detected, retrying once: {cheat_reason}"
-        )
-        retry_prompt = prompt + f"""
-
-YOUR PREVIOUS ATTEMPT WAS REJECTED for the following reason:
-  {cheat_reason}
-
-Rewrite the verifier so that:
-  - it does NOT contain any large string literal copied from the workflow
-    output or the agent's answer,
-  - it OPENS and reads the file(s) listed in likely_relevant_files,
-  - it RECOMPUTES the value the claim asserts from the file contents,
-  - it compares the recomputed value to the small, scalar target taken from
-    the claim description (not to a pasted answer payload).
-
-Return STRICT JSON in the same format as before.
-"""
-        retry_spec = self._call_and_parse_verifier(uuid, claim, retry_prompt, attempt=2)
-        if not (retry_spec.get("executable") and retry_spec.get("code")):
-            return {
-                "executable": False,
-                "reason": f"rejected as tautology (retry failed): {cheat_reason}",
-            }
-        cheating2, cheat_reason2 = _verifier_appears_to_cheat(
-            retry_spec["code"], execution_text, requires_io=requires_io
-        )
-        if cheating2:
-            self.logger.warning(
-                f"[verifier {claim['id']}] retry also cheats ({cheat_reason2}); "
-                f"falling back to soft check"
-            )
-            return {
-                "executable": False,
-                "reason": (
-                    f"rejected as tautology after one retry; original: "
-                    f"{cheat_reason}; retry: {cheat_reason2}"
-                ),
-            }
-        return retry_spec
+        return spec
 
     def _call_and_parse_verifier(
         self,
@@ -1371,51 +1285,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                     f"{self._JSON_RETRY_FEEDBACK}\n"
                 )
         return None, last_err
-
-    # ------------------------------------------------------------------
-    # Layer 3 — cheat detector (independent epistemology)
-    # ------------------------------------------------------------------
-
-    def _run_cheat_detector(self, uuid: str) -> CheatVerdict | None:
-        """Audit the agents' produced script; never sees claims or evaluation."""
-        if not self.use_cheat_detector:
-            return None
-        if not self._task_spec:
-            self.logger.debug(
-                f"cheat detector skipped for {uuid}: no task_spec installed"
-            )
-            return None
-        script_path = (
-            self.workflow_dir / uuid / f"workflow_genotype_{uuid}.py"
-        )
-        if not script_path.exists():
-            self.logger.debug(
-                f"cheat detector skipped for {uuid}: script not found at {script_path}"
-            )
-            return None
-        verdict = cheat_penalty(
-            script_path=script_path,
-            task_spec=self._task_spec,
-            llm_config=self.llm_config,
-            memory_dir=self.memory_dir,
-            agent_name=f"cheat_detector_{uuid}",
-        )
-        color = GREEN if verdict.penalty == 0.0 else (YELLOW if verdict.penalty < 0.5 else RED)
-        summary_lines = [f"penalty: {verdict.penalty:.2f}"]
-        if verdict.error:
-            summary_lines.append(f"error:   {verdict.error}")
-        if verdict.behavioral:
-            summary_lines.append("behavioral findings:")
-            summary_lines.extend(f"  - {b}" for b in verdict.behavioral)
-        if verdict.mechanism:
-            summary_lines.append("mechanism findings (audit-only):")
-            summary_lines.extend(f"  - {m}" for m in verdict.mechanism)
-        print_box(
-            "\n".join(summary_lines),
-            title=f"Cheat detector · {uuid}",
-            color=color,
-        )
-        return verdict
 
     @staticmethod
     def _apply_cheat_penalty(

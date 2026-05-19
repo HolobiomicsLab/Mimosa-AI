@@ -1095,6 +1095,8 @@ Provide your analysis following the specified output format."""
             avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
             total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
 
+            assert sr_success > 3, "Run considered failed due to SR < 3. Return code 1."
+
         print_summary("📊 EVALUATION SUMMARY", rows)
 
         # If launched via EvaluationCLI, append final metrics to the run notes file.
