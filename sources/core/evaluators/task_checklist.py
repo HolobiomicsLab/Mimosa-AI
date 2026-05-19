@@ -201,29 +201,33 @@ class TaskChecklistBuilder:
             task=task,
             grounding=(grounding or "(unavailable)").strip(),
         )
-        try:
-            raw = provider(prompt) or ""
-        except Exception as e:
-            _LOG.error(f"task checklist LLM call failed: {e}")
-            return {
+        record = {}
+        for _ in range(0, 3):
+            try:
+                raw = provider(prompt) or ""
+            except Exception as e:
+                _LOG.error(f"task checklist LLM call failed: {e}")
+                return {
+                    "task_hash": h,
+                    "task_text": task,
+                    "version": _CHECKLIST_VERSION,
+                    "items": [],
+                    "error": f"{type(e).__name__}: {e}",
+                }
+
+            items = _parse_items(raw)
+            record = {
                 "task_hash": h,
                 "task_text": task,
                 "version": _CHECKLIST_VERSION,
-                "items": [],
-                "error": f"{type(e).__name__}: {e}",
+                "items": items,
             }
-
-        items = _parse_items(raw)
-        record = {
-            "task_hash": h,
-            "task_text": task,
-            "version": _CHECKLIST_VERSION,
-            "items": items,
-        }
-        if not items:
-            record["error"] = "could not parse any items from LLM response"
-            _LOG.warning(f"task checklist parse returned no items for {h}")
-
+            if not items:
+                record["error"] = "could not parse any items from LLM response"
+                _LOG.warning(f"task checklist parse returned no items for {h}")
+            else:
+                record["error"] = ""
+                break
         try:
             with open(cache_path, "w") as f:
                 json.dump(record, f, indent=2)

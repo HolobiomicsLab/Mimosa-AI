@@ -449,16 +449,43 @@ this kind of task; use it to know what is scientifically load-bearing):
 {grounding_block}
 
 TASK:
-Extract a list of ATOMIC CLAIMS the workflow makes. A good claim is:
-- a single, checkable statement (a number, a file existence, a dataset shape,
-  a structural property, a comparison against a constraint, a derivation step),
-- ideally specific enough that a small Python script could potentially verify it
-  against the workspace, or that can be verified against scientific literature if it concerns a methodological choice or a conclusion's defensibility,
-- not a meta-comment about the workflow ("the analysis was thorough").
-- not a vague statement about the workflow's overall performance ("the workflow successfully identified the key drivers of the system")
-- not claims about what was created but rather about what was achieved.
-- not claims about reported status or that are obviously just restatements of the workflow output ("the answer is X").
+Extract a list of ATOMIC CLAIMS that verify what the workflow did is factually true and scientifically supported.
 
+How to make good claims:
+
+POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
+the workflow ACHIEVED scientifically. A claim is well-formed only if
+"verified TRUE" is equivalent to "the workflow succeeded at this aspect".
+Never extract a claim that a FAILURE MODE would satisfy. If the workflow
+produced no usable answer, do NOT extract "the final answer is empty" (true →
+wrongly passes). Extract the success condition it failed: "the workflow
+produced <the deliverable the task asked for, meeting <the task's bar>>".
+That claim will FAIL verification — which is the correct signal.
+
+DISCRIMINATION TEST. Before including any "hard" claim, ask: "If the workflow
+had done nothing scientifically meaningful — only moved files, saved a
+checkpoint, but never produced a correct and complete answer — would this
+claim still verify TRUE?" If YES: the claim is worthless. Reframe it into the
+functional success condition it is a proxy for, or drop it. A valid hard-claim
+set is one where a null/failed workflow FAILS most hard claims. If all your
+hard claims would pass for a run that produced no real answer, you have
+extracted the wrong claims — redo them.
+
+MANDATORY GOAL CLAIM. Claim c1 MUST assert that the workflow produced the
+specific scientific deliverable the task requested AND that it meets the
+task's stated success criterion. Use the literature grounding to define what
+"success" means for this task type (the standard metric, threshold, or
+constraint). If the task names a quantitative bar (accuracy ≥ x, energy ≤ y,
+AUC ≥ z, p < α), c1 must encode that bar — not merely "a result exists".
+Phrase it so a workflow that skipped, faked, or left the deliverable empty
+FAILS it. Mark it "hard".
+
+ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are NOT
+scientific achievements and are NEVER "hard". Extract an artifact claim only
+chained to a functional property that makes it load-bearing — not
+"predictions.csv exists" but "predictions.csv contains a valid probability in
+[0,1] for every row of the test set". Maximum 2 soft artifact claims total.
+Do not pad.
 
 For each claim, also estimate `criticality`:
 - "hard": load-bearing for the answer (final metrics, headline files,
@@ -466,8 +493,7 @@ For each claim, also estimate `criticality`:
   literature grounding to recognise which steps are scientifically
   load-bearing for this task — those are "hard" by default.
 - "soft": supporting context (intermediate sanity remarks, choices that are
-  defensible but not strictly required, decisions the literature treats as
-  trivial or auxiliary).
+  defensible but not strictly required, methods decisions the literature cites).
 
 Use the literature grounding to **prioritise** claims:
 - Prefer claims that map onto the methodology the literature considers
