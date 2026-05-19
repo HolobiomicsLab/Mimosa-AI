@@ -10,7 +10,6 @@ Required:
     EMAIL_TO                 recipient(s), comma-separated
     credentials.json         OAuth client secrets, downloaded from Google Cloud Console
                              (path overridable via env var GMAIL_CREDENTIALS_FILE)
-
 Optional env vars:
     EMAIL_USER               sender label (default 'me' = authenticated Gmail account)
     GMAIL_CREDENTIALS_FILE   path to OAuth client secrets (default 'credentials.json')
@@ -51,6 +50,9 @@ _SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 # Cache the Gmail service across calls so we only authenticate once per process.
 _service = None
 _service_init_attempted = False
+
+import dotenv
+dotenv.load_dotenv()
 
 
 def _format_text_report(title: str, rows: list[tuple[str, str]]) -> str:
