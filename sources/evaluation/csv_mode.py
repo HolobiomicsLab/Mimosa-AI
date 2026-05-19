@@ -23,6 +23,7 @@ from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.list_files import list_files
+from sources.utils.email_reporter import send_evaluation_report
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_summary,
@@ -925,6 +926,7 @@ Provide your analysis following the specified output format."""
         self.execution_history.sort(key=lambda x: x.get("iteration", 0))
 
         self._print_final_summary()
+        self._send_email_report(status="completed")
 
     async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
         """
@@ -1039,9 +1041,10 @@ Provide your analysis following the specified output format."""
                     raise e
 
         self._print_final_summary()
+        self._send_email_report(status="completed")
 
-    def _print_final_summary(self) -> None:
-        """Print a summary of all autonomous executions."""
+    def _build_summary_rows(self) -> tuple[list[tuple[str, str]], list[dict], list[dict]]:
+        """Build the rows used for both the printed summary and the email report."""
         # Filter out cached entries to count only actual runs from this session
         current_runs = [exec_data for exec_data in self.execution_history
                        if exec_data.get("success_level") != "Cached"]
@@ -1053,13 +1056,12 @@ Provide your analysis following the specified output format."""
             f"{len(successful_runs)/len(current_runs)*100:.1f}%"
             if current_runs else "N/A"
         )
-        rows = [
+        rows: list[tuple[str, str]] = [
             ("Steps evaluated", str(len(current_runs))),
             ("Successful runs", str(len(successful_runs))),
             ("Success rate", success_rate),
         ]
 
-        # For SAB metrics, also exclude cached entries
         sab_runs = [exec_data for exec_data in current_runs if 'VER' in exec_data]
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
@@ -1074,6 +1076,24 @@ Provide your analysis following the specified output format."""
                 ("Total API Cost", f"${total_cost:.4f}"),
                 ("Avg cost/task", f"${total_cost/len(sab_runs):.4f}"),
             ]
+        return rows, current_runs, sab_runs
+
+    def _print_final_summary(self) -> None:
+        """Print a summary of all autonomous executions."""
+        rows, current_runs, sab_runs = self._build_summary_rows()
+
+        # Recompute the values needed for the cli-notes side-effect below.
+        successful_runs = [exec_data for exec_data in current_runs
+                          if exec_data.get("success_level") in ["High", "Medium"]]
+        success_rate = (
+            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
+            if current_runs else "N/A"
+        )
+        if sab_runs:
+            ver_success = sum(1 for run in sab_runs if run.get('VER', False))
+            sr_success = sum(1 for run in sab_runs if run.get('SR', False))
+            avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
+            total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
 
         print_summary("📊 EVALUATION SUMMARY", rows)
 
@@ -1105,6 +1125,20 @@ Provide your analysis following the specified output format."""
             except Exception:
                 pass  # best-effort
 
+    def _send_email_report(self, status: str = "completed") -> None:
+        """Send the final summary by email (no-op if email env vars are unset)."""
+        try:
+            rows, current_runs, _ = self._build_summary_rows()
+            model = getattr(self.config, "smolagent_model_id", "unknown")
+            subject = f"[Mimosa] Evaluation {status} — {len(current_runs)} runs ({model})"
+            body_prefix = (
+                f"Mimosa-AI evaluation {status} at "
+                f"{datetime.now().isoformat(timespec='seconds')}."
+            )
+            send_evaluation_report(subject=subject, rows=rows, body_prefix=body_prefix)
+        except Exception as e:
+            self.logger.warning(f"[EMAIL] Skipped email report due to error: {e}")
+
     async def start_evaluation(
         self,
         dataset_type: str = "default",
@@ -1134,9 +1168,11 @@ Provide your analysis following the specified output format."""
         except KeyboardInterrupt:
             print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
+            self._send_email_report(status="interrupted")
         except Exception as e:
             self.logger.error(f"[PAPERS DATASET MODE] Fatal error: {str(e)}")
             print_err(f"Fatal error in autonomous mode: {str(e)}")
+            self._send_email_report(status="failed")
             raise
 
     async def start_concurrent_evaluation(
