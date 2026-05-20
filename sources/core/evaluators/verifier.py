@@ -408,9 +408,42 @@ this kind of task; use it to know what is scientifically load-bearing):
 {grounding_block}
 
 TASK:
-Extract a list of ATOMIC CLAIMS that verify what the workflow did is factually true and scientifically supported.
+Extract a list of ATOMIC CLAIMS that together define whether the workflow
+succeeded at this scientific task. The claim list MUST DRAW FROM BOTH SOURCES
+BELOW — neither alone is sufficient.
 
-How to make good claims:
+SOURCE A — REQUIRED CLAIMS (from the literature grounding).
+These are claims about what the task DEMANDS in theory, regardless of what
+the agents actually did. Derive them from the literature grounding:
+- Required methodology steps (e.g. "data was normalised before PCA",
+  "cross-validation was performed with k≥5", "the energy minimisation
+  converged to a stationary point").
+- Required outputs / quality bars (e.g. "the predicted structure has
+  RMSD ≤ X to the reference", "the regression model reports an R² on a
+  held-out test set").
+- Required constraints / sanity properties standard in the field
+  (e.g. "probabilities sum to 1", "the contact matrix is symmetric").
+These claims are extracted EVEN IF the agents did not perform the step —
+a missing required step SHOULD FAIL verification, which is the correct
+signal that the workflow skipped something load-bearing.
+
+SOURCE B — PERFORMED CLAIMS (from the agents' narration + workspace).
+These are claims about what the agents ACTUALLY did and what they
+produced. Derive them from the WORKFLOW OUTPUT and the WORKSPACE FILES:
+- Concrete computations the agents reported (specific numbers, metrics,
+  intermediate values, decisions made).
+- Workspace changes the agents claim to have produced (files written,
+  formats used, structural properties of outputs).
+- Tool / method usage the agents claim to have invoked.
+These claims let the verifier check the agents did not lie or hallucinate:
+they will FAIL if the reported value cannot be recomputed from the
+artefacts on disk.
+
+Aim for a roughly balanced mix of A and B, with the exact balance set by
+which is most load-bearing for THIS task. A typical good list will include
+several required-by-literature methodology/quality claims AND several
+agent-reported computation/artefact claims. Do NOT extract only from one
+source.
 
 POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
 the workflow ACHIEVED scientifically. A claim is well-formed only if
@@ -437,7 +470,8 @@ task's stated success criterion. Use the literature grounding to define what
 constraint). If the task names a quantitative bar (accuracy ≥ x, energy ≤ y,
 AUC ≥ z, p < α), c1 must encode that bar — not merely "a result exists".
 Phrase it so a workflow that skipped, faked, or left the deliverable empty
-FAILS it. Mark it "hard".
+FAILS it. Mark it "hard". This is a SOURCE A claim — it stands whether or
+not the agents claimed to meet the bar.
 
 ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are NOT
 scientific achievements and are NEVER "hard". Extract an artifact claim only
@@ -448,21 +482,11 @@ Do not pad.
 
 For each claim, also estimate `criticality`:
 - "hard": load-bearing for the answer (final metrics, headline files,
-  required computations, claimed satisfaction of the user goal). Use the
-  literature grounding to recognise which steps are scientifically
-  load-bearing for this task — those are "hard" by default.
+  required computations, claimed satisfaction of the user goal, required
+  methodology steps according to the literature). Source-A claims about
+  literature-required steps are "hard" by default.
 - "soft": supporting context (intermediate sanity remarks, choices that are
   defensible but not strictly required, methods decisions the literature cites).
-
-Use the literature grounding to **prioritise** claims:
-- Prefer claims that map onto the methodology the literature considers
-  standard for this task (e.g. expected metrics, required preprocessing,
-  established constraints).
-- Avoid extracting claims about steps the literature considers irrelevant
-  or trivial. Don't pad the claim list with cosmetic statements.
-- If the workflow skipped a step the literature considers required, you
-  may add a claim asserting the workflow performed that step (it will
-  likely fail verification, which is the correct signal).
 
 For each claim, also list `likely_relevant_files`: relative paths whose
 contents the verifier would need to read in order to check the claim.
@@ -470,7 +494,8 @@ contents the verifier would need to read in order to check the claim.
   Do not invent or guess paths the workflow's answer mentions but that are
   not in the listing.
 - Use `[]` if the claim is purely about the workflow's output text and has
-  no on-disk artefact to consult.
+  no on-disk artefact to consult (common for Source-A claims when the
+  agents skipped the step entirely — that's expected).
 - Multi-file claims (e.g. "model in weights.pt produces predictions.csv")
   may list several files — keep them in dependency order.
 
@@ -488,8 +513,9 @@ Return STRICT JSON only, no prose, in this exact form:
 }}
 
 Aim for {self.min_claims}–{self.max_claims} claims (target at least {self.min_claims}),
-prioritising the most load-bearing first. Do not invent claims that the workflow
-did not make.
+prioritising the most load-bearing first. Source-A claims (literature-required)
+may be included even when the agents did not perform the step — do NOT silently
+drop a required claim because the workflow skipped it.
 """
         # Two outer attempts: first call, then one retry if fewer than min_claims returned
         attempts_for_count = 2
@@ -520,11 +546,13 @@ did not make.
             extra_feedback = (
                 f"\n\nYOUR PREVIOUS RESPONSE RETURNED ONLY {len(cleaned)} CLAIMS. "
                 f"The verifier requires at least {self.min_claims} atomic claims. "
-                f"The workflow output likely contains more verifiable claims — "
-                f"re-read it and extract additional load-bearing claims (specific "
-                f"numbers, file properties, structural assertions, methodological "
-                f"steps). Aim for {self.min_claims}–{self.max_claims} claims, "
-                f"prioritising the most load-bearing first."
+                f"Re-read BOTH sources and extract additional load-bearing claims: "
+                f"Source A — required methodology/quality claims from the LITERATURE "
+                f"GROUNDING (these stand even if the agents skipped the step); "
+                f"Source B — concrete computations, numbers, file properties, and "
+                f"methodological steps reported in the WORKFLOW OUTPUT. "
+                f"Aim for {self.min_claims}–{self.max_claims} claims, prioritising "
+                f"the most load-bearing first."
             )
         return cleaned
 
