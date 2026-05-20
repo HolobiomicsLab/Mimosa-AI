@@ -49,14 +49,12 @@ class Config:
         self.planner_llm_model: str = "anthropic/claude-opus-4-5"
         self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
-        self.capsule_namer_model = "openrouter/deepseek/deepseek-v3.2"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
-        # Pin OpenRouter inference provider(s) to avoid quantization / serving-stack
-        # drift across providers (critical for reproducible benchmarks). None = let
-        # OpenRouter route freely. Slug is case-sensitive (e.g. "DeepSeek", "Z.AI").
-        self.openrouter_provider: list[str] | None = None
+        # OpenRouter inference provider(s) to avoid quantization / serving-stack
+        self.openrouter_provider: list[str] | None = ["friendli", "google-vertex", "parasail/fp8", "atlas-cloud/fp8", "novita/fp8"]
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -73,7 +71,7 @@ class Config:
 
         # learning parameters
         self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 10
+        self.max_learning_evolve_iterations = 25
 
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
