@@ -28,7 +28,6 @@ from .base import (
     ScoreExtractionError,
     WorkflowDataError,
 )
-from .cheat_detector import CheatVerdict, cheat_penalty
 from .grounding import get_perspicacite_grounding
 
 from sources.cli.pretty_print import (
@@ -230,7 +229,7 @@ class VerifierEvaluator(BaseEvaluator):
         The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
         Here is the verifier's detailed report for workflow {uuid}:
         {report}
-        Make a very short (one sentence) diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
+        Make a short (one sentence) diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
         """
         return self._call_judge(
             uuid,
@@ -280,7 +279,7 @@ class VerifierEvaluator(BaseEvaluator):
             not execution_text or _EMPTY_RUN_MARKER in execution_text
         )
         grounding = (
-            self._get_grounding(uuid, execution_text)
+            self._get_grounding(uuid, execution_text, wf_info.goal)
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
@@ -1087,14 +1086,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     _GROUNDING_DISABLED = "(literature grounding disabled for this run)"
     _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
 
-    def _get_grounding(self, uuid: str, execution_text: str) -> str:
+    def _get_grounding(self, uuid: str, execution_text: str, goal: str) -> str:
         """One Perspicacite round-trip per uuid; cached + opt-out."""
         if not self.use_grounding:
             return self._GROUNDING_DISABLED
         if uuid in self._grounding_cache:
             return self._grounding_cache[uuid]
         try:
-            grounding = get_perspicacite_grounding(execution_text)
+            grounding = get_perspicacite_grounding(goal)
         except Exception as e:
             self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
             grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"
@@ -1288,7 +1287,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
     @staticmethod
     def _apply_cheat_penalty(
-        scores: dict[str, Any], cheat: CheatVerdict | None
+        scores: dict[str, Any], cheat
     ) -> dict[str, Any]:
         """Subtract cheat penalty from the capped overall score; floor at 0.0."""
         penalty = float(cheat.penalty) if cheat is not None else 0.0
@@ -1308,7 +1307,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
     @staticmethod
     def _fallback_diagnosis(
-        scores: dict[str, Any], cheat: CheatVerdict | None
+        scores: dict[str, Any], cheat
     ) -> str:
         """Deterministic fallback when the abstractor LLM is unavailable."""
         n_pass = scores.get("n_pass", 0)
@@ -1347,7 +1346,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         self,
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
-        cheat: CheatVerdict | None = None,
+        cheat
     ) -> str:
         lines: list[str] = []
         w = lines.append
@@ -1420,7 +1419,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         claims: list[dict[str, Any]],
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
-        cheat: CheatVerdict | None = None,
+        cheat
     ) -> None:
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)

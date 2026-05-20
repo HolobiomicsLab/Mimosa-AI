@@ -73,6 +73,8 @@ class WorkflowInfo:
     @property
     def answers(self) -> list:
         state_result = self.load_state_result()
+        if state_result is None:
+            return []
         return state_result.get('answers', [])
 
     @property

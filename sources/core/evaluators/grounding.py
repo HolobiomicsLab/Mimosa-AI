@@ -1,33 +1,33 @@
 
 from sources.utils.perspicacite_client import query_perspicacite
 
-def get_perspicacite_grounding(execution_text: str) -> str:
-    """Query Perspicacite for citation grounded verification of workflow execution.
+def get_perspicacite_grounding(goal: str) -> str:
+    """Query Perspicacite for citation-grounded expectations of how a science goal should be achieved.
     Args:
-        execution_text: The execution text to send to Perspicacite
+        goal: The science goal given to the agents
     """
     prompt = f"""
-TASK: Provide scientific literature evidence to verify specific claims from an AI agent's answer.
+TASK: Provide scientific literature evidence about how the following science goal is typically and successfully achieved, so that an agent's eventual answer can be evaluated against established practice.
 
-AGENT OUTPUT TO VERIFY:
-{execution_text}
+SCIENCE GOAL:
+{goal}
 
 INSTRUCTIONS:
-1. EXTRACT: Identify 2-5 specific factual/scientific claims made in the agent's answer that aim to address the workflow's goal.
-2. SEARCH: For each claim, find relevant peer-reviewed literature that supports or contradicts it, prioritizing empirical studies and meta-analyses
-3. PROVIDE EVIDENCE: For each claim, cite specific papers that support or contradict it
-4. SUMMARIZE: For all claims, summarize the evidence and state whether it supports, contradicts, or is inconclusive regarding the claim
-5. IF NO CLAIMS: If the agent's answer is vague or non-specific, focus on the goal to provide litterature grounding useful for the evaluation of the answer rather than specific claims.
+1. INFER SUCCESS INDICATORS: Identify 2-5 concrete scientific claims, findings, methods, or measurable outcomes whose presence in an answer would credibly indicate the goal has been achieved. They must be specific enough to be checked against literature (not generic virtues like "rigorous methodology").
+2. SEARCH: For each indicator, find relevant peer-reviewed literature on how the goal is approached in practice — state-of-the-art methods, reported empirical results, established quantitative ranges, and known pitfalls. Prioritize empirical studies, meta-analyses, and methods papers.
+3. PROVIDE EVIDENCE: For each indicator, cite specific papers establishing the expected approach, result, or constraint.
+4. SUMMARIZE: Give a concise overview of where the literature converges or disagrees on how this goal should be achieved, including common failure modes and methodological caveats relevant to judging an answer.
+5. IF GOAL IS VAGUE: If the goal is too underspecified to extract concrete success indicators, provide foundational literature on the broader topic that would help evaluate any reasonable answer, and flag the underspecification.
 
 RULES:
-- Do NOT explain what verification means or discuss AI/XAI concepts
-- Do NOT provide general methodology advice
-- ONLY output concrete claims and their supporting/contradicting evidence
-- If no relevant literature exists for a claim, state "No peer-reviewed evidence found for this specific claim"
-- Prioritize empirical findings over theoretical discussions
+- Do NOT explain what grounding means or discuss AI/XAI concepts
+- Do NOT give generic methodology advice outside what the literature supports
+- ONLY output concrete expected claims/methods and their supporting evidence
+- If no relevant literature exists for an indicator, state "No peer-reviewed evidence found for this specific aspect"
+- Prioritize empirical findings and established methods over theoretical discussions
 """
     try:
         response = query_perspicacite(prompt)
         return response
     except Exception as e:
-        return "Perspicacite query failed, unable to provide grounded verification. Estimating plausibility based on available evidence without external grounding."
+        return "Perspicacite query failed, unable to provide grounded expectations. Proceeding without external grounding."
