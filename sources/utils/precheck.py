@@ -101,10 +101,10 @@ class PreCheck:
                 "error": str(e)[:200],
             }
 
-    def _check_openrouter_providers(self, name: str, model_id: str) -> None:
+    def _check_openrouter_providers(self, name: str, model_id: str) -> list[dict]:
         providers = self.config.openrouter_provider or []
         if not providers:
-            return
+            return []
 
         print(f"\n🔍 OpenRouter provider probe — {name} ({model_id})")
         max_workers = min(len(providers), 5)
@@ -118,22 +118,61 @@ class PreCheck:
         order_idx = {p: i for i, p in enumerate(providers)}
         results.sort(key=lambda r: order_idx[r["provider"]])
 
-        any_ok = False
         for r in results:
             status = "✅" if r["compiles"] else "❌"
             detail = f"error: {r['error']}" if r["error"] else f"compiles={r['compiles']}"
             print(
                 f"  {status} {r['provider']:<22} time={r['elapsed']:6.2f}s   {detail}"
             )
-            if r["compiles"]:
-                any_ok = True
+        return results
 
-        if not any_ok:
+    def _update_openrouter_provider_list(self, all_results: dict[str, list[dict]]) -> None:
+        """Reorder config.openrouter_provider by mean latency and drop any
+        provider that failed (or errored on) at least one probe.
+
+        Mutates self.config.openrouter_provider in place so the rest of the run
+        uses the cleaned-up list. Does not persist to disk.
+        """
+        original = list(self.config.openrouter_provider or [])
+        if not original or not all_results:
+            return
+
+        per_provider: dict[str, dict] = {p: {"times": [], "all_ok": True} for p in original}
+        for results in all_results.values():
+            by_name = {r["provider"]: r for r in results}
+            for p in original:
+                r = by_name.get(p)
+                if r is None or not r["compiles"]:
+                    per_provider[p]["all_ok"] = False
+                    continue
+                per_provider[p]["times"].append(r["elapsed"])
+
+        kept = [
+            (p, sum(info["times"]) / len(info["times"]))
+            for p, info in per_provider.items()
+            if info["all_ok"] and info["times"]
+        ]
+        kept.sort(key=lambda x: x[1])
+        new_list = [p for p, _ in kept]
+        removed = [p for p in original if p not in new_list]
+
+        if not new_list:
             print(
-                f"⚠️  No provider in the preference list produced compilable code for "
-                f"'{name}' — runs will likely hallucinate. Consider revising "
-                f"openrouter_provider in config."
+                "\n⚠️  All providers failed at least one probe — leaving "
+                "openrouter_provider unchanged. Runs will likely hallucinate."
             )
+            return
+
+        if new_list == original:
+            print("\n✅ All OpenRouter providers passed; order unchanged.")
+            return
+
+        print("\n♻️  Updating openrouter_provider (in-memory, this run only):")
+        print(f"   before:  {original}")
+        print(f"   after:   {new_list}")
+        if removed:
+            print(f"   removed: {removed}   (failed at least one probe)")
+        self.config.openrouter_provider = new_list
 
     def run(self) -> None:
         required = {
@@ -160,10 +199,12 @@ class PreCheck:
 
         providers_ids = {**required, **optional}
 
-        # 2) Per-provider OpenRouter probe (latency + simple compile-check).
+        # 2) Per-provider OpenRouter probe (latency + simple compile-check),
+        # then aggregate to reorder and prune config.openrouter_provider.
         if not self.config.openrouter_provider:
             return
 
+        all_results: dict[str, list[dict]] = {}
         seen: set[str] = set()
         for name, model_id in providers_ids.items():
             if not model_id or model_id in seen:
@@ -172,4 +213,6 @@ class PreCheck:
             if provider != "openrouter":
                 continue
             seen.add(model_id)
-            self._check_openrouter_providers(name, model_id)
+            all_results[model_id] = self._check_openrouter_providers(name, model_id)
+
+        self._update_openrouter_provider_list(all_results)
