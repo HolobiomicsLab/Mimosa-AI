@@ -175,6 +175,7 @@ class PreCheck:
         self.config.openrouter_provider = new_list
 
     def run(self) -> None:
+        print("🚦 Checking LLM providers...")
         required = {
             "planner": self.config.planner_llm_model,
             "workflow": self.config.workflow_llm_model,
