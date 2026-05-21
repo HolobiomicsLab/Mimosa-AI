@@ -196,7 +196,7 @@ class SmolAgentFactory:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-        return f"""You are an autonomous agent executing tasks in a constrained environment.
+        return f""" 
 OPERATIONAL CONTEXT:
 {prev_infos}
 

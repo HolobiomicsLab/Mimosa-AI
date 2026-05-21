@@ -167,29 +167,14 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             generation_time = time.time() - generation_start
             # Extract UUID from exception message if available
             error_msg = str(e)
+            print_err(error_msg)
             if error_msg.startswith("UUID:") and "|" in error_msg:
                 uuid_part, actual_error = error_msg.split("|", 1)
                 workflow_uuid = uuid_part.replace("UUID:", "")
                 logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{actual_error}\n")
-
-                self.notifier.send_message(
-                    f"Workflow {workflow_uuid} generation failed after {generation_time:.1f}s\n"
-                    f"Goal: {goal[:128]}...\n"
-                    f"Error: {actual_error[:256]}",
-                    title="Workflow generation failed",
-                    priority=1
-                )
                 return f"WORKFLOW_GENERATION_ERROR: {actual_error}", workflow_uuid, "error", False
             else:
                 logger.warning(f"[WORKFLOW_GENERATION_ERROR]\n{error_msg}\n")
-
-                self.notifier.send_message(
-                    f"Workflow generation failed after {generation_time:.1f}s\n"
-                    f"Goal: {goal[:128]}...\n"
-                    f"Error: {error_msg[:256]}",
-                    title="Workflow generation failed",
-                    priority=1
-                )
                 return f"WORKFLOW_GENERATION_ERROR: {error_msg}", "generation_failed", "error", False
 
         generation_time = time.time() - generation_start
