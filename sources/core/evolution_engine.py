@@ -340,7 +340,7 @@ class EvolutionEngine:
         )
         if parents:
             wf = parents[0]
-        else:
+        elif not single_agent_mode:
             initial_population = await self.create_initial_population(goal,
                                                                       population_size=2,
                                                                       max_iterations=max_iteration

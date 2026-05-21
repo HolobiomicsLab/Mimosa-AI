@@ -36,7 +36,7 @@ from sources.cli.pretty_print import (
 )
 
 # ----- Execution limits -------------------------------------------------------
-_VERIFIER_TIMEOUT_SECONDS = 60
+_VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 100
 _VERIFIER_MIN_CLAIMS = 24
 _HARD_FAIL_CAP = 0.7
