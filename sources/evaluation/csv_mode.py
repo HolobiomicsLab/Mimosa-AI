@@ -418,12 +418,6 @@ EXPECTED OUTPUT:
 2. Python script — keep exactly ONE final script at: {script_path}
    (i.e. directly inside {workspace_subfolder}/, not nested deeper)
 3. Others scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
-
-⚠️ OUTPUT FORMAT RULES — non-compliance will cause evaluation failure:
-• Column names in the output file must match the source data exactly.
-  Example: if the input CSV column is named FDA_APPROVED, the output column MUST also be FDA_APPROVED.
-  Variants such as FDA_APPROVED_prob are NOT acceptable.
-• Do not rename, reorder, or otherwise alter column identifiers from the source.
 """
         return task_prompt, scenario_id, scoring_rubric_file
 
