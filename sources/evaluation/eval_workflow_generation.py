@@ -24,8 +24,8 @@ class WorkflowEval:
         self.csv_runs_limit = csv_runs_limit
         self.orchestrator = WorkflowOrchestrator(config)
         self.model_lists = [
+            "openrouter/mistralai/mistral-large-2512",
             "anthropic/claude-opus-4-5",
-            "openrouter/mistralai/mistral-large-2512"
             #"openrouter/deepseek/deepseek-v3.2",
             #"openrouter/openrouter/inception/mercury-2",
             #"openrouter/minimax/minimax-m2.5",

@@ -173,10 +173,7 @@ class VariationEngine:
                 diagnosis_block,
                 "</diagnosis>",
                 "",
-                "## YOUR TASK:",
-                "1. Diagnose what went wrong (code bug? wrong approach? bad decomposition? weak agent prompts?).",
-                "2. Let the change pressures above shift your perspective on the problem.",
-                "3. Generate an improved workflow different from the previous one.",
+                "## Task: apply a single mutation to the workflow code.",
             ])
 
         return "\n".join([

@@ -13,6 +13,33 @@ You generate executable LangGraph multi-agent workflows. You must use provided e
 | `WorkflowNodeFactory.create_agent_node(agent)` | Wraps agent as graph node |
 | `master_router` | Returns `"next_node"` / `"retry_node"` / `"fallback_node"` / `END` based on agent status |
 
+## Router Reference
+
+### master_router
+Standard routing based on status field:
+| Status | Route |
+|--------|-------|
+| SUCCESS | next_node |
+| RETRY | retry_node |
+| FALLBACK | fallback_node |
+| FAILURE | END |
+
+### debate_router
+Deliberation routing based on aggregator consensus:
+| Consensus | Route |
+|-----------|-------|
+| PASS (status=SUCCESS) | next_node |
+| REVISE (status=FALLBACK) | another_round |
+| max rounds (status=FAILURE) | END |
+
+Usage:
+```python
+workflow.add_conditional_edges(
+    "aggregator",
+    debate_router,
+    {"next_node": "executor", "another_round": "proposer", "fallback_node": END, END: END}
+)
+```
 ---
 
 # Scientific Workflow Example
@@ -233,6 +260,14 @@ workflow.add_conditional_edges(
 ```
 
 ---
+
+## Tips
+
+- Each individual agent see the final answer of all 5 previous agents
+- Agents execute in the same workspace and have access to all previous agents artifacts.
+- Expert Agents could use web tools to seek solutions.
+- Avoid verifiers or knowledge-seeker agents without consensus verification.
+- When making workflow ensure: (a) agents are heterogeneous with distinct expertise, (b) dynamic routing only to specialists agents, (c) adding consensus agent that weights aggregation of previous agents. (d) verification of artifacts by agents
 
 ## Checklist
 

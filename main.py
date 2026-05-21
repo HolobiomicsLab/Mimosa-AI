@@ -261,7 +261,6 @@ async def main():
         print(f"Configuration loaded from: {args.config}")
 
     # security check
-    PackageCheck().run()
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
 
@@ -304,16 +303,18 @@ async def main():
     config.create_paths()
     config.validate_paths()
 
-    PreCheck(config).run()
 
     try:
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
+            PreCheck(config).run()
             await papers_mode(args, config)
         elif (args.science_agent_bench):
+            PreCheck(config).run()
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
+            PreCheck(config).run()
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
