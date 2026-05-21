@@ -25,6 +25,7 @@ perform that one-time setup before launching long evaluations:
 from __future__ import annotations
 
 import base64
+import html
 import logging
 import os
 import sys
@@ -55,7 +56,7 @@ import dotenv
 dotenv.load_dotenv()
 
 
-def _format_text_report(title: str, rows: list[tuple[str, str]]) -> str:
+def _text_kv_block(title: str, rows: list[tuple[str, str]]) -> str:
     key_w = max((len(k) for k, _ in rows), default=12) + 2
     lines = [title, "=" * max(len(title), 32), ""]
     for k, v in rows:
@@ -67,25 +68,101 @@ def _format_text_report(title: str, rows: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _format_html_report(title: str, rows: list[tuple[str, str]]) -> str:
+def _text_table(title: str, headers: list[str], rows: list[list[str]]) -> str:
+    str_rows = [[str(c) for c in row] for row in rows]
+    widths = [len(h) for h in headers]
+    for row in str_rows:
+        for i, cell in enumerate(row):
+            if i < len(widths):
+                widths[i] = max(widths[i], len(cell))
+
+    def fmt(cells: list[str]) -> str:
+        return " | ".join(c.ljust(widths[i]) for i, c in enumerate(cells))
+
+    separator = "-+-".join("-" * w for w in widths)
+    lines = [title, "=" * max(len(title), 32), "", fmt(headers), separator]
+    lines.extend(fmt(row) for row in str_rows)
+    return "\n".join(lines)
+
+
+def _html_kv_table(rows: list[tuple[str, str]]) -> str:
     body_rows = []
     for k, v in rows:
         if not v:
             body_rows.append(
                 f'<tr><td colspan="2" style="padding-top:12px;'
-                f'font-weight:bold;color:#666">{k}</td></tr>'
+                f'font-weight:bold;color:#666">{html.escape(k)}</td></tr>'
             )
         else:
             body_rows.append(
                 f'<tr><td style="padding:4px 16px 4px 0;vertical-align:top">'
-                f'<strong>{k}</strong></td>'
-                f'<td style="padding:4px 0;font-family:monospace">{v}</td></tr>'
+                f'<strong>{html.escape(k)}</strong></td>'
+                f'<td style="padding:4px 0;font-family:monospace">{html.escape(v)}</td></tr>'
             )
+    return f'<table style="border-collapse:collapse">{"".join(body_rows)}</table>'
+
+
+def _html_kv_block(title: str, rows: list[tuple[str, str]]) -> str:
+    return f'<h3>{html.escape(title)}</h3>' + _html_kv_table(rows)
+
+
+def _html_table(title: str, headers: list[str], rows: list[list[str]]) -> str:
+    header_html = "".join(
+        f'<th style="padding:6px 12px;border-bottom:2px solid #333;'
+        f'text-align:left">{html.escape(h)}</th>'
+        for h in headers
+    )
+    body_parts = []
+    for row in rows:
+        cells = "".join(
+            f'<td style="padding:4px 12px;border-bottom:1px solid #eee;'
+            f'font-family:monospace;white-space:nowrap">{html.escape(str(c))}</td>'
+            for c in row
+        )
+        body_parts.append(f"<tr>{cells}</tr>")
     return (
-        f'<html><body style="font-family:-apple-system,Segoe UI,sans-serif;font-size:14px">'
-        f'<h2>{title}</h2>'
-        f'<table style="border-collapse:collapse">{"".join(body_rows)}</table>'
-        f'</body></html>'
+        f'<h3>{html.escape(title)}</h3>'
+        f'<table style="border-collapse:collapse">'
+        f'<thead><tr>{header_html}</tr></thead>'
+        f'<tbody>{"".join(body_parts)}</tbody>'
+        f'</table>'
+    )
+
+
+def _format_text_report(
+    title: str,
+    rows: list[tuple[str, str]],
+    config_rows: list[tuple[str, str]] | None = None,
+    task_table: dict | None = None,
+) -> str:
+    parts: list[str] = []
+    if config_rows:
+        parts.append(_text_kv_block("Run configuration", config_rows))
+    parts.append(_text_kv_block(title, rows))
+    if task_table and task_table.get("rows"):
+        parts.append(_text_table(
+            "Per-task results", task_table["headers"], task_table["rows"]
+        ))
+    return "\n\n".join(parts)
+
+
+def _format_html_report(
+    title: str,
+    rows: list[tuple[str, str]],
+    config_rows: list[tuple[str, str]] | None = None,
+    task_table: dict | None = None,
+) -> str:
+    parts: list[str] = []
+    if config_rows:
+        parts.append(_html_kv_block("Run configuration", config_rows))
+    parts.append(f'<h2>{html.escape(title)}</h2>' + _html_kv_table(rows))
+    if task_table and task_table.get("rows"):
+        parts.append(_html_table(
+            "Per-task results", task_table["headers"], task_table["rows"]
+        ))
+    return (
+        f'<html><body style="font-family:-apple-system,Segoe UI,sans-serif;'
+        f'font-size:14px">{"".join(parts)}</body></html>'
     )
 
 
@@ -162,6 +239,8 @@ def send_evaluation_report(
     subject: str,
     rows: list[tuple[str, str]],
     body_prefix: str = "",
+    config_rows: list[tuple[str, str]] | None = None,
+    task_table: dict | None = None,
 ) -> bool:
     """
     Send a summary email via the Gmail API.
@@ -171,6 +250,10 @@ def send_evaluation_report(
         rows: List of (label, value) tuples. A row with an empty value is
               treated as a section header (matches print_summary semantics).
         body_prefix: Optional plain-text paragraph shown above the table.
+        config_rows: Optional list of (label, value) tuples rendered as a
+              "Run configuration" block above the aggregate summary.
+        task_table: Optional dict {"headers": [...], "rows": [[...], ...]}
+              rendered as a per-task results table below the aggregate summary.
 
     Returns:
         True if the email was sent, False otherwise (including the no-op case
@@ -188,11 +271,11 @@ def send_evaluation_report(
     recipients = [r.strip() for r in recipients_raw.split(",") if r.strip()]
     sender = os.getenv("EMAIL_USER", "me")  # 'me' = authenticated Gmail user
 
-    text_body = _format_text_report(subject, rows)
-    html_body = _format_html_report(subject, rows)
+    text_body = _format_text_report(subject, rows, config_rows, task_table)
+    html_body = _format_html_report(subject, rows, config_rows, task_table)
     if body_prefix:
         text_body = f"{body_prefix}\n\n{text_body}"
-        html_body = f"<p>{body_prefix}</p>" + html_body
+        html_body = f"<p>{html.escape(body_prefix)}</p>" + html_body
 
     msg = MIMEMultipart("alternative")
     msg["From"] = sender

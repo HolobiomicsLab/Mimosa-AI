@@ -119,6 +119,14 @@ class CsvEvaluationMode:
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
 
+        # Run-level context captured by start_evaluation for the email report.
+        self._dataset_type: str | None = None
+        self._dataset_path: str | None = None
+        self._learning: bool = False
+        self._single_agent_mode: bool = False
+        self._concurrent: bool = False
+        self._start_row: int = 0
+
     def _get_result_analyzer_system_prompt(self) -> str:
         """System prompt for the result analysis LLM."""
         return """You are an autonomous AI scientist result analyzer for Mimosa-AI.
@@ -830,6 +838,7 @@ Provide your analysis following the specified output format."""
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        self._start_row = start_row
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -937,6 +946,7 @@ Provide your analysis following the specified output format."""
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        self._start_row = start_row
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
@@ -1008,7 +1018,8 @@ Provide your analysis following the specified output format."""
                         "goal": goal,
                         "execution_time": execution_time,
                         "success_level": analysis.get("success_level", "Unknown"),
-                        "key_insight": analysis.get("full_analysis", "Unknown")
+                        "key_insight": analysis.get("full_analysis", "Unknown"),
+                        "task_id": self._extract_workspace_name_from_row(row),
                     }
                     if dataset_type == "science_agent_bench" and sab_loader:
                         execution_data = self._evaluate_with_science_agent_bench(
@@ -1119,17 +1130,77 @@ Provide your analysis following the specified output format."""
             except Exception:
                 pass  # best-effort
 
+    def _build_config_rows(self) -> list[tuple[str, str]]:
+        """Build the run-configuration rows shown at the top of the email."""
+        mode = "single-agent" if self._single_agent_mode else "multi-agent"
+        concurrency = (
+            f"{self.max_concurrent_tasks} workers (stagger {self.task_start_delay:.1f}s)"
+            if self._concurrent else "sequential"
+        )
+        return [
+            ("Execution mode", mode),
+            ("Learning", "enabled" if self._learning else "disabled"),
+            ("Concurrency", concurrency),
+            ("Dataset type", self._dataset_type or "unknown"),
+            ("Dataset path", self._dataset_path or "unknown"),
+            ("CSV runs limit", str(self.csv_runs_limit)),
+            ("Start row", str(self._start_row + 1)),
+            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown")),
+            ("Judge model", f"{self.llm_config.provider}/{self.llm_config.model}"),
+        ]
+
+    def _build_task_table(self) -> dict | None:
+        """Build the per-task results table for the email. Returns None if empty."""
+        current_runs = [
+            exec_data for exec_data in self.execution_history
+            if exec_data.get("success_level") != "Cached"
+        ]
+        if not current_runs:
+            return None
+
+        has_sab = any("VER" in d for d in current_runs)
+        headers = ["#", "Task", "Time (s)", "Success"]
+        if has_sab:
+            headers += ["VER", "SR", "CBS", "Cost ($)"]
+
+        rows: list[list[str]] = []
+        for d in current_runs:
+            task_label = d.get("task_id") or (d.get("goal", "") or "")[:40]
+            row = [
+                str(d.get("iteration", "?")),
+                task_label,
+                f"{d.get('execution_time', 0):.1f}",
+                str(d.get("success_level", "?")),
+            ]
+            if has_sab:
+                row += [
+                    "✓" if d.get("VER") else "✗",
+                    "✓" if d.get("SR") else "✗",
+                    f"{d.get('CBS', 0.0):.3f}",
+                    f"{d.get('eval_cost', 0.0):.4f}",
+                ]
+            rows.append(row)
+        return {"headers": headers, "rows": rows}
+
     def _send_email_report(self, status: str = "completed") -> None:
         """Send the final summary by email (no-op if email env vars are unset)."""
         try:
             rows, current_runs, _ = self._build_summary_rows()
+            config_rows = self._build_config_rows()
+            task_table = self._build_task_table()
             model = getattr(self.config, "smolagent_model_id", "unknown")
             subject = f"[Mimosa] Evaluation {status} — {len(current_runs)} runs ({model})"
             body_prefix = (
                 f"Mimosa-AI evaluation {status} at "
                 f"{datetime.now().isoformat(timespec='seconds')}."
             )
-            send_evaluation_report(subject=subject, rows=rows, body_prefix=body_prefix)
+            send_evaluation_report(
+                subject=subject,
+                rows=rows,
+                body_prefix=body_prefix,
+                config_rows=config_rows,
+                task_table=task_table,
+            )
         except Exception as e:
             self.logger.warning(f"[EMAIL] Skipped email report due to error: {e}")
 
@@ -1151,6 +1222,13 @@ Provide your analysis following the specified output format."""
             single_agent_mode: Whether to use single agent mode
             concurrent: Whether to run tasks concurrently (uses max_concurrent_tasks from init)
         """
+        # Snapshot the run-level args so the email report can describe what ran.
+        self._dataset_type = dataset_type
+        self._dataset_path = dataset_path
+        self._learning = learning
+        self._single_agent_mode = single_agent_mode
+        self._concurrent = concurrent and self.max_concurrent_tasks > 1
+
         try:
             if concurrent and self.max_concurrent_tasks > 1:
                 print(f"\033[95mStarting CONCURRENT evaluation with {self.max_concurrent_tasks} workers\033[0m")
