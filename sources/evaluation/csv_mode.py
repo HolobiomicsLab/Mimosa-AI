@@ -684,9 +684,6 @@ Provide your analysis following the specified output format."""
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
-                # When learning is disabled, run only 1 iteration (no evolution loop)
-                max_iter = self.config.max_learning_evolve_iterations if learning else 1
-
                 runs = None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
@@ -697,7 +694,6 @@ Provide your analysis following the specified output format."""
                         judge=True,
                         enable_evolution=learning,
                         scenario_rubric=None,
-                        max_iteration=max_iter,
                         single_agent_mode=single_agent_mode
                     )
                     results_str = self._format_task_mode_results(runs[-1])
@@ -705,7 +701,6 @@ Provide your analysis following the specified output format."""
                     tasks_data = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
-                        max_evolve_iteration=max_iter,
                         max_task_retry=3
                     )
                     results_str = self._format_goal_mode_results(tasks_data)
@@ -987,23 +982,18 @@ Provide your analysis following the specified output format."""
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
-                    # When learning is disabled, run only 1 iteration (no evolution loop)
-                    max_iter = self.config.max_learning_evolve_iterations if learning else 1
-
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
                                                         enable_evolution=learning,
                                                         scenario_rubric=None,
-                                                        max_iteration=max_iter,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_evolve_iteration=self.config.max_learning_evolve_iterations,
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)

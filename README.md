@@ -348,7 +348,6 @@ This replays the full execution trace — thoughts, tool calls, and outputs — 
 | Argument | Description |
 |----------|-------------|
 | `--learn` | Enable iterative learning to optimize task performance |
-| `--max_evolve_iterations N` | Maximum learning iterations |
 | `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
 | `--scenario <scenario file name>` | Use specific scenario-based assertions instead of LLM-as-a-judge for scoring |
 | `--single_agent` | Single-agent mode — fast, but cannot improve through learning |
@@ -378,7 +377,7 @@ uv run main.py --science_agent_bench --learn
 
 **Quick evaluation (10 tasks, 4 learning iterations):**
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
+uv run main.py --science_agent_bench --csv_runs_limit 10
 ```
 
 ### PaperBench

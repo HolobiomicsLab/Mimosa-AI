@@ -331,7 +331,6 @@ python memory_explorer.py 20260115_113303_9bb63437
 | 引数 | 説明 |
 |------|------|
 | `--learn` | タスクパフォーマンスを最適化するための反復学習を有効化 |
-| `--max_evolve_iterations N` | 最大学習反復回数 |
 | `--csv_runs_limit N` | 評価する CSV エントリの数を制限 |
 | `--scenario <シナリオファイル名>` | スコアリングに LLM ジャッジの代わりに特定シナリオベースのアサーションを使用 |
 | `--single_agent` | シングルエージェントモード——高速だが学習による改善不可 |
@@ -359,7 +358,7 @@ uv run main.py --science_agent_bench --learn
 
 **クイック評価（10タスク、4回の学習反復）：**
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
+uv run main.py --science_agent_bench --csv_runs_limit 10
 ```
 
 ### PaperBench

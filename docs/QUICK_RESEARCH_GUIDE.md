@@ -44,7 +44,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json 
 
 **Self-Evolving Multi-Agent (7 tasks):**
 ```bash
-uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --learn --max_evolve_iterations 10
+uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --learn
 ```
 
 It is advised to run for only 7 iterations and try to get maximize results.

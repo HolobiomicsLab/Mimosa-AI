@@ -331,7 +331,6 @@ python memory_explorer.py 20260115_113303_9bb63437
 | 인수 | 설명 |
 |-----|------|
 | `--learn` | 작업 성능 최적화를 위한 반복 학습 활성화 |
-| `--max_evolve_iterations N` | 최대 학습 반복 횟수 |
 | `--csv_runs_limit N` | 평가할 CSV 항목 수 제한 |
 | `--scenario <시나리오 파일명>` | 채점에 LLM 판정자 대신 특정 시나리오 기반 어설션 사용 |
 | `--single_agent` | 단일 에이전트 모드——빠르지만 학습을 통한 개선 불가 |
@@ -359,7 +358,7 @@ uv run main.py --science_agent_bench --learn
 
 **빠른 평가 (10개 작업, 4회 학습 반복):**
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
+uv run main.py --science_agent_bench --csv_runs_limit 10
 ```
 
 ### PaperBench

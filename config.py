@@ -54,7 +54,7 @@ class Config:
         self.engine_name: str = "litellm" # for smolagent
 
         # OpenRouter inference provider(s) to avoid quantization / serving-stack
-        self.openrouter_provider: list[str] | None = ["friendli", "google-vertex", "parasail/fp8", "atlas-cloud/fp8", "novita/fp8"]
+        self.openrouter_provider: list[str] | None = ["friendli", "google-vertex", "parasail/fp8", "atlas-cloud/fp8", "novita/fp8", "siliconflow/fp8"]
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"

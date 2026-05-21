@@ -331,7 +331,6 @@ python memory_explorer.py 20260115_113303_9bb63437
 | 參數 | 描述 |
 |------|------|
 | `--learn` | 啟用迭代學習以優化任務效能 |
-| `--max_evolve_iterations N` | 最大學習迭代次數 |
 | `--csv_runs_limit N` | 限制評估的 CSV 條目數量 |
 | `--scenario <情境檔案名稱>` | 使用基於特定情境斷言的評分方式，而非 LLM 作為評判者 |
 | `--single_agent` | 單智能體模式，速度快，但無法透過學習自我改進 |
@@ -359,7 +358,7 @@ uv run main.py --science_agent_bench --learn
 
 **快速評估（10 個任務，4 次學習迭代）：**
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
+uv run main.py --science_agent_bench --csv_runs_limit 10
 ```
 
 ### PaperBench

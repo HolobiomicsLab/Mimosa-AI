@@ -1014,7 +1014,6 @@ class OnboardCLI:
         await planner.start_planner(
             goal=self._objective,
             judge=True,
-            max_evolve_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
         )
 
     async def _launch_task(self) -> None:
@@ -1027,5 +1026,4 @@ class OnboardCLI:
             goal=self._objective,
             judge=True,
             enable_evolution=self._learn,
-            max_iteration=self.config.max_learning_evolve_iterations if self._learn else 1,
         )

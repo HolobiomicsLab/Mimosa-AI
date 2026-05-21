@@ -177,7 +177,6 @@ async def normal_execution_mode(args, config):
         await evolve.start_workflow_evolution(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_rubric=args.scenario,
-                            max_iteration=args.max_evolve_iterations,
                             enable_evolution=args.learn,
                             single_agent_mode=args.single_agent
                            )
@@ -186,7 +185,6 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
-                                    max_evolve_iteration=args.max_evolve_iterations
                                    )
         trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)

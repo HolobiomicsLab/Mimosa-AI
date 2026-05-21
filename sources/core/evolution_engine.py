@@ -304,7 +304,6 @@ class EvolutionEngine:
         template_uuid: str | None = "20260512_162504_70ccefbf",
         judge: bool = True,
         scenario_rubric: str = None,
-        max_iteration: int = 1,
         enable_evolution: bool = False,
         original_task: str = None,
         single_agent_mode: bool = False,
@@ -323,10 +322,9 @@ class EvolutionEngine:
         - mockup_mode (bool, optional): If True, use existing workflow data from select_parent_workflow
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
-        if max_iteration is None:
-            max_iteration = 1
+        max_iteration = 1
         if enable_evolution:
-            max_iteration = self.config.max_learning_evolve_iterations if max_iteration <= 1 else max_iteration
+            max_iteration = self.config.max_learning_evolve_iterations
 
         # Reset archive at session start
         self.selection._archive = []

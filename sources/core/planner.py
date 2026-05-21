@@ -608,13 +608,12 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
-    async def evolve_runs(self, task, judge, max_evolve_iteration, cached_wf_allow=True, original_task=None):
+    async def evolve_runs(self, task, judge, cached_wf_allow=True, original_task=None):
         """
         Execute Iterative-Learning for a given task.
         Args:
             task: Task description string (may be knowledge-wrapped)
             judge: Whether to use judge evaluation
-            max_evolve_iteration: Maximum iterations for Evolution
             cached_wf_allow: Whether to allow using cached workflows
             original_task: Original unwrapped task for similarity matching
         Returns:
@@ -625,9 +624,6 @@ Original request:
         if not task or not isinstance(task, str):
             raise ValueError("❌ Planner: Task must be a non-empty string")
 
-        if max_evolve_iteration is None or max_evolve_iteration < 1:
-            max_evolve_iteration = 1
-            print_warn(f"Invalid max_evolve_iteration, using default: {max_evolve_iteration}")
 
         print_info(f"Starting Iterative-Learning for task: {task[:60]}…")
 
@@ -660,7 +656,6 @@ Original request:
                     return [run]
 
             # Generate new workflows via Evolution
-            print_info(f"No cached run found, starting task learning (max_iter: {max_evolve_iteration})")
 
             if self.evolve is None:
                 raise ValueError("❌ Planner: instance is None")
@@ -670,7 +665,6 @@ Original request:
                 template_uuid=None,
                 judge=judge,
                 enable_evolution=True,
-                max_iteration=max_evolve_iteration,
                 original_task=original_task
             )
 
@@ -688,7 +682,7 @@ Original request:
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
         return success_list[-1]
 
-    async def run_attempts(self, attempt_counts, max_attempts, step, judge, max_evolve_iteration):
+    async def run_attempts(self, attempt_counts, max_attempts, step, judge):
         """
         Execute multiple attempts for a step with comprehensive error handling.
         Args:
@@ -696,7 +690,6 @@ Original request:
             max_attempts: Maximum number of attempts allowed
             step: The plan step to execute
             judge: Whether to use judge evaluation
-            max_evolve_iteration: Maximum learning iterations
         Returns:
             PlanStep: The updated step with execution status
         """
@@ -733,7 +726,6 @@ Original request:
                 evolve_runs = await self.evolve_runs(
                     enhanced_task,
                     judge,
-                    max_evolve_iteration,
                     cached_wf_allow=(attempt<=1),
                     original_task=step_task  # Pass original for similarity matching
                 )
@@ -802,7 +794,6 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_evolve_iteration: int = 1,
         max_task_retry: int = 5
     ) -> list[Task]:
         """
@@ -810,7 +801,6 @@ Original request:
         Args:
             goal: The goal description for the planner
             judge: Whether to use a judge for evaluation
-            max_evolve_iteration: Maximum number of Evolution improvement attempts per task
             max_task_retry: Maximum number of retries for each task
         Returns:
             List[Task]: List of executed tasks
@@ -867,7 +857,7 @@ Original request:
 
                 try:
                     self._capture_workspace_snapshot()  # Snapshot before execution for output diff
-                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge, max_evolve_iteration)
+                    step = await self.run_attempts(attempt_counts, max_attempts, step, judge)
                     total_cost += step.cost
                     self._update_visualization(total_cost)  # Update after step completes
                 except Exception as e:
