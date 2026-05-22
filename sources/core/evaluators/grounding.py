@@ -13,7 +13,7 @@ SCIENCE GOAL:
 {goal}
 
 INSTRUCTIONS:
-1. INFER SUCCESS INDICATORS: Identify 2-5 concrete scientific claims, findings, methods, or measurable outcomes whose presence in an answer would credibly indicate the goal has been achieved. They must be specific enough to be checked against literature (not generic virtues like "rigorous methodology").
+1. INFER SUCCESS INDICATORS: Identify 15-35 concrete scientific claims, findings, methods, or measurable outcomes whose presence in an answer would credibly indicate the goal has been achieved. They must be specific enough to be checked against literature (not generic virtues like "rigorous methodology").
 2. SEARCH: For each indicator, find relevant peer-reviewed literature on how the goal is approached in practice — state-of-the-art methods, reported empirical results, established quantitative ranges, and known pitfalls. Prioritize empirical studies, meta-analyses, and methods papers.
 3. PROVIDE EVIDENCE: For each indicator, cite specific papers establishing the expected approach, result, or constraint.
 4. SUMMARIZE: Give a concise overview of where the literature converges or disagrees on how this goal should be achieved, including common failure modes and methodological caveats relevant to judging an answer.

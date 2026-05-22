@@ -299,7 +299,7 @@ class VerifierEvaluator(BaseEvaluator):
             else self._GROUNDING_DISABLED
         )
         claims = self._extract_claims(
-            uuid, execution_text, workspace_listing, is_truly_empty, grounding
+            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
         )
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
@@ -307,6 +307,9 @@ class VerifierEvaluator(BaseEvaluator):
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
+        # Narration is passed through to verifier-gen unconditionally; the
+        # Goodhart guardrail lives at claim extraction (the task-locked
+        # checklist supersedes agent narration there).
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
@@ -374,6 +377,7 @@ class VerifierEvaluator(BaseEvaluator):
     def _extract_claims(
         self,
         uuid: str,
+        goal: str,
         execution_text: str,
         workspace_listing: str,
         is_truly_empty: bool,
@@ -398,6 +402,9 @@ You will receive the final state of a multi-agent workflow, a listing of
 files present in the agents' workspace, and peer-reviewed scientific
 literature grounding for the task at hand.
 
+WORKFLOW GOAL:
+{goal}
+
 WORKFLOW OUTPUT:
 {execution_text}
 
@@ -409,11 +416,10 @@ this kind of task; use it to know what is scientifically load-bearing):
 {grounding_block}
 
 TASK:
-Extract a list of ATOMIC CLAIMS that together define whether the workflow
-succeeded at this scientific task. The claim list MUST DRAW FROM BOTH SOURCES
-BELOW — neither alone is sufficient.
+Extract a list of requirements/claims that together define whether the workflow
+succeeded at this scientific task.
 
-SOURCE A — REQUIRED CLAIMS (from the literature grounding).
+SOURCE A — SCIENCE REQUIREMENTS (from the literature grounding).
 These are claims about what the task DEMANDS in theory, regardless of what
 the agents actually did. Derive them from the literature grounding:
 - Required methodology steps (e.g. "data was normalised before PCA",
@@ -428,7 +434,14 @@ These claims are extracted EVEN IF the agents did not perform the step —
 a missing required step SHOULD FAIL verification, which is the correct
 signal that the workflow skipped something load-bearing.
 
-SOURCE B — PERFORMED CLAIMS (from the agents' narration + workspace).
+SOURCE B - GOAL REQUIREMENTS (from the workflow output and workspace).
+These are the instructions and deliverables required according to the user goal.
+Derive them from the goal instructions. Such as :
+- Explicit deliverables the goal (e.g. "a CSV file with columns A,B,C", "a plot of X vs Y").
+- Explicit instructions in the goal (e.g. "use method X", "report metric Y", "compare to baseline Z").
+- explicit quality bars in the goal (e.g. "accuracy ≥ 90%", "energy ≤ -20 kJ/mol", "p < 0.05").
+
+SOURCE C — PERFORMED CLAIMS (from the agents' narration + workspace).
 These are claims about what the agents ACTUALLY did and what they
 produced. Derive them from the WORKFLOW OUTPUT and the WORKSPACE FILES:
 - Concrete computations the agents reported (specific numbers, metrics,
@@ -1067,10 +1080,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             uuid, f"verifier_soft_{claim['id']}", prompt
         )
         if err is not None or not isinstance(data, dict):
-            # Aggregator now scores errors as fails (0). A broken judge call
-            # for a hard claim trips the hard-fail cap, which is the right
-            # signal — "we couldn't measure" should not score higher than
-            # "we measured and it was wrong".
+            # No usable verdict — treat as non-signal so it neither rewards nor
+            # punishes the workflow. Aggregator excludes errors from the mean.
             return {
                 "score": 0.0,
                 "verifier_kind": "soft",
@@ -1106,15 +1117,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         )
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Mean over all claims + information bonus; hard-fail caps the result.
-
-        Errors count as fails: they contribute 0 to the mean, count toward
-        the denominator, and trigger the hard-fail cap on hard claims. A
-        crashing verifier carries the same signal as a verifier that proved
-        the claim false; excluding errors from the denominator opens a
-        reward-hacking path where output too pathological for any verifier
-        to parse scores higher than parseable-but-wrong output.
-        """
+        """Mean over scored claims + information bonus; hard-fail caps the result."""
         if not per_claim:
             return {
                 "overall_score": 0.0,
@@ -1131,24 +1134,43 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "n_scored": 0,
             }
 
+        scored = [c for c in per_claim if c.get("status") != "error"]
         n_pass = sum(1 for c in per_claim if c["status"] == "pass")
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
         n_hard_pass = sum(
-            1 for c in per_claim
+            1 for c in scored
             if c["claim"].get("criticality") == "hard" and c["status"] == "pass"
         )
 
-        base_mean = sum(c["score"] for c in per_claim) / len(per_claim)
+        if not scored:
+            return {
+                "overall_score": 0.0,
+                "overall_score_uncapped": 0.0,
+                "base_mean": 0.0,
+                "information_bonus": 0.0,
+                "n_hard_pass": 0,
+                "hard_fail_capped": False,
+                "n_claims": len(per_claim),
+                "n_pass": n_pass,
+                "n_fail": n_fail,
+                "n_error": n_error,
+                "n_unsure": n_unsure,
+                "n_scored": 0,
+                "skipped_reason": "all_verifiers_errored",
+            }
+
+        base_mean = sum(c["score"] for c in scored) / len(scored)
         bonus = self._information_bonus(n_hard_pass)
         # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
         # bonus can never push past 1.0 nor rescue a broken run.
         pre_cap = max(0.0, min(1.0, base_mean + bonus))
+        # Hard-fail cap fires only on a real refutation, not on errors or unsure.
         hard_fail = any(
             c["claim"].get("criticality") == "hard"
-            and c["status"] in ("fail", "error")
-            for c in per_claim
+            and c["status"] == "fail"
+            for c in scored
         )
         overall = min(pre_cap, self.hard_fail_cap) if hard_fail else pre_cap
 
@@ -1164,7 +1186,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             "n_fail": n_fail,
             "n_error": n_error,
             "n_unsure": n_unsure,
-            "n_scored": len(per_claim),
+            "n_scored": len(scored),
         }
 
     # ------------------------------------------------------------------
