@@ -31,7 +31,7 @@ from .base import (
 from .grounding import get_perspicacite_grounding
 
 from sources.cli.pretty_print import (
-    print_box, print_info,
+    print_box, print_info, print_ok, print_step, print_warn,
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
@@ -451,9 +451,7 @@ class VerifierEvaluator(BaseEvaluator):
                 "criticality": "hard",
                 "likely_relevant_files": [],
             }]
-        if self._task_checklist:
-            return self._claims_from_checklist(self._task_checklist)
-
+        # TODO: use checklist for litterature claims ?
         per_source_min, per_source_max = self._per_source_targets()
         sources = (
             ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
@@ -463,6 +461,7 @@ class VerifierEvaluator(BaseEvaluator):
 
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
+        print_info(f"Extracting claims for workflow {uuid} from {len(sources)} sources...")
         for label, prompt in sources:
             data, err = self._call_judge_for_json(
                 uuid, f"verifier_extract_claims_{label}", prompt
@@ -473,6 +472,7 @@ class VerifierEvaluator(BaseEvaluator):
                 )
                 continue
             for claim in self._parse_and_filter_claims(uuid, data):
+                print_ok(f"Extracted claim {claim['id']} from source {label} for {uuid}")
                 claim_id = claim["id"]
                 if claim_id in seen_ids:
                     claim_id = f"{claim_id}_{label}"
@@ -482,6 +482,7 @@ class VerifierEvaluator(BaseEvaluator):
                 merged.append(claim)
 
         if len(merged) < self.min_claims:
+            print_warn("Claim extraction yielded fewer than the minimum required claims ")
             self.logger.warning(
                 f"Claim extraction yielded only {len(merged)} claims "
                 f"(min_claims={self.min_claims}); proceeding with what we got"
@@ -752,7 +753,7 @@ Aim for {target_min}–{target_max} Source-C claims.
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
-            print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=512)
+            print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=256)
             exec_result = self._run_verifier(uuid, claim["id"], code)
 
             exit_status = exec_result.get("exit_status", "?")
@@ -770,9 +771,9 @@ Aim for {target_min}–{target_max} Source-C claims.
             print_box(summary, title=f"Verifier run · {claim.get('id')}", color=run_color)
 
             if stdout.strip():
-                print_box(stdout, title=f"stdout · {claim.get('id')}", color=DIM, truncate=4000)
+                print_box(stdout, title=f"stdout · {claim.get('id')}", color=DIM, truncate=256)
             if stderr.strip():
-                print_box(stderr, title=f"stderr · {claim.get('id')}", color=RED, truncate=4000)
+                print_box(stderr, title=f"stderr · {claim.get('id')}", color=RED, truncate=256)
 
             scored = self._score_executable(claim, spec, exec_result)
         else:
@@ -882,18 +883,6 @@ Return STRICT JSON only:
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
-        checklist_hints = ""
-        if claim.get("source") == "task_checklist":
-            checklist_hints = (
-                "\nCHECKLIST CONTEXT (claim came from a task-locked rubric, "
-                "not from agent narration — find the artefact in the workspace):"
-                f"\n- expected_artifact_kind: {claim.get('expected_artifact_kind') or '(unspecified)'}"
-                f"\n- acceptable_variation:   {claim.get('acceptable_variation') or '(unspecified)'}"
-                f"\n- checkable_via:          {claim.get('checkable_via') or 'file'}\n"
-                "Inspect the workspace listing and pick the file whose name or "
-                "content best matches the expected_artifact_kind. Do NOT rely "
-                "on the agent's self-report to identify the file.\n"
-            )
         prompt = f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
@@ -906,7 +895,6 @@ RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 
 WORKFLOW OUTPUT (for context only — do not re-evaluate the whole thing):
 {execution_text}
-{checklist_hints}
 CLAIM TO VERIFY:
 - id: {claim['id']}
 - criticality: {claim['criticality']}
