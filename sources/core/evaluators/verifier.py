@@ -52,6 +52,21 @@ _PREVIEW_TAIL_BYTES = 2 * 1024
 _PREVIEW_PER_CLAIM_CAP = 24 * 1024
 _BINARY_SNIFF_BYTES = 4096
 
+# ----- Workspace preview filter -----------------------------------------------
+# Suffixes never previewed as text. Everything else is fed through
+# ``_preview_file`` which falls back to a magic-byte hex dump for binaries it
+# sniffs at read time.
+_PREVIEW_DENY_SUFFIXES = (
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico",
+    ".pdf",
+    ".pkl", ".pickle", ".npy", ".npz", ".joblib", ".h5", ".hdf5",
+    ".bin", ".so", ".o", ".a", ".dll", ".dylib", ".exe",
+    ".pyc", ".pyo",
+    ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z",
+    ".db", ".sqlite", ".sqlite3",
+    ".mp3", ".mp4", ".wav", ".ogg", ".webm",
+)
+
 # ----- Empty-run marker -------------------------------------------------------
 # Emitted by base.workflow_execution_text when no state_result and no code exist.
 # We use this as the precise empty-run signal, NOT the brittle `success` flag
@@ -283,11 +298,6 @@ class VerifierEvaluator(BaseEvaluator):
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
-        # When a checklist is installed, verifier-generation must not see the
-        # agent narration: closing that loop is what produced the original
-        # Goodhart leak. We still keep `execution_text` for empty-run detection
-        # and the soft-check anchor for non-checklist claims.
-        use_checklist = bool(self._task_checklist) and not is_truly_empty
         claims = self._extract_claims(
             uuid, execution_text, workspace_listing, is_truly_empty, grounding
         )
@@ -298,18 +308,14 @@ class VerifierEvaluator(BaseEvaluator):
             return {"uuid": uuid, "claims": [], **scores}
 
         per_claim: list[dict[str, Any]] = []
-        # Layer 2: hide narration from the verifier generator when checklist
-        # mode is active. The workspace listing is still passed so verifiers
-        # can find artefacts; only the agent's self-report is withheld.
-        verifier_context = (
-            "(agent narration withheld in checklist mode — derive the check "
-            "from the claim description and the workspace files only)"
-            if use_checklist
-            else execution_text
-        )
+        # The Goodhart guardrail lives at claim extraction (the task-locked
+        # checklist supersedes agent narration as the source of claims). The
+        # verifier-generation step itself NEEDS the narration: the agents are
+        # the ones who chose where to write their artefacts on disk, and
+        # without their report the file-selection step is blind.
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
-                uuid, claim, verifier_context, workspace_listing, grounding
+                uuid, claim, execution_text, workspace_listing, grounding
             )
             per_claim.append(result)
 
@@ -600,7 +606,14 @@ drop a required claim because the workflow skipped it.
     def _claims_from_checklist(
         self, items: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Promote a pre-built task checklist to verifier claims."""
+        """Promote a pre-built task checklist to verifier claims.
+
+        Checklist items are task-locked shape hints, not file paths. The
+        adaptation to "what's actually in the workspace" happens later inside
+        ``_verify_claim`` via a per-claim LLM file-selection call that sees
+        the agent narration (which generally names the files the agents
+        wrote) and the workspace listing.
+        """
         cleaned: list[dict[str, Any]] = []
         for idx, it in enumerate(items):
             if not isinstance(it, dict) or "description" not in it:
@@ -630,6 +643,16 @@ drop a required claim because the workflow skipped it.
         grounding: str = "",
     ) -> dict[str, Any]:
         """Generate, execute (if executable) and score a single claim."""
+        # Resolve which workspace files the verifier should open. For checklist
+        # claims this is the only step that maps the task-locked rubric onto
+        # the candidate's actual workspace; for LLM-extracted claims it
+        # refines (and rechecks) the extractor's initial pick against the
+        # agent narration that names the files just written.
+        selected = self._llm_select_files(
+            uuid, claim, execution_text, workspace_listing
+        )
+        claim = {**claim, "likely_relevant_files": selected}
+
         rel_files = claim.get("likely_relevant_files", [])
         claim_text = (
             f"id:          {claim.get('id')}\n"
@@ -695,6 +718,79 @@ drop a required claim because the workflow skipped it.
             color=GREEN if scored.get("score", 0) >= 0.5 else RED,
         )
         return scored
+
+    def _llm_select_files(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        max_files: int = 3,
+    ) -> list[str]:
+        """Pick the workspace files most likely to hold this claim's artefact.
+
+        Per-claim LLM call that fuses three signals the keyword heuristics
+        couldn't see together: the agent narration (typically names the files
+        the agents wrote), the workspace listing (ground truth of what is on
+        disk), and the claim description (what artefact we're after). Returns
+        only paths present in the workspace listing — hallucinated entries
+        are dropped. Falls back to all eligible workspace files on parse or
+        provider failure so the downstream verifier-gen step is never blind.
+        """
+        eligible = set(self._eligible_workspace_files())
+        if not eligible:
+            return []
+        prompt = f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
+
+WORKSPACE FILES (name<TAB>size, relative to workspace root, cwd at runtime):
+{workspace_listing}
+
+AGENT NARRATION (what the agents reported doing — typically names the files they wrote):
+{execution_text}
+
+CLAIM TO CHECK:
+- id:                       {claim.get('id')}
+- description:              {claim.get('description')}
+- expected_artifact_kind:   {claim.get('expected_artifact_kind') or '(unspecified)'}
+- acceptable_variation:     {claim.get('acceptable_variation') or '(none)'}
+
+Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer files the agents explicitly mention writing for this artefact. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
+
+Return STRICT JSON only:
+  {{"files": ["<relative/path>", ...]}}
+"""
+        agent_name = f"verifier_select_files_{claim.get('id', 'unknown')}"
+        parsed, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        if err or not isinstance(parsed, dict):
+            self.logger.debug(
+                f"file selection failed for {claim.get('id')}: {err or 'non-dict JSON'}; "
+                f"falling back to all eligible files"
+            )
+            return self._eligible_workspace_files()
+        raw_files = parsed.get("files")
+        if not isinstance(raw_files, list):
+            return self._eligible_workspace_files()
+        selected: list[str] = []
+        seen: set[str] = set()
+        for rf in raw_files:
+            if not isinstance(rf, str):
+                continue
+            rp = rf.strip().lstrip("./")
+            if not rp or rp in seen:
+                continue
+            if rp not in eligible:
+                self.logger.debug(
+                    f"dropping hallucinated/ineligible path '{rp}' for {claim.get('id')}"
+                )
+                continue
+            selected.append(rp)
+            seen.add(rp)
+            if len(selected) >= max_files:
+                break
+        # Empty LLM result means "no plausible file" — but the parser still
+        # needs SOMETHING to look at, so hand it the eligible set rather than
+        # falling into the original empty-previews bug.
+        return selected or self._eligible_workspace_files()
 
     def _generate_verifier(
         self,
@@ -1142,6 +1238,23 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
     # File preview helpers
     # ------------------------------------------------------------------
+
+    def _eligible_workspace_files(self) -> list[str]:
+        """Workspace files plausibly readable as text artefacts (sorted).
+
+        Filters out compiled artefacts and obvious binaries by suffix; the
+        deeper magic-byte check inside ``_preview_file`` still catches
+        anything that slips through.
+        """
+        out: list[str] = []
+        for f in self._workspace_files:
+            lower = f.lower()
+            if lower.endswith(_PREVIEW_DENY_SUFFIXES):
+                continue
+            if any(p in lower for p in ("/__pycache__/", "/.git/", "/.venv/")):
+                continue
+            out.append(f)
+        return sorted(out)
 
     @staticmethod
     def _looks_binary(sample: bytes) -> bool:
