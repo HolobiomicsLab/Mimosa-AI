@@ -13,6 +13,7 @@ from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.visualization import VisualizationUtils
 from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.core.evaluators.evaluator import WorkflowEvaluator
 
 from sources.utils.workspace_management import WorkspaceManager
 from .orchestrator import WorkflowOrchestrator
@@ -39,7 +40,6 @@ class EvolutionEngine:
         viz_utils: VisualizationUtils = None,
         process_id: int = None,
     ) -> None:
-        from sources.core.evaluators.evaluator import WorkflowEvaluator
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
@@ -452,7 +452,7 @@ class EvolutionEngine:
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
             )
-        elif len(parent_workflows) > self.initial_population:
+        elif len(parent_workflows) >= self.initial_population:
             # MUTATION — perturb the single best parent
             print_phase("MUTATION VARIATION", color=YELLOW)
             primary_parent = parent_workflows[0] if parent_workflows else None
