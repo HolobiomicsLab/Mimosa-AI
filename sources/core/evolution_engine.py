@@ -261,8 +261,7 @@ class EvolutionEngine:
         parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
-        if parents:
-            wf = parents[0]
+        wf = parents[0] if parents else None
 
         if mockup_mode:
             return await self.mockup(wf, goal)
@@ -408,18 +407,19 @@ class EvolutionEngine:
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
-        if enable_evolution and wf_info.overall_score > self.config.learned_score_threshold:
-            # reach learning threshold
-            print_ok("Evolution engine reached learning threshold.")
-            self._save_final_plots(assertion_history, rewards_history, uuid)
-            self.notifier.send_message(
-                f"Done learning task: {wf_info.goal[:256]} \n"
-                f"Final UUID: {uuid}\n"
-                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
-                title="Evolution done learning task.",
-                priority=0
-            )
-            return runs
+        if enable_evolution:
+            if wf_info.overall_score > self.config.learned_score_threshold:
+                print_ok("Evolution engine reached learning threshold.")
+                self._save_final_plots(assertion_history, rewards_history, uuid)
+                self.notifier.send_message(
+                    f"Done learning task: {wf_info.goal[:256]} \n"
+                    f"Final UUID: {uuid}\n"
+                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
+                    title="Evolution done learning task.",
+                    priority=0
+                )
+                return runs
+            # Below threshold with --learn: fall through to keep evolving.
         elif not on_error:
             self._save_final_plots(assertion_history, rewards_history, uuid)
             print_ok("Completed workflow execution. Evolution disabled.")
