@@ -260,8 +260,7 @@ class EvolutionEngine:
         parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
         )
-        if parents:
-            wf = parents[0]
+        wf = parents[0] if parents else None
 
         if mockup_mode:
             return await self.mockup(wf, goal)
