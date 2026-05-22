@@ -348,9 +348,9 @@ class EvolutionEngine:
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
         self._save_evolution_prompt_artifact(uuid, runs[-1].prompt)
-        if "WORKFLOW_GENERATION_ERROR" in run_stdout:
-            print_err(f"Workflow generation failed:\n{run_stdout[256:]}")
-            on_error = True
+        on_error = not executed
+        if on_error:
+            print_err(f"Workflow failed:\n{run_stdout[:512]}")
         # ── Snapshot workspace results produced by this run ───────────────────
         if workspace_mgr is not None and uuid:
             workspace_mgr.save_run_snapshot(uuid)
@@ -432,7 +432,9 @@ class EvolutionEngine:
                 priority=0
             )
             return runs
-        # continue on error: use evolution as recovery for when failed to execute
+        # Intentional fall-through on error: trigger automatic recovery via
+        # re-attempt with a fresh prompt, regardless of `enable_evolution`.
+        # A failed generation/execution must not block the user's workflow.
 
         # ── Evolutionary parent selection: mutation or crossover ──────
         parent_workflows, use_crossover = self.select_parent_workflow(
