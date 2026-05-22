@@ -246,6 +246,7 @@ class EvolutionEngine:
         - mockup_mode (bool, optional): If True, use existing workflow data from select_parent_workflow
             instead of calling orchestrate_workflow. Useful for testing and debugging.
         """
+        wf = None
         max_iteration = 1
         if enable_evolution:
             max_iteration = self.config.max_learning_evolve_iterations
@@ -464,6 +465,8 @@ class EvolutionEngine:
                 runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
             )
         else:
+            # SEED — create initial random workflow(s) without a parent (cold start)
+            print_phase("SEED POPULATION", color=GREEN)
             runs[-1].prompt = self.get_genotype_instructions(task_goal, None, max_iterations=runs[-1].max_depth)
 
         runs.append(IndividualRun(
