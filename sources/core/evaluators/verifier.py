@@ -283,7 +283,7 @@ class VerifierEvaluator(BaseEvaluator):
         # Short-circuit when the workflow produced no artefacts: avoids scoring
         # against stale state from a prior generation in a shared workspace.
         wf_info = self._load_workflow_data(uuid)
-        if not wf_info.state_result and not wf_info.code:
+        if not wf_info.state_result or not wf_info.code:
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
@@ -307,9 +307,6 @@ class VerifierEvaluator(BaseEvaluator):
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
-        # Narration is passed through to verifier-gen unconditionally; the
-        # Goodhart guardrail lives at claim extraction (the task-locked
-        # checklist supersedes agent narration there).
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
@@ -1070,8 +1067,10 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             uuid, f"verifier_soft_{claim['id']}", prompt
         )
         if err is not None or not isinstance(data, dict):
-            # No usable verdict — treat as non-signal so it neither rewards nor
-            # punishes the workflow. Aggregator excludes errors from the mean.
+            # Aggregator now scores errors as fails (0). A broken judge call
+            # for a hard claim trips the hard-fail cap, which is the right
+            # signal — "we couldn't measure" should not score higher than
+            # "we measured and it was wrong".
             return {
                 "score": 0.0,
                 "verifier_kind": "soft",
@@ -1107,7 +1106,15 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         )
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Mean over scored claims + information bonus; hard-fail caps the result."""
+        """Mean over all claims + information bonus; hard-fail caps the result.
+
+        Errors count as fails: they contribute 0 to the mean, count toward
+        the denominator, and trigger the hard-fail cap on hard claims. A
+        crashing verifier carries the same signal as a verifier that proved
+        the claim false; excluding errors from the denominator opens a
+        reward-hacking path where output too pathological for any verifier
+        to parse scores higher than parseable-but-wrong output.
+        """
         if not per_claim:
             return {
                 "overall_score": 0.0,
@@ -1124,43 +1131,24 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "n_scored": 0,
             }
 
-        scored = [c for c in per_claim if c.get("status") != "error"]
         n_pass = sum(1 for c in per_claim if c["status"] == "pass")
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
         n_hard_pass = sum(
-            1 for c in scored
+            1 for c in per_claim
             if c["claim"].get("criticality") == "hard" and c["status"] == "pass"
         )
 
-        if not scored:
-            return {
-                "overall_score": 0.0,
-                "overall_score_uncapped": 0.0,
-                "base_mean": 0.0,
-                "information_bonus": 0.0,
-                "n_hard_pass": 0,
-                "hard_fail_capped": False,
-                "n_claims": len(per_claim),
-                "n_pass": n_pass,
-                "n_fail": n_fail,
-                "n_error": n_error,
-                "n_unsure": n_unsure,
-                "n_scored": 0,
-                "skipped_reason": "all_verifiers_errored",
-            }
-
-        base_mean = sum(c["score"] for c in scored) / len(scored)
+        base_mean = sum(c["score"] for c in per_claim) / len(per_claim)
         bonus = self._information_bonus(n_hard_pass)
         # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
         # bonus can never push past 1.0 nor rescue a broken run.
         pre_cap = max(0.0, min(1.0, base_mean + bonus))
-        # Hard-fail cap fires only on a real refutation, not on errors or unsure.
         hard_fail = any(
             c["claim"].get("criticality") == "hard"
-            and c["status"] == "fail"
-            for c in scored
+            and c["status"] in ("fail", "error")
+            for c in per_claim
         )
         overall = min(pre_cap, self.hard_fail_cap) if hard_fail else pre_cap
 
@@ -1176,7 +1164,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             "n_fail": n_fail,
             "n_error": n_error,
             "n_unsure": n_unsure,
-            "n_scored": len(scored),
+            "n_scored": len(per_claim),
         }
 
     # ------------------------------------------------------------------
