@@ -1,4 +1,5 @@
 *.wav
+.claude/*
 credentials.json
 token.json
 *credentials*
