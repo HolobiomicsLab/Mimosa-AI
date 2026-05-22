@@ -63,6 +63,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
+                 temperature=0.7,
                  max_steps=64,
                 ) -> None:
         self.name = name
@@ -77,6 +78,7 @@ class SmolAgentFactory:
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 8192
+        self.temperature = temperature
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
@@ -165,7 +167,7 @@ class SmolAgentFactory:
                 }
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=0.7,
+                temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 timeout=self.timeout,
                 request_timeout=180,
@@ -196,7 +198,7 @@ class SmolAgentFactory:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-        return f""" 
+        return f"""
 OPERATIONAL CONTEXT:
 {prev_infos}
 

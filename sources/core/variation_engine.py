@@ -35,7 +35,7 @@ class VariationEngine:
     ):
         """
         EV-ranked phase schedule: single-agent → tools → prompt → (only if needed)
-        decomposition → integrative tuning → polish. 
+        decomposition → integrative tuning → polish.
         """
         if max_iterations <= 1:
             progress = 0.5
@@ -104,12 +104,7 @@ class VariationEngine:
 
     def seed_genome_prompt(self, goal: str) -> str:
         """
-        Prompt for the very first workflow generation (generation 0).
-
-        No prior code or evaluation exists yet, so this is intentionally
-        minimal — just the goal and a nudge toward simplicity.  The annealing
-        schedule's SEED phase rules apply implicitly; they are not injected
-        here to keep the first prompt clean and unbiased.
+        Prompt for very first workflow generation (generation 0).
         """
         return (
             "## First workflow generation\n"

@@ -97,6 +97,7 @@ class EvolutionEngine:
             novelty_k_neighbours=25,
             novelty_weight=0.4
         )
+        self.initial_population = 3 # number of initial random workflows before enabling mutation
 
     async def mockup(self, wf, goal):
         """
@@ -259,45 +260,6 @@ class EvolutionEngine:
         else:
             return self.variation.seed_genome_prompt(goal)
 
-    async def create_initial_population(
-        self,
-        goal: str,
-        population_size: int = 3,
-        max_iterations: int = 10
-    ) -> list[IndividualRun]:
-        """Create the initial population of workflows."""
-        population = []
-        print_phase("CREATING INITIAL POPULATION", color=CYAN)
-        for i in range(population_size):
-            prompt =  self.variation.seed_genome_prompt(goal)
-            run_stdout, uuid, workflow_genotype_code, executed = await self.orchestrator.orchestrate_workflow(
-                goal=goal,
-                craft_instructions=prompt,
-                original_task=goal,
-                single_agent_mode=False
-            )
-            wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
-            if workflow_genotype_code:
-                answers = wf_info.answers
-                _, _ = await self._evaluate_and_calculate_cost(
-                    executed, True, uuid, answers, None, []
-                )
-                population.append(IndividualRun(
-                    goal=goal,
-                    prompt=prompt,
-                    current_uuid=uuid,
-                    workflow_template=None,
-                    iteration_count=0,
-                    max_depth=max_iterations,
-                    judge=True,
-                    answers=answers,
-                    state_result=wf_info.state_result,
-                    scenario_rubric=None,
-                    original_task=goal,
-                    reward=wf_info.overall_score
-                ))
-        return population
-
     async def start_workflow_evolution(
         self,
         goal: str,
@@ -338,18 +300,6 @@ class EvolutionEngine:
         )
         if parents:
             wf = parents[0]
-        elif not single_agent_mode:
-            initial_population = await self.create_initial_population(goal,
-                                                                      population_size=2,
-                                                                      max_iterations=max_iteration
-                                                                     )
-            initial_population.sort(key=lambda r: r.reward if r.reward is not None else 0.0, reverse=True)
-            best = initial_population[0] if initial_population else None
-            wf = (
-                WorkflowInfo(best.current_uuid, Path(f"{self.workflow_dir}/{best.current_uuid}"))
-                if best and best.current_uuid else None
-            )
-            print_info(f"Created initial population of {len(initial_population)} workflows.")
 
         if mockup_mode:
             return await self.mockup(wf, goal)
@@ -531,7 +481,7 @@ class EvolutionEngine:
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
-        if use_crossover and len(parent_workflows) >= 2:
+        if use_crossover and len(parent_workflows) >= self.initial_population:
             # CROSSOVER — recombine multiple parent genotypes
             print_phase("CROSSOVER VARIATION", color=CYAN)
             runs[-1].prompt = self.variation.crossover_prompt(
@@ -542,7 +492,7 @@ class EvolutionEngine:
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
             )
-        else:
+        elif len(parent_workflows) > self.initial_population:
             # MUTATION — perturb the single best parent
             print_phase("MUTATION VARIATION", color=YELLOW)
             primary_parent = parent_workflows[0] if parent_workflows else None
@@ -551,6 +501,8 @@ class EvolutionEngine:
                 task_goal, primary_parent, code, run_stdout,
                 runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
             )
+        else:
+            runs[-1].prompt = self.get_genotype_instructions(task_goal, None, max_iterations=runs[-1].max_depth)
 
         runs.append(IndividualRun(
             goal=runs[-1].goal,
