@@ -433,9 +433,6 @@ class EvolutionEngine:
                 priority=0
             )
             return runs
-        # Intentional fall-through on error: trigger automatic recovery via
-        # re-attempt with a fresh prompt, regardless of `enable_evolution`.
-        # A failed generation/execution must not block the user's workflow.
 
         # ── Evolutionary parent selection: mutation or crossover ──────
         parent_workflows, use_crossover = self.select_parent_workflow(

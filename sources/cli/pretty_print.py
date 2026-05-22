@@ -116,7 +116,7 @@ def print_rule(width: int = _W, color: str = CYAN) -> None:
 def print_iteration_header(
     current: int,
     total: int,
-    subtitle: str = "Self-Improvement Loop",
+    subtitle: str = "Evolution Loop",
     width: int = _W,
 ) -> None:
     """
