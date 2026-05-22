@@ -102,6 +102,57 @@ _IO_MARKERS = (
 )
 
 
+# ----- Claim extraction: rules shared across all three source prompts ---------
+_CLAIM_RULES_BLOCK = """For each claim, also estimate `criticality`:
+- "hard": load-bearing for the answer (final metrics, headline files,
+  required computations, claimed satisfaction of the user goal, required
+  methodology steps according to the literature).
+- "soft": supporting context (intermediate sanity remarks, choices that are
+  defensible but not strictly required, methods decisions the literature cites).
+
+For each claim, also list `likely_relevant_files`: relative paths whose
+contents the verifier would need to read in order to check the claim.
+- ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
+  Do not invent or guess paths the workflow's answer mentions but that are
+  not in the listing.
+- Use `[]` if the claim is purely about the workflow's output text and has
+  no on-disk artefact to consult.
+
+POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
+the workflow ACHIEVED scientifically. A claim is well-formed only if
+"verified TRUE" is equivalent to "the workflow succeeded at this aspect".
+Never extract a claim that a FAILURE MODE would satisfy. Extract the
+success condition the workflow failed: a workflow that produced no usable
+answer should FAIL the claim "produced <the deliverable, meeting <the
+bar>>", not pass the claim "the final answer is empty".
+
+DISCRIMINATION TEST. Before including any "hard" claim, ask: "If the workflow
+had done nothing scientifically meaningful — only moved files, saved a
+checkpoint, but never produced a correct and complete answer — would this
+claim still verify TRUE?" If YES: the claim is worthless. Reframe it into the
+functional success condition it is a proxy for, or drop it.
+
+ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are NOT
+scientific achievements and are NEVER "hard". Extract an artifact claim only
+chained to a functional property that makes it load-bearing — not
+"predictions.csv exists" but "predictions.csv contains a valid probability in
+[0,1] for every row of the test set". Maximum 2 soft artifact claims total.
+
+Return STRICT JSON only, no prose, in this exact form:
+{
+  "claims": [
+    {
+      "id": "<short_slug>",
+      "description": "<concise restatement of the claim>",
+      "criticality": "hard" | "soft",
+      "likely_relevant_files": ["<relative/path>", ...]
+    },
+    ...
+  ]
+}
+"""
+
+
 T = TypeVar("T")
 
 
@@ -383,7 +434,16 @@ class VerifierEvaluator(BaseEvaluator):
         is_truly_empty: bool,
         grounding: str = "",
     ) -> list[dict[str, Any]]:
-        """Ask the LLM to break the workflow output into atomic, typed claims."""
+        """Extract atomic claims by polling three independent source prompts.
+
+        Source A asks an LLM for what the LITERATURE demands of a correct
+        solution; Source B asks what the USER explicitly required in the goal
+        text; Source C asks what the AGENTS reported doing in their narration.
+        Three short, focused prompts beat one giant one — each call stays well
+        within attention budget and concentrates the LLM on one perspective at
+        a time. Results are merged with id deduplication; a failed source
+        degrades gracefully instead of failing the whole extraction.
+        """
         if is_truly_empty:
             return [{
                 "id": "c0_execution_succeeded",
@@ -391,184 +451,189 @@ class VerifierEvaluator(BaseEvaluator):
                 "criticality": "hard",
                 "likely_relevant_files": [],
             }]
-
-        # Layer 2: when a task-locked checklist is installed, derive claims
         if self._task_checklist:
             return self._claims_from_checklist(self._task_checklist)
 
+        per_source_min, per_source_max = self._per_source_targets()
+        sources = (
+            ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
+            ("b", self._build_source_b_prompt(goal, workspace_listing, per_source_min, per_source_max)),
+            ("c", self._build_source_c_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
+        )
+
+        merged: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for label, prompt in sources:
+            data, err = self._call_judge_for_json(
+                uuid, f"verifier_extract_claims_{label}", prompt
+            )
+            if err is not None:
+                self.logger.warning(
+                    f"Claim extraction source {label} failed for {uuid}: {err}"
+                )
+                continue
+            for claim in self._parse_and_filter_claims(uuid, data):
+                claim_id = claim["id"]
+                if claim_id in seen_ids:
+                    claim_id = f"{claim_id}_{label}"
+                claim["id"] = claim_id
+                claim["source"] = f"source_{label}"
+                seen_ids.add(claim_id)
+                merged.append(claim)
+
+        if len(merged) < self.min_claims:
+            self.logger.warning(
+                f"Claim extraction yielded only {len(merged)} claims "
+                f"(min_claims={self.min_claims}); proceeding with what we got"
+            )
+        return merged
+
+    def _per_source_targets(self) -> tuple[int, int]:
+        """Per-source min/max claim targets derived from the global bounds."""
+        per_min = max(2, self.min_claims // 3)
+        per_max = max(per_min, self.max_claims // 3)
+        return per_min, per_max
+
+    def _build_source_a_prompt(
+        self,
+        goal: str,
+        grounding: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source A — what the LITERATURE demands of a correct solution."""
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
-        prompt = f"""
-You will receive the final state of a multi-agent workflow, a listing of
-files present in the agents' workspace, and peer-reviewed scientific
-literature grounding for the task at hand.
+        return f"""You are extracting SOURCE A claims for a verification rubric: requirements the peer-reviewed literature places on any correct solution to this task, independent of what the agents actually did.
 
 WORKFLOW GOAL:
 {goal}
 
-WORKFLOW OUTPUT:
+LITERATURE GROUNDING:
+{grounding_block}
+
+WORKSPACE FILES (relative to workspace root):
+{workspace_listing}
+
+TASK:
+Extract Source-A claims. These are the things the LITERATURE demands of a
+correct solution, regardless of whether the agents performed them:
+- Required methodology steps (e.g. "data was normalised before PCA",
+  "cross-validation was performed with k≥5", "the energy minimisation
+  converged to a stationary point").
+- Required outputs / quality bars the field treats as load-bearing
+  (e.g. "the predicted structure has RMSD ≤ X to the reference",
+  "the regression model reports an R² on a held-out test set").
+- Required constraints / sanity properties standard in the field
+  (e.g. "probabilities sum to 1", "the contact matrix is symmetric",
+  "the conformation is a valid self-avoiding walk").
+
+A Source-A claim is extracted EVEN IF the agents did not perform the step
+— a missing required step SHOULD FAIL verification, which is the correct
+signal that the workflow skipped something load-bearing.
+
+MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
+produced the specific scientific deliverable the task requested AND that
+it meets the literature-standard success criterion. If the task names a
+quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
+must encode that bar — not merely "a result exists". Phrase it so a
+workflow that skipped, faked, or left the deliverable empty FAILS it.
+Mark it "hard". Source-A claims about literature-required steps are
+"hard" by default.
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for {target_min}–{target_max} Source-A claims.
+"""
+
+    def _build_source_b_prompt(
+        self,
+        goal: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source B — what the USER explicitly required in the goal text."""
+        return f"""You are extracting SOURCE B claims for a verification rubric: requirements the user explicitly stated in the workflow goal, independent of what the literature would have demanded and independent of what the agents actually did.
+
+WORKFLOW GOAL:
+{goal}
+
+WORKSPACE FILES (relative to workspace root):
+{workspace_listing}
+
+TASK:
+Read ONLY the goal text above. Extract claims that capture instructions
+and deliverables the user spelled out. A Source-B claim FAILS if the
+agents skipped, weakened, or substituted what the user asked for — even
+if the literature would have accepted the substitution.
+
+Look for, in the goal:
+- Explicit deliverables ("produce a CSV with columns A,B,C", "save the
+  trained model to disk", "render a phylogenetic tree as SVG").
+- Explicit method / tool choices ("use random forest with 100 trees",
+  "run BLAST against the nr database", "fit with sklearn's PCA").
+- Explicit numeric or qualitative success bars ("accuracy ≥ 90%",
+  "energy ≤ −20 kJ/mol", "p < 0.05", "all residues classified").
+- Explicit comparisons or controls ("compare against a random baseline",
+  "include a negative control", "report both train and test metrics").
+- Explicit scope constraints ("over the 2020–2024 window", "for the
+  test split only", "use the 20-mer sequence HPHPPHHPHPPHPHHPPHPH").
+- Explicit output format constraints ("as JSON", "one row per sample",
+  "rounded to 3 decimal places").
+
+If the goal is short and contains few explicit requirements, return a
+short list — DO NOT pad with claims the user did not write. It is fine
+to return fewer than {target_min} claims when the goal is terse; do not
+invent constraints from the literature here (those belong to Source A).
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for up to {target_max} Source-B claims, but only as many as the goal
+text actually warrants.
+"""
+
+    def _build_source_c_prompt(
+        self,
+        goal: str,
+        execution_text: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source C — what the AGENTS reported doing in their narration."""
+        return f"""You are extracting SOURCE C claims for a verification rubric: concrete computations and artefacts the agents reported producing, so the verifier can check the agents did not lie or hallucinate.
+
+WORKFLOW GOAL:
+{goal}
+
+WORKFLOW OUTPUT (agent narration — the workflow's self-report):
 {execution_text}
 
 WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
-LITERATURE GROUNDING (peer-reviewed context — what the literature says about
-this kind of task; use it to know what is scientifically load-bearing):
-{grounding_block}
-
 TASK:
-Extract a list of requirements/claims that together define whether the workflow
-succeeded at this scientific task.
+Extract Source-C claims: things the agents CLAIM to have done, with the
+specificity needed to recompute or re-verify the claim against the
+on-disk artefacts. A Source-C claim FAILS if what the agents reported
+cannot be reproduced from the files they wrote.
 
-SOURCE A — SCIENCE REQUIREMENTS (from the literature grounding).
-These are claims about what the task DEMANDS in theory, regardless of what
-the agents actually did. Derive them from the literature grounding:
-- Required methodology steps (e.g. "data was normalised before PCA",
-  "cross-validation was performed with k≥5", "the energy minimisation
-  converged to a stationary point").
-- Required outputs / quality bars (e.g. "the predicted structure has
-  RMSD ≤ X to the reference", "the regression model reports an R² on a
-  held-out test set").
-- Required constraints / sanity properties standard in the field
-  (e.g. "probabilities sum to 1", "the contact matrix is symmetric").
-These claims are extracted EVEN IF the agents did not perform the step —
-a missing required step SHOULD FAIL verification, which is the correct
-signal that the workflow skipped something load-bearing.
-
-SOURCE B - GOAL REQUIREMENTS (from the workflow output and workspace).
-These are the instructions and deliverables required according to the user goal.
-Derive them from the goal instructions. Such as :
-- Explicit deliverables the goal (e.g. "a CSV file with columns A,B,C", "a plot of X vs Y").
-- Explicit instructions in the goal (e.g. "use method X", "report metric Y", "compare to baseline Z").
-- explicit quality bars in the goal (e.g. "accuracy ≥ 90%", "energy ≤ -20 kJ/mol", "p < 0.05").
-
-SOURCE C — PERFORMED CLAIMS (from the agents' narration + workspace).
-These are claims about what the agents ACTUALLY did and what they
-produced. Derive them from the WORKFLOW OUTPUT and the WORKSPACE FILES:
+Look for, in the narration and workspace:
 - Concrete computations the agents reported (specific numbers, metrics,
   intermediate values, decisions made).
 - Workspace changes the agents claim to have produced (files written,
   formats used, structural properties of outputs).
 - Tool / method usage the agents claim to have invoked.
-These claims let the verifier check the agents did not lie or hallucinate:
-they will FAIL if the reported value cannot be recomputed from the
-artefacts on disk.
 
-Aim for a roughly balanced mix of A and B, with the exact balance set by
-which is most load-bearing for THIS task. A typical good list will include
-several required-by-literature methodology/quality claims AND several
-agent-reported computation/artefact claims. Do NOT extract only from one
-source.
+Ignore aspirational language and meta-narration ("we tried", "we
+considered"); extract only verifiable assertions about state on disk
+or computed results.
 
-POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
-the workflow ACHIEVED scientifically. A claim is well-formed only if
-"verified TRUE" is equivalent to "the workflow succeeded at this aspect".
-Never extract a claim that a FAILURE MODE would satisfy. If the workflow
-produced no usable answer, do NOT extract "the final answer is empty" (true →
-wrongly passes). Extract the success condition it failed: "the workflow
-produced <the deliverable the task asked for, meeting <the task's bar>>".
-That claim will FAIL verification — which is the correct signal.
+{_CLAIM_RULES_BLOCK}
 
-DISCRIMINATION TEST. Before including any "hard" claim, ask: "If the workflow
-had done nothing scientifically meaningful — only moved files, saved a
-checkpoint, but never produced a correct and complete answer — would this
-claim still verify TRUE?" If YES: the claim is worthless. Reframe it into the
-functional success condition it is a proxy for, or drop it. A valid hard-claim
-set is one where a null/failed workflow FAILS most hard claims. If all your
-hard claims would pass for a run that produced no real answer, you have
-extracted the wrong claims — redo them.
-
-MANDATORY GOAL CLAIM. Claim c1 MUST assert that the workflow produced the
-specific scientific deliverable the task requested AND that it meets the
-task's stated success criterion. Use the literature grounding to define what
-"success" means for this task type (the standard metric, threshold, or
-constraint). If the task names a quantitative bar (accuracy ≥ x, energy ≤ y,
-AUC ≥ z, p < α), c1 must encode that bar — not merely "a result exists".
-Phrase it so a workflow that skipped, faked, or left the deliverable empty
-FAILS it. Mark it "hard". This is a SOURCE A claim — it stands whether or
-not the agents claimed to meet the bar.
-
-ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are NOT
-scientific achievements and are NEVER "hard". Extract an artifact claim only
-chained to a functional property that makes it load-bearing — not
-"predictions.csv exists" but "predictions.csv contains a valid probability in
-[0,1] for every row of the test set". Maximum 2 soft artifact claims total.
-Do not pad.
-
-For each claim, also estimate `criticality`:
-- "hard": load-bearing for the answer (final metrics, headline files,
-  required computations, claimed satisfaction of the user goal, required
-  methodology steps according to the literature). Source-A claims about
-  literature-required steps are "hard" by default.
-- "soft": supporting context (intermediate sanity remarks, choices that are
-  defensible but not strictly required, methods decisions the literature cites).
-
-For each claim, also list `likely_relevant_files`: relative paths whose
-contents the verifier would need to read in order to check the claim.
-- ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
-  Do not invent or guess paths the workflow's answer mentions but that are
-  not in the listing.
-- Use `[]` if the claim is purely about the workflow's output text and has
-  no on-disk artefact to consult (common for Source-A claims when the
-  agents skipped the step entirely — that's expected).
-- Multi-file claims (e.g. "model in weights.pt produces predictions.csv")
-  may list several files — keep them in dependency order.
-
-Return STRICT JSON only, no prose, in this exact form:
-{{
-  "claims": [
-    {{
-      "id": "c1_short_slug",
-      "description": "<concise restatement of the claim>",
-      "criticality": "hard" | "soft",
-      "likely_relevant_files": ["<relative/path>", ...]
-    }},
-    ...
-  ]
-}}
-
-Aim for {self.min_claims}–{self.max_claims} claims (target at least {self.min_claims}),
-prioritising the most load-bearing first. Source-A claims (literature-required)
-may be included even when the agents did not perform the step — do NOT silently
-drop a required claim because the workflow skipped it.
+Aim for {target_min}–{target_max} Source-C claims.
 """
-        # Two outer attempts: first call, then one retry if fewer than min_claims returned
-        attempts_for_count = 2
-        extra_feedback = ""
-        cleaned: list[dict[str, Any]] = []
-        for count_attempt in range(attempts_for_count):
-            full_prompt = prompt + extra_feedback
-            data, err = self._call_judge_for_json(
-                uuid, "verifier_extract_claims", full_prompt
-            )
-            if err is not None:
-                raise LLMEvaluationError(f"Claim extraction failed for {uuid}: {err}")
-
-            cleaned = self._parse_and_filter_claims(uuid, data)
-            if len(cleaned) >= self.min_claims:
-                return cleaned
-            if count_attempt == attempts_for_count - 1:
-                self.logger.warning(
-                    f"Claim extractor returned only {len(cleaned)} claims after "
-                    f"retry (min_claims={self.min_claims}); proceeding with "
-                    f"{len(cleaned)}"
-                )
-                return cleaned
-            self.logger.warning(
-                f"Claim extractor returned only {len(cleaned)} claims "
-                f"(min_claims={self.min_claims}); retrying once with feedback"
-            )
-            extra_feedback = (
-                f"\n\nYOUR PREVIOUS RESPONSE RETURNED ONLY {len(cleaned)} CLAIMS. "
-                f"The verifier requires at least {self.min_claims} atomic claims. "
-                f"Re-read BOTH sources and extract additional load-bearing claims: "
-                f"Source A — required methodology/quality claims from the LITERATURE "
-                f"GROUNDING (these stand even if the agents skipped the step); "
-                f"Source B — concrete computations, numbers, file properties, and "
-                f"methodological steps reported in the WORKFLOW OUTPUT. "
-                f"Aim for {self.min_claims}–{self.max_claims} claims, prioritising "
-                f"the most load-bearing first."
-            )
-        return cleaned
 
     def _parse_and_filter_claims(
         self,
