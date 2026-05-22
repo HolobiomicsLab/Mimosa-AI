@@ -385,6 +385,7 @@ class EvolutionEngine:
             single_agent_mode=single_agent_mode
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+        self._save_evolution_prompt_artifact(uuid, runs[-1].prompt)
         if "WORKFLOW_GENERATION_ERROR" in run_stdout:
             print_err(f"Workflow generation failed:\n{run_stdout[256:]}")
             on_error = True
@@ -690,6 +691,21 @@ class EvolutionEngine:
             f"Answers: {self.extract_agents_behavior(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
+
+    def _save_evolution_prompt_artifact(self, uuid: str, prompt: str) -> None:
+        """Persist the variation/seed prompt that produced this workflow into its folder."""
+        if not uuid or not prompt:
+            return
+        workflow_path = os.path.join(self.workflow_dir, uuid)
+        if not os.path.isdir(workflow_path):
+            return
+        try:
+            prompt_path = os.path.join(workflow_path, f"evolution_prompt_{uuid}.md")
+            with open(prompt_path, "w") as f:
+                f.write(prompt)
+            self.logger.info(f"Saved evolution prompt to: {prompt_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to save evolution prompt: {e}")
 
     def _save_final_plots(self, assertion_history: list, reward_history: list, uuid: str) -> str:
         """Save final assertion plots."""
