@@ -307,12 +307,10 @@ class VerifierEvaluator(BaseEvaluator):
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
+        # Narration is passed through to verifier-gen unconditionally; the
+        # Goodhart guardrail lives at claim extraction (the task-locked
+        # checklist supersedes agent narration there).
         per_claim: list[dict[str, Any]] = []
-        # The Goodhart guardrail lives at claim extraction (the task-locked
-        # checklist supersedes agent narration as the source of claims). The
-        # verifier-generation step itself NEEDS the narration: the agents are
-        # the ones who chose where to write their artefacts on disk, and
-        # without their report the file-selection step is blind.
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
                 uuid, claim, execution_text, workspace_listing, grounding
@@ -576,25 +574,12 @@ drop a required claim because the workflow skipped it.
         for idx, c in enumerate(claims):
             if not isinstance(c, dict) or "description" not in c:
                 continue
-            raw_files = c.get("likely_relevant_files", [])
-            if not isinstance(raw_files, list):
-                raw_files = []
-            relevant: list[str] = []
-            seen: set[str] = set()
-            for rf in raw_files:
-                if not isinstance(rf, str):
-                    continue
-                rp = rf.strip().lstrip("./")
-                if not rp or rp in seen:
-                    continue
-                if self._workspace_files and rp not in self._workspace_files:
-                    self.logger.debug(
-                        f"Dropping confabulated file '{rp}' for {c.get('id')}"
-                    )
-                    continue
-                relevant.append(rp)
-                seen.add(rp)
-
+            raw_files = c.get("likely_relevant_files") or []
+            relevant = self._validate_workspace_paths(
+                raw_files,
+                allowed=self._workspace_files or None,
+                label=str(c.get("id") or f"c{idx}"),
+            )
             cleaned.append({
                 "id": str(c.get("id") or f"c{idx}"),
                 "description": str(c["description"]).strip(),
@@ -602,6 +587,39 @@ drop a required claim because the workflow skipped it.
                 "likely_relevant_files": relevant,
             })
         return cleaned
+
+    def _validate_workspace_paths(
+        self,
+        raw: Any,
+        allowed: set[str] | None = None,
+        max_count: int | None = None,
+        label: str = "",
+    ) -> list[str]:
+        """Normalise, dedupe and validate a list of workspace-relative paths.
+
+        Strips leading ``./``, drops empties, duplicates and non-strings. When
+        ``allowed`` is given, paths not in that set are logged and dropped
+        (hallucination guard). When ``max_count`` is given, truncates to that
+        cap. Returns paths in input order.
+        """
+        if not isinstance(raw, list):
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for rf in raw:
+            if not isinstance(rf, str):
+                continue
+            rp = rf.strip().lstrip("./")
+            if not rp or rp in seen:
+                continue
+            if allowed is not None and rp not in allowed:
+                self.logger.debug(f"Dropping confabulated path '{rp}' for {label}")
+                continue
+            out.append(rp)
+            seen.add(rp)
+            if max_count is not None and len(out) >= max_count:
+                break
+        return out
 
     def _claims_from_checklist(
         self, items: list[dict[str, Any]]
@@ -643,17 +661,10 @@ drop a required claim because the workflow skipped it.
         grounding: str = "",
     ) -> dict[str, Any]:
         """Generate, execute (if executable) and score a single claim."""
-        # Resolve which workspace files the verifier should open. For checklist
-        # claims this is the only step that maps the task-locked rubric onto
-        # the candidate's actual workspace; for LLM-extracted claims it
-        # refines (and rechecks) the extractor's initial pick against the
-        # agent narration that names the files just written.
-        selected = self._llm_select_files(
+        rel_files = self._llm_select_files(
             uuid, claim, execution_text, workspace_listing
         )
-        claim = {**claim, "likely_relevant_files": selected}
-
-        rel_files = claim.get("likely_relevant_files", [])
+        claim = {**claim, "likely_relevant_files": rel_files}
         claim_text = (
             f"id:          {claim.get('id')}\n"
             f"criticality: {claim.get('criticality')}\n"
@@ -727,20 +738,46 @@ drop a required claim because the workflow skipped it.
         workspace_listing: str,
         max_files: int = 3,
     ) -> list[str]:
-        """Pick the workspace files most likely to hold this claim's artefact.
+        """Pick workspace files most likely to hold this claim's artefact.
 
-        Per-claim LLM call that fuses three signals the keyword heuristics
-        couldn't see together: the agent narration (typically names the files
-        the agents wrote), the workspace listing (ground truth of what is on
-        disk), and the claim description (what artefact we're after). Returns
-        only paths present in the workspace listing — hallucinated entries
-        are dropped. Falls back to all eligible workspace files on parse or
-        provider failure so the downstream verifier-gen step is never blind.
+        Per-claim judge call that fuses the agent narration (names the files
+        the agents wrote), the workspace listing (ground truth of what's on
+        disk), and the claim description. Returns only paths present in the
+        workspace — hallucinated entries are dropped. On parse or provider
+        failure falls back to all eligible workspace files so the downstream
+        verifier-gen step is never blind.
         """
-        eligible = set(self._eligible_workspace_files())
+        eligible = self._eligible_workspace_files()
         if not eligible:
             return []
-        prompt = f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
+        prompt = self._build_select_files_prompt(
+            claim, execution_text, workspace_listing, max_files
+        )
+        agent_name = f"verifier_select_files_{claim.get('id', 'unknown')}"
+        parsed, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        if err or not isinstance(parsed, dict):
+            self.logger.debug(
+                f"file selection failed for {claim.get('id')}: "
+                f"{err or 'non-dict JSON'}"
+            )
+            return eligible
+        selected = self._validate_workspace_paths(
+            parsed.get("files"),
+            allowed=set(eligible),
+            max_count=max_files,
+            label=str(claim.get("id", "unknown")),
+        )
+        return selected or eligible
+
+    @staticmethod
+    def _build_select_files_prompt(
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        max_files: int,
+    ) -> str:
+        """Build the per-claim file-selection prompt sent to the judge."""
+        return f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
 
 WORKSPACE FILES (name<TAB>size, relative to workspace root, cwd at runtime):
 {workspace_listing}
@@ -759,38 +796,6 @@ Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are
 Return STRICT JSON only:
   {{"files": ["<relative/path>", ...]}}
 """
-        agent_name = f"verifier_select_files_{claim.get('id', 'unknown')}"
-        parsed, err = self._call_judge_for_json(uuid, agent_name, prompt)
-        if err or not isinstance(parsed, dict):
-            self.logger.debug(
-                f"file selection failed for {claim.get('id')}: {err or 'non-dict JSON'}; "
-                f"falling back to all eligible files"
-            )
-            return self._eligible_workspace_files()
-        raw_files = parsed.get("files")
-        if not isinstance(raw_files, list):
-            return self._eligible_workspace_files()
-        selected: list[str] = []
-        seen: set[str] = set()
-        for rf in raw_files:
-            if not isinstance(rf, str):
-                continue
-            rp = rf.strip().lstrip("./")
-            if not rp or rp in seen:
-                continue
-            if rp not in eligible:
-                self.logger.debug(
-                    f"dropping hallucinated/ineligible path '{rp}' for {claim.get('id')}"
-                )
-                continue
-            selected.append(rp)
-            seen.add(rp)
-            if len(selected) >= max_files:
-                break
-        # Empty LLM result means "no plausible file" — but the parser still
-        # needs SOMETHING to look at, so hand it the eligible set rather than
-        # falling into the original empty-previews bug.
-        return selected or self._eligible_workspace_files()
 
     def _generate_verifier(
         self,
