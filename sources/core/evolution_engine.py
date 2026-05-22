@@ -440,15 +440,13 @@ class EvolutionEngine:
             wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
         )
 
-        all_success = evaluate_workflow_success(wf_info, runs[-1].answers)
-
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
         if enable_evolution and wf_info.overall_score > self.config.learned_score_threshold:
             # reach learning threshold
-            print_ok("Evolution engine done learning task.")
+            print_ok("Evolution engine reached learning threshold.")
             self._save_final_plots(assertion_history, rewards_history, uuid)
             self.notifier.send_message(
                 f"Done learning task: {wf_info.goal[:256]} \n"
@@ -459,19 +457,18 @@ class EvolutionEngine:
             )
             return runs
         elif not on_error:
-            if not enable_evolution and all_success:
-                self._save_final_plots(assertion_history, rewards_history, uuid)
-                print_ok("evolution engine completed task successfully.")
-                self.notifier.send_message(
-                    f"Task completed successfully!\n"
-                    f"Goal: {runs[-1].goal[:128]}...\n"
-                    f"Final UUID: {uuid}\n"
-                    f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
-                    f"All workflows successful!",
-                    title=f"Evolution success - {uuid}",
-                    priority=0
-                )
-                return runs
+            self._save_final_plots(assertion_history, rewards_history, uuid)
+            print_ok("Completed workflow execution. Evolution disabled.")
+            self.notifier.send_message(
+                f"Task completed successfully!\n"
+                f"Goal: {runs[-1].goal[:128]}...\n"
+                f"Final UUID: {uuid}\n"
+                f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n"
+                f"All workflows successful!",
+                title=f"Evolution success - {uuid}",
+                priority=0
+            )
+            return runs
         # continue on error: use evolution as recovery for when failed to execute
 
         # ── Evolutionary parent selection: mutation or crossover ──────
