@@ -30,44 +30,6 @@ from sources.cli.pretty_print import (
 )
 
 
-def check_answer_success(answer: str) -> bool:
-    """Check if an answer indicates success using pattern matching.
-    Args:
-        answer: The answer string to check
-    Returns:
-        bool: True if answer indicates success, False otherwise
-    """
-    answer_lower = str(answer).lower()
-    failure_patterns = [
-        r'\bfailed\b', r'\berror\b', r'\bfailure\b',
-    ]
-    return all(not re.search(pattern, answer_lower) for pattern in failure_patterns)
-
-def evaluate_workflow_success(wf_info: WorkflowInfo, answers: list) -> bool:
-    """
-    Evaluate workflow success using multiple criteria.
-    Args:
-        wf_info: WorkflowInfo object containing state and evaluation results
-        answers: List of answers from workflow agents
-    Returns:
-        bool: True if workflow is considered successful, False otherwise
-    """
-    if wf_info.state_result and 'evaluation' in wf_info.state_result:
-        eval_data = wf_info.state_result['evaluation']
-
-        if 'scenario' in eval_data and eval_data['scenario']:
-            passed = eval_data['scenario'].get('passed_assertions', 0)
-            total = eval_data['scenario'].get('total_assertions', 1)
-            return (passed / total) >= 0.9
-        if 'generic' in eval_data and eval_data['generic']:
-            score = eval_data['generic'].get('overall_score', 0.0)
-            return score >= 0.9
-        if 'verifier' in eval_data and eval_data['verifier']:
-            score = eval_data['verifier'].get('overall_score', 0.0)
-            return score >= 0.9
-    if answers:
-        return check_answer_success(answers[-1])
-    return False
 
 class EvolutionEngine:
     """Darwin Machine for evolution of workflow workflows."""
