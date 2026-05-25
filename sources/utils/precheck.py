@@ -268,58 +268,59 @@ class PreCheck:
             print(line)
         return results
 
-    def _update_openrouter_provider_list(
-        self, all_results: dict[str, list[dict]]
+    def _populate_per_model_provider_lists(
+        self,
+        all_results: dict[str, list[dict]],
+        required_model_ids: set[str],
     ) -> None:
-        """Reorder config.openrouter_provider by (worst-tier asc, best-quant
-        across models desc, mean latency asc). Drop providers that failed any
-        model's probe."""
+        """Write a per-model sorted provider list into
+        `config.openrouter_provider_by_model`. Each OpenRouter model gets its
+        own list because endpoint coverage varies per model — a single shared
+        list would either 404 at runtime or leave some use case empty.
+
+        Sort within a model: tier asc (strict → drift), quant rank desc,
+        latency asc. Fails loudly if any required model has no usable
+        provider, since that's a runtime failure waiting to happen.
+        """
         if not all_results:
             return
 
-        agg: dict[str, dict] = {}
-        for results in all_results.values():
-            for r in results:
-                p = r["provider"]
-                a = agg.setdefault(
-                    p, {"tiers": [], "quants": [], "latencies": [], "ok": True}
+        print("\n♻️  Per-model provider selections (in-memory, this run only):")
+        empty_required: list[str] = []
+
+        for model_id, results in all_results.items():
+            kept = [
+                (
+                    r["provider"],
+                    r["tier"],
+                    quant_rank(r["discovered_quant"]),
+                    r["mean_latency"],
                 )
-                if r["tier"] == 0:
-                    a["ok"] = False
-                    continue
-                a["tiers"].append(r["tier"])
-                a["quants"].append(r["discovered_quant"])
-                a["latencies"].append(r["mean_latency"])
+                for r in results
+                if r["tier"] != 0
+            ]
+            # Stable sort: strict before drift; within each, higher precision
+            # first, then faster.
+            kept.sort(key=lambda x: (x[1], -x[2], x[3]))
+            new_list = [p for p, *_ in kept]
 
-        kept = [
-            (
-                p,
-                max(info["tiers"]),                                       # worst tier
-                max(quant_rank(q) for q in info["quants"]),               # best quant rank
-                sum(info["latencies"]) / len(info["latencies"]),          # mean latency
+            if new_list:
+                self.config.openrouter_provider_by_model[model_id] = new_list
+                print(f"   {model_id}")
+                print(f"     -> {new_list}")
+            else:
+                print(f"   {model_id}")
+                print("     -> (no usable provider)")
+                if model_id in required_model_ids:
+                    empty_required.append(model_id)
+
+        if empty_required:
+            raise RuntimeError(
+                "No usable OpenRouter provider for required model(s): "
+                f"{empty_required}. Every probe failed (404, rate limit, or "
+                "invalid content). Either widen `openrouter_provider` in "
+                "config, pick a different model, or relax probe strictness."
             )
-            for p, info in agg.items()
-            if info["ok"] and info["tiers"]
-        ]
-        kept.sort(key=lambda x: (x[1], -x[2], x[3]))
-        new_list = [p for p, _, _, _ in kept]
-        original = list(self.config.openrouter_provider or [])
-        original_norm = {_normalize_provider_name(p) for p in original}
-        removed = sorted(original_norm - set(new_list)) if original_norm else []
-
-        if not new_list:
-            print(
-                "\n⚠️  All providers failed at least one probe — leaving "
-                "openrouter_provider unchanged. Runs will likely hallucinate."
-            )
-            return
-
-        print("\n♻️  Updating openrouter_provider (in-memory, this run only):")
-        print(f"   before:  {original or '(unset, used discovery)'}")
-        print(f"   after:   {new_list}    (strict-pass first, then drift; higher precision wins ties)")
-        if removed:
-            print(f"   removed: {removed}   (failed at least one probe)")
-        self.config.openrouter_provider = new_list
 
     def run(self) -> None:
         print("🚦 Checking LLM providers...")
@@ -340,6 +341,7 @@ class PreCheck:
         providers_ids = {**required}
 
         all_results: dict[str, list[dict]] = {}
+        required_openrouter: set[str] = set()
         seen: set[str] = set()
         for name, model_id in providers_ids.items():
             if not model_id or model_id in seen:
@@ -348,9 +350,11 @@ class PreCheck:
             if provider != "openrouter":
                 continue
             seen.add(model_id)
+            if name in required:
+                required_openrouter.add(model_id)
             all_results[model_id] = self._check_openrouter_providers(name, model_id)
 
-        self._update_openrouter_provider_list(all_results)
+        self._populate_per_model_provider_lists(all_results, required_openrouter)
 
 
 if __name__ == "__main__":
@@ -382,5 +386,9 @@ if __name__ == "__main__":
         seen.add(model_id)
         all_results[model_id] = pc._check_openrouter_providers(label, model_id)
 
-    pc._update_openrouter_provider_list(all_results)
-    print(f"\n✅ Final openrouter_provider: {cfg.openrouter_provider}")
+    # Smoke test treats every probed model as required so the safety rail
+    # is exercised end-to-end.
+    pc._populate_per_model_provider_lists(all_results, set(all_results.keys()))
+    print("\n✅ Final per-model provider lists:")
+    for mid, plist in cfg.openrouter_provider_by_model.items():
+        print(f"   {mid} -> {plist}")

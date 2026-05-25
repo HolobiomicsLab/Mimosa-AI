@@ -53,13 +53,23 @@ class Config:
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
-        # OpenRouter inference provider(s), selected by precheck.py according to availability and quantization.
+        # OpenRouter inference provider(s) — default candidate pool. Precheck
+        # reads this as the discovery filter and writes per-model selections
+        # into `openrouter_provider_by_model` below (so judge/smolagent each
+        # get an independent list).
         self.openrouter_provider: list[str] | None = [
             "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
             "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
              "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes", "friendli",
              "groq", "cerebras", "sambanova", "nvidia"
         ]
+
+        # Per-model precheck-selected provider lists. A given OpenRouter model
+        # only has endpoints on a subset of providers, so a single shared list
+        # would either be over-broad (causing 404s at runtime) or so narrow it
+        # leaves some use cases (judge, smolagent, …) with no usable provider.
+        # Populated by sources.utils.precheck.PreCheck.run().
+        self.openrouter_provider_by_model: dict[str, list[str]] = {}
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -117,6 +127,18 @@ class Config:
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
 
+
+    def openrouter_provider_for(self, model_id: str | None) -> list[str] | None:
+        """Return the precheck-selected provider list for `model_id`, or the
+        default `openrouter_provider` when no per-model selection exists.
+
+        Callers that build an LLMConfig for an OpenRouter model should use
+        this — passing the shared `openrouter_provider` directly can leave
+        the runtime with no routable provider for that specific model.
+        """
+        if model_id and model_id in self.openrouter_provider_by_model:
+            return self.openrouter_provider_by_model[model_id]
+        return self.openrouter_provider
 
     @property
     def model_pricing(self) -> dict[str, dict[str, float]]:
