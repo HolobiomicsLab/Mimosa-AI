@@ -23,7 +23,9 @@ from .workflow_selection import WorkflowSelector
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
 from .lineage import record_lineage
-from sources.utils.evolution_tree import render_evolution_tree
+# Note: sources.utils.evolution_tree is imported lazily inside
+# _refresh_evolution_tree to avoid a circular import via sources.core.__init__
+# (which eagerly imports EvolutionEngine).
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_section,
@@ -689,9 +691,11 @@ class EvolutionEngine:
         """Re-render the evolution-tree PNG after each iteration.
 
         Best-effort: scanning failures are logged and swallowed so an issue
-        rendering the tree never aborts an evolution run.
+        rendering the tree never aborts an evolution run. The visualizer is
+        imported lazily to avoid a circular import via ``sources.core``.
         """
         try:
+            from sources.utils.evolution_tree import render_evolution_tree
             output = render_evolution_tree(self.workflow_dir)
             if output is not None:
                 self.logger.info(f"Evolution tree refreshed: {output}")
