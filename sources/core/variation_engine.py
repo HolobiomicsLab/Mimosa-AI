@@ -55,8 +55,8 @@ class VariationEngine:
         elif progress < 0.50:
             return (
                 f"## PHASE: ANCHOR  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: prompt (primary), tools (secondary). Agent count: 1-3.\n"
-                "Goal: rewrite the agent's prompt. This phase gets the largest iteration budget.\n"
+                "Permitted mutations: prompt (primary), topology, tools. Agent count: 1-3.\n"
+                "Goal: rewrite the agent's prompt or decompse verification/steps across agents. This phase gets the largest iteration budget.\n"
                 "Each variant should change ONE thing from the previous best:\n"
                 "  domain vocabulary, role definition, required output shape, level of formality,\n"
                 "  explicit step listing, requirement to preserve task wording verbatim.\n"
@@ -65,13 +65,13 @@ class VariationEngine:
         elif progress < 0.65:
             return (
                 f"## PHASE: DECOMPOSE  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: topology (restricted), prompt, handoff format. Agent count: 2-5 maximum.\n"
-                "Why: multi-agent shape might outperforms a well-prompted single agent."
+                "Permitted mutations: topology, prompt, handoff format. Agent count: 2-5 maximum.\n"
+                "Why: see if multi-agent shape might outperforms a well-prompted single agent."
             )
         elif progress < 0.85:
             return (
                 f"## PHASE: ENGAGE  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: prompt, handoff format, agent deletion. Agent count: frozen (deletion still allowed).\n"
+                "Permitted mutations: prompt, handoff format, agent count (restricted) 2-6 maximum.\n"
                 "Goal: tighten the workflow you have; remove any agent that isn't earning its place."
                 "Solver / executor / single-purpose agents need sharper, more specific prompts so they commit confidently to one approach.\n"
             )

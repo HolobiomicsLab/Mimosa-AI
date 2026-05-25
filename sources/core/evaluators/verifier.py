@@ -39,7 +39,7 @@ from sources.cli.pretty_print import (
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 20
 _VERIFIER_MIN_CLAIMS = 5
-_HARD_FAIL_CAP = 0.91
+_HARD_FAIL_CAP = 0.96
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
@@ -571,6 +571,7 @@ Look for, in the goal:
 - Explicit output format constraints ("as JSON", "one row per sample",
   "rounded to 3 decimal places").
 - Input dataset's exact column names, order, and data types in your output. Ensure agents don't add suffixes (e.g., _prob, _score) or rename columns unless the task explicitly specifies a different output schema. Any deviation from the source format is an error.
+- Any hint, advice, recommandations, treat them as explicit user requirements that must be followed
 
 
 

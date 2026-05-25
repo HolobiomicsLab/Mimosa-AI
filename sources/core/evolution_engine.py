@@ -300,7 +300,7 @@ class EvolutionEngine:
         try:
             best_run = max(
                 (r for r in runs if r.current_uuid),
-                key=lambda r: r.reward if r.reward is not None else 0.0,
+                key=lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count),
                 default=None,
             )
             if best_run and best_run.current_uuid:

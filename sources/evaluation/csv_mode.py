@@ -401,6 +401,7 @@ Your ENTIRE working environment is confined to the subfolder: {workspace_subfold
 • ALL file reads, writes and creations MUST happen inside {workspace_subfolder}/ — never outside.
 • Treat {workspace_subfolder}/ as your root directory and use paths relative to it.
 • Do NOT access, create or modify anything outside {workspace_subfolder}/.
+. Any scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
 """
 
         # Build explicit output paths
@@ -424,8 +425,6 @@ EXPECTED OUTPUT:
 1. Results file — save to the EXACT path: {output_path}
    (i.e. at the root of your workspace subfolder, not in any sub-directory)
 2. Python script — keep exactly ONE final script at: {script_path}
-   (i.e. directly inside {workspace_subfolder}/, not nested deeper)
-3. Others scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
 """
         return task_prompt, scenario_id, scoring_rubric_file
 
