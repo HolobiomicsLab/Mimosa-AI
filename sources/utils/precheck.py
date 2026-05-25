@@ -265,13 +265,7 @@ class PreCheck:
     def run(self) -> None:
         print("🚦 Checking LLM providers...")
         required = {
-            "planner": self.config.planner_llm_model,
-            "workflow": self.config.workflow_llm_model,
             "smolagent": self.config.smolagent_model_id,
-        }
-        optional = {
-            "judge": getattr(self.config, "judge_model", None),
-            "capsule_namer": getattr(self.config, "capsule_namer_model", None),
         }
 
         for name, model_id in required.items():
@@ -280,11 +274,7 @@ class PreCheck:
             if not self._basic_check(name, model_id):
                 raise RuntimeError(f"Required model '{name}' failed basic check.")
 
-        for name, model_id in optional.items():
-            if model_id:
-                self._basic_check(name, model_id)
-
-        providers_ids = {**required, **optional}
+        providers_ids = {**required}
 
         if not self.config.openrouter_provider:
             return

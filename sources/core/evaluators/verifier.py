@@ -39,7 +39,7 @@ from sources.cli.pretty_print import (
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 20
 _VERIFIER_MIN_CLAIMS = 5
-_HARD_FAIL_CAP = 0.96
+_HARD_FAIL_CAP = 0.94
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.

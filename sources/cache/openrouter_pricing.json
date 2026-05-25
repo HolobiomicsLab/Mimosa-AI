@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-23T17:29:14.792056",
+  "timestamp": "2026-05-25T12:18:04.601227",
   "pricing": {
     "qwen/qwen3.7-max": {
       "input": 2.5,
@@ -712,10 +712,6 @@
     "deepseek/deepseek-v3.1-terminus": {
       "input": 0.27,
       "output": 0.95
-    },
-    "alibaba/tongyi-deepresearch-30b-a3b": {
-      "input": 0.09,
-      "output": 0.44999999999999996
     },
     "qwen/qwen3-coder-flash": {
       "input": 0.195,
