@@ -304,11 +304,16 @@ class LLMProvider:
                 # Avoids silent routing to alternative providers that may use different
                 # quantizations or serving stacks and produce divergent outputs.
                 if self.config.provider == "openrouter" and self.config.openrouter_provider:
+                    # quantizations: filter out int4/int8/fp4/fp6/awq etc.
+                    # Order is precheck-sorted (tier-1 bf16/fp16 first, then
+                    # tier-2 fp8), so allowing all three lets OpenRouter route
+                    # to bf16/fp16 endpoints naturally where available.
                     completion_params["extra_body"] = {
                         "provider": {
                             "order": self.config.openrouter_provider,
                             "allow_fallbacks": False,
                             "require_parameters": True,
+                            "quantizations": ["bf16", "fp16", "fp8"],
                         }
                     }
 
