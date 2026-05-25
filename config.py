@@ -38,23 +38,28 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5100)
         ]
 
         # LLMs choices
         self.planner_llm_model: str = "anthropic/claude-opus-4-5"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
+        self.workflow_llm_model: str = "openrouter/anthropic/claude-opus-4-5"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
-        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        self.judge_model = "openrouter/qwen/qwen3.7-max"
+        self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
-        # OpenRouter inference provider(s) to avoid quantization / serving-stack
-        self.openrouter_provider: list[str] | None = ["friendli", "google-vertex", "parasail/fp8", "atlas-cloud/fp8", "novita/fp8", "siliconflow/fp8"]
+        # OpenRouter inference provider(s), selected by precheck.py according to availability and quantization.
+        self.openrouter_provider: list[str] | None = [
+            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
+            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
+             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes", "friendli",
+             "groq", "cerebras", "sambanova", "nvidia"
+        ]
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -70,7 +75,7 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.8
+        self.learned_score_threshold = 0.95
         self.max_learning_evolve_iterations = 25
 
         # evaluation concurrency settings

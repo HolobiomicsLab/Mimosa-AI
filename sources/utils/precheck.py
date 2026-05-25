@@ -324,7 +324,11 @@ class PreCheck:
     def run(self) -> None:
         print("🚦 Checking LLM providers...")
         required = {
+            "planner": self.config.planner_llm_model,
+            "workflow": self.config.workflow_llm_model,
             "smolagent": self.config.smolagent_model_id,
+            "judge": self.config.judge_model,
+            "capsule_namer": self.config.capsule_namer_model,
         }
 
         for name, model_id in required.items():

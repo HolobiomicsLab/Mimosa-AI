@@ -29,7 +29,7 @@ scientific task. A single evolutionary run looks like this:
                 ┌──────────────────────────────────────┐
                 │  variation                           │  (variation_engine.py)
                 │  mutation prompt  or  crossover      │
-                │  + Mutagen 5-axis perturbation       │
+                │  + 5-axis perturbation       │
                 │  + annealing/curriculum phase        │
                 └──────────────┬───────────────────────┘
                                ▼
@@ -153,44 +153,13 @@ mutation.
 |---|---|---|
 | Archives beat incumbents | Archive of 100 with QD weighting + admit gate | ✅ Matches DGM/ADAS pattern; admit gate cuts archive bloat from unconditional appends. |
 | QD is the default open-endedness scheme | Novelty + quality on AST-derived structural descriptor `[n_agents, n_edges, n_branches, prompt_chars]` | ⚠️ Descriptor is orthogonal to fitness but only covers granularity (math_lens §4.2); basin identity and boundary D are not yet captured. |
-| Mode collapse is the default failure mode | Mutagen perturbations + tried-strategy memory + admit gate Pareto check | ⚠️ Diversity injected at the prompt layer; population-layer dedup now via Pareto on `(reward_uncapped, novelty)`. |
+| Mode collapse is the default failure mode | perturbations + tried-strategy memory + admit gate Pareto check | ⚠️ Diversity injected at the prompt layer; population-layer dedup now via Pareto on `(reward_uncapped, novelty)`. |
 | Selection bias = `qd_score` roulette | `random.choices(weights=qd)` over `reward_uncapped`-driven `qd_score` | ⚠️ No inverse-child-count term — high-`qd` parents can dominate offspring. |
 | Cross-task transfer via similar tasks | Cosine ≥ 0.5 on MiniLM of `original_task` | ⚠️ Pure embedding similarity collapses behaviorally distinct solutions (the skill explicitly flags this as a V1 limitation). |
 
 ---
 
-## 4. Variation — Mutagen + curriculum
-
-[`VariationEngine`](../sources/core/variation_engine.py) assembles three
-prompt layers per iteration:
-
-1. **Voice framing** — a "thinking voice" for the entire prompt (one of 8
-   from `Mutagen.prompt_voices`).
-2. **Execution grounding** — previous genotype, agent answers, abstracted
-   diagnosis (Layer 1 of the verifier — see §5).
-3. **Change pressures** — a freshly sampled `Perturbation` with 5
-   independent axes plus a recent-history block telling the LLM what *not*
-   to repeat.
-
-### 4.1 Mutagen — 5 sampling axes
-
-[`Mutagen`](../sources/core/mutagen.py:68) holds five pools and samples one
-item from each per iteration. Multiplicatively this gives ≈ 10 × 10 × 8 × 9
-× 8 = **57 600 distinct combinations**, with a 25-deep sliding window
-preventing immediate repeats.
-
-| Axis | Pool size | Purpose |
-|---|---|---|
-| `lens` (thinking lens) | 10 | Epistemic stance — first-principles, red-team, info-theoretic, … |
-| `structure` (structural pressure) | 10 | Topology pressure — widen, narrow, flatten, add tension, … |
-| `voice` (prompt voice) | 8 | Tone — surgical, provocateur, pragmatist, … |
-| `constraint` (constraint inversion) | 9 | Banned default move — ban sequential, ban JSON handoff, … |
-| `decomposition` (decomposition angle) | 8 | How to split the problem — by uncertainty, by timescale, by failure mode, … |
-
-This is best read as a **prompt-level mutation operator pool**, designed to
-fight the single-incumbent saturation V1 hit at iter ~8.
-
-### 4.2 Annealing + complexity curriculum
+### 4 Annealing + complexity curriculum
 
 [`_get_temperature_phase`](../sources/core/variation_engine.py:30)
 returns one of six phase blocks based on
@@ -223,7 +192,6 @@ output, so the recombinator doesn't learn rubric-shaped patterns.
 
 | Principle | Mimosa today | Verdict |
 |---|---|---|
-| Evolve the operators, not just artifacts | Operator pool is **fixed** in `Mutagen.__init__` | ❌ The 5 axes and 45 items don't change across runs. Promptbreeder-style meta-mutation is absent. |
 | Mode-collapse mitigation | Tried-strategy dedup + 5-axis combinatorial sampling | ✅ At the prompt layer. ⚠️ No island migration, no MAP-Elites grid. |
 | Abstraction level for long runs | Code-space rewrite | ✅ Matches DGM/ADAS for 20+ iter horizons. |
 | Diversity inheritance under crossover | Best-first parent ordering + rubric-blind diagnosis | ✅ Smart anti-Goodhart move. ⚠️ Single-shot LLM recombination has no structural recombination operator — fully relies on the LLM to "do the right thing." |
@@ -361,7 +329,6 @@ Cross-referencing the skill's decision heuristics:
 | Selection scheme | Archive + parent selection weighted by fitness × inverse-child-count | Archive + QD-weighted roulette + admit gate (Pareto on `(reward_uncapped, novelty)`); no child-count term yet | Minor — add child-count penalty to avoid over-mining the same parent. |
 | Diversity mechanism | CVT-MAP-Elites over hybrid behavior descriptor | k-NN novelty with AST-derived structural descriptor | **Partial fix**. Descriptor left fitness-space; not yet MAP-Elites bins. |
 | Behavior descriptors | Topology + execution features (graph complexity, tool diversity, …) | `[n_agents, n_edges, n_branches, prompt_chars]` from AST walk | **Partial fix**. Covers granularity only; basin identity (prompt content) and boundary D not captured — see math_lens §4.3 for tiered upgrade. |
-| Mutation operators | Evolved population of mutation strategies | Fixed 5-axis pool in `Mutagen.__init__` | **Material**. Promptbreeder-style meta-mutation absent. |
 | Judge | Criteria injection + k=3 ensemble; debate for finalists | Per-claim atomic check ensemble + cheat audit + checklist | Mostly ✅. Could add debate on borderline aggregates. |
 | Memory key | Hybrid task embedding + behavior descriptors | Pure MiniLM cosine on task text | Inherits V1 limitation. Needs behavior-aware retrieval. |
 | Mutation substrate | Code-space for long runs | Code-space | ✅. |
@@ -385,9 +352,6 @@ Cross-referencing the skill's decision heuristics:
    per cell instead of an unbounded-capacity archive evicting by
    `qd_score`. The admit gate already filters out dominated candidates;
    binning would replace the Pareto check with the canonical QD design.
-3. **Evolve the Mutagen pool.** Track which axes correlate with
-   downstream improvement; let high-performing combinations mutate
-   themselves (the Promptbreeder meta-mutation step).
 4. **Parent-draw child-count penalty.** Divide `qd_score` by
    `(1 + n_children_already)` in `select_parent` to spread offspring.
 5. **Skill library.** Persist code fragments (agents, tool-binding
@@ -412,8 +376,6 @@ Cross-referencing the skill's decision heuristics:
   similarity.
 - [variation_engine.py](../sources/core/variation_engine.py) — prompt
   assembly for mutation/crossover; annealing curriculum.
-- [mutagen.py](../sources/core/mutagen.py) — 5-axis perturbation sampler,
-  tried-strategy sliding window.
 - [orchestrator.py](../sources/core/orchestrator.py) — meta-agent → workflow
   factory → sandbox runner pipeline.
 - [evaluators/verifier.py](../sources/core/evaluators/verifier.py) — per-claim
@@ -425,31 +387,3 @@ Cross-referencing the skill's decision heuristics:
 - [evaluators/grounding.py](../sources/core/evaluators/grounding.py) —
   Perspicacite literature-grounding adapter used by both checklist build
   and verifier claim extraction.
-
----
-
-## 9. Reading order
-
-For someone arriving cold to the V2 evolution code, the recommended
-sequence is:
-
-1. [`EvolutionEngine.start_workflow_evolution`](../sources/core/evolution_engine.py:259)
-   — see the top of the loop, archive reset, checklist install.
-2. [`EvolutionEngine.evolve_generation`](../sources/core/evolution_engine.py:359)
-   — single iteration; this is where everything below is called.
-3. [`WorkflowSelector.select_parent_workflows`](../sources/core/workflow_selection.py:170)
-   — how parents are drawn.
-4. [`VariationEngine.mutation_prompt`](../sources/core/variation_engine.py:161)
-   — how the next genotype is requested.
-5. [`Mutagen.compose`](../sources/core/mutagen.py:242) +
-   [`_get_temperature_phase`](../sources/core/variation_engine.py:30) — the
-   diversity mechanism and the curriculum.
-6. [`VerifierEvaluator.evaluate`](../sources/core/evaluators/verifier.py:299)
-   — the fitness function and the 3-layer Goodhart defense.
-7. [`SelectionPressure.validate_survivor`](../sources/core/selection.py:81)
-   — archive update and QD score.
-
-After that, the variation pool ([mutagen.py](../sources/core/mutagen.py))
-is the highest-leverage place to tinker; the behavior descriptor
-([code_features.py](../sources/core/code_features.py)) is the next
-place to extend along the math_lens §4.3 tiered upgrade path.
