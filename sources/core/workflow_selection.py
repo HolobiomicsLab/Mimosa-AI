@@ -8,6 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from config import Config
 from sources.core.selection import PopulationMember, SelectionPressure
 from sources.core.workflow_info import WorkflowInfo
+from sources.core.lineage import scan_all as _scan_lineage
 
 
 logger = logging.getLogger(__name__)
@@ -139,6 +140,20 @@ class WorkflowSelector:
         wf = WorkflowInfo(uuid, self.workflows_folder / uuid)
         return wf if wf.is_valid() else None
 
+    def _count_children_on_disk(self) -> dict[str, int]:
+        """Build ``{parent_uuid: n_children}`` from the on-disk lineage records.
+
+        Used to penalise repeatedly-mined parents during parent draw — without
+        this, a single high-qd ancestor monopolises the offspring stream
+        (observed empirically in early evolution runs).
+        """
+        counts: dict[str, int] = {}
+        for rec in _scan_lineage(self.workflows_folder).values():
+            for parent_uuid in rec.get("parents", []) or []:
+                if parent_uuid:
+                    counts[parent_uuid] = counts.get(parent_uuid, 0) + 1
+        return counts
+
     def _select_from_archive(
         self,
         selection_pressure: SelectionPressure,
@@ -147,10 +162,12 @@ class WorkflowSelector:
     ) -> tuple[list[WorkflowInfo], bool]:
         """Archive-driven parent selection (steady-state, current session)."""
         archive = selection_pressure._archive
+        child_counts = self._count_children_on_disk()
         selected_members, use_crossover = selection_pressure.select_parents(
             candidates=archive,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
+            child_counts=child_counts,
         )
         # Rehydrate PopulationMember -> WorkflowInfo
         selected_workflows: list[WorkflowInfo] = []
@@ -223,10 +240,12 @@ class WorkflowSelector:
             return [], False
 
         adapters = [_WorkflowScoreAdapter(wf) for wf in candidates]
+        child_counts = self._count_children_on_disk()
         selected_adapters, use_crossover = selection_pressure.select_parents(
             candidates=adapters,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
+            child_counts=child_counts,
         )
         selected_workflows = [a.workflow_info for a in selected_adapters]
         uuids = [wf.uuid for wf in selected_workflows]

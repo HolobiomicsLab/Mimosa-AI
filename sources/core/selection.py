@@ -59,6 +59,8 @@ class SelectionPressure:
         novelty_k_neighbours: int = 10,
         novelty_weight: float = 0.4,
         admit_threshold: float = 0.3,
+        pareto_reward_epsilon: float = 0.02,
+        pareto_novelty_epsilon: float = 0.0,
     ):
         """
         Args:
@@ -67,6 +69,12 @@ class SelectionPressure:
             population_size: Max individuals kept in the archive (for open-ended modes).
             novelty_k_neighbours: k for k-nearest novelty calculation.
             novelty_weight: Weight of novelty vs quality in QD score (0 = pure quality, 1 = pure novelty).
+            pareto_reward_epsilon: Absolute reward delta below which two members are
+                treated as equivalent on the reward axis of the Pareto admit gate.
+                Without ε, a 0.001 lead on a near-saturated reward axis is enough
+                to dominate every behaviourally-distinct sibling.
+            pareto_novelty_epsilon: Same idea on the novelty axis. Default 0 because
+                novelty is k-NN distance and already scale-relative.
         """
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
@@ -79,6 +87,8 @@ class SelectionPressure:
         self.novelty_k = novelty_k_neighbours
         self.novelty_weight = novelty_weight
         self.admit_threshold = admit_threshold
+        self.pareto_reward_epsilon = pareto_reward_epsilon
+        self.pareto_novelty_epsilon = pareto_novelty_epsilon
 
         # Population archive for open-ended modes
         self._archive: list[PopulationMember] = []
@@ -116,7 +126,11 @@ class SelectionPressure:
         else:
             return self._validate_greedy(baseline_list, new_list, threshold)
 
-    def select_parent(self, runs: list[Any]) -> Any:
+    def select_parent(
+        self,
+        runs: list[Any],
+        child_counts: dict[str, int] | None = None,
+    ) -> Any:
         """Select a single parent for mutation.
 
         In greedy mode: always returns the best-scoring run from `runs`.
@@ -126,6 +140,14 @@ class SelectionPressure:
             when the archive is empty (cold start).
         Callers driving from archive must rehydrate the chosen member's
         UUID into their domain object (e.g., WorkflowInfo).
+
+        Args:
+            runs: Candidate pool. May be a list of `PopulationMember` (archive
+                draw) or any object with a `reward` attribute (greedy/tournament).
+            child_counts: Optional ``{uuid: n_children_already}`` map used in
+                QD/novelty mode to apply a ``1/(1+n_children)`` penalty so
+                already-mined parents don't keep dominating the offspring stream.
+                v2_evolution §7 leveraged-move #4.
         """
         if not runs and not self._archive:
             return None
@@ -143,7 +165,11 @@ class SelectionPressure:
             members = [c for c in (runs or []) if isinstance(c, PopulationMember)]
             if not members:
                 members = self._archive
-            weights = [max(m.qd_score, 0.01) for m in members]
+            weights = [
+                max(m.qd_score, 0.01)
+                / (1 + (child_counts or {}).get(getattr(m, "uuid", None) or "", 0))
+                for m in members
+            ]
             return random.choices(members, weights=weights, k=1)[0]
 
         # Cold start fallback
@@ -154,12 +180,15 @@ class SelectionPressure:
         candidates: list[Any],
         n_parents: int = 2,
         crossover_rate: float = 0.3,
+        child_counts: dict[str, int] | None = None,
     ) -> tuple[list[Any], bool]:
         """Select one or more parents from a candidate pool
         Args:
             candidates: Pool of objects with a reward (or overall_score) attribute
             n_parents:  Number of parents to pick when crossover fires (≥2).
             crossover_rate: Probability ∈ [0, 1] of choosing crossover over mutation.
+            child_counts: Optional ``{uuid: n_children_already}`` map forwarded to
+                `select_parent` to apply an inverse-child-count penalty.
         Returns:
             (list[parent], bool) — selected parents and whether to crossover.
         """
@@ -173,20 +202,23 @@ class SelectionPressure:
             and random.random() < crossover_rate
         )
         if not do_crossover:
-            parent = self.select_parent(candidates)
+            parent = self.select_parent(candidates, child_counts=child_counts)
             return [parent], False
         selected: list[Any] = []
         pool = list(candidates)  # shallow copy so we can remove picked items
 
         for _ in range(min(n_parents, len(pool))):
-            parent = self.select_parent(pool)
+            parent = self.select_parent(pool, child_counts=child_counts)
             if parent is None:
                 break
             selected.append(parent)
             pool = [c for c in pool if c is not parent]
         # Safety: if we ended up with < 2, fall back to mutation
         if len(selected) < 2:
-            return selected or [self.select_parent(candidates)], False
+            return (
+                selected or [self.select_parent(candidates, child_counts=child_counts)],
+                False,
+            )
         return selected, True
 
     @property
@@ -347,15 +379,62 @@ class SelectionPressure:
         novelties = [m.novelty_score for m in self._archive if m.novelty_score > 0]
         return max(novelties) if novelties else 1.0
 
-    def _is_dominated(self, candidate: PopulationMember) -> bool:
-        """Pareto domination on (reward_uncapped, novelty_score).
+    def _hypothetical_novelties(
+        self, candidate: PopulationMember
+    ) -> tuple[float, dict[int, float]]:
+        """Return novelty values computed against ``archive ∪ {candidate}``.
+
+        Without this, the first archive member is stored with the bootstrap
+        default ``novelty=1.0`` (computed when no peers existed yet) which
+        permanently dominates every later arrival on the novelty axis of the
+        Pareto admit gate. Computing both the candidate's *and* the existing
+        members' novelty inside a hypothetical archive that contains the
+        candidate makes the comparison scale-consistent.
+
+        Returns:
+            (candidate_novelty, {id(member): member_novelty}) — keyed by
+            id() so callers don't conflate distinct members with equal hashes.
         """
+        hypothetical = self._archive + [candidate]
+
+        def _knn(target: PopulationMember) -> float:
+            distances = [
+                _euclidean(target.behaviour_descriptor, o.behaviour_descriptor)
+                for o in hypothetical
+                if o is not target
+            ]
+            if not distances:
+                return 0.0
+            distances.sort()
+            k = min(self.novelty_k, len(distances))
+            return sum(distances[:k]) / k if k > 0 else 0.0
+
+        cand_nov = _knn(candidate)
+        member_novs = {id(m): _knn(m) for m in self._archive}
+        return cand_nov, member_novs
+
+    def _is_dominated(self, candidate: PopulationMember) -> bool:
+        """Pareto domination on (reward_uncapped, novelty_score) with ε-bands.
+
+        Uses *hypothetical* novelties (see ``_hypothetical_novelties``) so the
+        comparison reflects the archive that would exist *after* admission, not
+        the stale snapshot from the bootstrap. Applies an absolute ε on each
+        axis when deciding "strictly better" — a 0.001 reward lead on a near-
+        saturated axis should not be enough to dominate a behaviourally-distinct
+        sibling.
+        """
+        if not self._archive:
+            return False
+        cand_nov, member_novs = self._hypothetical_novelties(candidate)
+        eps_r = self.pareto_reward_epsilon
+        eps_n = self.pareto_novelty_epsilon
         for m in self._archive:
-            ge_reward = m.reward_uncapped >= candidate.reward_uncapped
-            ge_novelty = m.novelty_score >= candidate.novelty_score
+            m_nov = member_novs[id(m)]
+            ge_reward = m.reward_uncapped >= candidate.reward_uncapped - eps_r
+            ge_novelty = m_nov >= cand_nov - eps_n
             strictly = (
-                m.reward_uncapped > candidate.reward_uncapped
-                or m.novelty_score > candidate.novelty_score
+                m.reward_uncapped > candidate.reward_uncapped + eps_r
+                or m_nov > cand_nov + eps_n
             )
             if ge_reward and ge_novelty and strictly:
                 return True
@@ -380,7 +459,16 @@ class SelectionPressure:
         return True
 
     def _add_to_archive(self, member: PopulationMember) -> None:
-        """Add a member to the archive, evicting the weakest if full."""
+        """Add a member to the archive, evicting the weakest if full.
+
+        After membership changes (admission and eviction) we refresh every
+        member's stored ``novelty_score`` and ``qd_score``. The bootstrap
+        member is admitted with ``novelty=1.0`` (no peers existed yet to
+        measure against), but as soon as a second member arrives that value
+        is stale — and used by ``select_parent``'s QD weighting and by the
+        Pareto admit gate. Recomputing keeps both consistent with the current
+        k-NN scale.
+        """
         self._archive.append(member)
 
         if len(self._archive) > self.population_size:
@@ -390,6 +478,35 @@ class SelectionPressure:
             self.logger.debug(
                 f" Evicted archive member (qd={weakest.qd_score:.3f}, "
                 f"reward={weakest.reward:.3f}) — archive full"
+            )
+
+        self._refresh_member_metrics()
+
+    def _refresh_member_metrics(self) -> None:
+        """Recompute stored novelty + qd_score for every archive member."""
+        n = len(self._archive)
+        if n < 2:
+            return
+        # Pass 1: k-NN novelty against current archive peers.
+        for m in self._archive:
+            distances = sorted(
+                _euclidean(m.behaviour_descriptor, o.behaviour_descriptor)
+                for o in self._archive
+                if o is not m
+            )
+            k = min(self.novelty_k, len(distances))
+            m.novelty_score = sum(distances[:k]) / k if k > 0 else 0.0
+        # Pass 2: renormalise qd_score against the current novelty range.
+        novelty_range = max(
+            (m.novelty_score for m in self._archive if m.novelty_score > 0),
+            default=1.0,
+        )
+        for m in self._archive:
+            quality_norm = min(max(m.reward_uncapped, 0.0), 1.0)
+            novelty_norm = min(m.novelty_score / max(novelty_range, 1e-6), 1.0)
+            m.qd_score = (
+                (1 - self.novelty_weight) * quality_norm
+                + self.novelty_weight * novelty_norm
             )
 
     # ------------------------------------------------------------------
