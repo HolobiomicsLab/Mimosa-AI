@@ -107,7 +107,7 @@ max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
-openrouter_provider = {self.config.openrouter_provider!r}
+openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
 engine = None
 
 if engine_name == "mlx":

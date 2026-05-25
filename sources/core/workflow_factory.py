@@ -271,7 +271,7 @@ MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {self.config.openrouter_provider!r}
+OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 

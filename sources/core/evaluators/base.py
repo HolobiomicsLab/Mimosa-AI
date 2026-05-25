@@ -75,7 +75,7 @@ class BaseEvaluator:
                     "provider": provider,
                     "reasoning_effort": config.reasoning_effort,
                     "max_tokens": getattr(config, 'max_tokens', 8192),
-                    "openrouter_provider": config.openrouter_provider,
+                    "openrouter_provider": config.openrouter_provider_for(self.judge_model),
                 })
             except Exception as e:
                 raise EvaluatorError(f"Failed to initialize LLM configuration: {str(e)}") from e
