@@ -67,12 +67,42 @@ def providers_for_model(model_id: str) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     for ep in fetch_endpoints(model_id):
-        # OpenRouter field names have varied historically; try the likely ones.
-        name = ep.get("provider_name") or ep.get("provider") or ep.get("name") or ""
-        quant = (ep.get("quantization") or "unknown").lower()
-        if not name:
+        # `tag` looks like "baidu/fp8" or just "friendli"; the prefix before
+        # the slash is the lowercase routing slug used by extra_body.provider.
+        # `provider_name` is display-cased ("Baidu") and NOT usable for routing.
+        tag = ep.get("tag") or ""
+        slug = tag.split("/", 1)[0] if tag else ""
+        if not slug:
+            # Last-resort: derive a slug from the display name.
+            pn = ep.get("provider_name") or ""
+            slug = pn.lower().replace(" ", "-")
+        if not slug:
             continue
-        existing = out.get(name)
+        quant = (ep.get("quantization") or "unknown").lower()
+        existing = out.get(slug)
         if existing is None or quant_rank(quant) > quant_rank(existing):
-            out[name] = quant
+            out[slug] = quant
     return out
+
+
+if __name__ == "__main__":
+    import json as _json
+    import sys
+
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True))
+
+    model = sys.argv[1] if len(sys.argv) > 1 else "deepseek/deepseek-v3.2"
+    print(f"Discovering OpenRouter endpoints for: {model}\n")
+
+    raw = fetch_endpoints(model)
+    print(f"{len(raw)} raw endpoint record(s).")
+    if raw:
+        print("\nFirst record (shape sanity-check):")
+        print(_json.dumps(raw[0], indent=2)[:1200])
+
+    agg = providers_for_model(model)
+    print(f"\nAggregated providers ({len(agg)}):")
+    for p, q in sorted(agg.items(), key=lambda kv: (-quant_rank(kv[1]), kv[0])):
+        print(f"  {p:<20} {q}")

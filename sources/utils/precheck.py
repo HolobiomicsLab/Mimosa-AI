@@ -197,7 +197,10 @@ class PreCheck:
         - If discovery fails, falls back to the configured list with unknown
           quants — so the precheck still runs, just blindly.
         """
-        discovered = providers_for_model(model_id)
+        # Strip the leading 'openrouter/' provider prefix — the discovery API
+        # wants the bare model slug (e.g. 'deepseek/deepseek-v3.2').
+        _, slug = extract_model_pattern(model_id)
+        discovered = providers_for_model(slug)
         configured = self.config.openrouter_provider or []
         configured_norm = {_normalize_provider_name(p) for p in configured}
 
@@ -354,3 +357,36 @@ class PreCheck:
             all_results[model_id] = self._check_openrouter_providers(name, model_id)
 
         self._update_openrouter_provider_list(all_results)
+
+
+if __name__ == "__main__":
+    # Smoke test for the OpenRouter discovery + probe + classification path.
+    # Skips the Anthropic basic_check so the test only needs OPENROUTER_API_KEY.
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True))
+
+    from config import Config
+
+    cfg = Config()
+    pc = PreCheck(cfg)
+
+    print("🚦 OpenRouter precheck smoke test\n")
+    all_results: dict[str, list[dict]] = {}
+    seen: set[str] = set()
+    candidates = {
+        "smolagent": cfg.smolagent_model_id,
+        "judge": getattr(cfg, "judge_model", None),
+        "capsule_namer": getattr(cfg, "capsule_namer_model", None),
+    }
+    for label, model_id in candidates.items():
+        if not model_id or model_id in seen:
+            continue
+        provider, _ = extract_model_pattern(model_id)
+        if provider != "openrouter":
+            continue
+        seen.add(model_id)
+        all_results[model_id] = pc._check_openrouter_providers(label, model_id)
+
+    pc._update_openrouter_provider_list(all_results)
+    print(f"\n✅ Final openrouter_provider: {cfg.openrouter_provider}")
