@@ -46,17 +46,13 @@ class Config:
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-opus-4-5"
-        self.workflow_llm_model: str = "openrouter/anthropic/claude-opus-4-5"
+        self.planner_llm_model: str = "deepseek/deepseek-chat"
+        self.workflow_llm_model: str = "openai/gpt-5.5"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openrouter/qwen/qwen3.7-max"
+        self.judge_model = "openai/gpt-5.5"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
-        # OpenRouter inference provider(s) — default candidate pool. Precheck
-        # reads this as the discovery filter and writes per-model selections
-        # into `openrouter_provider_by_model` below (so judge/smolagent each
-        # get an independent list).
         self.openrouter_provider: list[str] | None = [
             "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
             "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
@@ -64,11 +60,6 @@ class Config:
              "groq", "cerebras", "sambanova", "nvidia"
         ]
 
-        # Per-model precheck-selected provider lists. A given OpenRouter model
-        # only has endpoints on a subset of providers, so a single shared list
-        # would either be over-broad (causing 404s at runtime) or so narrow it
-        # leaves some use cases (judge, smolagent, …) with no usable provider.
-        # Populated by sources.utils.precheck.PreCheck.run().
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
 
         # prompts for planner / workflow generator
@@ -77,7 +68,7 @@ class Config:
         self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
-        self.reasoning_effort: str = "high"
+        self.reasoning_effort: str = "medium"
 
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 8192
