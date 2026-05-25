@@ -37,14 +37,14 @@ from sources.cli.pretty_print import (
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
-_VERIFIER_MAX_CLAIMS = 100
-_VERIFIER_MIN_CLAIMS = 24
-_HARD_FAIL_CAP = 0.7
+_VERIFIER_MAX_CLAIMS = 20
+_VERIFIER_MIN_CLAIMS = 5
+_HARD_FAIL_CAP = 0.91
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.15
-_INFO_BONUS_BETA = 4.0
+_INFO_BONUS_BETA = 8.0
 
 # ----- File preview budgets ---------------------------------------------------
 _PREVIEW_HEAD_BYTES = 8 * 1024
@@ -106,7 +106,7 @@ _IO_MARKERS = (
 _CLAIM_RULES_BLOCK = """For each claim, also estimate `criticality`:
 - "hard": load-bearing for the answer (final metrics, headline files,
   required computations, claimed satisfaction of the user goal, required
-  methodology steps according to the literature).
+  methodology steps that are the only path to success according to the literature).
 - "soft": supporting context (intermediate sanity remarks, choices that are
   defensible but not strictly required, methods decisions the literature cites).
 
@@ -279,7 +279,6 @@ class VerifierEvaluator(BaseEvaluator):
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
             f"timeout={verifier_timeout}s, claims={self.min_claims}–{max_claims}, "
             f"use_grounding={use_grounding}, "
-            f"use_cheat_detector={use_cheat_detector}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
 
@@ -293,6 +292,7 @@ class VerifierEvaluator(BaseEvaluator):
         You must summarise the judge's detailed report into a concise diagnosis of the agents's behavior and failure modes, in plain language that a human user can understand.
         The diagnosis should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
         The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
+        The diagnosis could mention anything forbidden that contributed to failure such as fallback, short, hacks, or cheating.
         Here is the verifier's detailed report for workflow {uuid}:
         {report}
         Make a short (one sentence) diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
@@ -371,8 +371,6 @@ class VerifierEvaluator(BaseEvaluator):
         scores = self._aggregate(per_claim)
 
         # Layer 3: independent cheat audit over the agents' produced script.
-        #cheat = self._run_cheat_detector(uuid, workspace_listing)
-        #scores = self._apply_cheat_penalty(scores, cheat)
         cheat = None # NOTE: cheat_detector was crap. Will need to be rethink.
 
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
@@ -435,14 +433,9 @@ class VerifierEvaluator(BaseEvaluator):
         grounding: str = "",
     ) -> list[dict[str, Any]]:
         """Extract atomic claims by polling three independent source prompts.
-
         Source A asks an LLM for what the LITERATURE demands of a correct
         solution; Source B asks what the USER explicitly required in the goal
         text; Source C asks what the AGENTS reported doing in their narration.
-        Three short, focused prompts beat one giant one — each call stays well
-        within attention budget and concentrates the LLM on one perspective at
-        a time. Results are merged with id deduplication; a failed source
-        degrades gracefully instead of failing the whole extraction.
         """
         if is_truly_empty:
             return [{
@@ -451,7 +444,6 @@ class VerifierEvaluator(BaseEvaluator):
                 "criticality": "hard",
                 "likely_relevant_files": [],
             }]
-        # TODO: use checklist for litterature claims ?
         per_source_min, per_source_max = self._per_source_targets()
         sources = (
             ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
@@ -461,7 +453,6 @@ class VerifierEvaluator(BaseEvaluator):
 
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
-        print_info(f"Extracting claims for workflow {uuid} from {len(sources)} sources...")
         for label, prompt in sources:
             data, err = self._call_judge_for_json(
                 uuid, f"verifier_extract_claims_{label}", prompt
@@ -472,7 +463,7 @@ class VerifierEvaluator(BaseEvaluator):
                 )
                 continue
             for claim in self._parse_and_filter_claims(uuid, data):
-                print_ok(f"Extracted claim {claim['id']} from source {label} for {uuid}")
+                print_info(f"Extracted claim {claim['id']} from source {label} for {uuid}")
                 claim_id = claim["id"]
                 if claim_id in seen_ids:
                     claim_id = f"{claim_id}_{label}"
@@ -481,6 +472,7 @@ class VerifierEvaluator(BaseEvaluator):
                 seen_ids.add(claim_id)
                 merged.append(claim)
 
+        print_ok(f"Extracted claims for workflow {uuid} from {len(sources)} sources...")
         if len(merged) < self.min_claims:
             print_warn("Claim extraction yielded fewer than the minimum required claims ")
             self.logger.warning(
@@ -528,10 +520,6 @@ correct solution, regardless of whether the agents performed them:
 - Required constraints / sanity properties standard in the field
   (e.g. "probabilities sum to 1", "the contact matrix is symmetric",
   "the conformation is a valid self-avoiding walk").
-
-A Source-A claim is extracted EVEN IF the agents did not perform the step
-— a missing required step SHOULD FAIL verification, which is the correct
-signal that the workflow skipped something load-bearing.
 
 MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
 produced the specific scientific deliverable the task requested AND that
@@ -582,11 +570,14 @@ Look for, in the goal:
   test split only", "use the 20-mer sequence HPHPPHHPHPPHPHHPPHPH").
 - Explicit output format constraints ("as JSON", "one row per sample",
   "rounded to 3 decimal places").
+- Input dataset's exact column names, order, and data types in your output. Ensure agents don't add suffixes (e.g., _prob, _score) or rename columns unless the task explicitly specifies a different output schema. Any deviation from the source format is an error.
+
+
 
 If the goal is short and contains few explicit requirements, return a
 short list — DO NOT pad with claims the user did not write. It is fine
 to return fewer than {target_min} claims when the goal is terse; do not
-invent constraints from the literature here (those belong to Source A).
+invent constraints.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -608,24 +599,26 @@ text actually warrants.
 WORKFLOW GOAL:
 {goal}
 
-WORKFLOW OUTPUT (agent narration — the workflow's self-report):
+WORKFLOW OUTPUT (agents narration — the workflow's self-report):
 {execution_text}
 
 WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
 TASK:
-Extract Source-C claims: things the agents CLAIM to have done, with the
-specificity needed to recompute or re-verify the claim against the
-on-disk artefacts. A Source-C claim FAILS if what the agents reported
-cannot be reproduced from the files they wrote.
+Extract Source-C claims: things the agents CLAIM to have done, that we can verify against the
+on-disk artefacts or using calculations. A Source-C claim FAILS if what the agents reported
+cannot be reproduced from the files they wrote. Methodological claims are NOT source C - do not include them.
 
 Look for, in the narration and workspace:
 - Concrete computations the agents reported (specific numbers, metrics,
-  intermediate values, decisions made).
+  intermediate values, decisions made) that can be verified with small calculations in python.
 - Workspace changes the agents claim to have produced (files written,
   formats used, structural properties of outputs).
-- Tool / method usage the agents claim to have invoked.
+Do not:
+- Do not extract aspirational claims about what the agents "tried" to do or "considered" doing.
+- Do not extract claims about fallback or any alternative paths that is trying to "hack" the solutions.
+- Do not extract claims that would require parsing a python program to verify.
 
 Ignore aspirational language and meta-narration ("we tried", "we
 considered"); extract only verifiable assertions about state on disk
@@ -919,16 +912,18 @@ RULES FOR YOUR SCRIPT:
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
 - When verifying usage of a specific library method is found in a script, also ensure no cheating attempt was done, such as a try-catch branching that lead to the wrong method being used on exception.
+- On a "Used fallback claim", the score is inverted: 0 if the claim passes, 1 if it fails. This is to incentivize the verified program to not use fallback
 
-ANTI-PATTERNS — your verifier will be REJECTED if it does any of these:
-- Embeds the workflow output, the agent's final answer, or any large
+What should not be done:
+- Do not Embeds the workflow output, the agent's final answer, or any large
   fragment thereof as a string literal and then parses that literal. This
   is a tautology: comparing the answer to itself proves nothing.
-- Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
+- Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
   inlined JSON blob) instead of recomputing it from workspace files.
-- Returns "pass" without ever opening a file or running a real computation
+- Do not Returns "pass" without ever opening a file or running a real computation
   derived from on-disk state.
-- Declares ``likely_relevant_files`` but performs no file I/O.
+- Do not Declares ``likely_relevant_files`` but performs no file I/O.
+- Do not Check against hard-coded value (string or numerical) that was not explicitly given in the claim description as the target to check against.
 
 What a legitimate verifier does:
 - Opens the file(s) in ``likely_relevant_files`` from the workspace cwd.

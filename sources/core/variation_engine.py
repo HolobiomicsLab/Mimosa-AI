@@ -95,7 +95,7 @@ class VariationEngine:
         answers = wf_state["answers"]
         if isinstance(answers, list):
             return "\n".join(
-                f"agent {name}: {str(answer)[:256]}..."
+                f"agent {name}: {str(answer)[:2048]}..."
                 for name, answer in zip(wf_state["step_name"], answers, strict=True)
             )
         return str(answers)
@@ -137,7 +137,7 @@ class VariationEngine:
         diagnosis_block = (
             diagnosis.strip()
             if diagnosis and diagnosis.strip()
-            else (run_stderr or "")[-1024:].strip()
+            else (run_stderr or "").strip()
             or "No diagnosis captured."
         )
         self.diagnosis_history.append(diagnosis_block[:512])

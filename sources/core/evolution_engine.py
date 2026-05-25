@@ -59,7 +59,7 @@ class EvolutionEngine:
             novelty_k_neighbours=25,
             novelty_weight=0.4
         )
-        self.initial_population = 3 # number of initial random workflows before enabling mutation
+        self.initial_population = 2 # number of initial random workflows before enabling mutation
 
     async def mockup(self, wf, goal):
         """
@@ -441,7 +441,7 @@ class EvolutionEngine:
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
-        if use_crossover and len(parent_workflows) >= self.initial_population:
+        if use_crossover and len(runs) >= self.initial_population:
             # CROSSOVER — recombine multiple parent genotypes
             print_phase("CROSSOVER VARIATION", color=CYAN)
             runs[-1].prompt = self.variation.crossover_prompt(
@@ -452,7 +452,7 @@ class EvolutionEngine:
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
             )
-        elif len(parent_workflows) >= self.initial_population:
+        elif len(runs) >= self.initial_population:
             # MUTATION — perturb the single best parent
             print_phase("MUTATION VARIATION", color=YELLOW)
             primary_parent = parent_workflows[0] if parent_workflows else None
