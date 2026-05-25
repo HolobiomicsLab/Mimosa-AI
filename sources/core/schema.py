@@ -60,6 +60,11 @@ class IndividualRun:
     original_task: str | None = None  # Original unwrapped task for similarity matching
     code: str | None = None
     selection_log: "SelectionLog | None" = None
+    # Lineage: parents that produced this individual and the variation operator
+    # used. Set by EvolutionEngine before orchestrate_workflow runs and
+    # persisted via sources.core.lineage.record_lineage afterwards.
+    parent_uuids: list[str] = field(default_factory=list)
+    evolution_kind: str = "seed"  # "seed" | "mutation" | "crossover"
 
     def __str__(self) -> str:
         return (f"IndividualRun(goal='{self.goal}', prompt='{self.prompt}', "

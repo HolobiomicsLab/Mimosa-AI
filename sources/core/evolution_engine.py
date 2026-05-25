@@ -22,6 +22,8 @@ from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
+from .lineage import record_lineage
+from sources.utils.evolution_tree import render_evolution_tree
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_section,
@@ -276,6 +278,9 @@ class EvolutionEngine:
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
+        # First run lineage: template-mutation if a parent was loaded, else seed.
+        run0_kind = "mutation" if wf is not None else "seed"
+        run0_parents = [wf.uuid] if wf is not None else []
         run0 = IndividualRun(
             goal=goal,
             prompt=craft_instructions,
@@ -284,7 +289,9 @@ class EvolutionEngine:
             max_depth=max_iteration,
             judge=judge,
             scenario_rubric=scenario_rubric,
-            original_task=original_task
+            original_task=original_task,
+            parent_uuids=run0_parents,
+            evolution_kind=run0_kind,
         )
 
         runs = await self.evolve_generation(
@@ -348,6 +355,17 @@ class EvolutionEngine:
         )
         wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
         self._save_evolution_prompt_artifact(uuid, runs[-1].prompt)
+        # Persist lineage as soon as we have a uuid so the evolution tree can
+        # include even runs that subsequently fail evaluation.
+        if uuid:
+            record_lineage(
+                self.workflow_dir,
+                uuid,
+                parents=runs[-1].parent_uuids,
+                kind=runs[-1].evolution_kind,
+                iteration=runs[-1].iteration_count,
+                goal=runs[-1].original_task or runs[-1].goal,
+            )
         on_error = not executed
         if on_error:
             print_err(f"Workflow failed:\n{run_stdout[:512]}")
@@ -393,6 +411,7 @@ class EvolutionEngine:
             rewards_history, assertion_history,
             runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
+        self._refresh_evolution_tree()
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
@@ -441,6 +460,8 @@ class EvolutionEngine:
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
+        next_kind: str
+        next_parent_uuids: list[str]
         if use_crossover and len(runs) >= self.initial_population:
             # CROSSOVER — recombine multiple parent genotypes
             print_phase("CROSSOVER VARIATION", color=CYAN)
@@ -452,6 +473,8 @@ class EvolutionEngine:
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
             )
+            next_kind = "crossover"
+            next_parent_uuids = [pw.uuid for pw in parent_workflows if pw and pw.uuid]
         elif len(runs) >= self.initial_population:
             # MUTATION — perturb the single best parent
             print_phase("MUTATION VARIATION", color=YELLOW)
@@ -461,10 +484,14 @@ class EvolutionEngine:
                 task_goal, primary_parent, code, run_stdout,
                 runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
             )
+            next_kind = "mutation" if primary_parent else "seed"
+            next_parent_uuids = [primary_parent.uuid] if primary_parent else []
         else:
             # SEED — create initial random workflow(s) without a parent (cold start)
             print_phase("SEED POPULATION", color=GREEN)
             runs[-1].prompt = self.get_genotype_instructions(task_goal, None, max_iterations=runs[-1].max_depth)
+            next_kind = "seed"
+            next_parent_uuids = []
 
         runs.append(IndividualRun(
             goal=runs[-1].goal,
@@ -479,7 +506,9 @@ class EvolutionEngine:
             answers=wf_info.answers,
             state_result=wf_info.state_result,
             scenario_rubric=runs[-1].scenario_rubric,
-            original_task=runs[-1].original_task  # PRESERVE original_task for workflow selection
+            original_task=runs[-1].original_task,  # PRESERVE original_task for workflow selection
+            parent_uuids=next_parent_uuids,
+            evolution_kind=next_kind,
         ))
 
         runs = await self.evolve_generation(
@@ -655,6 +684,19 @@ class EvolutionEngine:
             f"Answers: {self.extract_agents_behavior(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
         )
+
+    def _refresh_evolution_tree(self) -> None:
+        """Re-render the evolution-tree PNG after each iteration.
+
+        Best-effort: scanning failures are logged and swallowed so an issue
+        rendering the tree never aborts an evolution run.
+        """
+        try:
+            output = render_evolution_tree(self.workflow_dir)
+            if output is not None:
+                self.logger.info(f"Evolution tree refreshed: {output}")
+        except Exception as e:
+            self.logger.warning(f"Failed to refresh evolution tree: {e}")
 
     def _save_evolution_prompt_artifact(self, uuid: str, prompt: str) -> None:
         """Persist the variation/seed prompt that produced this workflow into its folder."""
