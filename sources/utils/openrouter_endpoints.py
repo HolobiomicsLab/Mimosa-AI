@@ -1,0 +1,108 @@
+"""Discover which providers actually serve a given OpenRouter model.
+
+Avoids the 'probe every known provider, 404 most of them' anti-pattern by
+calling OpenRouter's per-model endpoints API up front.
+
+API:  GET https://openrouter.ai/api/v1/models/{author}/{slug}/endpoints
+"""
+from __future__ import annotations
+
+import logging
+import os
+
+import requests
+
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+
+# Higher rank = higher precision. Used to pick the best endpoint when a
+# provider exposes multiple quantizations, and to sort the final probe list.
+_QUANT_RANK: dict[str, int] = {
+    "fp32": 5,
+    "bf16": 4, "fp16": 4,
+    "fp8": 3,
+    "int8": 2,
+    "fp6": 1,
+    "fp4": 0, "int4": 0,
+    "unknown": -1,
+}
+
+logger = logging.getLogger(__name__)
+
+
+def quant_rank(q: str) -> int:
+    return _QUANT_RANK.get((q or "unknown").lower(), -1)
+
+
+def fetch_endpoints(model_id: str, timeout: int = 30) -> list[dict]:
+    """Raw endpoint records for `model_id` (e.g. 'deepseek/deepseek-v3.2').
+    Returns [] on any error so callers can fall back to their configured list.
+    """
+    key = os.getenv("OPENROUTER_API_KEY", "")
+    url = f"{OPENROUTER_BASE}/models/{model_id}/endpoints"
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    try:
+        r = requests.get(url, headers=headers, timeout=timeout)
+    except requests.RequestException as e:
+        logger.warning("OpenRouter endpoint discovery network error for %s: %s", model_id, e)
+        return []
+    if r.status_code != 200:
+        logger.warning(
+            "OpenRouter endpoint discovery failed for %s: %s %s",
+            model_id, r.status_code, r.text[:200],
+        )
+        return []
+    try:
+        body = r.json()
+    except ValueError:
+        return []
+    data = body.get("data") or {}
+    return data.get("endpoints", []) or []
+
+
+def providers_for_model(model_id: str) -> dict[str, str]:
+    """Map provider_name -> highest-precision quantization for `model_id`.
+
+    Example: {'parasail': 'fp8', 'friendli': 'bf16', 'novita': 'fp8'}.
+    Returns {} on discovery failure.
+    """
+    out: dict[str, str] = {}
+    for ep in fetch_endpoints(model_id):
+        # `tag` looks like "baidu/fp8" or just "friendli"; the prefix before
+        # the slash is the lowercase routing slug used by extra_body.provider.
+        # `provider_name` is display-cased ("Baidu") and NOT usable for routing.
+        tag = ep.get("tag") or ""
+        slug = tag.split("/", 1)[0] if tag else ""
+        if not slug:
+            # Last-resort: derive a slug from the display name.
+            pn = ep.get("provider_name") or ""
+            slug = pn.lower().replace(" ", "-")
+        if not slug:
+            continue
+        quant = (ep.get("quantization") or "unknown").lower()
+        existing = out.get(slug)
+        if existing is None or quant_rank(quant) > quant_rank(existing):
+            out[slug] = quant
+    return out
+
+
+if __name__ == "__main__":
+    import json as _json
+    import sys
+
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True))
+
+    model = sys.argv[1] if len(sys.argv) > 1 else "deepseek/deepseek-v3.2"
+    print(f"Discovering OpenRouter endpoints for: {model}\n")
+
+    raw = fetch_endpoints(model)
+    print(f"{len(raw)} raw endpoint record(s).")
+    if raw:
+        print("\nFirst record (shape sanity-check):")
+        print(_json.dumps(raw[0], indent=2)[:1200])
+
+    agg = providers_for_model(model)
+    print(f"\nAggregated providers ({len(agg)}):")
+    for p, q in sorted(agg.items(), key=lambda kv: (-quant_rank(kv[1]), kv[0])):
+        print(f"  {p:<20} {q}")
