@@ -53,22 +53,6 @@ class Config:
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
-        self.openrouter_provider: list[str] | None = [
-            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
-            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
-             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes", "friendli",
-             "groq", "cerebras", "sambanova", "nvidia"
-        ]
-
-        self.openrouter_provider_by_model: dict[str, list[str]] = {}
-        # Per-model OpenRouter `quantizations` filter, populated by precheck.
-        # `None` = omit the filter at call time (required for first-party
-        # endpoints like google-vertex / google-ai-studio that don't tag a
-        # quantization — passing a list would exclude them).
-        self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
-        # Default safety filter used when a model has no precheck-derived
-        # selection. Rejects providers serving int4/int8/fp4 quantizations.
-        self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -98,6 +82,16 @@ class Config:
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
 
+        # openrouter providers
+        self.openrouter_provider: list[str] | None = [
+            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
+            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
+             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes", "friendli",
+             "groq", "cerebras", "sambanova", "nvidia"
+        ]
+        self.openrouter_provider_by_model: dict[str, list[str]] = {}
+        self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
+        self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
         # runner settings
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
