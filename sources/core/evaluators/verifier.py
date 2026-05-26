@@ -747,7 +747,7 @@ Aim for {target_min}–{target_max} Source-C claims.
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
-            print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=256)
+            #print_box(code, title=f"Verifier preview · {claim.get('id')}", color=YELLOW, truncate=256)
             exec_result = self._run_verifier(uuid, claim["id"], code)
 
             exit_status = exec_result.get("exit_status", "?")
