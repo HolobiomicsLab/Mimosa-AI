@@ -30,8 +30,14 @@ class LLMConfig:
     reasoning_effort: str = "medium"
     max_tokens = 8192
     openrouter_provider: list[str] | None = None
+    # OpenRouter `quantizations` exclusion filter. `None` means omit the
+    # filter (required when routing to untagged first-party endpoints like
+    # google-vertex). Empty/default list applies a safety filter at runtime.
+    openrouter_quantizations: list[str] | None = field(
+        default_factory=lambda: ["bf16", "fp16", "fp8"]
+    )
 
-    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 8192, openrouter_provider=None):
+    def __init__(self, model=model, provider=provider, temperature=1.0, key="", reasoning_effort="medium", max_tokens = 8192, openrouter_provider=None, openrouter_quantizations=("bf16", "fp16", "fp8")):
         self.model = model
         self.provider = provider.lower()
         self.temperature = temperature
@@ -41,6 +47,12 @@ class LLMConfig:
         if isinstance(openrouter_provider, str):
             openrouter_provider = [openrouter_provider]
         self.openrouter_provider = openrouter_provider
+        # Tuple default keeps a non-None mutable-safe sentinel for "use safety
+        # filter"; explicit `None` disables the filter entirely.
+        if openrouter_quantizations is None:
+            self.openrouter_quantizations = None
+        else:
+            self.openrouter_quantizations = list(openrouter_quantizations)
         self.__post_init__()
 
     def __post_init__(self):
@@ -79,7 +91,7 @@ class LLMConfig:
     def from_dict(cls, config: dict = None) -> "LLMConfig":
         """Alternative constructor from dictionary (maintains backward compatibility)."""
         config = config or {}
-        return cls(
+        kwargs = dict(
             model=config.get("model", "anthropic/claude-sonnet-4-5"),
             provider=config.get("provider", "anthropic"),
             temperature=config.get("temperature", 1.0),
@@ -88,6 +100,11 @@ class LLMConfig:
             max_tokens=config.get("max_tokens", 8192),
             openrouter_provider=config.get("openrouter_provider"),
         )
+        # Only forward `openrouter_quantizations` if the caller set it;
+        # otherwise inherit the constructor default.
+        if "openrouter_quantizations" in config:
+            kwargs["openrouter_quantizations"] = config["openrouter_quantizations"]
+        return cls(**kwargs)
 
 
 class LLMProvider:
@@ -304,14 +321,18 @@ class LLMProvider:
                 # Avoids silent routing to alternative providers that may use different
                 # quantizations or serving stacks and produce divergent outputs.
                 if self.config.provider == "openrouter" and self.config.openrouter_provider:
-                    completion_params["extra_body"] = {
-                        "provider": {
-                            "order": self.config.openrouter_provider,
-                            "allow_fallbacks": False,
-                            "require_parameters": True,
-                            "quantizations": ["bf16", "fp16", "fp8"],
-                        }
+                    provider_routing = {
+                        "order": self.config.openrouter_provider,
+                        "allow_fallbacks": False,
+                        "require_parameters": True,
                     }
+                    # OpenRouter's `quantizations` field is an exclusion filter:
+                    # untagged endpoints (e.g. google-vertex, google-ai-studio)
+                    # are dropped when it's set. Omit it when precheck selected
+                    # such a provider (config records `None` in that case).
+                    if self.config.openrouter_quantizations:
+                        provider_routing["quantizations"] = self.config.openrouter_quantizations
+                    completion_params["extra_body"] = {"provider": provider_routing}
 
                 response = litellm.completion(**completion_params)
 

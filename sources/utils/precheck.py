@@ -103,12 +103,24 @@ class PreCheck:
         self,
         model_id: str,
         or_provider: str,
-        quantizations: list[str],
+        quantizations: list[str] | None,
         timeout: int = 90,
     ) -> dict:
         """Run N_REPEAT temp=0 calls against (model, provider, quantizations).
-        Returns content-validity and bit-exact determinism aggregates."""
+        Returns content-validity and bit-exact determinism aggregates.
+
+        `quantizations=None` omits the OpenRouter filter entirely — required
+        for first-party endpoints (google-vertex, google-ai-studio, etc.)
+        that don't advertise a quant tag and would otherwise be excluded.
+        """
         provider, model = extract_model_pattern(model_id)
+        provider_routing: dict = {
+            "order": [or_provider],
+            "allow_fallbacks": False,
+            "require_parameters": True,
+        }
+        if quantizations:
+            provider_routing["quantizations"] = quantizations
         params = {
             "model": f"{provider}/{model}",
             "messages": [
@@ -120,14 +132,7 @@ class PreCheck:
             "timeout": timeout,
             "api_key": os.getenv("OPENROUTER_API_KEY", ""),
             "num_retries": 0,
-            "extra_body": {
-                "provider": {
-                    "order": [or_provider],
-                    "allow_fallbacks": False,
-                    "require_parameters": True,
-                    "quantizations": quantizations,
-                }
-            },
+            "extra_body": {"provider": provider_routing},
         }
 
         outputs: list[str] = []
@@ -178,11 +183,16 @@ class PreCheck:
     ) -> dict:
         """Single probe using the discovered quantization as the pinned filter."""
         if discovered_quant in {"bf16", "fp16", "fp8"}:
-            quant_filter = [discovered_quant]
+            quant_filter: list[str] | None = [discovered_quant]
         else:
-            # Unknown or lower-than-supported; allow the broad set and let the
-            # outcome speak. We still tag the discovered value for sorting.
-            quant_filter = ALL_ACCEPTED_QUANTS
+            # 'unknown' — provider didn't tag any quantization. Typical for
+            # first-party endpoints (google-vertex, google-ai-studio, openai,
+            # anthropic) that serve full precision and don't expose a quant
+            # tag. OpenRouter's `quantizations` filter is an exclusion list:
+            # passing ["bf16","fp16","fp8"] would drop untagged endpoints
+            # rather than treat the list as permissive. Omit the filter and
+            # let probe content validity decide.
+            quant_filter = None
         r = self._probe(model_id, or_provider, quant_filter)
         r["discovered_quant"] = discovered_quant
         r["tier"] = self._classify(r)
@@ -295,6 +305,7 @@ class PreCheck:
                     r["tier"],
                     quant_rank(r["discovered_quant"]),
                     r["mean_latency"],
+                    r["discovered_quant"],
                 )
                 for r in results
                 if r["tier"] != 0
@@ -302,10 +313,22 @@ class PreCheck:
             # Stable sort: strict before drift; within each, higher precision
             # first, then faster.
             kept.sort(key=lambda x: (x[1], -x[2], x[3]))
-            new_list = [p for p, *_ in kept]
+            new_list = [t[0] for t in kept]
+            selected_quants = {t[4] for t in kept}
 
             if new_list:
                 self.config.openrouter_provider_by_model[model_id] = new_list
+                # If any selected provider is untagged (first-party endpoint),
+                # the runtime must omit the `quantizations` filter — otherwise
+                # OpenRouter excludes that endpoint and the request 404s.
+                # When all selected providers carry a known quant, keep the
+                # safety filter so unsafe (int4/fp4) routing stays blocked.
+                if "unknown" in selected_quants:
+                    self.config.openrouter_quantizations_by_model[model_id] = None
+                else:
+                    self.config.openrouter_quantizations_by_model[model_id] = list(
+                        ALL_ACCEPTED_QUANTS
+                    )
                 print(f"   {model_id}")
                 print(f"     -> {new_list}")
             else:

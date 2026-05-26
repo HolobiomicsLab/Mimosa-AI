@@ -61,6 +61,14 @@ class Config:
         ]
 
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
+        # Per-model OpenRouter `quantizations` filter, populated by precheck.
+        # `None` = omit the filter at call time (required for first-party
+        # endpoints like google-vertex / google-ai-studio that don't tag a
+        # quantization — passing a list would exclude them).
+        self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
+        # Default safety filter used when a model has no precheck-derived
+        # selection. Rejects providers serving int4/int8/fp4 quantizations.
+        self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
@@ -130,6 +138,18 @@ class Config:
         if model_id and model_id in self.openrouter_provider_by_model:
             return self.openrouter_provider_by_model[model_id]
         return self.openrouter_provider
+
+    def openrouter_quantizations_for(self, model_id: str | None) -> list[str] | None:
+        """Return the OpenRouter `quantizations` filter to apply for `model_id`.
+
+        `None` means omit the filter — this is the case when precheck
+        selected at least one untagged first-party provider (google-vertex,
+        google-ai-studio, etc.). Without precheck data, returns the default
+        safety filter which blocks unsafe (int4/fp4) routing.
+        """
+        if model_id and model_id in self.openrouter_quantizations_by_model:
+            return self.openrouter_quantizations_by_model[model_id]
+        return self.default_openrouter_quantizations
 
     @property
     def model_pricing(self) -> dict[str, dict[str, float]]:
