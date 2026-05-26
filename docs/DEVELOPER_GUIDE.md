@@ -1,6 +1,6 @@
 # Contributing to Mimosa-AI
 
-> Note: This file is the technical contribution guide.
+> Technical contribution guide for Mimosa V2 (post `mimosa_v2` branch merge).
 
 ## Table of Contents
 1. [Project Philosophy](#project-philosophy)
@@ -8,65 +8,75 @@
 3. [Directory Structure](#directory-structure)
 4. [Core Components](#core-components)
 5. [Execution Flow](#execution-flow)
-6. [Development Guide](#development-guide)
-7. [Adding New Features](#adding-new-features)
-8. [Testing & Evaluation](#testing--evaluation)
+6. [Evaluation & the 3-layer Verifier](#evaluation--the-3-layer-verifier)
+7. [Testing & Evaluation](#testing--evaluation)
+8. [Contributing Guidelines](#contributing-guidelines)
 
 ---
 
 ## Project Philosophy
 
 ### Vision
-Mimosa-AI is an **autonomous AI-scientist framework** designed to reproduce published scientific findings and execute end-to-end research pipelines with minimal human intervention. It provides academics with an open, transparent alternative to closed corporate systems for scientific discovery.
+Mimosa-AI is an **autonomous AI-scientist framework** that synthesizes
+task-specific multi-agent workflows and refines them through execution
+feedback. It targets reproducible scientific research and provides
+academics with an open, auditable alternative to closed corporate systems.
 
 ### Core Principles
 
-#### 1. **Polymorphic Multi-Agent Architecture**
-Rather than forcing all tasks through fixed pipelines, Mimosa synthesizes specialized multi-agent workflows **on-demand** for each unique task. This polymorphic approach allows:
-- Dynamic adaptation to domain-specific requirements
-- Custom tool/agent combinations per task
-- Evolutionary optimization over time
+#### 1. Polymorphic Multi-Agent Architecture
+Workflows are **synthesized on-demand** for each task as Python programs
+that wire LLM agents, MCP tools, and control flow together. There is no
+fixed pipeline — the meta-orchestrator emits a new graph per task.
 
-#### 2. **Goal-Task Decomposition**
-The system operates on a hierarchical decomposition pattern:
-```
-HIGH-LEVEL GOAL (e.g., "Reproduce paper X")
-    ↓
-PLANNER decomposes into multiple TASKS with dependencies
-    ↓
-Each TASK triggers workflow synthesis
-    ↓
-Specialized WORKFLOW created and executed for each task
-    ↓
-Results aggregated into CAPSULE with full artifacts
-```
+#### 2. Code-space Neuroevolution
+The framework evolves workflows as full Python source, not prompts or
+fixed templates. A single evolution loop is a depth-first recursion over
+generations seeded from a Quality-Diversity (QD) archive. See
+[v2_evolution.md](v2_evolution.md) for the canonical mapping onto
+neuroevolution primitives (representation / selection / variation /
+evaluation).
 
-#### 3. **Iterative-Learning (IL) Self-Improvement**
-Inspired by evolutionary algorithms and Gödel machines, the system:
-- Maintains a library of successful workflow patterns
-- Learns from past executions via similarity matching
-- Validates improvements before integration (safety principle)
-- Optimizes its own workflow generation over time
-- Visualizes reward progress through iterations
+#### 3. Goodhart-resistant evaluation
+The verifier is structured as **defense in depth** with three independent
+epistemic surfaces:
 
-#### 4. **Tool Discovery & Integration**
-Uses MCP (Model Context Protocol) for:
-- Automatic discovery of available tools on local network
-- Dynamic tool invocation in generated workflows
-- Seamless integration with lab instruments, web services, data analysis tools
-- Toolomics integration for centralized MCP tool management and workspace exchange
+- **Layer 1** — abstracted, rubric-blind diagnosis (the only signal fed
+  back into the mutator).
+- **Layer 2** — task-locked checklist built once per task hash, sourced
+  from the task spec + literature grounding, *before* any candidate runs.
+- **Layer 3** — independent cheat detector that reads only the task spec
+  and the workflow source — never the claim list or evaluation output.
+
+See [evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.mermaid).
+
+#### 4. Tool Discovery & Integration
+Uses MCP (Model Context Protocol) for tool auto-discovery on the local
+network and via Toolomics workspace exchange.
 
 ---
 
 ## Architecture Overview
 
-Mimosa follows the same five-layer architecture described in the manuscript: `(0)` optional planning, `(1)` tool discovery through MCP, `(2)` meta-orchestration, `(3)` agent execution, and `(4)` judge/evaluation. In `goal` mode, the planner decomposes a high-level objective into tasks; in `task` mode, prompts are sent directly to the meta-orchestration layer.
+Mimosa follows a five-layer architecture: `(0)` optional planning, `(1)`
+tool discovery via MCP/Perspicacite, `(2)` meta-orchestration (the
+evolution engine), `(3)` agent execution in a Python sandbox, and `(4)`
+judge / evaluation.
 
-- Layer `0` plans and decomposes goals into tasks.
-- Layer `1` discovers MCP tools exposed through Toolomics or the local network.
-- Layer `2` synthesizes and iteratively refines task-specific multi-agent workflows.
-- Layer `3` executes those workflows with code-generating agents and scientific software.
-- Layer `4` evaluates executions and returns structured feedback for refinement or reporting.
+![Overall architecture](images/architecture_overall.png)
+
+Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.mermaid).
+
+- Layer `0` plans and decomposes goals into tasks (skipped in `--task` /
+  benchmark mode).
+- Layer `1` discovers MCP tools exposed via Toolomics and queries
+  Perspicacite for literature grounding.
+- Layer `2` synthesizes and iteratively refines task-specific workflows
+  via the `EvolutionEngine` (QD selection over a session archive).
+- Layer `3` executes those workflows in a sandboxed runner with
+  SmolAgents.
+- Layer `4` runs the 3-layer verifier and reports `overall_score`,
+  `reward_uncapped`, and abstracted diagnosis back into the loop.
 
 ---
 
@@ -74,274 +84,371 @@ Mimosa follows the same five-layer architecture described in the manuscript: `(0
 
 ```
 mimosa-ai/
-├── config.py                           # Configuration management
-├── main.py                             # Entry point & mode selection
-├── requirements.txt                    # Python dependencies
-├── pyproject.toml                      # Project metadata
+├── config.py                              # Configuration management
+├── main.py                                # CLI entry point & mode dispatch
+├── pyproject.toml                         # Project metadata + deps
+├── cleanup.sh                             # Reset workflows + capsules
+├── memory_explorer.py                     # Interactive trace replay
+├── memory_timelapse.py                    # Memory growth visualisation
 │
 ├── sources/
-│   ├── core/                           # Core orchestration logic
-│   │   ├── orchestrator.py             # Workflow execution manager
-│   │   ├── planner.py                  # Goal → Task decomposition
-│   │   ├── evolution_engine.py                      # Iterative-Learning (learning loop)
-│   │   ├── workflow_factory.py         # Workflow synthesis from LLM
-│   │   ├── workflow_runner.py          # Code execution runtime
-│   │   ├── workflow_selection.py       # Similarity-based template matching
-│   │   ├── workflow_info.py            # Workflow metadata & state
-│   │   ├── llm_provider.py             # Multi-provider LLM abstraction
-│   │   ├── tools_manager.py            # MCP tool discovery & management
-│   │   ├── selection.py    # Improvement validation
-│   │   └── schema.py                   # Data classes (IndividualRun, Task, Plan, etc.)
+│   ├── core/
+│   │   ├── evolution_engine.py            # Top-level evolutionary loop (depth-first recursion)
+│   │   ├── selection.py                   # SelectionPressure (greedy/tournament/novelty/QD)
+│   │   ├── variation_engine.py            # Mutation/crossover prompt assembly + annealing
+│   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
+│   │   ├── code_features.py               # AST → behaviour descriptor (4-vector)
+│   │   ├── lineage.py                     # parent → child sidecar records
+│   │   ├── orchestrator.py                # Grounding → factory → sandbox pipeline
+│   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
+│   │   ├── single_agent_factory.py        # Single-agent baseline factory
+│   │   ├── factory.py                     # Shared factory primitives
+│   │   ├── workflow_runner.py             # Sandboxed Python execution
+│   │   ├── workflow_info.py               # Workflow metadata reader
+│   │   ├── tools_manager.py               # MCP tool discovery
+│   │   ├── llm_provider.py                # Multi-provider LLM abstraction
+│   │   ├── planner.py                     # Goal → Task decomposition (Layer 0)
+│   │   ├── schema.py                      # IndividualRun, Plan, Task, SelectionLog
+│   │   └── evaluators/
+│   │       ├── evaluator.py               # WorkflowEvaluator facade (routes to backends)
+│   │       ├── verifier.py                # Per-claim 3-layer verifier (default)
+│   │       ├── task_checklist.py          # Layer 2 task-locked checklist builder
+│   │       ├── grounding.py               # Perspicacite literature-grounding adapter
+│   │       ├── generic.py                 # Legacy LLM judge (4-criterion)
+│   │       ├── scenario.py                # Rubric-based evaluation
+│   │       ├── bs_detection.py            # BullshitDetector penalty
+│   │       └── base.py                    # Shared evaluator primitives
 │   │
-│   ├── evaluation/                     # Performance assessment
-│   │   ├── csv_mode.py                 # Batch evaluation on CSV datasets
-│   │   ├── evaluator.py                # Generic/Scenario evaluation
-│   │   ├── capsule_evaluator.py        # ScienceAgentBench metrics (VER/SR/CBS)
-│   │   ├── codebert_scorer.py          # Semantic code similarity
-│   │   ├── execution_sandbox.py        # Safe code execution environment
-│   │   ├── scenario_loader.py          # Load benchmark scenarios
-│   │   └── science_agent_bench.py      # ScienceAgentBench dataset integration
+│   ├── evaluation/
+│   │   ├── csv_mode.py                    # Concurrent batch eval on CSV datasets
+│   │   ├── capsule_evaluator.py           # ScienceAgentBench metrics (VER/SR/CBS)
+│   │   ├── codebert_scorer.py             # Semantic code similarity
+│   │   ├── execution_sandbox.py           # Safe code execution for benchmark eval
+│   │   ├── scenario_loader.py             # Load scenario rubrics
+│   │   ├── science_agent_bench.py         # ScienceAgentBench dataset integration
+│   │   └── eval_workflow_generation.py    # Workflow-generation-quality eval
 │   │
-│   ├── extensibility/                  # Alternative execution modes
-│   │   ├── human_mode.py               # Interactive manual CLI
-│   │   └── text_to_speech.py           # Text to speech
+│   ├── cli/
+│   │   ├── onboard_cli.py                 # Interactive zero-arg onboarding flow
+│   │   ├── evaluation_cli.py              # Interactive ScienceAgentBench launcher
+│   │   └── pretty_print.py                # Coloured CLI primitives (print_phase, …)
 │   │
-│   ├── modules/                        # Reusable code snippets as pre-fabricated part of workflow
-│   │   ├── state_schema.py             # Workflow state template
-│   │   └── smolagent_factory.py        # SmolAgent factory template
+│   ├── extensibility/
+│   │   ├── human_mode.py                  # Manual no-LLM CLI mode
+│   │   └── text_to_speech.py              # TTS hook
 │   │
-│   ├── utils/                          # Utility functions
-│   │   ├── pricing.py                  # LLM pricing calculation
-│   │   ├── logging.py                  # logging
-│   │   ├── notify.py                   # Push notifications (Pushover)
-│   │   ├── transfer_toolomics.py       # Workspace file management for transfer from/to toolomics
-│   │   ├── planner_visualization.py    # Real-time plan visualization
-│   │   └── precheck.py                 # Environment validation
+│   ├── modules/                           # Pre-fab code injected into workflows
+│   │   ├── state_schema.py                # Workflow state template
+│   │   └── smolagent_factory.py           # SmolAgent factory template
 │   │
-│   ├── memory/                         # Execution memory & history
-│   │   └── (llm call cache, memory traces)
+│   ├── prompts/
+│   │   ├── workflow_v10.md                # Current workflow generator prompt
+│   │   ├── workflow_v9.md                 # (kept for diffing)
+│   │   ├── workflow_v8.md                 # (legacy reference)
+│   │   ├── planner_reproduction.md        # Planner prompt — reproduction goal
+│   │   ├── planner_paperbench_codedev.md  # Planner prompt — code-dev paperbench
+│   │   └── smolagent_sys_prompt.md        # SmolAgent system prompt
 │   │
-│   └── prompts/                        # LLM system prompts
-│       ├── planner_reproduction.md     # Planner system prompt
-│       ├── workflow_v8.md              # Workflow generation prompt
-│       └── (other specialized prompts)
+│   ├── cache/
+│   │   └── openrouter_pricing.json        # Cached pricing for cost tracking
+│   │
+│   ├── security/
+│   │   └── check_package.py               # Pre-flight package vetting
+│   │
+│   ├── utils/
+│   │   ├── pricing.py                     # LLM pricing (OpenRouter-aware)
+│   │   ├── logging.py                     # Structured logging
+│   │   ├── notify.py                      # Pushover notifications
+│   │   ├── transfer_toolomics.py          # Workspace ↔ Toolomics transfer
+│   │   ├── workspace_management.py        # Snapshot / restore best run
+│   │   ├── perspicacite_client.py         # Literature grounding HTTP client
+│   │   ├── planner_visualization.py       # Real-time plan visualisation
+│   │   ├── evolution_tree.py              # Lineage → tree PNG renderer
+│   │   ├── visualization.py               # Reward/assertion plots
+│   │   ├── shared_visualization.py        # Shared plot primitives
+│   │   ├── email_reporter.py              # Email run summaries
+│   │   ├── openrouter_endpoints.py        # OpenRouter endpoint catalogue
+│   │   ├── precheck.py                    # Environment validation
+│   │   ├── list_files.py                  # Workspace listing helper
+│   │   ├── dataset.py                     # CSV / scenario helpers
+│   │   └── mock_data.py                   # Test fixtures
+│   │
+│   ├── memory/                            # LLM call cache + memory traces (runtime)
+│   └── workflows/                         # Generated workflow storage (runtime)
+│       └── <uuid>/                        # Per-execution folders
+│           ├── workflow_genotype_<uuid>.py
+│           ├── state_result.json
+│           ├── evolution_prompt_<uuid>.md
+│           ├── lineage_<uuid>.json
+│           ├── reward_progress.png
+│           └── memory/
 │
-├── sources/workflows/                  # Generated workflow storage
-│   └── <uuid>/                         # Per-execution folders
-│       ├── workflow.py                 # Generated agent code
-│       ├── state_result.json           # Execution state & results
-│       ├── memory/                     # Agent memory traces
-│       ├── reward_progress.png         # learning progress visualization
-│       └── ...
+├── runs_capsule/
+│   └── <capsule_name>/                    # Per-execution capsule
+│       ├── workflow.py
+│       ├── results/
+│       ├── logs/
+│       └── evaluation_results.json
 │
-├── runs_capsule/                       # Results storage
-│   └── <capsule_name>/                 # Per-execution capsule
-│       ├── workflow.py                 # Final workflow code
-│       ├── results/                    # Output artifacts
-│       ├── logs/                       # Execution logs
-│       ├── evaluation_results.json     # Metrics & evaluation
-│       └── ...
+├── datasets/
+│   ├── ScienceAgentBench.csv              # ScienceAgentBench tasks
+│   ├── ScienceAgentBench/                 # Per-task workspaces
+│   ├── our_benchmark.csv                  # Custom benchmark
+│   ├── paper_bench.csv                    # OpenAI PaperBench
+│   ├── paper_bench_light.csv              # Light variant
+│   ├── papers_rejection_watch.csv         # Rejected-paper tracking
+│   ├── datascience_papers.csv             # DS papers list
+│   └── scenarios/                         # Scenario rubrics
 │
-├── datasets/                           # Test & benchmark data
-│   ├── our_benchmark.csv               # Custom benchmark
-│   ├── paper_bench.csv                 # OpenAI Paper Bench
-│   ├── ScienceAgentBench.csv           # ScienceAgentBench dataset
-│   └── scenarios/                      # Scenario rubrics for evaluation
-│       └── <scenario_name>.json        # Individual scenario definitions
-│
-├── docs/                               # Documentation
-│   ├── DEVELOPER_GUIDE.md              # This file
+├── docs/
+│   ├── DEVELOPER_GUIDE.md                 # This file
+│   ├── QUICK_RESEARCH_GUIDE.md            # Quick research workflow
+│   ├── v2_evolution.md                    # Neuroevolution-lens view of the engine
+│   ├── math_lens.md                       # Math-style analysis of representation/QD
+│   ├── papers_bench_evaluation.md
 │   ├── science_agent_bench_evaluation.md
-│   ├── diagrams/                       # Architecture diagrams
-│   └── images/                         # Documentation images
+│   ├── diagrams/                          # .mermaid sources + .puml
+│   └── images/                            # Rendered .png diagrams
 │
-└── tests/                              # Test suite
+└── tests/
     ├── evaluator_test.py
     ├── scenario_rubric_test.py
-    └── ...
+    ├── judge_test.py
+    ├── workflow_evaluator_test.py
+    ├── tools_manager_test.py
+    ├── pricing_test.py
+    ├── memory_read.py
+    └── cosine_similarity.py
 ```
 
 ---
 
 ## Core Components
 
-### 1. **Planner** (`sources/core/planner.py`)
-**Purpose**: Decompose high-level goals into executable task plans
+### 1. `EvolutionEngine` — [`sources/core/evolution_engine.py`](../sources/core/evolution_engine.py)
 
-**Key Responsibilities**:
-- Parse goals and generate multi-step execution plans
-- Track dependencies between tasks
-- Validate task I/O requirements
-- Maintain task history and knowledge context
-- Support human-in-the-loop plan validation
+Top-level evolutionary loop. `start_workflow_evolution()` installs the
+task-locked checklist, resets the session archive, optionally rehydrates
+a parent from disk, then dives into `evolve_generation()` — a
+**depth-first recursion** over up to `config.max_learning_evolve_iterations`
+generations.
 
----
+Key collaborators (instantiated in `__init__`):
+- `WorkflowSelector` — parent retrieval.
+- `WorkflowOrchestrator` — grounding → factory → sandbox.
+- `VariationEngine` — mutation / crossover prompt assembly.
+- `WorkflowEvaluator` — 3-layer verifier (default).
+- `SelectionPressure` — QD archive (population_size=50, k=25,
+  novelty_weight=0.4).
 
-### 2. **Iterative-Learning (IL)** (`sources/core/evolution_engine.py`)
-**Purpose**: Execute and iteratively improve task solutions through self-optimization
+Each recursive step:
+1. resets the workspace to the initial state,
+2. orchestrates a workflow run (LLM → sandbox),
+3. snapshots the workspace,
+4. evaluates → `overall_score` / `reward_uncapped`,
+5. calls `validate_survivor()` and admits to the archive if non-dominated
+   on `(reward_uncapped, novelty)`,
+6. selects the next parent(s) and chooses mutation vs crossover,
+7. recurses.
 
-**Key Responsibilities**:
-- Synthesize workflows for new tasks
-- Look up cached successful workflows for similar tasks
-- Propose improvements to workflows
-- Validate improvements before integration
-- Maintain reward progress metrics
-- Generate learning visualizations
+Termination: `overall_score > learned_score_threshold` (default 0.95) in
+`--learn` mode, or `max_depth` reached.
 
-**Learning Loop**:
-```
-1. TASK RECOGNITION
-   ├─ Calculate similarity to past tasks
-   ├─ Look up historical workflows
-   └─ Check success threshold (0.9)
-       ├─ If found → Return cached result
-       └─ If not → Create new workflow
+### 2. `SelectionPressure` — [`sources/core/selection.py`](../sources/core/selection.py)
 
-2. WORKFLOW SYNTHESIS
-   ├─ Call WorkflowFactory to generate code
-   ├─ Execute workflow via Orchestrator
-   └─ Evaluate results
+Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
+QD mode it maintains a session archive of up to `population_size`
+members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
+(`w = novelty_weight = 0.4`). Quality is sourced from `reward_uncapped`
+so the 0.94 hard-fail cap doesn't flatten rank ordering. Admission is
+gated by Pareto non-domination on `(reward_uncapped, novelty)` with
+ε-bands. Parent draw applies an inverse-child-count penalty
+`÷(1 + n_children_already)` to spread offspring.
 
-3. IMPROVEMENT VALIDATION (if enable_evolution)
-   ├─ Propose modifications to workflow
-   ├─ Re-execute modified workflow
-   ├─ Validate improvement (reward delta)
-   └─ Accept/reject based on threshold
+### 3. `VariationEngine` — [`sources/core/variation_engine.py`](../sources/core/variation_engine.py)
 
-4. ITERATE (up to max_depth)
-   └─ Repeat steps 2-3 until target score reached
-```
+Prompt assembly for mutation and crossover. A phase-aware annealing
+schedule (`_get_temperature_phase`) gates topology complexity by
+iteration progress:
 
----
+| Phase     | Progress | Agent count       | Permitted mutations            |
+|-----------|----------|-------------------|--------------------------------|
+| SEED      | <0.25    | 1–2               | prompt only                    |
+| ANCHOR    | <0.50    | 1–3               | prompt (primary), topology, tools |
+| DECOMPOSE | <0.65    | 2–5               | topology, prompt, handoff      |
+| ENGAGE    | <0.85    | 2–6               | prompt, handoff, restricted topology |
+| POLISH    | ≥0.85    | frozen            | prompt only                    |
 
-### 3. **WorkflowFactory** (`sources/core/workflow_factory.py`)
-**Purpose**: Synthesize specialized multi-agent workflows for tasks
+Progress is `(iter / (max_iter-1)) ** (1 - α·score)` with α=0.5 — high
+scorers progress slower (stay exploratory longer).
 
-**Key Responsibilities**:
-- Generate LLM prompts for workflow creation
-- Orchestrate LLM calls to synthesize Python code
-- Extract and validate generated workflow code
-- Assemble workflows with necessary modules/dependencies
-- Provide system prompt with available tools
-- Save in sources/workflows folder.
+### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](../sources/core/workflow_selection.py)
 
-**Workflow Folder Structure**:
-```python
-# Auto-generated workflow contains:
-# - State schema (from state_schema.py)
-# - Tool client initialization (from tools_manager)
-# - Multi-agent orchestration (SmolagentFactory)
-# - Main execution loop
-# - State serialization (to state_result.json)
-```
+Two-mode parent retrieval:
 
----
+- **Steady state**: when `selection_pressure._archive` is populated, draws
+  parents from the live session archive via QD-roulette.
+- **Cold start**: empty archive → similarity-filtered disk scan
+  (`cosine ≥ 0.5` on MiniLM embeddings of `original_task`, `score ≥ 0.05`)
+  routed through the same `select_parents()` weighting.
 
-### 4. **Orchestrator** (`sources/core/orchestrator.py`)
-**Purpose**: Manage workflow execution and tool integration
+### 5. `WorkflowOrchestrator` — [`sources/core/orchestrator.py`](../sources/core/orchestrator.py)
 
-**Key Responsibilities**:
-- Generate multi-agent workflow tailored or mutate existing one.
-- Install workflow dependencies
-- Execute workflows in sandboxed environment
-- Monitor execution and stream output
----
+End-to-end workflow execution per generation:
 
-### 5. **LLMProvider** (`sources/core/llm_provider.py`)
-**Purpose**: Abstraction layer for multi-provider LLM access
+1. **Grounding**: queries Perspicacite for scientific literature context
+   and prepends it to craft instructions.
+2. **Generation**: calls `WorkflowFactory` (multi-agent) or
+   `SingleAgentFactory` (`--single_agent`).
+3. **Dependency install + sandbox run**: via `WorkflowRunner` with the
+   pinned `runner_requirements` list from `config.py`.
 
-**Supported Providers**:
-- Anthropic Claude (via LiteLLM)
-- OpenAI (via LiteLLM)
-- DeepSeek (via LiteLLM)
-- Hugging Face
-- Local models via MLX
+Returns `(execution_output, uuid, workflow_genotype_code, executed)` —
+`executed=False` is the structural failure signal that drives
+re-attempts.
 
-**Key Features**:
-- Unified interface across providers
-- Request caching for cost reduction
-- Retry logic with exponential backoff
-- Token counting and cost tracking
-- Reasoning token support (Claude)
+### 6. `LLMProvider` — [`sources/core/llm_provider.py`](../sources/core/llm_provider.py)
 
----
+Unified interface (via LiteLLM) over Anthropic Claude, OpenAI,
+DeepSeek, Hugging Face, OpenRouter (with per-model provider routing),
+and local MLX. Features:
+- prompt-cache compatible request caching,
+- retry/backoff,
+- token counting + cost tracking,
+- reasoning-effort support (Claude / GPT-5 `minimal|low|medium|high`).
 
-### 6. **ToolsManager** (`sources/core/tools_manager.py`)
-**Purpose**: Discover and manage MCP-based tools
+### 7. `ToolManager` — [`sources/core/tools_manager.py`](../sources/core/tools_manager.py)
 
-**Key Responsibilities**:
-- Auto-discover MCP servers on network
-- Extract tool definitions and schemas
-- Generate tool integration code for workflows
-- Provide tool client instantiation code
-- Handle tool registration
+MCP server auto-discovery on the configured `discovery_addresses` port
+range. Generates the tool-binding code injected into each workflow
+genotype.
 
----
+### 8. Evaluation backends — [`sources/core/evaluators/`](../sources/core/evaluators/)
 
-### 7. **Evaluation System** (`sources/evaluation/`)
+| Backend          | File              | Use                                   |
+|------------------|-------------------|---------------------------------------|
+| `VerifierEvaluator` | `verifier.py`     | **Default**: 3-layer per-claim defense |
+| `TaskChecklistBuilder` | `task_checklist.py` | Layer 2 — pre-runs checklist build  |
+| `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
+| `ScenarioEvaluator` | `scenario.py`    | Rubric / assertion-based scoring      |
+| `Perspicacite grounding` | `grounding.py` | Adapter used by checklist + verifier |
+| `BullshitDetector` | `bs_detection.py` | Numerical-fraud penalty               |
 
-#### BaseEvaluator & GenericEvaluator
-- Generic evaluation using LLM judge
-- Extracts scores from judge output
-- Saves results to workflow state
+The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
+calls it with `evaluator_type="verifier"`.
 
-#### ScenarioEvaluator
-- Task-specific rubric-based evaluation
-- Supports both legacy and rubric formats
-- Evaluates assertions with detailed prompts
+### 9. Benchmark evaluation — [`sources/evaluation/`](../sources/evaluation/)
 
-#### CapsuleEvaluator (ScienceAgentBench)
-- **VER** (Valid Execution Rate): Code executes without errors
-- **SR** (Success Rate): Output meets task-specific criteria
-- **CBS** (CodeBERT Score): Semantic similarity to reference implementation
-- Cost tracking and aggregation
+- `csv_mode.py` — concurrent batch runner over a CSV dataset
+  (controlled by `config.max_concurrent_eval_tasks` and
+  `config.task_start_delay`).
+- `capsule_evaluator.py` — computes ScienceAgentBench's VER (Valid
+  Execution Rate), SR (Success Rate), and CBS (CodeBERT Score).
+- `science_agent_bench.py` — dataset adapter.
+- `eval_workflow_generation.py` — workflow-generation-quality eval mode.
 
 ---
 
 ## Execution Flow
 
-### Mode 1: Goal Mode (Multi-step Planning)
+### Mode 1: Task mode (`--task`)
+```
+main.py --task "<task>" [--learn] [--single_agent]
+    ↓
+EvolutionEngine.start_workflow_evolution(goal)
+    ├─ install task-locked checklist (Layer 2)
+    ├─ reset session archive
+    ├─ rehydrate parent if --template_uuid (else None)
+    ├─ first run: seed prompt OR template mutation
+    └─ evolve_generation()   ← depth-first recursion
+        ├─ orchestrate_workflow()
+        │   ├─ Perspicacite grounding
+        │   ├─ workflow_factory.craft_workflow()
+        │   └─ workflow_runner.execute() (sandbox)
+        ├─ WorkflowEvaluator.evaluate(evaluator_type="verifier")
+        ├─ SelectionPressure.validate_survivor() → archive admit?
+        ├─ record_lineage()
+        ├─ select next parent (archive QD-roulette)
+        ├─ choose crossover (~0.3 rate) or mutation
+        └─ recurse → stop on threshold OR max_depth
+    ↓
+WorkspaceManager.restore_best(best_uuid)
+```
+
+### Mode 2: Goal mode (`--goal`)
 ```
 main.py --goal "Reproduce paper X"
     ↓
 Planner.start_planner(goal)
-    ├─ Generate multi-step plan
-    ├─ Request human approval
-    └─ For each step:
-        ├─ start_workflow_evolution(step_task)
-        │   ├─ Check workflow cache
-        │   ├─ Synthesize workflow (if new)
-        │   ├─ Execute workflow
-        │   ├─ Evaluate results
-        │   └─ Optionally iterate for improvement
-        ├─ Store results
-        └─ Continue to next step
+    ├─ generate multi-step plan
+    ├─ human approval prompt
+    └─ for each step:
+        └─ start_workflow_evolution(step_task)
     ↓
-Generate Capsule with results
+LocalTransfer.transfer_workspace_files_to_capsule()
 ```
 
-### Mode 2: Task Mode
+### Mode 3: Benchmark batch (`--science_agent_bench`)
 ```
-main.py --task "Task description" --learn
+main.py --science_agent_bench --csv_runs_limit N --config my_config.json [--learn] [--single_agent]
     ↓
-start_workflow_evolution(task, enable_evolution=True, max_iterations=10)
-    ├─ Check workflow cache (similarity > 0.8)
-    ├─ If found & successful: use cached workflow as inspiration
-    ├─ Else: Synthesize workflow
-    ├─ Execute and evaluate
-    ├─ If enable_evolution:
-    │   ├─ Propose improvements
-    │   ├─ Validate improvements
-    │   └─ Iterate until threshold reached
-    └─ Return best result
+CsvEvaluationMode(max_concurrent_tasks=config.max_concurrent_eval_tasks)
     ↓
-Generate Capsule with results
+parallel start_workflow_evolution() per row, with task_start_delay between launches
+    ↓
+capsule_evaluator → ScienceAgentBench metrics (VER / SR / CBS)
 ```
+
+### Mode 4: Onboarding / Evaluation CLI (zero-args)
+```
+main.py                       # interactive setup wizard (OnboardCLI)
+main.py --evaluation_cli      # guided model/workspace/mode picker (EvaluationCLI)
+```
+
+---
+
+## Evaluation & the 3-layer Verifier
+
+![Evaluation pipeline](images/evaluation_pipeline.png)
+
+Source: [diagrams/evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.mermaid).
+
+For each generation:
+
+1. **Layer 2 checklist** (built once per task hash) drives the atomic
+   claim extraction so the verifier doesn't learn rubric-shaped patterns
+   from agent narration.
+2. **Per-claim verification**: each claim is classified as executable or
+   soft. Executable claims get an LLM-written verifier script that opens
+   workspace files and recomputes the asserted value; anti-tautology
+   tripwires (literal/output overlap ≥ 80 chars, I/O markers presence)
+   reject scripts that parse the agent's answer back to itself. Soft
+   claims get a `pass/unsure/fail` LLM verdict against workspace
+   previews + literature grounding (mapped to `1.0 / 0.5 / 0.0`).
+3. **Layer 3 cheat detector** reads only the task spec and the workflow
+   source. Findings are split into *behavioral* (safe to feed back to
+   mutator) and *mechanism* (audit only — leaking would teach the
+   mutator to hide cheats).
+4. **Aggregation**:
+   ```
+   overall = clamp(base_mean + info_bonus, 0, 1)
+   if any hard claim refuted:
+       overall = min(overall, 0.94)        # _HARD_FAIL_CAP
+   overall = max(0, overall - cheat_penalty)
+   ```
+   where `info_bonus(n_hard_pass) = 0.15 · (1 - exp(-n_hard_pass / 8))`
+   (saturating reward for thoroughness).
+5. **Layer 1 abstracted diagnosis** — rubric-blind plain-language
+   summary of what failed — is the **only** verifier signal the mutator
+   sees.
+
+Detail: [v2_evolution.md §5](v2_evolution.md#5-evaluation--the-3-layer-verifier).
+
 ---
 
 ## Testing & Evaluation
 
-### Running Tests
+### Running tests
 
 ```bash
 # All tests
@@ -350,59 +457,86 @@ python -m pytest tests/
 # Specific test
 python -m pytest tests/evaluator_test.py
 
-# With verbose output
-python -m pytest tests/ -v
-
-# With coverage
-python -m pytest tests/ --cov=sources
+# Verbose + coverage
+python -m pytest tests/ -v --cov=sources
 ```
 
-### Evaluation Modes
+### Running evaluations
 
 ```bash
-# papers dataset evaluation
+# Papers dataset (custom CSV)
 python main.py --papers datasets/our_benchmark.csv --csv_runs_limit 10 --config my_config.json
-# ScienceAgentBench
-uv run main.py --science_agent_bench --csv_runs_limit 42 --config my_config.json
+
+# ScienceAgentBench (full sweep)
+uv run main.py --science_agent_bench --csv_runs_limit 102 --config my_config.json
+
+# ScienceAgentBench with iterative learning
+uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --learn
+
+# Single-agent baseline
+uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json --single_agent
 ```
 
-### Monitoring & Debugging
+### Inspecting a workflow run
 
-**Inspect Workflow State**:
 ```bash
-# View generated workflow code
-cat sources/workflows/<uuid>/workflow.py
+# Generated workflow code (genotype)
+cat sources/workflows/<uuid>/workflow_genotype_<uuid>.py
 
-# View execution results
+# Execution state & per-claim scores
 cat sources/workflows/<uuid>/state_result.json
 
-# View memory traces
+# Variation prompt that produced this run
+cat sources/workflows/<uuid>/evolution_prompt_<uuid>.md
+
+# Lineage record (parents + operator)
+cat sources/workflows/<uuid>/lineage_<uuid>.json
+
+# Memory traces
 ls sources/workflows/<uuid>/memory/
+
+# Interactive replay
+python memory_explorer.py <uuid>
 ```
 
-**Pushover Notifications** (optional):
-1. Create Pushover account at pushover.net
-2. Set PUSHOVER_USER and PUSHOVER_TOKEN
-3. Receive notifications on task completion/failure
+### Pushover notifications (optional)
+
+1. Create a Pushover account at pushover.net.
+2. Export `PUSHOVER_TOKEN` and `PUSHOVER_USER`.
+3. Receive per-iteration completion and best-uuid notifications.
 
 ---
 
 ## Contributing Guidelines
 
-### Before Submitting PR
-1. ✅ Run tests: `pytest tests/`
-2. ✅ Format code: Follow existing style
-3. ✅ Add docstrings
-4. ✅ Update relevant documentation
+### Before submitting a PR
+1. ✅ `pytest tests/`
+2. ✅ Follow existing style and the conventions in
+   [v2_evolution.md](v2_evolution.md) for new
+   evolution-layer components.
+3. ✅ Add docstrings on public functions.
+4. ✅ Update the relevant doc(s): `DEVELOPER_GUIDE.md`,
+   `QUICK_RESEARCH_GUIDE.md`, or `v2_evolution.md`. If you change
+   architecture, also update the `.mermaid` source under
+   `docs/diagrams/` and regenerate the `.png` under `docs/images/`.
 
-### PR Description Should Include
-- **Problem**: What issue does this solve?
-- **Solution**: How does it solve it?
-- **Testing**: How was it tested?
-- **Backwards Compatibility**: Any breaking changes?
+### PR description should include
+- **Problem** — what does this solve?
+- **Solution** — how does it solve it?
+- **Testing** — how was it tested? (Pytest output, benchmark numbers.)
+- **Backwards compatibility** — any breaking changes?
+
+### Re-rendering diagrams
+
+```bash
+cd docs
+npx -y -p @mermaid-js/mermaid-cli mmdc \
+  -i diagrams/<name>.mermaid -o images/<name>.png \
+  -t neutral -b white -w 1800
+```
 
 ---
 
 ## Questions & Support
 
-Raise an **Issue** for any question or support request.
+Open an Issue for any question or support request.
