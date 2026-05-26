@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-25T12:18:04.601227",
+  "timestamp": "2026-05-26T14:29:09.065959",
   "pricing": {
     "qwen/qwen3.7-max": {
       "input": 2.5,
@@ -111,7 +111,7 @@
     },
     "qwen/qwen3.6-27b": {
       "input": 0.3,
-      "output": 3.1999999999999997
+      "output": 2.0
     },
     "openai/gpt-5.5-pro": {
       "input": 30.0,
@@ -1174,8 +1174,8 @@
       "output": 3.0
     },
     "deepseek/deepseek-chat": {
-      "input": 0.32,
-      "output": 0.8899999999999999
+      "input": 0.2288,
+      "output": 0.9144
     },
     "sao10k/l3.3-euryale-70b": {
       "input": 0.65,

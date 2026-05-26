@@ -100,7 +100,7 @@ class CsvEvaluationMode:
         self._semaphore: asyncio.Semaphore | None = None
         self._base_workspace_dir = config.workspace_dir
 
-        model_name = "anthropic/claude-haiku-4-5-20251001"  # judge
+        model_name = config.judge_model 
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(

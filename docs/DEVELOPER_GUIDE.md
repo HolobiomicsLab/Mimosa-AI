@@ -38,15 +38,9 @@ neuroevolution primitives (representation / selection / variation /
 evaluation).
 
 #### 3. Goodhart-resistant evaluation
-The verifier is structured as **defense in depth** with three independent
-epistemic surfaces:
 
-- **Layer 1** — abstracted, rubric-blind diagnosis (the only signal fed
+Abstracted, rubric-blind diagnosis (the only signal fed
   back into the mutator).
-- **Layer 2** — task-locked checklist built once per task hash, sourced
-  from the task spec + literature grounding, *before* any candidate runs.
-- **Layer 3** — independent cheat detector that reads only the task spec
-  and the workflow source — never the claim list or evaluation output.
 
 See [evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.mermaid).
 
@@ -112,7 +106,6 @@ mimosa-ai/
 │   │   └── evaluators/
 │   │       ├── evaluator.py               # WorkflowEvaluator facade (routes to backends)
 │   │       ├── verifier.py                # Per-claim 3-layer verifier (default)
-│   │       ├── task_checklist.py          # Layer 2 task-locked checklist builder
 │   │       ├── grounding.py               # Perspicacite literature-grounding adapter
 │   │       ├── generic.py                 # Legacy LLM judge (4-criterion)
 │   │       ├── scenario.py                # Rubric-based evaluation
@@ -227,11 +220,7 @@ mimosa-ai/
 
 ### 1. `EvolutionEngine` — [`sources/core/evolution_engine.py`](../sources/core/evolution_engine.py)
 
-Top-level evolutionary loop. `start_workflow_evolution()` installs the
-task-locked checklist, resets the session archive, optionally rehydrates
-a parent from disk, then dives into `evolve_generation()` — a
-**depth-first recursion** over up to `config.max_learning_evolve_iterations`
-generations.
+Top-level evolutionary loop.
 
 Key collaborators (instantiated in `__init__`):
 - `WorkflowSelector` — parent retrieval.
@@ -328,10 +317,9 @@ genotype.
 | Backend          | File              | Use                                   |
 |------------------|-------------------|---------------------------------------|
 | `VerifierEvaluator` | `verifier.py`     | **Default**: 3-layer per-claim defense |
-| `TaskChecklistBuilder` | `task_checklist.py` | Layer 2 — pre-runs checklist build  |
 | `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
 | `ScenarioEvaluator` | `scenario.py`    | Rubric / assertion-based scoring      |
-| `Perspicacite grounding` | `grounding.py` | Adapter used by checklist + verifier |
+| `Perspicacite grounding` | `grounding.py` | Adapter used by verifier |
 | `BullshitDetector` | `bs_detection.py` | Numerical-fraud penalty               |
 
 The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
@@ -356,7 +344,6 @@ calls it with `evaluator_type="verifier"`.
 main.py --task "<task>" [--learn] [--single_agent]
     ↓
 EvolutionEngine.start_workflow_evolution(goal)
-    ├─ install task-locked checklist (Layer 2)
     ├─ reset session archive
     ├─ rehydrate parent if --template_uuid (else None)
     ├─ first run: seed prompt OR template mutation
@@ -415,9 +402,6 @@ Source: [diagrams/evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.merm
 
 For each generation:
 
-1. **Layer 2 checklist** (built once per task hash) drives the atomic
-   claim extraction so the verifier doesn't learn rubric-shaped patterns
-   from agent narration.
 2. **Per-claim verification**: each claim is classified as executable or
    soft. Executable claims get an LLM-written verifier script that opens
    workspace files and recomputes the asserted value; anti-tautology

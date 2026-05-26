@@ -15,6 +15,7 @@ from typing import Any
 
 from .code_features import extract_code_features
 
+MAX_CHILDREN_PER_PARENT = 2
 
 class SelectionStrategy(Enum):
     """Available selection strategies for the evolution loop."""
@@ -61,6 +62,7 @@ class SelectionPressure:
         admit_threshold: float = 0.3,
         pareto_reward_epsilon: float = 0.02,
         pareto_novelty_epsilon: float = 0.0,
+        max_children: int = MAX_CHILDREN_PER_PARENT
     ):
         """
         Args:
@@ -89,6 +91,7 @@ class SelectionPressure:
         self.admit_threshold = admit_threshold
         self.pareto_reward_epsilon = pareto_reward_epsilon
         self.pareto_novelty_epsilon = pareto_novelty_epsilon
+        self.max_children = max_children
 
         # Population archive for open-ended modes
         self._archive: list[PopulationMember] = []
@@ -163,8 +166,15 @@ class SelectionPressure:
         # Novelty / QD: archive-driven if populated.
         if self._archive:
             members = [c for c in (runs or []) if isinstance(c, PopulationMember)]
+
             if not members:
                 members = self._archive
+
+            eligible = [
+                m for m in members
+                if (child_counts or {}).get(getattr(m, "uuid", None) or "", 0) < self.max_children
+            ]
+            members = eligible or members
             weights = [
                 max(m.qd_score, 0.01)
                 / (1 + (child_counts or {}).get(getattr(m, "uuid", None) or "", 0))

@@ -68,8 +68,8 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.95
-        self.max_learning_evolve_iterations = 25
+        self.learned_score_threshold = 0.97
+        self.max_learning_evolve_iterations = 35
 
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode

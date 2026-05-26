@@ -10,6 +10,7 @@ from sources.cli.pretty_print import (
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
+import numpy as np
 
 class VariationEngine:
     """
@@ -24,6 +25,19 @@ class VariationEngine:
 
     def __init__(self):
         self.diagnosis_history = []
+
+    def _sample_agent_count(self, progress: float, lo: int, hi: int, concentration: float = 4.0) -> int:
+        """
+        Sample agent random count within [lo, hi], biased upward by progress.
+        """
+        if lo == hi:
+            return lo
+        target_mean = lo + progress * (hi - lo)
+        p = np.clip((target_mean - lo) / (hi - lo), 0.05, 0.95)
+        alpha = p * concentration
+        beta = (1 - p) * concentration
+        prob = np.random.beta(alpha, beta)
+        return lo + int(np.random.binomial(hi - lo, prob))
 
     def _get_temperature_phase(
         self,
@@ -46,16 +60,18 @@ class VariationEngine:
         diag = f"Prior diagnosis: {last_failure_mode}\n" if last_failure_mode else ""
 
         if progress < 0.25:
+            n_agents = self._sample_agent_count(progress, 1, 2)
             return (
                 f"## PHASE: SEED  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Priority mutations: prompt only. Max agent count: 1-2.\n"
+                f"Priority mutations: prompt only. Max agent count: {n_agents}.\n"
                 "Goal: build the strongest possible single-agent workflow and see how far it gets.\n"
                 "Do: one agent with a domain-specific role prompt; attach every relevant tool.\n"
             )
         elif progress < 0.50:
+            n_agents = self._sample_agent_count(progress, 1, 3)
             return (
                 f"## PHASE: ANCHOR  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: prompt (primary), topology, tools. Agent count: 1-3.\n"
+                f"Permitted mutations: prompt (primary), topology, tools. Agent count: {n_agents}.\n"
                 "Goal: rewrite the agent's prompt or decompse verification/steps across agents. This phase gets the largest iteration budget.\n"
                 "Each variant should change ONE thing from the previous best:\n"
                 "  domain vocabulary, role definition, required output shape, level of formality,\n"
@@ -63,22 +79,25 @@ class VariationEngine:
                 "Why: prompts steer the model into the right way of thinking about the task. "
             )
         elif progress < 0.65:
+            n_agents = self._sample_agent_count(progress, 2, 5)
             return (
                 f"## PHASE: DECOMPOSE  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: topology, prompt, handoff format. Agent count: 2-5 maximum.\n"
+                f"Permitted mutations: topology, prompt, handoff format. Agent count: {n_agents} maximum.\n"
                 "Why: see if multi-agent shape might outperforms a well-prompted single agent."
             )
         elif progress < 0.85:
+            n_agents = self._sample_agent_count(progress, 3, 7)
             return (
                 f"## PHASE: ENGAGE  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: prompt, handoff format, agent count (restricted) 2-6 maximum.\n"
+                f"Permitted mutations: prompt, handoff format, agent count (restricted) {n_agents} maximum.\n"
                 "Goal: tighten the workflow you have; remove any agent that isn't earning its place."
                 "Solver / executor / single-purpose agents need sharper, more specific prompts so they commit confidently to one approach.\n"
             )
         else:
+            n_agents = self._sample_agent_count(progress, 5, 7)
             return (
                 f"## PHASE: POLISH  [{i}/{n} | {p:.0%}]\n{diag}"
-                "Permitted mutations: prompt only. Agent count: frozen.\n"
+                f"Permitted mutations: prompt only. Agent count: {n_agents}.\n"
                 "Goal: one prompt fix per iteration, targeting the single most concrete failure.\n"
                 "Do: trace the failure to one agent and edit that agent's prompt."
                 "Don't: change topology, add tools, or rewrite multiple prompts at once.\n"

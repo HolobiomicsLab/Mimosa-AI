@@ -117,7 +117,6 @@ def scan_all(workflow_dir: str | Path) -> dict[str, dict]:
         folder = root / entry
         if not folder.is_dir() or entry.startswith("_") or entry.startswith("."):
             continue
-        # Skip caches like _task_checklists
         rec = load_lineage(root, entry)
         if rec is None:
             # Synthesize a minimal record so legacy workflows still appear.

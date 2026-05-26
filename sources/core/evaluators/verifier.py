@@ -37,9 +37,9 @@ from sources.cli.pretty_print import (
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
-_VERIFIER_MAX_CLAIMS = 20
-_VERIFIER_MIN_CLAIMS = 5
-_HARD_FAIL_CAP = 0.94
+_VERIFIER_MAX_CLAIMS = 35
+_VERIFIER_MIN_CLAIMS = 15
+_HARD_FAIL_CAP = 0.99
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
@@ -269,11 +269,6 @@ class VerifierEvaluator(BaseEvaluator):
         self._runner_temp_root = Path(
             getattr(config, "temp_dir", None) or self.workflow_dir / "_verifier_tmp"
         )
-        # Layer 2: per-task verification checklist (set externally before
-        # evolution starts). When present, drives claim extraction in place of
-        # the workflow's self-narration so the workflow can't author its own
-        # exam. None ⇒ fall back to the legacy execution-text extractor.
-        self._task_checklist: list[dict[str, Any]] | None = None
         self._task_spec: str = ""
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
@@ -282,9 +277,6 @@ class VerifierEvaluator(BaseEvaluator):
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
 
-    # ------------------------------------------------------------------
-    # External hooks (Layer 2 — pre-evolution task checklist)
-    # ------------------------------------------------------------------
 
     def _build_abstracted_diagnosis(self, uuid, report: str) -> str:
         """Goodhart-resistant residual signal passed to provide basic directional signal to orchestrator"""
@@ -301,21 +293,6 @@ class VerifierEvaluator(BaseEvaluator):
             uuid,
             "verifier_abstract_diagnosis",
             prompt,
-        )
-
-    def set_task_checklist(
-        self,
-        items: list[dict[str, Any]] | None,
-        task_spec: str = "",
-    ) -> None:
-        """Install a task-locked checklist used by ``_extract_claims``.
-        """
-        self._task_checklist = items or None
-        self._task_spec = (task_spec or "").strip()
-        n = len(self._task_checklist) if self._task_checklist else 0
-        self.logger.info(
-            f"VerifierEvaluator task checklist set: {n} item(s), "
-            f"task_spec_len={len(self._task_spec)}"
         )
 
     # ------------------------------------------------------------------
@@ -358,9 +335,6 @@ class VerifierEvaluator(BaseEvaluator):
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
-        # Narration is passed through to verifier-gen unconditionally; the
-        # Goodhart guardrail lives at claim extraction (the task-locked
-        # checklist supersedes agent narration there).
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
@@ -690,33 +664,6 @@ Aim for {target_min}–{target_max} Source-C claims.
             if max_count is not None and len(out) >= max_count:
                 break
         return out
-
-    def _claims_from_checklist(
-        self, items: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Promote a pre-built task checklist to verifier claims.
-
-        Checklist items are task-locked shape hints, not file paths. The
-        adaptation to "what's actually in the workspace" happens later inside
-        ``_verify_claim`` via a per-claim LLM file-selection call that sees
-        the agent narration (which generally names the files the agents
-        wrote) and the workspace listing.
-        """
-        cleaned: list[dict[str, Any]] = []
-        for idx, it in enumerate(items):
-            if not isinstance(it, dict) or "description" not in it:
-                continue
-            cleaned.append({
-                "id": str(it.get("id") or f"chk_{idx}"),
-                "description": str(it["description"]).strip(),
-                "criticality": "hard" if it.get("criticality") == "hard" else "soft",
-                "likely_relevant_files": [],
-                "expected_artifact_kind": str(it.get("expected_artifact_kind") or "").strip(),
-                "acceptable_variation": str(it.get("acceptable_variation") or "").strip(),
-                "checkable_via": str(it.get("checkable_via") or "file").strip(),
-                "source": "task_checklist",
-            })
-        return cleaned
 
     # ------------------------------------------------------------------
     # Stage 2 + 3 + 4 — generate, run and score one verifier
@@ -1583,11 +1530,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             rel = cl.get("likely_relevant_files", [])
             if rel:
                 w(f"  relevant_files: {rel}")
-            if cl.get("source") == "task_checklist":
-                w(
-                    f"  source: task_checklist  "
-                    f"expected_artifact_kind={cl.get('expected_artifact_kind') or '(unspecified)'}"
-                )
             w(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}")
             if c.get("details"):
                 w(f"  details: {c['details']}")
