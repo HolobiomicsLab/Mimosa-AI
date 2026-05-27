@@ -1,0 +1,145 @@
+site_name: Mimosa-AI
+site_description: Self-evolving AI framework for autonomous scientific research
+site_url: https://holobiomicslab.github.io/Mimosa-AI/
+repo_url: https://github.com/HolobiomicsLab/Mimosa-AI
+repo_name: HolobiomicsLab/Mimosa-AI
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  logo: images/logo_mimosa.png
+  favicon: images/logo_mimosa.png
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.keys
+  - pymdownx.smartsymbols
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/HolobiomicsLab/Mimosa-AI
+    - icon: fontawesome/solid/globe
+      link: https://holobiomicslab.cnrs.fr/
+    - icon: fontawesome/solid/scroll
+      link: https://arxiv.org/abs/2603.28986
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+      - API keys & environment: getting-started/env.md
+  - Concepts:
+      - Overview: concepts/index.md
+      - Architecture: concepts/architecture.md
+      - Evolution engine: concepts/evolution-engine.md
+      - Evaluation pipeline: concepts/evaluation-pipeline.md
+      - Tool discovery & MCP: concepts/tools-and-mcp.md
+      - Scientific grounding: concepts/grounding.md
+  - Usage:
+      - Overview: usage/index.md
+      - Execution modes: usage/modes.md
+      - Iterative learning: usage/learning.md
+      - Workspace & audit trail: usage/workspace.md
+      - Transparency & replay: usage/transparency.md
+      - Notifications: usage/notifications.md
+      - Telemetry: usage/telemetry.md
+  - Evaluation:
+      - Overview: evaluation/index.md
+      - ScienceAgentBench: science_agent_bench_evaluation.md
+      - PaperBench: papers_bench_evaluation.md
+      - Custom benchmarks: evaluation/custom-benchmarks.md
+  - Reference:
+      - CLI reference: reference/cli.md
+      - Configuration reference: reference/configuration.md
+      - File layout: reference/file-layout.md
+      - Troubleshooting: reference/troubleshooting.md
+  - Developer:
+      - Developer guide: DEVELOPER_GUIDE.md
+      - Extending Mimosa: developer/extending.md
+      - Contributing: developer/contributing.md
+  - About:
+      - Citation: about/citation.md
+      - Licensing: licensing-notes.md
+      - CLA process: cla-process.md

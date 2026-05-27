@@ -96,6 +96,8 @@ In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthes
 
 ---
 
+> :books: **Full documentation**: see [`docs/`](./docs/index.md) — render locally with `uvx --with mkdocs-material mkdocs serve` (live preview at `http://localhost:8000`) or `uvx --with mkdocs-material mkdocs build` (static HTML to `./site`). The full site config is in [`mkdocs.yml`](./mkdocs.yml).
+
 ## Table of Contents
 
 - [What is Toolomics and do I need it?](#what-is-toolomics-and-do-i-need-it)

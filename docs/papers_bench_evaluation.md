@@ -1,4 +1,4 @@
-g Running PaperBench Locally (Quick Note)
+# Running PaperBench Locally (Quick Note)
 
 This note captures the minimum you need to run PaperBench with pre-existing submissions (via `PBDirectSubmissionSolver`). For a full walkthrough see `paperbench/README.md`.
 
