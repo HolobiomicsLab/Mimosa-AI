@@ -39,6 +39,47 @@ class VariationEngine:
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
+    def _diagnosis_similarity(self, a: str, b: str) -> float:
+        """Token-level Jaccard. Cheap stand-in for embedding cosine; no model load."""
+        if not a or not b:
+            return 0.0
+        tokens_a = set(a.lower().split())
+        tokens_b = set(b.lower().split())
+        if not tokens_a or not tokens_b:
+            return 0.0
+        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+
+    def _compute_stagnation(self, window: int = 5) -> float:
+        """Mean pairwise Jaccard over the last `window` diagnoses, ∈ [0, 1].
+
+        High value ⇒ the LLM-mutator is cycling on similar failure modes
+        (mode collapse). Used to drive stochastic phase regression.
+        """
+        recent = self.diagnosis_history[-window:]
+        if len(recent) < 2:
+            return 0.0
+        sims = [
+            self._diagnosis_similarity(recent[i], recent[j])
+            for i in range(len(recent))
+            for j in range(i + 1, len(recent))
+        ]
+        return sum(sims) / len(sims) if sims else 0.0
+
+    def _sample_phase_regression(
+        self, stagnation: float, max_regression: float = 0.45, concentration: float = 4.0
+    ) -> float:
+        """Beta-sampled regression amount, mean ≈ stagnation · max_regression.
+
+        Mirrors `_sample_agent_count`'s shape so the schedule keeps some
+        randomness instead of snapping deterministically on the threshold.
+        """
+        if stagnation <= 0.0:
+            return 0.0
+        p = float(np.clip(stagnation, 0.05, 0.95))
+        alpha = p * concentration
+        beta = (1 - p) * concentration
+        return float(np.random.beta(alpha, beta)) * max_regression
+
     def _get_temperature_phase(
         self,
         iteration_count,
@@ -50,14 +91,28 @@ class VariationEngine:
         """
         EV-ranked phase schedule: single-agent → tools → prompt → (only if needed)
         decomposition → integrative tuning → polish.
+
+        When recent failure diagnoses cluster (LLM mutator cycling on a basin),
+        stochastically regress progress so the next iteration drops back into a
+        more exploratory phase. Regression magnitude is Beta-sampled.
         """
         if max_iterations <= 1:
             progress = 0.5
         else:
             progress = (iteration_count / max(max_iterations - 1, 1)) ** (1 - alpha * score)
 
+        stagnation = self._compute_stagnation()
+        regression = self._sample_phase_regression(stagnation)
+        progress = max(0.0, progress - regression)
+
+        stuck_note = (
+            f"[stagnation={stagnation:.2f} → regress {regression:.2f}; "
+            "recent diagnoses cluster — try a structural change, not a prompt tweak]\n"
+            if regression > 0.05 else ""
+        )
+
         i, n, p = iteration_count + 1, max_iterations, progress
-        diag = f"Prior diagnosis: {last_failure_mode}\n" if last_failure_mode else ""
+        diag = stuck_note + (f"Prior diagnosis: {last_failure_mode}\n" if last_failure_mode else "")
 
         if progress < 0.25:
             n_agents = self._sample_agent_count(progress, 1, 2)
@@ -260,3 +315,35 @@ class VariationEngine:
             "",
             f"Target goal:\n{goal}",
         ])
+
+
+if __name__ == "__main__":
+    ve = VariationEngine()
+    assert ve._compute_stagnation() == 0.0, "empty history → no stagnation"
+
+    ve.diagnosis_history = ["verification failed: claim X not supported"] * 5
+    s_high = ve._compute_stagnation()
+    assert s_high > 0.9, f"clustered diagnoses → high stagnation, got {s_high}"
+
+    ve.diagnosis_history = [
+        "verification failed: claim X not supported",
+        "tool returned empty result for query Y",
+        "import error: matplotlib missing",
+        "agent emitted no answer at step 2",
+        "syntax error in generated code",
+    ]
+    s_low = ve._compute_stagnation()
+    assert s_low < 0.3, f"diverse diagnoses → low stagnation, got {s_low}"
+
+    np.random.seed(0)
+    samples = [ve._sample_phase_regression(0.8) for _ in range(500)]
+    mean = sum(samples) / len(samples)
+    assert 0.28 < mean < 0.44, f"E[regression@0.8] ≈ 0.36, got {mean:.3f}"
+
+    ve.diagnosis_history = ["stuck same failure"] * 6
+    block = ve._get_temperature_phase(iteration_count=30, max_iterations=35)
+    assert "stagnation=" in block, "high-stagnation phase prompt should mention it"
+
+    print(f"✅ stagnation high={s_high:.3f}, low={s_low:.3f}, "
+          f"mean regression@0.8={mean:.3f}")
+    print("✅ variation_engine smoke check passed.")
