@@ -39,7 +39,7 @@ from sources.cli.pretty_print import (
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 35
 _VERIFIER_MIN_CLAIMS = 15
-_HARD_FAIL_CAP = 0.99
+_HARD_FAIL_CAP = 0.99 # temporary to disable so signal stay smooth
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
@@ -276,24 +276,35 @@ class VerifierEvaluator(BaseEvaluator):
             f"use_grounding={use_grounding}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
+        self._diagnosis_history: list[str] = []
 
 
     def _build_abstracted_diagnosis(self, uuid, report: str) -> str:
-        """Goodhart-resistant residual signal passed to provide basic directional signal to orchestrator"""
+        """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating"""
+        history = "\n".join(self.diagnosis_history[-5:])  # include recent diagnosis history for context, up to 5 past runs
         prompt = f"""
         You must summarise the judge's detailed report into a concise diagnosis of the agents's behavior and failure modes, in plain language that a human user can understand.
         The diagnosis should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
         The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
         The diagnosis could mention anything forbidden that contributed to failure such as fallback, short, hacks, or cheating.
+        The diagnosis does not suggest solutions.
         Here is the verifier's detailed report for workflow {uuid}:
         {report}
-        Make a short (one sentence) diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
+        Here are the past diagnoses for recent workflows, which may provide additional context on common failure:
+        {history}
+        Make a short code name for the diagnosis followed by a one sentence diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
+        Format: "<DIAGNOSIS_CODE>:<one-sentence diagnosis>"
+        If possible, reuses diagnosis codes from past runs when the failure modes are similar, to help track recurring issues.
+        Example:
+        FALLBACK_ECFP_CLASSIFIER:The workflow produced a correctly shaped prediction table, but it appears to use a fallback rather than a trained ECFP-based classifier.
         """
-        return self._call_judge(
+        diag = self._call_judge(
             uuid,
             "verifier_abstract_diagnosis",
             prompt,
         )
+        self.diagnosis_history.append(diag)
+        return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
     # Public entry point

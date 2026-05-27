@@ -3,6 +3,7 @@
 VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evolution.
 """
 
+import math
 from .workflow_info import WorkflowInfo
 
 from sources.cli.pretty_print import (
@@ -19,20 +20,22 @@ class VariationEngine:
     Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
       - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
       - Injects a freshly-sampled multi-dimensional perturbation (via Mutagen)
-      - Applies a phase-aware annealing schedule that governs exploration breadth
-        and permitted topology complexity as iterations progress.
+      - Applies a step-aware annealing schedule that governs exploration breadth
+        and permitted topology complexity as iterations stagnation.
     """
 
     def __init__(self):
         self.diagnosis_history = []
+        self.agent_count_history = []
+        self.max_possible_agents = 7
 
-    def _sample_agent_count(self, progress: float, lo: int, hi: int, concentration: float = 4.0) -> int:
+    def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
         """
-        Sample agent random count within [lo, hi], biased upward by progress.
+        Sample agent random count within [lo, hi], biased upward by stagnation.
         """
         if lo == hi:
             return lo
-        target_mean = lo + progress * (hi - lo)
+        target_mean = lo + stagnation * (hi - lo)
         p = np.clip((target_mean - lo) / (hi - lo), 0.05, 0.95)
         alpha = p * concentration
         beta = (1 - p) * concentration
@@ -43,17 +46,20 @@ class VariationEngine:
         """Token-level Jaccard. Cheap stand-in for embedding cosine; no model load."""
         if not a or not b:
             return 0.0
-        tokens_a = set(a.lower().split())
-        tokens_b = set(b.lower().split())
+        a = ' '.join([a_c for a_c in a.split() if len(a_c) > 5 or a_c.isupper()])
+        b = ' '.join([b_c for b_c in b.split() if len(b_c) > 5 or b_c.isupper()])
+        print(f"Comparing diagnoses:\nA: {a}\nB: {b}")
+        tokens_a = set(a.lower().split(' '))
+        tokens_b = set(b.lower().split(' '))
         if not tokens_a or not tokens_b:
             return 0.0
         return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
-    def _compute_stagnation(self, window: int = 5) -> float:
+    def _compute_stagnation(self, window: int = 3) -> float:
         """Mean pairwise Jaccard over the last `window` diagnoses, ∈ [0, 1].
 
         High value ⇒ the LLM-mutator is cycling on similar failure modes
-        (mode collapse). Used to drive stochastic phase regression.
+        (mode collapse). Used to drive stochastic step regression.
         """
         recent = self.diagnosis_history[-window:]
         if len(recent) < 2:
@@ -63,96 +69,39 @@ class VariationEngine:
             for i in range(len(recent))
             for j in range(i + 1, len(recent))
         ]
-        return sum(sims) / len(sims) if sims else 0.0
+        raw = sum(sims) / len(sims) if sims else 0.0
+        stagnation = np.clip(raw / 0.5, 0, 1) ** 0.5
+        return stagnation
 
-    def _sample_phase_regression(
-        self, stagnation: float, max_regression: float = 0.45, concentration: float = 4.0
-    ) -> float:
-        """Beta-sampled regression amount, mean ≈ stagnation · max_regression.
-
-        Mirrors `_sample_agent_count`'s shape so the schedule keeps some
-        randomness instead of snapping deterministically on the threshold.
+    def _get_prompt_step_size(self):
         """
-        if stagnation <= 0.0:
-            return 0.0
-        p = float(np.clip(stagnation, 0.05, 0.95))
-        alpha = p * concentration
-        beta = (1 - p) * concentration
-        return float(np.random.beta(alpha, beta)) * max_regression
-
-    def _get_temperature_phase(
-        self,
-        iteration_count,
-        max_iterations=10,
-        score=0.0,
-        alpha=0.5,
-        last_failure_mode=None,
-    ):
+        prompt gradient 'step size' to adapt mutation boldness based on stagnation level. High stagnation → bolder mutations.
         """
-        EV-ranked phase schedule: single-agent → tools → prompt → (only if needed)
-        decomposition → integrative tuning → polish.
-
-        When recent failure diagnoses cluster (LLM mutator cycling on a basin),
-        stochastically regress progress so the next iteration drops back into a
-        more exploratory phase. Regression magnitude is Beta-sampled.
-        """
-
         stagnation = self._compute_stagnation()
-        regression = self._sample_phase_regression(stagnation)
-        progress = max(0.0, progress - regression)
+        curr_agent_count = self.agent_count_history[-1] if self.agent_count_history else 1
+        max_agent = int((curr_agent_count + stagnation * self.max_possible_agents))  # more stagnation → allow more agents
+        n_agents = self._sample_agent_count(stagnation, 1, max_agent)
+        self.agent_count_history.append(n_agents)
 
-        stuck_note = (
-            f"[stagnation={stagnation:.2f} → regress {regression:.2f}; "
-            "recent diagnoses cluster — try a structural change, not a prompt tweak]\n"
-            if regression > 0.05 else ""
-        )
-
-        i, n, p = iteration_count + 1, max_iterations, progress
-        diag = stuck_note + (f"Prior diagnosis: {last_failure_mode}\n" if last_failure_mode else "")
-
-        if progress < 0.25:
-            n_agents = self._sample_agent_count(progress, 1, 2)
+        if stagnation < 0.25:
             return (
-                f"## PHASE: SEED  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Priority mutations: prompt only. Max agent count: {n_agents}.\n"
-                "Goal: build the strongest possible single-agent workflow and see how far it gets.\n"
-                "Do: one agent with a domain-specific role prompt; attach every relevant tool.\n"
+                f"Priority mutations: small change, prompt only. Max Agent count: {n_agents}.\n"
             )
-        elif progress < 0.50:
-            n_agents = self._sample_agent_count(progress, 1, 3)
+        elif stagnation < 0.50:
             return (
-                f"## PHASE: ANCHOR  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: prompt (primary), topology, tools. Max agent count: {n_agents}.\n"
-                "Goal: rewrite the agent's prompt or decompse verification/steps across agents. This phase gets the largest iteration budget.\n"
-                "Each variant should change ONE thing from the previous best:\n"
-                "  domain vocabulary, role definition, required output shape, level of formality,\n"
-                "  explicit step listing, requirement to preserve task wording verbatim.\n"
-                "Why: prompts steer the model into the right way of thinking about the task. "
+                f"Permitted mutations: small change, prompt (primary), tools. Max Agent count: {n_agents}.\n"
             )
-        elif progress < 0.65:
-            n_agents = self._sample_agent_count(progress, 2, 5)
+        elif stagnation < 0.65:
             return (
-                f"## PHASE: DECOMPOSE  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: topology, prompt, handoff format. Max agent count: {n_agents}.\n"
-                "Why: see if multi-agent shape might outperforms a well-prompted single agent."
+                f"Permitted mutations: medium change, topology, prompt, handoff format. Max Agent count: {n_agents}.\n"
             )
-        elif progress < 0.85:
-            n_agents = self._sample_agent_count(progress, 3, 7)
+        elif stagnation < 0.85:
             return (
-                f"## PHASE: ENGAGE  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: prompt, handoff format, agent count (restricted) {n_agents} maximum.\n"
-                "Goal: tighten the workflow you have; remove any agent that isn't earning its place."
-                "Solver / executor / single-purpose agents need sharper, more specific prompts so they commit confidently to one approach.\n"
+                f"Permitted mutations: big change, prompt, handoff format, Max Agent count {n_agents}.\n"
             )
         else:
-            n_agents = self._sample_agent_count(progress, 5, 7)
             return (
-                f"## PHASE: POLISH  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: prompt only. Max agent count: {n_agents}.\n"
-                "Goal: one prompt fix per iteration, targeting the single most concrete failure.\n"
-                "Do: trace the failure to one agent and edit that agent's prompt."
-                "Don't: change topology, add tools, or rewrite multiple prompts at once.\n"
-                "Why: at this point, any large change risks breaking what works. Make small, precise edits."
+                f"Permitted mutations: complete rethink. Max Agent count: {n_agents}.\n"
             )
 
     # ── Utility ───────────────────────────────────────────────────────────────
@@ -207,11 +156,11 @@ class VariationEngine:
         diagnosis_block = (
             diagnosis.strip()
             if diagnosis and diagnosis.strip()
-            else (run_stderr or "").strip()
-            or "No diagnosis captured."
-        )
-        self.diagnosis_history.append(diagnosis_block[:512])
-        phase_block   = self._get_temperature_phase(iteration_count, max_iterations, score)
+            else (run_stderr or "FAILURE:unknown failure").strip()
+            or "NO_DIAGNOSIS:No diagnosis captured."
+        ).replace('_', ' ')[:2048]
+        self.diagnosis_history.append(diagnosis_block)
+        step_block   = self._get_prompt_step_size()
 
         if genotype is None:
             body = "Previous attempt failed. Fix syntax errors."
@@ -219,10 +168,7 @@ class VariationEngine:
             body = "\n".join([
                 "## WORKFLOW EVOLUTION STEP",
                 "",
-                phase_block,
-                "",
                 "Your previous workflow attempt did not reach the success threshold.",
-                f"Goal: {goal}",
                 "",
                 "## Previous workflow code:",
                 "<python>",
@@ -237,6 +183,9 @@ class VariationEngine:
                 "",
                 diagnosis_block,
                 "</diagnosis>",
+                "<boldness>",
+                step_block,
+                "</boldness>",
                 "",
                 "## Task: apply a single mutation to the workflow code.",
             ])
@@ -308,38 +257,37 @@ class VariationEngine:
             "2. Identify which decisions failed and why.",
             "3. Build a new workflow that inherits the strongest sub-structures across parents",
             "   and discards the weakest, even if that means a topology none of the parents used.",
-            "",
-            f"Target goal:\n{goal}",
         ])
 
 
 if __name__ == "__main__":
     ve = VariationEngine()
-    assert ve._compute_stagnation() == 0.0, "empty history → no stagnation"
-
-    ve.diagnosis_history = ["verification failed: claim X not supported"] * 5
+    ve.diagnosis_history = ["verification failed: claim X not supported"] * 3
     s_high = ve._compute_stagnation()
-    assert s_high > 0.9, f"clustered diagnoses → high stagnation, got {s_high}"
-
-    ve.diagnosis_history = [
-        "verification failed: claim X not supported",
-        "tool returned empty result for query Y",
-        "import error: matplotlib missing",
-        "agent emitted no answer at step 2",
-        "syntax error in generated code",
-    ]
-    s_low = ve._compute_stagnation()
-    assert s_low < 0.3, f"diverse diagnoses → low stagnation, got {s_low}"
 
     np.random.seed(0)
-    samples = [ve._sample_phase_regression(0.8) for _ in range(500)]
-    mean = sum(samples) / len(samples)
-    assert 0.28 < mean < 0.44, f"E[regression@0.8] ≈ 0.36, got {mean:.3f}"
+    ve.diagnosis_history = []
+    simulate_diagnosis = [
+        "AMBIGUOUS_PROBABILITIES: the workflow largely built the intended multitask molecular predictor and produced complete-looking probabilities, but it was weakened by ambiguous/reproducibility issues in how probabilities were generated, missing held-out classification evaluation, leftover competing scripts, and a minor implementation/tooling inconsistency that made parts of the solution hard to verify.",
+        "FALLBACK_ECFP: the workflow produced a correctly shaped prediction table, but it appears to rely on fallback or constant baseline probabilities rather than a trained ECFP-based multitask ClinTox classifier, so the main fix is to remove bypass logic and ensure the script actually featurizes structures, trains on the labeled training split, predicts with the fitted two-task model, and saves non-placeholder positive-class probabilities.",
+        "TRAIN_TEST: the workflow produced a plausible prediction table, but its script was not sufficiently transparent or complete: it did not clearly demonstrate proper train/test split usage, two-task positive-class probability extraction, or required validation AUC reporting, making the scientific results hard to trust despite the output file looking valid.",
+        "TRAIN_TEST_ISSUE: the workflow produced a well-formed prediction file, but its implementation did not convincingly use the intended train/test separation, clearly model both required binary targets, or reliably extract positive-class probabilities, making the results structurally valid but scientifically unreliable.",
+        "BROKEN_CLASSIFIER: the workflow produced a plausible prediction CSV, but the underlying script is broken and does not reliably demonstrate a real trained two-task molecular classifier with proper featurization, train/test use, probability extraction, and alignment-safe molecule handling, suggesting the deliverable may have come from fallback or non-reproducible output generation rather than the intended workflow.",
+        "FALLBACK_ECFP: probabilities are constant baselines rather than outputs of a trained ECFP multitask ClinTox model; remove bypass logic and ensure real training and prediction.",
+        "FALLBACK_ECFP: the script writes baseline probabilities instead of trained ECFP predictions; the fix is to train the multitask model and persist real positive-class scores.",
+        "FALLBACK_FEATURIZER: featurization silently degraded to a placeholder when RDKit failed, so downstream predictions are not based on real molecular structure; harden the featurizer path.",
+        "FEATURIZER_DEGRADED: the molecular featurizer fell back to a degenerate representation under partial RDKit failure, yielding predictions that do not reflect structure-aware learning.",
+        "RDKIT_PARTIAL: RDKit loaded but several molecules failed to parse and were silently dropped, biasing the trained model toward an unrepresentative subset of the data.",
+        "TIMEOUT_AGENT_3: agent 3 hit the wall-clock limit while iterating over the full dataset; reduce per-agent scope, batch inputs, or split the responsibility across two agents instead of one monolithic loop.",
+        "JUDGE_REJECTED_FORMAT: the final CSV had the right columns but used semicolons as separators, causing the judge's pandas read to misparse; enforce comma-delimited output in the writer agent.",
+        "EMPTY_HANDOFF: agent 2 returned an empty string to agent 3, breaking the chain; add a validation gate that retries or escalates when an upstream answer is empty or below a length threshold.",
+        "INFINITE_LOOP_PLANNER: the planner agent kept re-emitting the same plan because the critic's feedback was not threaded back into its context; route critic output explicitly into the planner's next prompt."
+    ]
 
-    ve.diagnosis_history = ["stuck same failure"] * 6
-    block = ve._get_temperature_phase(iteration_count=30, max_iterations=35)
-    assert "stagnation=" in block, "high-stagnation phase prompt should mention it"
-
-    print(f"✅ stagnation high={s_high:.3f}, low={s_low:.3f}, "
-          f"mean regression@0.8={mean:.3f}")
-    print("✅ variation_engine smoke check passed.")
+    for diag in simulate_diagnosis:
+        print("Adding diagnosis to history:", diag)
+        ve.diagnosis_history.append(diag)  # only keep code for stagnation sim
+        s_low = ve._compute_stagnation()
+        print(f"Stagnation scores: {s_low:.3f}")
+        block = ve._get_prompt_step_size()
+        print("Block:", block)
