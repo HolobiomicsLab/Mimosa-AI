@@ -276,35 +276,35 @@ class VerifierEvaluator(BaseEvaluator):
             f"use_grounding={use_grounding}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
-        self._diagnosis_history: list[str] = []
+        self._prompt_gradient_history: list[str] = []
 
 
-    def _build_abstracted_diagnosis(self, uuid, report: str) -> str:
+    def _build_abstracted_prompt_gradient(self, uuid, report: str) -> str:
         """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating"""
-        history = "\n".join(self.diagnosis_history[-5:])  # include recent diagnosis history for context, up to 5 past runs
+        history = "\n".join(self.prompt_gradient_history[-5:])  # include recent prompt_gradient history for context, up to 5 past runs
         prompt = f"""
-        You must summarise the judge's detailed report into a concise diagnosis of the agents's behavior and failure modes, in plain language that a human user can understand.
-        The diagnosis should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
-        The diagnosis should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
-        The diagnosis could mention anything forbidden that contributed to failure such as fallback, short, hacks, or cheating.
-        The diagnosis does not suggest solutions.
+        You must summarise the judge's detailed report into a concise prompt_gradient of the agents's behavior and failure modes, in plain language that a human user can understand.
+        The prompt_gradient should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
+        The prompt_gradient should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
+        The prompt_gradient could mention anything forbidden that contributed to failure such as fallback, short, hacks, or cheating.
+        The prompt_gradient does not suggest solutions.
         Here is the verifier's detailed report for workflow {uuid}:
         {report}
         Here are the past diagnoses for recent workflows, which may provide additional context on common failure:
         {history}
-        Make a short code name for the diagnosis followed by a one sentence diagnosis of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
-        Format: "<DIAGNOSIS_CODE>:<one-sentence diagnosis>"
-        If possible, reuses diagnosis codes from past runs when the failure modes are similar, to help track recurring issues.
+        Make a short code name for the prompt_gradient followed by a one sentence prompt_gradient of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
+        Format: "<prompt_gradient_CODE>:<one-sentence prompt_gradient>"
+        If possible, reuses prompt_gradient codes from past runs when the failure modes are similar, to help track recurring issues.
         Example:
         FALLBACK_ECFP_CLASSIFIER:The workflow produced a correctly shaped prediction table, but it appears to use a fallback rather than a trained ECFP-based classifier.
         """
         diag = self._call_judge(
             uuid,
-            "verifier_abstract_diagnosis",
+            "verifier_abstract_prompt_gradient",
             prompt,
         )
-        self.diagnosis_history.append(diag)
-        return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
+        self.prompt_gradient_history.append(diag)
+        return diag.strip() or "UNDIAGNOSED:No prompt_gradient could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -361,9 +361,9 @@ class VerifierEvaluator(BaseEvaluator):
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
 
         report = self._build_report(per_claim, scores, cheat)
-        diagnosis = self._build_abstracted_diagnosis(uuid, report)
-        scores["abstracted_diagnosis"] = diagnosis
-        self._persist_diagnosis(uuid, diagnosis)
+        prompt_gradient = self._build_abstracted_prompt_gradient(uuid, report)
+        scores["abstracted_prompt_gradient"] = prompt_gradient
+        self._persist_prompt_gradient(uuid, prompt_gradient)
 
         try:
             self._save_results(scores, uuid, "verifier")
@@ -390,14 +390,14 @@ class VerifierEvaluator(BaseEvaluator):
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
-            "abstracted_diagnosis": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
+            "abstracted_prompt_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
         }
         try:
             self._write_report(uuid, [], [], scores, cheat=None)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
-        self._persist_diagnosis(uuid, "")
+        self._persist_prompt_gradient(uuid, "")
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -1464,12 +1464,12 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return scores
 
     # ------------------------------------------------------------------
-    # Layer 1 — abstracted diagnosis for the mutator
+    # Layer 1 — abstracted prompt_gradient for the mutator
     # ------------------------------------------------------------------
 
 
     @staticmethod
-    def _fallback_diagnosis(
+    def _fallback_prompt_gradient(
         scores: dict[str, Any], cheat
     ) -> str:
         """Deterministic fallback when the abstractor LLM is unavailable."""
@@ -1494,16 +1494,16 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             )
         return " ".join(bits)
 
-    def _persist_diagnosis(self, uuid: str, diagnosis: str) -> None:
-        """Write the diagnosis to ``diagnosis.txt`` alongside the report."""
-        if not diagnosis:
+    def _persist_prompt_gradient(self, uuid: str, prompt_gradient: str) -> None:
+        """Write the prompt_gradient to ``prompt_gradient.txt`` alongside the report."""
+        if not prompt_gradient:
             return
-        path = self.workflow_dir / uuid / "diagnosis.txt"
+        path = self.workflow_dir / uuid / "prompt_gradient.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            path.write_text(diagnosis, encoding="utf-8")
+            path.write_text(prompt_gradient, encoding="utf-8")
         except OSError as e:
-            self.logger.warning(f"could not write diagnosis.txt for {uuid}: {e}")
+            self.logger.warning(f"could not write prompt_gradient.txt for {uuid}: {e}")
 
     def _build_report(
         self,

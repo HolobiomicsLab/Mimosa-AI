@@ -27,7 +27,7 @@ class VariationEngine:
     """
 
     def __init__(self):
-        self.diagnosis_history = []
+        self.prompt_gradient_history = []
         self.agent_count_history = []
         self.max_possible_agents = 7
         self._embedder = None
@@ -45,7 +45,7 @@ class VariationEngine:
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
-    def _diagnosis_similarity(self, a: str, b: str) -> float:
+    def _prompt_gradient_similarity(self, a: str, b: str) -> float:
         """Cosine similarity over MiniLM-encoded diagnoses."""
         if not a or not b:
             return 0.0
@@ -61,11 +61,11 @@ class VariationEngine:
         High value ⇒ the LLM-mutator is cycling on similar failure modes
         (mode collapse). Used to drive stochastic step regression.
         """
-        recent = self.diagnosis_history[-window:]
+        recent = self.prompt_gradient_history[-window:]
         if len(recent) < 2:
             return 0.0
         sims = [
-            self._diagnosis_similarity(recent[i], recent[j])
+            self._prompt_gradient_similarity(recent[i], recent[j])
             for i in range(len(recent))
             for j in range(i + 1, len(recent))
         ]
@@ -141,18 +141,18 @@ class VariationEngine:
           2. Execution grounding — previous code, agent answers, and judge eval.
         """
         score      = wf_info.overall_score        if wf_info else 0.0
-        diagnosis  = wf_info.abstracted_diagnosis if wf_info else ""
+        prompt_gradient  = wf_info.abstracted_prompt_gradient if wf_info else ""
         wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Execution evidence ───────────────────────────────────────────────
         agent_answers = self._extract_agent_answers(wf_state)
-        diagnosis_block = (
-            diagnosis.strip()
-            if diagnosis and diagnosis.strip()
+        prompt_gradient_block = (
+            prompt_gradient.strip()
+            if prompt_gradient and prompt_gradient.strip()
             else (run_stderr or "FAILURE:unknown failure").strip()
-            or "NO_DIAGNOSIS:No diagnosis captured."
+            or "NO_prompt_gradient:No prompt_gradient captured."
         ).replace('_', ' ')[:2048]
-        self.diagnosis_history.append(diagnosis_block)
+        self.prompt_gradient_history.append(prompt_gradient_block)
         step_block   = self._get_prompt_step_size()
 
         if genotype is None:
@@ -172,10 +172,10 @@ class VariationEngine:
                 "<agents_answers>",
                 agent_answers,
                 "</agents_answers>",
-                "<diagnosis>",
+                "<prompt_gradient>",
                 "",
-                diagnosis_block,
-                "</diagnosis>",
+                prompt_gradient_block,
+                "</prompt_gradient>",
                 "<boldness>",
                 step_block,
                 "</boldness>",
@@ -209,16 +209,16 @@ class VariationEngine:
             zip(wf_infos, genotypes, run_stderrs)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
-            diagnosis = wf_info.abstracted_diagnosis if wf_info else ""
-            # Layer 1: rubric-blind diagnosis instead of raw judge log.
-            # Fall back to stderr tail only when no diagnosis exists.
-            diagnosis = diagnosis.strip() or (stderr or "").strip()[-1024:]
+            prompt_gradient = wf_info.abstracted_prompt_gradient if wf_info else ""
+            # Layer 1: rubric-blind prompt_gradient instead of raw judge log.
+            # Fall back to stderr tail only when no prompt_gradient exists.
+            prompt_gradient = prompt_gradient.strip() or (stderr or "").strip()[-1024:]
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
                 "index":     i + 1,
                 "score":     score,
                 "code":      genotype,
-                "diagnosis": diagnosis,
+                "prompt_gradient": prompt_gradient,
                 "answers":   answers,
             })
 
@@ -255,12 +255,12 @@ class VariationEngine:
 
 if __name__ == "__main__":
     ve = VariationEngine()
-    ve.diagnosis_history = ["verification failed: claim X not supported"] * 3
+    ve.prompt_gradient_history = ["verification failed: claim X not supported"] * 3
     s_high = ve._compute_stagnation()
 
     np.random.seed(0)
-    ve.diagnosis_history = []
-    simulate_diagnosis = [
+    ve.prompt_gradient_history = []
+    simulate_prompt_gradient = [
         "AMBIGUOUS_PROBABILITIES: the workflow largely built the intended multitask molecular predictor and produced complete-looking probabilities, but it was weakened by ambiguous/reproducibility issues in how probabilities were generated, missing held-out classification evaluation, leftover competing scripts, and a minor implementation/tooling inconsistency that made parts of the solution hard to verify.",
         "FALLBACK_ECFP: the workflow produced a correctly shaped prediction table, but it appears to rely on fallback or constant baseline probabilities rather than a trained ECFP-based multitask ClinTox classifier, so the main fix is to remove bypass logic and ensure the script actually featurizes structures, trains on the labeled training split, predicts with the fitted two-task model, and saves non-placeholder positive-class probabilities.",
         "TRAIN_TEST: the workflow produced a plausible prediction table, but its script was not sufficiently transparent or complete: it did not clearly demonstrate proper train/test split usage, two-task positive-class probability extraction, or required validation AUC reporting, making the scientific results hard to trust despite the output file looking valid.",
@@ -277,9 +277,9 @@ if __name__ == "__main__":
         "INFINITE_LOOP_PLANNER: the planner agent kept re-emitting the same plan because the critic's feedback was not threaded back into its context; route critic output explicitly into the planner's next prompt."
     ]
 
-    for diag in simulate_diagnosis:
-        print("Adding diagnosis to history:", diag)
-        ve.diagnosis_history.append(diag)  # only keep code for stagnation sim
+    for diag in simulate_prompt_gradient:
+        print("Adding prompt_gradient to history:", diag)
+        ve.prompt_gradient_history.append(diag)  # only keep code for stagnation sim
         s_low = ve._compute_stagnation()
         print(f"Stagnation scores: {s_low:.3f}")
         block = ve._get_prompt_step_size()
