@@ -4,6 +4,8 @@ VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evo
 """
 
 import math
+from sentence_transformers import SentenceTransformer
+import torch.nn.functional as F
 from .workflow_info import WorkflowInfo
 
 from sources.cli.pretty_print import (
@@ -28,6 +30,7 @@ class VariationEngine:
         self.diagnosis_history = []
         self.agent_count_history = []
         self.max_possible_agents = 7
+        self._embedder = None
 
     def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
         """
@@ -43,20 +46,17 @@ class VariationEngine:
         return lo + int(np.random.binomial(hi - lo, prob))
 
     def _diagnosis_similarity(self, a: str, b: str) -> float:
-        """Token-level Jaccard. Cheap stand-in for embedding cosine; no model load."""
+        """Cosine similarity over MiniLM-encoded diagnoses."""
         if not a or not b:
             return 0.0
-        a = ' '.join([a_c for a_c in a.split() if len(a_c) > 5 or a_c.isupper()])
-        b = ' '.join([b_c for b_c in b.split() if len(b_c) > 5 or b_c.isupper()])
-        print(f"Comparing diagnoses:\nA: {a}\nB: {b}")
-        tokens_a = set(a.lower().split(' '))
-        tokens_b = set(b.lower().split(' '))
-        if not tokens_a or not tokens_b:
-            return 0.0
-        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+        if self._embedder is None:
+            self._embedder = SentenceTransformer("all-MiniLM-L6-v2", token=False)
+        emb_a = self._embedder.encode(a, convert_to_tensor=True, show_progress_bar=False)
+        emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
+        return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
     def _compute_stagnation(self, window: int = 3) -> float:
-        """Mean pairwise Jaccard over the last `window` diagnoses, ∈ [0, 1].
+        """Mean pairwise cosine over the last `window` diagnoses, ∈ [0, 1].
 
         High value ⇒ the LLM-mutator is cycling on similar failure modes
         (mode collapse). Used to drive stochastic step regression.
@@ -70,39 +70,32 @@ class VariationEngine:
             for j in range(i + 1, len(recent))
         ]
         raw = sum(sims) / len(sims) if sims else 0.0
-        stagnation = np.clip(raw / 0.5, 0, 1) ** 0.5
+        # MiniLM unrelated baseline ≈ 0.4; treat 0.8+ as fully stagnated.
+        stagnation = float(np.clip((raw - 0.4) / 0.4, 0, 1))
         return stagnation
 
     def _get_prompt_step_size(self):
         """
-        prompt gradient 'step size' to adapt mutation boldness based on stagnation level. High stagnation → bolder mutations.
+        Adapt mutation boldness to current stagnation. Higher stagnation widens
+        both the mutation scope and the permitted agent budget.
         """
         stagnation = self._compute_stagnation()
-        curr_agent_count = self.agent_count_history[-1] if self.agent_count_history else 1
-        max_agent = int((curr_agent_count + stagnation * self.max_possible_agents))  # more stagnation → allow more agents
-        n_agents = self._sample_agent_count(stagnation, 1, max_agent)
+        curr = self.agent_count_history[-1] if self.agent_count_history else 1
+        # Budget grows linearly with stagnation from `curr` up to the global cap,
+        # so it is mathematically bounded by max_possible_agents.
+        budget = curr + round(stagnation * (self.max_possible_agents - curr))
+        n_agents = self._sample_agent_count(stagnation, 1, budget)
         self.agent_count_history.append(n_agents)
 
-        if stagnation < 0.25:
-            return (
-                f"Priority mutations: small change, prompt only. Max Agent count: {n_agents}.\n"
-            )
-        elif stagnation < 0.50:
-            return (
-                f"Permitted mutations: small change, prompt (primary), tools. Max Agent count: {n_agents}.\n"
-            )
-        elif stagnation < 0.65:
-            return (
-                f"Permitted mutations: medium change, topology, prompt, handoff format. Max Agent count: {n_agents}.\n"
-            )
-        elif stagnation < 0.85:
-            return (
-                f"Permitted mutations: big change, prompt, handoff format, Max Agent count {n_agents}.\n"
-            )
-        else:
-            return (
-                f"Permitted mutations: complete rethink. Max Agent count: {n_agents}.\n"
-            )
+        bands = [
+            (0.25, "prompt-only tweak"),
+            (0.50, "prompt, optional tool change"),
+            (0.65, "topology, prompts, handoff format"),
+            (0.85, "bold rewire — restructure or grow the agent set"),
+            (1.01, "complete rethink — discard inherited topology"),
+        ]
+        scope = next(label for threshold, label in bands if stagnation < threshold)
+        return f"Mutation scope: {scope}. Use at most {n_agents} agent(s).\n"
 
     # ── Utility ───────────────────────────────────────────────────────────────
 
