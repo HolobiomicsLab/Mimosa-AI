@@ -96,10 +96,6 @@ class VariationEngine:
         stochastically regress progress so the next iteration drops back into a
         more exploratory phase. Regression magnitude is Beta-sampled.
         """
-        if max_iterations <= 1:
-            progress = 0.5
-        else:
-            progress = (iteration_count / max(max_iterations - 1, 1)) ** (1 - alpha * score)
 
         stagnation = self._compute_stagnation()
         regression = self._sample_phase_regression(stagnation)
@@ -126,7 +122,7 @@ class VariationEngine:
             n_agents = self._sample_agent_count(progress, 1, 3)
             return (
                 f"## PHASE: ANCHOR  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: prompt (primary), topology, tools. Agent count: {n_agents}.\n"
+                f"Permitted mutations: prompt (primary), topology, tools. Max agent count: {n_agents}.\n"
                 "Goal: rewrite the agent's prompt or decompse verification/steps across agents. This phase gets the largest iteration budget.\n"
                 "Each variant should change ONE thing from the previous best:\n"
                 "  domain vocabulary, role definition, required output shape, level of formality,\n"
@@ -137,7 +133,7 @@ class VariationEngine:
             n_agents = self._sample_agent_count(progress, 2, 5)
             return (
                 f"## PHASE: DECOMPOSE  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: topology, prompt, handoff format. Agent count: {n_agents} maximum.\n"
+                f"Permitted mutations: topology, prompt, handoff format. Max agent count: {n_agents}.\n"
                 "Why: see if multi-agent shape might outperforms a well-prompted single agent."
             )
         elif progress < 0.85:
@@ -152,7 +148,7 @@ class VariationEngine:
             n_agents = self._sample_agent_count(progress, 5, 7)
             return (
                 f"## PHASE: POLISH  [{i}/{n} | {p:.0%}]\n{diag}"
-                f"Permitted mutations: prompt only. Agent count: {n_agents}.\n"
+                f"Permitted mutations: prompt only. Max agent count: {n_agents}.\n"
                 "Goal: one prompt fix per iteration, targeting the single most concrete failure.\n"
                 "Do: trace the failure to one agent and edit that agent's prompt."
                 "Don't: change topology, add tools, or rewrite multiple prompts at once.\n"
