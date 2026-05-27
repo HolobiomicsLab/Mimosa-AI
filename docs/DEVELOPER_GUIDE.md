@@ -8,8 +8,8 @@
 3. [Directory Structure](#directory-structure)
 4. [Core Components](#core-components)
 5. [Execution Flow](#execution-flow)
-6. [Evaluation & the 3-layer Verifier](#evaluation--the-3-layer-verifier)
-7. [Testing & Evaluation](#testing--evaluation)
+6. [Evaluation & the 3-layer Verifier](#evaluation-the-3-layer-verifier)
+7. [Testing & Evaluation](#testing-evaluation)
 8. [Contributing Guidelines](#contributing-guidelines)
 
 ---
@@ -33,7 +33,7 @@ fixed pipeline — the meta-orchestrator emits a new graph per task.
 The framework evolves workflows as full Python source, not prompts or
 fixed templates. A single evolution loop is a depth-first recursion over
 generations seeded from a Quality-Diversity (QD) archive. See
-[v2_evolution.md](v2_evolution.md) for the canonical mapping onto
+[Evolution engine](concepts/evolution-engine.md) for the canonical mapping onto
 neuroevolution primitives (representation / selection / variation /
 evaluation).
 
@@ -42,7 +42,7 @@ evaluation).
 Abstracted, rubric-blind diagnosis (the only signal fed
   back into the mutator).
 
-See [evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.mermaid).
+See [Evaluation pipeline](concepts/evaluation-pipeline.md).
 
 #### 4. Tool Discovery & Integration
 Uses MCP (Model Context Protocol) for tool auto-discovery on the local
@@ -218,7 +218,7 @@ mimosa-ai/
 
 ## Core Components
 
-### 1. `EvolutionEngine` — [`sources/core/evolution_engine.py`](../sources/core/evolution_engine.py)
+### 1. `EvolutionEngine` — [`sources/core/evolution_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evolution_engine.py)
 
 Top-level evolutionary loop.
 
@@ -243,7 +243,7 @@ Each recursive step:
 Termination: `overall_score > learned_score_threshold` (default 0.95) in
 `--learn` mode, or `max_depth` reached.
 
-### 2. `SelectionPressure` — [`sources/core/selection.py`](../sources/core/selection.py)
+### 2. `SelectionPressure` — [`sources/core/selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
 
 Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
@@ -254,7 +254,7 @@ gated by Pareto non-domination on `(reward_uncapped, novelty)` with
 ε-bands. Parent draw applies an inverse-child-count penalty
 `÷(1 + n_children_already)` to spread offspring.
 
-### 3. `VariationEngine` — [`sources/core/variation_engine.py`](../sources/core/variation_engine.py)
+### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
 Prompt assembly for mutation and crossover. A phase-aware annealing
 schedule (`_get_temperature_phase`) gates topology complexity by
@@ -271,7 +271,7 @@ iteration progress:
 Progress is `(iter / (max_iter-1)) ** (1 - α·score)` with α=0.5 — high
 scorers progress slower (stay exploratory longer).
 
-### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](../sources/core/workflow_selection.py)
+### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 
 Two-mode parent retrieval:
 
@@ -281,7 +281,7 @@ Two-mode parent retrieval:
   (`cosine ≥ 0.5` on MiniLM embeddings of `original_task`, `score ≥ 0.05`)
   routed through the same `select_parents()` weighting.
 
-### 5. `WorkflowOrchestrator` — [`sources/core/orchestrator.py`](../sources/core/orchestrator.py)
+### 5. `WorkflowOrchestrator` — [`sources/core/orchestrator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/orchestrator.py)
 
 End-to-end workflow execution per generation:
 
@@ -296,7 +296,7 @@ Returns `(execution_output, uuid, workflow_genotype_code, executed)` —
 `executed=False` is the structural failure signal that drives
 re-attempts.
 
-### 6. `LLMProvider` — [`sources/core/llm_provider.py`](../sources/core/llm_provider.py)
+### 6. `LLMProvider` — [`sources/core/llm_provider.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/llm_provider.py)
 
 Unified interface (via LiteLLM) over Anthropic Claude, OpenAI,
 DeepSeek, Hugging Face, OpenRouter (with per-model provider routing),
@@ -306,13 +306,13 @@ and local MLX. Features:
 - token counting + cost tracking,
 - reasoning-effort support (Claude / GPT-5 `minimal|low|medium|high`).
 
-### 7. `ToolManager` — [`sources/core/tools_manager.py`](../sources/core/tools_manager.py)
+### 7. `ToolManager` — [`sources/core/tools_manager.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/tools_manager.py)
 
 MCP server auto-discovery on the configured `discovery_addresses` port
 range. Generates the tool-binding code injected into each workflow
 genotype.
 
-### 8. Evaluation backends — [`sources/core/evaluators/`](../sources/core/evaluators/)
+### 8. Evaluation backends — [`sources/core/evaluators/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/)
 
 | Backend          | File              | Use                                   |
 |------------------|-------------------|---------------------------------------|
@@ -325,7 +325,7 @@ genotype.
 The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
 calls it with `evaluator_type="verifier"`.
 
-### 9. Benchmark evaluation — [`sources/evaluation/`](../sources/evaluation/)
+### 9. Benchmark evaluation — [`sources/evaluation/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/)
 
 - `csv_mode.py` — concurrent batch runner over a CSV dataset
   (controlled by `config.max_concurrent_eval_tasks` and
@@ -398,7 +398,7 @@ main.py --evaluation_cli      # guided model/workspace/mode picker (EvaluationCL
 
 ![Evaluation pipeline](images/evaluation_pipeline.png)
 
-Source: [diagrams/evaluation_pipeline.mermaid](diagrams/evaluation_pipeline.mermaid).
+Source diagram: [`docs/diagrams/verifiers_judge.mermaid`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/docs/diagrams/verifiers_judge.mermaid).
 
 For each generation:
 
@@ -426,7 +426,7 @@ For each generation:
    summary of what failed — is the **only** verifier signal the mutator
    sees.
 
-Detail: [v2_evolution.md §5](v2_evolution.md#5-evaluation--the-3-layer-verifier).
+Detail: [Evaluation pipeline](concepts/evaluation-pipeline.md).
 
 ---
 
@@ -495,12 +495,10 @@ python memory_explorer.py <uuid>
 
 ### Before submitting a PR
 1. ✅ `pytest tests/`
-2. ✅ Follow existing style and the conventions in
-   [v2_evolution.md](v2_evolution.md) for new
-   evolution-layer components.
+2. ✅ Follow existing style; see [Evolution engine](concepts/evolution-engine.md)
+   for conventions on new evolution-layer components.
 3. ✅ Add docstrings on public functions.
-4. ✅ Update the relevant doc(s): `DEVELOPER_GUIDE.md`,
-   `QUICK_RESEARCH_GUIDE.md`, or `v2_evolution.md`. If you change
+4. ✅ Update the relevant doc page(s) under `docs/`. If you change
    architecture, also update the `.mermaid` source under
    `docs/diagrams/` and regenerate the `.png` under `docs/images/`.
 

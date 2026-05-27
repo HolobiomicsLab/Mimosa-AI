@@ -193,7 +193,7 @@ ScienceAgentBench CSV requires these columns:
 
 - [ScienceAgentBench Paper](https://arxiv.org/abs/2410.05080)
 - [CodeBERT Model](https://huggingface.co/microsoft/codebert-base)
-- [Mimosa-AI Documentation](../README.md)
+- [Mimosa-AI Documentation](index.md)
 
 ## License
 
