@@ -1,6 +1,14 @@
 {
-  "timestamp": "2026-05-27T20:22:48.337065",
+  "timestamp": "2026-05-28T22:17:31.910126",
   "pricing": {
+    "anthropic/claude-opus-4.8-fast": {
+      "input": 10.0,
+      "output": 50.0
+    },
+    "anthropic/claude-opus-4.8": {
+      "input": 5.0,
+      "output": 25.0
+    },
     "qwen/qwen3.7-max": {
       "input": 1.25,
       "output": 3.75
@@ -134,8 +142,8 @@
       "output": 0.625
     },
     "tencent/hy3-preview": {
-      "input": 0.06599999999999999,
-      "output": 0.26
+      "input": 0.063,
+      "output": 0.21
     },
     "xiaomi/mimo-v2.5-pro": {
       "input": 0.435,
@@ -161,9 +169,9 @@
       "input": -1000000.0,
       "output": -1000000.0
     },
-    "baidu/qianfan-ocr-fast": {
-      "input": 0.6799999999999999,
-      "output": 2.81
+    "moonshotai/kimi-k2.6:free": {
+      "input": 0.0,
+      "output": 0.0
     },
     "moonshotai/kimi-k2.6": {
       "input": 0.73,
@@ -839,7 +847,7 @@
     },
     "z-ai/glm-4.5-air": {
       "input": 0.125,
-      "output": 0.84
+      "output": 0.85
     },
     "qwen/qwen3-235b-a22b-thinking-2507": {
       "input": 0.14950000000000002,
@@ -1249,6 +1257,10 @@
       "input": 0.16999999999999998,
       "output": 0.43
     },
+    "meta-llama/llama-3.2-1b-instruct": {
+      "input": 0.027,
+      "output": 0.201
+    },
     "meta-llama/llama-3.2-3b-instruct:free": {
       "input": 0.0,
       "output": 0.0
@@ -1256,10 +1268,6 @@
     "meta-llama/llama-3.2-3b-instruct": {
       "input": 0.0509,
       "output": 0.335
-    },
-    "meta-llama/llama-3.2-1b-instruct": {
-      "input": 0.027,
-      "output": 0.201
     },
     "meta-llama/llama-3.2-11b-vision-instruct": {
       "input": 0.245,
@@ -1313,11 +1321,11 @@
       "input": 0.02,
       "output": 0.03
     },
-    "openai/gpt-4o-mini": {
+    "openai/gpt-4o-mini-2024-07-18": {
       "input": 0.15,
       "output": 0.6
     },
-    "openai/gpt-4o-mini-2024-07-18": {
+    "openai/gpt-4o-mini": {
       "input": 0.15,
       "output": 0.6
     },
@@ -1369,13 +1377,13 @@
       "input": 2.0,
       "output": 6.0
     },
-    "openai/gpt-3.5-turbo-0613": {
-      "input": 1.0,
-      "output": 2.0
-    },
     "openai/gpt-4-turbo-preview": {
       "input": 10.0,
       "output": 30.0
+    },
+    "openai/gpt-3.5-turbo-0613": {
+      "input": 1.0,
+      "output": 2.0
     },
     "openrouter/auto": {
       "input": -1000000.0,
@@ -1409,17 +1417,17 @@
       "input": 0.06,
       "output": 0.06
     },
-    "openai/gpt-4-0314": {
-      "input": 30.0,
-      "output": 60.0
+    "openai/gpt-3.5-turbo": {
+      "input": 0.5,
+      "output": 1.5
     },
     "openai/gpt-4": {
       "input": 30.0,
       "output": 60.0
     },
-    "openai/gpt-3.5-turbo": {
-      "input": 0.5,
-      "output": 1.5
+    "openai/gpt-4-0314": {
+      "input": 30.0,
+      "output": 60.0
     }
   }
 }
