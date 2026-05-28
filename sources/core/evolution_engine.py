@@ -377,9 +377,6 @@ class EvolutionEngine:
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].code = wf_info.code
 
-        # Feed the *offspring* diagnosis into the variation engine's stagnation
-        # signal. Tagging execution failures so identical fallback text from the
-        # verifier short-circuit doesn't falsely peg cosine at 1.0.
         if uuid:
             verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
             is_failure = (

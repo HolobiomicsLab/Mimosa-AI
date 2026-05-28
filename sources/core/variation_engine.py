@@ -25,23 +25,12 @@ class VariationEngine:
     """
 
     def __init__(self):
-        # Each entry is (gradient_text, is_failure). Failures are kept in the
-        # log but skipped by the stagnation signal so identical fallback text
-        # ("…failed to generate or execute…") cannot peg cosine at 1.0.
         self.prompt_gradient_history: list[tuple[str, bool]] = []
         self.agent_count_history = []
         self.max_possible_agents = 7
         self._embedder = None
 
     def record_offspring_gradient(self, gradient: str, *, is_failure: bool = False) -> None:
-        """Record the diagnosis of a freshly evaluated offspring.
-
-        The engine must call this after each evaluation. Stagnation is
-        measured over *offspring* gradients, not parent gradients — when
-        the QD archive collapses to a single parent (common in practice),
-        appending the parent's gradient at every mutation would trivially
-        peg the signal at 1.0.
-        """
         text = (gradient or "").strip() or "NO_prompt_gradient:No prompt_gradient captured."
         self.prompt_gradient_history.append((text, bool(is_failure)))
 
@@ -69,12 +58,7 @@ class VariationEngine:
         return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
     def _compute_stagnation(self, window: int = 4) -> float:
-        """Mean pairwise cosine over the last `window` *semantic* offspring
-        diagnoses, ∈ [0, 1]. High value ⇒ the LLM-mutator is cycling on
-        similar failure modes (mode collapse). Failure-fallback gradients
-        are filtered out because their identical sentinel text would
-        falsely saturate the signal.
-        """
+        """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1]."""
         semantic = [g for g, is_failure in self.prompt_gradient_history if not is_failure]
         recent = semantic[-window:]
         if len(recent) < 2:
@@ -86,16 +70,10 @@ class VariationEngine:
         ]
         raw = sum(sims) / len(sims) if sims else 0.0
         # MiniLM unrelated baseline ≈ 0.4; treat 0.8+ as fully stagnated.
-        stagnation = float(np.clip((raw - 0.4) / 0.4, 0, 1))
-        return stagnation
+        return float(np.clip((raw - 0.4) / 0.4, 0, 1))
 
     def _get_prompt_step_size(self, parent_score: float = 0.0) -> str:
-        """
-        Adapt mutation boldness to current stagnation. Higher stagnation widens
-        both the mutation scope and the permitted agent budget. A near-winning
-        parent damps boldness so we don't rewire a workflow that almost
-        succeeded — `effective = raw_stagnation · (1 − parent_score)`.
-        """
+        """Boldness = raw_stagnation · (1 − parent_score). Near-winners stay protected."""
         raw_stagnation = self._compute_stagnation()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
         stagnation = raw_stagnation * (1.0 - parent_score)
@@ -300,44 +278,28 @@ class VariationEngine:
 
 if __name__ == "__main__":
     np.random.seed(0)
-    _FAILURE_SENTINEL = (
-        "workflow code failed to generate or execute; "
-        "ensure code is properly formatted and that the workflow runs without crashing"
-    )
 
-    # ── Fix #3: identical failure sentinels must NOT peg stagnation ──────
     ve = VariationEngine()
     for _ in range(4):
-        ve.record_offspring_gradient(_FAILURE_SENTINEL, is_failure=True)
-    assert ve._compute_stagnation() == 0.0, "failure sentinels must be filtered"
+        ve.record_offspring_gradient("anything", is_failure=True)
+    assert ve._compute_stagnation() == 0.0
 
-    # ── Fix #2: a near-winning parent damps effective stagnation ─────────
     ve = VariationEngine()
     for _ in range(4):
-        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT: same failure mode repeating")
-    raw = ve._compute_stagnation()
-    block_high_score = ve._get_prompt_step_size(parent_score=0.97)
-    block_low_score = ve._get_prompt_step_size(parent_score=0.10)
-    assert raw > 0.8, f"expected high raw stagnation, got {raw:.2f}"
-    assert "prompt-only tweak" in block_high_score, (
-        f"high-score parent should damp scope; got:\n{block_high_score}"
-    )
-    assert "rethink" in block_low_score or "rewire" in block_low_score, (
-        f"low-score parent under high stagnation should widen scope; got:\n{block_low_score}"
-    )
+        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
+    assert ve._compute_stagnation() > 0.8
+    assert "prompt-only tweak" in ve._get_prompt_step_size(parent_score=0.97)
+    low = ve._get_prompt_step_size(parent_score=0.10)
+    assert "rethink" in low or "rewire" in low
 
-    # ── Fix #1 (semantic): diverse offspring gradients keep stagnation low ─
     ve = VariationEngine()
-    diverse = [
-        "TIMEOUT_AGENT_3: agent 3 hit the wall-clock limit while iterating over the full dataset.",
-        "JUDGE_REJECTED_FORMAT: CSV used semicolons as separators; enforce commas.",
-        "EMPTY_HANDOFF: agent 2 returned empty string; add validation gate.",
-        "INFINITE_LOOP_PLANNER: planner re-emitted same plan; route critic output back.",
-    ]
-    for g in diverse:
+    for g in (
+        "TIMEOUT_AGENT_3: agent 3 hit the wall-clock limit.",
+        "JUDGE_REJECTED_FORMAT: CSV used semicolons; enforce commas.",
+        "EMPTY_HANDOFF: agent 2 returned empty string.",
+        "INFINITE_LOOP_PLANNER: planner re-emitted same plan.",
+    ):
         ve.record_offspring_gradient(g)
-    assert ve._compute_stagnation() < 0.5, (
-        f"diverse offspring gradients should not stagnate; got {ve._compute_stagnation():.2f}"
-    )
+    assert ve._compute_stagnation() < 0.5
 
-    print("smoke OK: failure-sentinel filter, parent-score damper, diverse-offspring ↦ low stagnation")
+    print("smoke OK")
