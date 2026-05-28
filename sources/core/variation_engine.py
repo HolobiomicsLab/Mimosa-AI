@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from .workflow_info import WorkflowInfo
 
 from sources.cli.pretty_print import (
-    print_info,
+    print_info, print_ok, print_warn, print_err,
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
 
@@ -18,12 +18,10 @@ import numpy as np
 class VariationEngine:
     """
     Orchestrates iterative LLM-driven workflow search via structured prompt mutation.
-
     Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
       - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
-      - Injects a freshly-sampled multi-dimensional perturbation (via Mutagen)
       - Applies a step-aware annealing schedule that governs exploration breadth
-        and permitted topology complexity as iterations stagnation.
+        and permitted topology complexity as progress stagnate.
     """
 
     def __init__(self):
@@ -55,9 +53,8 @@ class VariationEngine:
         emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
         return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
-    def _compute_stagnation(self, window: int = 3) -> float:
+    def _compute_stagnation(self, window: int = 4) -> float:
         """Mean pairwise cosine over the last `window` diagnoses, ∈ [0, 1].
-
         High value ⇒ the LLM-mutator is cycling on similar failure modes
         (mode collapse). Used to drive stochastic step regression.
         """
@@ -81,21 +78,24 @@ class VariationEngine:
         """
         stagnation = self._compute_stagnation()
         curr = self.agent_count_history[-1] if self.agent_count_history else 1
-        # Budget grows linearly with stagnation from `curr` up to the global cap,
-        # so it is mathematically bounded by max_possible_agents.
         budget = curr + round(stagnation * (self.max_possible_agents - curr))
         n_agents = self._sample_agent_count(stagnation, 1, budget)
         self.agent_count_history.append(n_agents)
 
+        if stagnation > 0.5:
+            print_warn(f"Stagnation detected (score={stagnation:.2f}). Increasing mutation boldness and agent budget.")
+        else:
+            print_info(f"Stagnation score: {stagnation:.2f}. Mutation scope and agent budget remain moderate.")
+
         bands = [
-            (0.25, "prompt-only tweak"),
-            (0.50, "prompt, optional tool change"),
-            (0.65, "topology, prompts, handoff format"),
-            (0.85, "bold rewire — restructure or grow the agent set"),
+            (0.20, "prompt-only tweak"),
+            (0.40, "prompt, optional tool change"),
+            (0.60, "topology, prompts, handoff format"),
+            (0.80, "bold rewire — restructure or grow the agent set"),
             (1.01, "complete rethink — discard inherited topology"),
         ]
         scope = next(label for threshold, label in bands if stagnation < threshold)
-        return f"Mutation scope: {scope}. Use at most {n_agents} agent(s).\n"
+        return f"Mutation scope: {scope}. Stagnation: {stagnation*100:.2f}%. Use at most {n_agents} agent(s).\n"
 
     # ── Utility ───────────────────────────────────────────────────────────────
 
@@ -114,14 +114,33 @@ class VariationEngine:
 
     # ── Prompt builders ───────────────────────────────────────────────────────
 
+    def random_topology_prompt(self) -> str:
+        return np.random.choice([
+            "simple linear chain",
+            "hub-and-spoke with 3-4 agents",
+            "fully connected mesh",
+            "single-agent",
+            "debate (two+ agents argue, judge decides)",
+            "reflection pair (actor + critic loop)",
+            "blackboard (shared debate scratchpad, no direct messaging)",
+            "map-reduce (fan-out subtasks, aggregator merges)",
+            "sequential pipeline (output of one is input to next)",
+            "round-robin group chat (shared conversation thread)",
+            "mixture-of-experts (router picks expert per step)",
+            "verifier-generator (generator proposes, verifier gates)"
+        ])
+
     def seed_genome_prompt(self, goal: str) -> str:
         """
         Prompt for very first workflow generation (generation 0).
         """
+        n_agents = self._sample_agent_count(0.5, 1, 5)  # start with small random agent count
+        topology = self.random_topology_prompt()
         return (
             "## First workflow generation\n"
             f"Goal to assemble a workflow for:\n{goal}\n"
-            "Build the minimal workflow for the task with maximum 2 agents.\n"
+            f"Suggested initial topology: {topology}.\n"
+            f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
 
     def mutation_prompt(

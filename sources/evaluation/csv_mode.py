@@ -100,13 +100,13 @@ class CsvEvaluationMode:
         self._semaphore: asyncio.Semaphore | None = None
         self._base_workspace_dir = config.workspace_dir
 
-        model_name = config.judge_model 
+        model_name = config.judge_model
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(
             model=model,
             provider=provider,
-            temperature=0.8,
+            temperature=1.0,
             max_tokens=8192
         )
         self.result_analyzer = LLMProvider(

@@ -43,7 +43,7 @@ _HARD_FAIL_CAP = 0.99 # temporary to disable so signal stay smooth
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
-_INFO_BONUS_ALPHA = 0.15
+_INFO_BONUS_ALPHA = 0.05
 _INFO_BONUS_BETA = 8.0
 
 # ----- File preview budgets ---------------------------------------------------
@@ -281,7 +281,7 @@ class VerifierEvaluator(BaseEvaluator):
 
     def _build_abstracted_prompt_gradient(self, uuid, report: str) -> str:
         """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating"""
-        history = "\n".join(self.prompt_gradient_history[-5:])  # include recent prompt_gradient history for context, up to 5 past runs
+        history = "\n".join(self._prompt_gradient_history[-5:])  # include recent prompt_gradient history for context, up to 5 past runs
         prompt = f"""
         You must summarise the judge's detailed report into a concise prompt_gradient of the agents's behavior and failure modes, in plain language that a human user can understand.
         The prompt_gradient should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
@@ -303,7 +303,7 @@ class VerifierEvaluator(BaseEvaluator):
             "verifier_abstract_prompt_gradient",
             prompt,
         )
-        self.prompt_gradient_history.append(diag)
+        self._prompt_gradient_history.append(diag)
         return diag.strip() or "UNDIAGNOSED:No prompt_gradient could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
@@ -1587,3 +1587,12 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             self.logger.info(f"Verifier report written to {path}")
         except OSError as e:
             self.logger.error(f"Could not write verifier report for {uuid}: {e}")
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    sys.path.append(str(Path(__file__).parent.parent.parent.parent))  # noqa: E402
+    from config import Config
+    config = Config()
+    verifier = VerifierEvaluator(config, config.workspace_dir)
+    verifier.evaluate("20260528_090358_ff330fde")
