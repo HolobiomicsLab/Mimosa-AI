@@ -377,6 +377,20 @@ class EvolutionEngine:
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].code = wf_info.code
 
+        # Feed the *offspring* diagnosis into the variation engine's stagnation
+        # signal. Tagging execution failures so identical fallback text from the
+        # verifier short-circuit doesn't falsely peg cosine at 1.0.
+        if uuid:
+            verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
+            is_failure = (
+                on_error
+                or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
+            )
+            self.variation.record_offspring_gradient(
+                wf_info.abstracted_prompt_gradient,
+                is_failure=is_failure,
+            )
+
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers
         runs[-1].state_result = wf_info.state_result

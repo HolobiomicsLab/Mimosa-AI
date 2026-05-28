@@ -1,53 +1,44 @@
-"""Tests for VariationEngine stagnation-aware phase regression.
+"""Tests for VariationEngine — stagnation signal + adaptive step size.
 
-Covers the new closed-loop signal: pairwise diagnosis similarity → Beta-sampled
-progress regression → earlier phase prompt when the LLM-mutator is cycling.
+Covers:
+- Cosine similarity contract on MiniLM-embedded prompt gradients.
+- Stagnation computation over offspring gradients with failure-sentinel filter.
+- `_get_prompt_step_size` damping by parent score (near-winners stay protected).
+- `record_offspring_gradient` is the only state-mutating entry point for the
+  stagnation signal (mutation_prompt no longer touches the history).
 """
 
 import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
 
 from sources.core.variation_engine import VariationEngine
 
 
-# ── _diagnosis_similarity ─────────────────────────────────────────────────
+# ── Similarity contract (one real-embedder test) ───────────────────────────
 
 
-def test_diagnosis_similarity_identical_is_one():
+def test_prompt_gradient_similarity_bounds_and_identity():
     ve = VariationEngine()
-    assert ve._diagnosis_similarity("foo bar baz", "foo bar baz") == 1.0
+    # Identical text → cosine ≈ 1.0 (allow tiny float wobble).
+    sim_same = ve._prompt_gradient_similarity("foo bar baz", "foo bar baz")
+    assert 0.99 <= sim_same <= 1.0 + 1e-6
+    # Empty strings short-circuit to 0.0 without invoking the embedder.
+    assert ve._prompt_gradient_similarity("", "anything") == 0.0
+    assert ve._prompt_gradient_similarity("foo", "") == 0.0
+    assert ve._prompt_gradient_similarity("", "") == 0.0
 
 
-def test_diagnosis_similarity_disjoint_is_zero():
-    ve = VariationEngine()
-    assert ve._diagnosis_similarity("foo bar", "baz qux") == 0.0
+# ── Stagnation logic (similarity stubbed for speed + determinism) ──────────
 
 
-def test_diagnosis_similarity_partial_overlap_half():
-    ve = VariationEngine()
-    # {foo, bar, baz, qux} ∩ {foo, bar, zap, zip} = {foo, bar} (size 2)
-    # union size 6 → 2/6 ≈ 0.333
-    sim = ve._diagnosis_similarity("foo bar baz qux", "foo bar zap zip")
-    assert abs(sim - 2 / 6) < 1e-6
-
-
-def test_diagnosis_similarity_handles_empty():
-    ve = VariationEngine()
-    assert ve._diagnosis_similarity("", "foo") == 0.0
-    assert ve._diagnosis_similarity("foo", "") == 0.0
-    assert ve._diagnosis_similarity("", "") == 0.0
-
-
-def test_diagnosis_similarity_is_case_insensitive():
-    ve = VariationEngine()
-    assert ve._diagnosis_similarity("Foo BAR", "foo bar") == 1.0
-
-
-# ── _compute_stagnation ───────────────────────────────────────────────────
+def _stub_similarity(ve: VariationEngine, fn) -> None:
+    """Bypass MiniLM by patching the instance similarity method."""
+    ve._prompt_gradient_similarity = fn.__get__(ve, type(ve))  # type: ignore[attr-defined]
 
 
 def test_stagnation_empty_history_is_zero():
@@ -57,100 +48,125 @@ def test_stagnation_empty_history_is_zero():
 
 def test_stagnation_single_entry_is_zero():
     ve = VariationEngine()
-    ve.diagnosis_history.append("only one entry")
+    ve.record_offspring_gradient("only one entry")
     assert ve._compute_stagnation() == 0.0
 
 
-def test_stagnation_high_when_diagnoses_cluster():
+def test_stagnation_high_when_offspring_gradients_repeat():
+    """Identical offspring gradients → raw cosine ~1.0 → max stagnation."""
     ve = VariationEngine()
-    diag = "verification failed assert claim X not supported in workspace"
-    ve.diagnosis_history.extend([diag] * 5)
-    assert ve._compute_stagnation() > 0.95
+    _stub_similarity(ve, lambda self, a, b: 1.0)
+    for _ in range(4):
+        ve.record_offspring_gradient("same failure mode every time")
+    assert ve._compute_stagnation() == 1.0
 
 
-def test_stagnation_low_when_diagnoses_diverse():
+def test_stagnation_low_when_offspring_gradients_diverge():
+    """Distinct gradients (pairwise sim at MiniLM baseline) → ~0 stagnation."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend([
-        "verification failed claim X",
-        "tool call returned empty result",
-        "import error matplotlib missing",
-        "agent emitted no answer step 2",
-        "syntax error in generated code",
-    ])
-    assert ve._compute_stagnation() < 0.3
+    _stub_similarity(ve, lambda self, a, b: 0.4)  # MiniLM unrelated baseline
+    for g in ("a", "b", "c", "d"):
+        ve.record_offspring_gradient(g)
+    assert ve._compute_stagnation() < 1e-9
 
 
 def test_stagnation_window_only_considers_recent():
-    """Old diverse diagnoses shouldn't dilute a recent stuck streak."""
+    """Old diverse entries must not dilute a recent stuck streak."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend([
-        "ancient diverse alpha",
-        "ancient diverse beta",
-        "ancient diverse gamma",
-    ])
-    ve.diagnosis_history.extend(["recent stuck mode"] * 5)
-    # default window=5 picks up only the stuck ones
-    assert ve._compute_stagnation(window=5) > 0.95
+    sims = {("ancient_a", "ancient_b"): 0.4}  # baseline; ignored once window slides
+    _stub_similarity(ve, lambda self, a, b: 1.0 if a == b else 0.4)
+    ve.record_offspring_gradient("ancient_a")
+    ve.record_offspring_gradient("ancient_b")
+    for _ in range(4):
+        ve.record_offspring_gradient("recent_stuck")
+    # Default window=4 → all four entries are identical → stagnation = 1.0
+    assert ve._compute_stagnation() == 1.0
 
 
-# ── _sample_phase_regression ──────────────────────────────────────────────
+# ── Fix #3: failure sentinels must NOT peg stagnation ──────────────────────
 
 
-def test_regression_zero_when_no_stagnation():
+def test_failure_tagged_gradients_are_filtered_from_stagnation():
     ve = VariationEngine()
-    assert ve._sample_phase_regression(0.0) == 0.0
+    _stub_similarity(ve, lambda self, a, b: 1.0)
+    sentinel = "workflow code failed to generate or execute; ensure code runs"
+    for _ in range(4):
+        ve.record_offspring_gradient(sentinel, is_failure=True)
+    # Even with cosine pinned at 1.0, failure entries get filtered out → 0.
+    assert ve._compute_stagnation() == 0.0
 
 
-def test_regression_bounded_by_max():
+def test_failure_entries_persist_in_history_for_audit():
+    """is_failure is a filter for the stagnation signal, not a drop."""
     ve = VariationEngine()
-    np.random.seed(0)
-    for _ in range(100):
-        r = ve._sample_phase_regression(0.99, max_regression=0.45)
-        assert 0.0 <= r <= 0.45
+    ve.record_offspring_gradient("crash", is_failure=True)
+    ve.record_offspring_gradient("real diag")
+    assert len(ve.prompt_gradient_history) == 2
+    assert ve.prompt_gradient_history[0] == ("crash", True)
+    assert ve.prompt_gradient_history[1] == ("real diag", False)
 
 
-def test_regression_mean_tracks_stagnation():
-    """E[Beta(α, β)] = stagnation → mean of N samples ≈ stagnation·max_regression."""
+# ── Fix #2: parent score damps boldness near a winner ──────────────────────
+
+
+def test_step_size_damped_by_high_parent_score():
+    """A 0.97 parent under maxed-out raw stagnation should still get a tweak."""
     ve = VariationEngine()
-    np.random.seed(42)
-    samples = [ve._sample_phase_regression(0.8) for _ in range(500)]
-    mean = sum(samples) / len(samples)
-    # target: 0.8 × 0.45 = 0.36, allow ±0.06 noise for n=500
-    assert 0.30 < mean < 0.42, f"expected ~0.36, got {mean:.3f}"
+    _stub_similarity(ve, lambda self, a, b: 1.0)
+    for _ in range(4):
+        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
+    block = ve._get_prompt_step_size(parent_score=0.97)
+    assert "prompt-only tweak" in block, block
 
 
-# ── _get_temperature_phase wiring ─────────────────────────────────────────
-
-
-def test_phase_emits_stagnation_hint_when_stuck():
+def test_step_size_unleashed_when_parent_score_low():
+    """Same raw stagnation, low parent score → bold mutation permitted."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend(["stuck same failure same"] * 6)
-    np.random.seed(0)
-    block = ve._get_temperature_phase(iteration_count=30, max_iterations=35)
-    assert "stagnation=" in block
+    _stub_similarity(ve, lambda self, a, b: 1.0)
+    for _ in range(4):
+        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
+    block = ve._get_prompt_step_size(parent_score=0.10)
+    assert ("rewire" in block) or ("rethink" in block), block
 
 
-def test_phase_no_hint_when_not_stuck():
+def test_step_size_parent_score_clipped_to_unit_interval():
+    """parent_score outside [0,1] must not break the damper."""
     ve = VariationEngine()
-    block = ve._get_temperature_phase(iteration_count=2, max_iterations=35)
-    assert "stagnation=" not in block
+    _stub_similarity(ve, lambda self, a, b: 1.0)
+    for _ in range(4):
+        ve.record_offspring_gradient("repeating failure")
+    # Should not raise; should behave as if parent_score=1.0 (full damp).
+    block = ve._get_prompt_step_size(parent_score=1.5)
+    assert "prompt-only tweak" in block
 
 
-def test_phase_regression_pushes_to_earlier_phase():
-    """High stagnation late in run should sometimes regress out of POLISH."""
+# ── Fix #1: mutation_prompt must NOT mutate the gradient history ──────────
+
+
+def test_mutation_prompt_does_not_touch_gradient_history():
+    """History is fed by the engine via record_offspring_gradient only."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend(["identical failure mode"] * 6)
-    np.random.seed(1)
-    # iteration 30 / 35 → progress ≈ 0.88 → POLISH (≥ 0.85)
-    # With stagnation ≈ 1.0 and Beta mean = 0.45, we expect frequent regression
-    saw_earlier_phase = False
-    for seed in range(30):
-        np.random.seed(seed)
-        block = ve._get_temperature_phase(iteration_count=30, max_iterations=35)
-        if "POLISH" not in block:
-            saw_earlier_phase = True
-            break
-    assert saw_earlier_phase, "high stagnation should sometimes escape POLISH"
+    _stub_similarity(ve, lambda self, a, b: 0.4)
+
+    class _FakeWfInfo:
+        overall_score = 0.5
+        abstracted_prompt_gradient = "FAKE_DIAG_should_not_be_recorded"
+        state_result = None
+
+    before = len(ve.prompt_gradient_history)
+    _ = ve.mutation_prompt(
+        goal="g",
+        wf_info=_FakeWfInfo(),
+        genotype="# code",
+        run_stderr="",
+        iteration_count=0,
+        max_iterations=10,
+    )
+    after = len(ve.prompt_gradient_history)
+    assert after == before, (
+        f"mutation_prompt must not append to history; "
+        f"grew from {before} to {after}"
+    )
 
 
 if __name__ == "__main__":
@@ -158,4 +174,4 @@ if __name__ == "__main__":
         if name.startswith("test_") and callable(fn):
             fn()
             print(f"  ✓ {name}")
-    print("✅ All variation_engine_test passed.")
+    print("All variation_engine_test passed.")
