@@ -23,7 +23,7 @@ flowchart TB
     Mut --> Orch
     Cross --> Orch
     Orch --> Eval[3-layer verifier<br/>reward + diagnosis]
-    Eval --> Admit{Pareto non-dominated?}
+    Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
     Archive --> Lin[Lineage]
@@ -43,8 +43,9 @@ A more detailed view lives in the source diagram
 3. **Snapshot** the workspace.
 4. **Evaluate** — get `overall_score` and `reward_uncapped` plus an
    abstracted diagnosis.
-5. **`validate_survivor()`** — admit to the archive if non-dominated on
-   `(reward_uncapped, novelty)`.
+5. **`validate_survivor()`** — admit to the archive when the candidate
+   improves over baseline or clears `qd_score > admit_threshold`;
+   capacity is curated by lowest-`qd_score` eviction.
 6. **Select** next parent(s) and choose mutation vs. crossover.
 7. **Recurse** until the score threshold is hit or `max_depth` is reached.
 
@@ -67,8 +68,10 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
 - Novelty is k-NN distance (`k = 25`) in behaviour-descriptor space, where
   the descriptor is `[n_agents, n_edges, n_branches, prompt_chars]`
   extracted by [`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py).
-- Admission is gated by **Pareto non-domination** on
-  `(reward_uncapped, novelty)` with ε-bands.
+- Admission gate: candidate is admitted when it either improves over
+  baseline by `min_improvement_threshold` or clears
+  `qd_score > admit_threshold`. When the archive reaches capacity, the
+  lowest-`qd_score` member is evicted.
 - Parent draw applies an inverse-child-count penalty
   `÷ (1 + n_children_already)` to spread offspring across the archive.
 

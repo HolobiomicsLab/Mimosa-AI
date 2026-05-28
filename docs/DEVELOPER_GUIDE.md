@@ -250,9 +250,10 @@ QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
 (`w = novelty_weight = 0.4`). Quality is sourced from `reward_uncapped`
 so the 0.94 hard-fail cap doesn't flatten rank ordering. Admission is
-gated by Pareto non-domination on `(reward_uncapped, novelty)` with
-ε-bands. Parent draw applies an inverse-child-count penalty
-`÷(1 + n_children_already)` to spread offspring.
+gated by the validity check (improvement over baseline or
+`qd_score > admit_threshold`); when capacity is hit, the lowest-
+`qd_score` member is evicted. Parent draw applies an inverse-child-count
+penalty `÷(1 + n_children_already)` to spread offspring.
 
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 

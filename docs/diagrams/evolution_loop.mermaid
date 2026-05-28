@@ -36,7 +36,7 @@ flowchart TB
         Verify["3-layer verifier<br/>(see evaluation_pipeline.mermaid)<br/>→ overall_score / reward_uncapped<br/>→ abstracted diagnosis"]
 
         Validate["SelectionPressure.validate_survivor()<br/>relative_improvement > θ<br/>OR qd_score > admit_threshold"]
-        Admit{{"_try_admit()<br/>not Pareto-dominated on<br/>(reward_uncapped, novelty)?"}}
+        Admit{{"_try_admit()<br/>is_valid?"}}
         Archive[("session archive<br/>≤ population_size, evict min(qd_score)")]
         Reject(["admit_rejected++<br/>(telemetry only)"])
         Lineage["record_lineage()<br/>seed | mutation | crossover"]

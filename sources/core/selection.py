@@ -60,8 +60,6 @@ class SelectionPressure:
         novelty_k_neighbours: int = 10,
         novelty_weight: float = 0.4,
         admit_threshold: float = 0.3,
-        pareto_reward_epsilon: float = 0.02,
-        pareto_novelty_epsilon: float = 0.0,
         max_children: int = MAX_CHILDREN_PER_PARENT
     ):
         """
@@ -71,12 +69,7 @@ class SelectionPressure:
             population_size: Max individuals kept in the archive (for open-ended modes).
             novelty_k_neighbours: k for k-nearest novelty calculation.
             novelty_weight: Weight of novelty vs quality in QD score (0 = pure quality, 1 = pure novelty).
-            pareto_reward_epsilon: Absolute reward delta below which two members are
-                treated as equivalent on the reward axis of the Pareto admit gate.
-                Without ε, a 0.001 lead on a near-saturated reward axis is enough
-                to dominate every behaviourally-distinct sibling.
-            pareto_novelty_epsilon: Same idea on the novelty axis. Default 0 because
-                novelty is k-NN distance and already scale-relative.
+            admit_threshold: Minimum qd_score for admission when greedy validity fails.
         """
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
@@ -89,8 +82,6 @@ class SelectionPressure:
         self.novelty_k = novelty_k_neighbours
         self.novelty_weight = novelty_weight
         self.admit_threshold = admit_threshold
-        self.pareto_reward_epsilon = pareto_reward_epsilon
-        self.pareto_novelty_epsilon = pareto_novelty_epsilon
         self.max_children = max_children
 
         # Population archive for open-ended modes
@@ -389,75 +380,9 @@ class SelectionPressure:
         novelties = [m.novelty_score for m in self._archive if m.novelty_score > 0]
         return max(novelties) if novelties else 1.0
 
-    def _hypothetical_novelties(
-        self, candidate: PopulationMember
-    ) -> tuple[float, dict[int, float]]:
-        """Return novelty values computed against ``archive ∪ {candidate}``.
-
-        Without this, the first archive member is stored with the bootstrap
-        default ``novelty=1.0`` (computed when no peers existed yet) which
-        permanently dominates every later arrival on the novelty axis of the
-        Pareto admit gate. Computing both the candidate's *and* the existing
-        members' novelty inside a hypothetical archive that contains the
-        candidate makes the comparison scale-consistent.
-
-        Returns:
-            (candidate_novelty, {id(member): member_novelty}) — keyed by
-            id() so callers don't conflate distinct members with equal hashes.
-        """
-        hypothetical = self._archive + [candidate]
-
-        def _knn(target: PopulationMember) -> float:
-            distances = [
-                _euclidean(target.behaviour_descriptor, o.behaviour_descriptor)
-                for o in hypothetical
-                if o is not target
-            ]
-            if not distances:
-                return 0.0
-            distances.sort()
-            k = min(self.novelty_k, len(distances))
-            return sum(distances[:k]) / k if k > 0 else 0.0
-
-        cand_nov = _knn(candidate)
-        member_novs = {id(m): _knn(m) for m in self._archive}
-        return cand_nov, member_novs
-
-    def _is_dominated(self, candidate: PopulationMember) -> bool:
-        """Pareto domination on (reward_uncapped, novelty_score) with ε-bands.
-
-        Uses *hypothetical* novelties (see ``_hypothetical_novelties``) so the
-        comparison reflects the archive that would exist *after* admission, not
-        the stale snapshot from the bootstrap. Applies an absolute ε on each
-        axis when deciding "strictly better" — a 0.001 reward lead on a near-
-        saturated axis should not be enough to dominate a behaviourally-distinct
-        sibling.
-        """
-        if not self._archive:
-            return False
-        cand_nov, member_novs = self._hypothetical_novelties(candidate)
-        eps_r = self.pareto_reward_epsilon
-        eps_n = self.pareto_novelty_epsilon
-        for m in self._archive:
-            m_nov = member_novs[id(m)]
-            ge_reward = m.reward_uncapped >= candidate.reward_uncapped - eps_r
-            ge_novelty = m_nov >= cand_nov - eps_n
-            strictly = (
-                m.reward_uncapped > candidate.reward_uncapped + eps_r
-                or m_nov > cand_nov + eps_n
-            )
-            if ge_reward and ge_novelty and strictly:
-                return True
-        return False
-
     def _try_admit(self, member: PopulationMember, is_valid: bool) -> bool:
-        """Gate archive admission. Returns True when ``member`` is added.
-
-        Rejects regressions that are neither improving nor novel, and
-        rejects anything strictly Pareto-dominated by an existing
-        archive member.
-        """
-        if not is_valid or self._is_dominated(member):
+        """Admit `member` to the archive when it passes the validity check."""
+        if not is_valid:
             self._n_admit_rejected += 1
             self.logger.info(
                 f"ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
@@ -469,24 +394,14 @@ class SelectionPressure:
         return True
 
     def _add_to_archive(self, member: PopulationMember) -> None:
-        """Add a member to the archive, evicting the weakest if full.
-
-        After membership changes (admission and eviction) we refresh every
-        member's stored ``novelty_score`` and ``qd_score``. The bootstrap
-        member is admitted with ``novelty=1.0`` (no peers existed yet to
-        measure against), but as soon as a second member arrives that value
-        is stale — and used by ``select_parent``'s QD weighting and by the
-        Pareto admit gate. Recomputing keeps both consistent with the current
-        k-NN scale.
-        """
+        """Append member; evict the lowest-qd_score peer if over capacity."""
         self._archive.append(member)
 
         if len(self._archive) > self.population_size:
-            # Evict the member with the lowest QD score
             weakest = min(self._archive, key=lambda m: m.qd_score)
             self._archive.remove(weakest)
             self.logger.debug(
-                f" Evicted archive member (qd={weakest.qd_score:.3f}, "
+                f"Evicted archive member (qd={weakest.qd_score:.3f}, "
                 f"reward={weakest.reward:.3f}) — archive full"
             )
 
@@ -594,3 +509,26 @@ def _euclidean(a: list[float], b: list[float]) -> float:
     if len(a) != len(b):
         return float("inf")
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
+if __name__ == "__main__":
+    from types import SimpleNamespace
+
+    sp = SelectionPressure(strategy="qd", population_size=50, novelty_k_neighbours=25, novelty_weight=0.4)
+
+    seed = SimpleNamespace(
+        reward=0.97, reward_uncapped=1.05, current_uuid="seed",
+        iteration_count=1, cost=0.0, code="x=1",
+    )
+    sp._validate_open_ended([seed], [seed], threshold=0.01)
+    assert len(sp._archive) == 1, sp._archive
+
+    distinct = SimpleNamespace(
+        reward=0.91, reward_uncapped=0.91, current_uuid="distinct",
+        iteration_count=5, cost=0.0,
+        code="\n".join(["def f():"] + ["    x = 'y' * 800"] * 6),
+    )
+    sp._validate_open_ended([seed], [distinct], threshold=0.01)
+    assert len(sp._archive) == 2, f"distinct sibling rejected; archive={[m.uuid for m in sp._archive]}"
+
+    print("smoke OK: distinct sibling admitted alongside higher-reward seed")
