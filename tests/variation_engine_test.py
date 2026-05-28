@@ -1,6 +1,6 @@
 """Tests for VariationEngine stagnation-aware phase regression.
 
-Covers the new closed-loop signal: pairwise diagnosis similarity → Beta-sampled
+Covers the new closed-loop signal: pairwise prompt_gradient similarity → Beta-sampled
 progress regression → earlier phase prompt when the LLM-mutator is cycling.
 """
 
@@ -14,37 +14,37 @@ sys.path.append(str(Path(__file__).parent.parent))
 from sources.core.variation_engine import VariationEngine
 
 
-# ── _diagnosis_similarity ─────────────────────────────────────────────────
+# ── _prompt_gradient_similarity ─────────────────────────────────────────────────
 
 
-def test_diagnosis_similarity_identical_is_one():
+def test_prompt_gradient_similarity_identical_is_one():
     ve = VariationEngine()
-    assert ve._diagnosis_similarity("foo bar baz", "foo bar baz") == 1.0
+    assert ve._prompt_gradient_similarity("foo bar baz", "foo bar baz") == 1.0
 
 
-def test_diagnosis_similarity_disjoint_is_zero():
+def test_prompt_gradient_similarity_disjoint_is_zero():
     ve = VariationEngine()
-    assert ve._diagnosis_similarity("foo bar", "baz qux") == 0.0
+    assert ve._prompt_gradient_similarity("foo bar", "baz qux") == 0.0
 
 
-def test_diagnosis_similarity_partial_overlap_half():
+def test_prompt_gradient_similarity_partial_overlap_half():
     ve = VariationEngine()
     # {foo, bar, baz, qux} ∩ {foo, bar, zap, zip} = {foo, bar} (size 2)
     # union size 6 → 2/6 ≈ 0.333
-    sim = ve._diagnosis_similarity("foo bar baz qux", "foo bar zap zip")
+    sim = ve._prompt_gradient_similarity("foo bar baz qux", "foo bar zap zip")
     assert abs(sim - 2 / 6) < 1e-6
 
 
-def test_diagnosis_similarity_handles_empty():
+def test_prompt_gradient_similarity_handles_empty():
     ve = VariationEngine()
-    assert ve._diagnosis_similarity("", "foo") == 0.0
-    assert ve._diagnosis_similarity("foo", "") == 0.0
-    assert ve._diagnosis_similarity("", "") == 0.0
+    assert ve._prompt_gradient_similarity("", "foo") == 0.0
+    assert ve._prompt_gradient_similarity("foo", "") == 0.0
+    assert ve._prompt_gradient_similarity("", "") == 0.0
 
 
-def test_diagnosis_similarity_is_case_insensitive():
+def test_prompt_gradient_similarity_is_case_insensitive():
     ve = VariationEngine()
-    assert ve._diagnosis_similarity("Foo BAR", "foo bar") == 1.0
+    assert ve._prompt_gradient_similarity("Foo BAR", "foo bar") == 1.0
 
 
 # ── _compute_stagnation ───────────────────────────────────────────────────
@@ -57,20 +57,20 @@ def test_stagnation_empty_history_is_zero():
 
 def test_stagnation_single_entry_is_zero():
     ve = VariationEngine()
-    ve.diagnosis_history.append("only one entry")
+    ve.prompt_gradient_history.append("only one entry")
     assert ve._compute_stagnation() == 0.0
 
 
 def test_stagnation_high_when_diagnoses_cluster():
     ve = VariationEngine()
     diag = "verification failed assert claim X not supported in workspace"
-    ve.diagnosis_history.extend([diag] * 5)
+    ve.prompt_gradient_history.extend([diag] * 5)
     assert ve._compute_stagnation() > 0.95
 
 
 def test_stagnation_low_when_diagnoses_diverse():
     ve = VariationEngine()
-    ve.diagnosis_history.extend([
+    ve.prompt_gradient_history.extend([
         "verification failed claim X",
         "tool call returned empty result",
         "import error matplotlib missing",
@@ -83,12 +83,12 @@ def test_stagnation_low_when_diagnoses_diverse():
 def test_stagnation_window_only_considers_recent():
     """Old diverse diagnoses shouldn't dilute a recent stuck streak."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend([
+    ve.prompt_gradient_history.extend([
         "ancient diverse alpha",
         "ancient diverse beta",
         "ancient diverse gamma",
     ])
-    ve.diagnosis_history.extend(["recent stuck mode"] * 5)
+    ve.prompt_gradient_history.extend(["recent stuck mode"] * 5)
     # default window=5 picks up only the stuck ones
     assert ve._compute_stagnation(window=5) > 0.95
 
@@ -124,7 +124,7 @@ def test_regression_mean_tracks_stagnation():
 
 def test_phase_emits_stagnation_hint_when_stuck():
     ve = VariationEngine()
-    ve.diagnosis_history.extend(["stuck same failure same"] * 6)
+    ve.prompt_gradient_history.extend(["stuck same failure same"] * 6)
     np.random.seed(0)
     block = ve._get_temperature_phase(iteration_count=30, max_iterations=35)
     assert "stagnation=" in block
@@ -139,7 +139,7 @@ def test_phase_no_hint_when_not_stuck():
 def test_phase_regression_pushes_to_earlier_phase():
     """High stagnation late in run should sometimes regress out of POLISH."""
     ve = VariationEngine()
-    ve.diagnosis_history.extend(["identical failure mode"] * 6)
+    ve.prompt_gradient_history.extend(["identical failure mode"] * 6)
     np.random.seed(1)
     # iteration 30 / 35 → progress ≈ 0.88 → POLISH (≥ 0.85)
     # With stagnation ≈ 1.0 and Beta mean = 0.45, we expect frequent regression

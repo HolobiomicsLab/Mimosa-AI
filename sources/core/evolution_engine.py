@@ -422,7 +422,7 @@ class EvolutionEngine:
             print_info("Maximum recursive depth reached.")
             return runs
         if enable_evolution:
-            if wf_info.overall_score > self.config.learned_score_threshold:
+            if wf_info.overall_score >= self.config.learned_score_threshold:
                 print_ok("Evolution engine reached learning threshold.")
                 self._save_final_plots(assertion_history, rewards_history, uuid)
                 self.notifier.send_message(
