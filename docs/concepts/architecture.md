@@ -37,8 +37,9 @@ recursively evolves workflows, with help from:
 - **WorkflowSelector** — picks parents from the live archive or, on a cold
   start, from previous runs on disk (filtered by task-text cosine similarity).
 - **SelectionPressure** — Quality-Diversity archive (`population_size=50`,
-  `k=25`, `novelty_weight=0.4`). Admission is gated by Pareto non-domination
-  on `(reward_uncapped, novelty)`.
+  `k=25`, `novelty_weight=0.4`). Admission is gated by the validity check
+  (improvement over baseline or `qd_score > admit_threshold`); capacity is
+  curated by lowest-`qd_score` eviction.
 - **VariationEngine** — assembles mutation or crossover prompts, with a
   phase-aware annealing schedule that gates topology complexity by progress.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
