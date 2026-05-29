@@ -39,16 +39,23 @@ class ScoreExtractionError(EvaluatorError):
 
 
 class BaseEvaluator:
-    """Base evaluator with common functionality for workflow evaluation."""
+    """Base evaluator with common functionality for workflow evaluation.
 
-    def __init__(self, config):
+    Provides shared setup (memory and workflow directories, LLM configuration,
+    judge model selection) and helper methods used by concrete evaluators.
+    """
+
+    def __init__(self, config: "Config") -> None:
         """Initialize the BaseEvaluator with configuration.
 
         Args:
-            config: Configuration object containing memory_dir, workflow_dir, model_pricing, and reasoning_effort
+            config: Configuration object containing memory_dir, workflow_dir,
+                model_pricing, reasoning_effort, judge_model, and OpenRouter
+                provider/quantization lookup helpers.
 
         Raises:
-            EvaluatorError: If configuration is invalid or required directories don't exist
+            EvaluatorError: If configuration is invalid or required directories
+                cannot be created/initialized.
         """
         try:
             if not hasattr(config, 'memory_dir') or not config.memory_dir:
@@ -132,12 +139,17 @@ class BaseEvaluator:
 
     def workflow_execution_text(self, uuid: str) -> tuple[str, bool] | None:
         """Generate workflow execution text for evaluation using WorkflowInfo.
+
         Args:
-            uuid: UUID of the workflow
+            uuid: UUID of the workflow.
+
         Returns:
-            Formatted workflow execution text and execution success status
+            A tuple ``(execution_text, success)``: the formatted workflow
+            execution text (goal + final answer) and a boolean indicating
+            whether the execution produced non-empty answers.
+
         Raises:
-            WorkflowDataError: If workflow data is invalid
+            WorkflowDataError: If workflow data is invalid.
         """
         try:
             workflow_info = self._load_workflow_data(uuid)
@@ -225,7 +237,12 @@ class BaseEvaluator:
             raise EvaluatorError(f"Unexpected error updating state result: {str(e)}") from e
 
     def _get_judge_system_prompt(self) -> str:
-        """Get system prompt for LLM judge (keeping existing format exactly)."""
+        """Return the system prompt used by the LLM judge.
+
+        Returns:
+            The fixed judge system prompt string, kept verbatim for
+            reproducibility across evaluations.
+        """
         # Preserving original prompt exactly
         return """You are an expert scientific researcher and rigorous multi-agent system evaluator. Your task is to assess whether a computational workflow achieved its intended goals through coordinated agent collaboration, while ensuring scientific validity and technical correctness.
 

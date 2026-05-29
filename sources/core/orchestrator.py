@@ -4,6 +4,7 @@ This class orchestrates the execution of workflows in a sandboxed environment.
 
 import logging
 import time
+from typing import Any
 
 from sources.utils.notify import PushNotifier
 from sources.utils.perspicacite_client import (
@@ -26,11 +27,12 @@ class WorkflowOrchestrator:
         workflow_dir (str): Directory containing workflow templates
     """
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: "Config") -> None:
         """Initialize the Workflow orchestrator.
 
         Args:
-            config: Configuration object containing paths and settings
+            config: Configuration object containing paths and settings (workspace
+                dir, workflow dir, Pushover credentials, runner defaults, etc.).
         """
         self.config = config
         self.single_agent_factory = SingleAgentFactory(config)
@@ -45,7 +47,13 @@ class WorkflowOrchestrator:
         )
         self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 
-    async def workflow_requirements_install(self):
+    async def workflow_requirements_install(self) -> None:
+        """Install the runner's declared dependencies into the sandbox.
+
+        Raises:
+            RuntimeError: If the dependency installation does not complete
+                successfully.
+        """
         deps = self.config.runner_requirements
         print_info(f"📦 Installing workflow dependencies: {deps}")
         dep_result = await self.workflow_runner.install_dependencies(deps)
@@ -53,10 +61,22 @@ class WorkflowOrchestrator:
             raise RuntimeError(f"Dependency installation failed: {dep_result.stderr}")
 
     async def workflow_sandbox_run(self, workflow_genotype_code: str) -> str:
-        """Run the workflow code in a sandboxed environment."""
+        """Run the workflow code in a sandboxed environment.
+
+        Args:
+            workflow_genotype_code: Python source code for the workflow to
+                execute inside the sandbox.
+
+        Returns:
+            The workflow execution output (stdout, or stderr/fallback message
+            when stdout is empty).
+
+        Raises:
+            Exception: If the workflow execution does not reach COMPLETED status.
+        """
         logging.getLogger(__name__)
 
-        def progress_handler(line: str):
+        def progress_handler(line: str) -> None:
             print(line)
 
         print_info("▶ Executing workflow in Python sandbox…")
@@ -72,7 +92,16 @@ class WorkflowOrchestrator:
             print_err(f"Workflow execution failed: {result.stderr}")
             raise Exception(f"Workflow execution failed: {result.stderr}")
     
-    def perspicacite_grounding_task(self, task):
+    def perspicacite_grounding_task(self, task: str) -> str:
+        """Query Perspicacite-AI for a literature-grounded approach to a task.
+
+        Args:
+            task: The scientific task description to ground.
+
+        Returns:
+            The literature-grounded response text, or a fallback message when
+            the service is unavailable or returns no relevant context.
+        """
         prompt = f"""You are a scientific literature specialist supporting a scientist on a task.
 SCIENTIFIC TASK:
 {task}
@@ -105,6 +134,14 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         """Enrich craft instructions with scientific context from Perspicacite-AI.
 
         Returns the original instructions if grounding is unavailable.
+
+        Args:
+            task: The scientific task to query for context.
+            craft_instructions: Original craft instructions to be enriched.
+
+        Returns:
+            The craft instructions, optionally prepended with formatted
+            scientific context retrieved from Perspicacite-AI.
         """
         print_phase(
             "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
@@ -132,6 +169,21 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
 
         Returns (complete_code, workflow_genotype_code, uuid).
         Raises on generation failure; factories may encode "UUID:<uuid>|<msg>".
+
+        Args:
+            goal: Workflow goal (may be knowledge-wrapped).
+            craft_instructions: Recipe for the LLM workflow generator.
+            single_agent_mode: When True, dispatch to the single-agent factory;
+                otherwise use the multi-agent workflow factory.
+            original_task: Unwrapped task for similarity matching, or None.
+
+        Returns:
+            A tuple ``(complete_code, workflow_genotype_code, uuid)`` produced
+            by the selected factory.
+
+        Raises:
+            Exception: Any error raised by the underlying factory; the message
+                may be encoded as ``"UUID:<uuid>|<msg>"``.
         """
         if single_agent_mode:
             return await self.single_agent_factory.craft_single_agent(
@@ -146,6 +198,14 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         """Extract (uuid, message) from a factory generation error.
 
         Returns ("generation_failed", message) when no uuid is encoded.
+
+        Args:
+            error: Exception raised by a workflow factory during generation.
+
+        Returns:
+            A tuple ``(uuid, message)``. When the error message uses the
+            ``"UUID:<uuid>|<msg>"`` convention, the encoded UUID and message
+            are returned; otherwise ``("generation_failed", str(error))``.
         """
         msg = str(error)
         if msg.startswith("UUID:") and "|" in msg:
@@ -158,6 +218,17 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
 
         Returns (execution_output, deps_install_time, exec_time).
         Raises on dependency install or execution failure.
+
+        Args:
+            complete_code: Full Python source code for the workflow to execute.
+
+        Returns:
+            A tuple ``(execution_output, deps_install_time, exec_time)`` where
+            times are in seconds.
+
+        Raises:
+            RuntimeError: If dependency installation fails.
+            Exception: If workflow execution fails inside the sandbox.
         """
         print_phase("DEPENDENCIES INSTALLATION PHASE")
         deps_start = time.time()
@@ -173,7 +244,14 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         return output, deps_time, exec_time
 
     def _notify_execution_failure(self, uuid: str, goal: str, workflow_time: float, error: Exception) -> None:
-        """Send a Pushover notification for an execution failure."""
+        """Send a Pushover notification for an execution failure.
+
+        Args:
+            uuid: Identifier of the workflow that failed.
+            goal: Workflow goal text (truncated in the notification body).
+            workflow_time: Elapsed time before the failure, in seconds.
+            error: Exception describing the failure (truncated in the body).
+        """
         self.notifier.send_message(
             f"Workflow {uuid} execution failed after {workflow_time:.1f}s\n"
             f"Goal: {goal[:128]}...\n"
@@ -186,7 +264,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         self,
         goal: str,
         craft_instructions: str,
-        original_task: str = None,
+        original_task: str | None = None,
         single_agent_mode: bool = False,
         no_run: bool = False,
     ) -> tuple[str, str, str, bool]:
@@ -260,11 +338,11 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         output = execution_output.strip() if execution_output else "Workflow executed successfully with no output."
         return output, uuid, workflow_genotype_code, True
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "WorkflowOrchestrator":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit with proper cleanup."""
         try:
             await self.workflow_runner.cleanup()
@@ -274,7 +352,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
 
             traceback.print_exc()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup resources on deletion - sync fallback."""
         try:
             import sys

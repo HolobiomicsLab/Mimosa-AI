@@ -8,6 +8,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
@@ -37,10 +38,19 @@ class EvolutionEngine:
     """Darwin Machine for evolution of workflow workflows."""
     def __init__(
         self,
-        config,
-        viz_utils: VisualizationUtils = None,
-        process_id: int = None,
+        config: "Config",
+        viz_utils: VisualizationUtils | None = None,
+        process_id: int | None = None,
     ) -> None:
+        """Wire up evaluator, orchestrator, variation and selection components.
+
+        Args:
+            config: Application configuration providing workflow directory,
+                pricing and notification credentials.
+            viz_utils: Optional visualization helper; a fresh one is built when
+                not supplied.
+            process_id: Optional caller-assigned identifier (used for logs).
+        """
         self.config = config
         self.workflow_dir = config.workflow_dir
         self.model_pricing = config.model_pricing
@@ -62,9 +72,18 @@ class EvolutionEngine:
         )
         self.initial_population = 2 # number of initial random workflows before enabling mutation
 
-    async def mockup(self, wf, goal):
-        """
-        Mockup mode: use existing workflow data without calling orchestrate_workflow
+    async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
+        """Use existing workflow data instead of orchestrating a fresh run.
+
+        Args:
+            wf: Pre-existing workflow info supplying state, answers and score.
+            goal: Task description, used when `wf.goal` is missing.
+
+        Returns:
+            A single-element list with the mocked :class:`IndividualRun`.
+
+        Raises:
+            ValueError: When no workflow template is supplied.
         """
         if wf is None:
             raise ValueError("❌ Mockup mode requires a valid workflow template. "
@@ -94,12 +113,18 @@ class EvolutionEngine:
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
-    def load_phenotype_result(self, uuid: str) -> any:
+    def load_phenotype_result(self, uuid: str) -> Any:
         """Load the result of a previously executed workflow state.
+
         Args:
-            uuid: UUID of the workflow state to load
+            uuid: UUID of the workflow state to load.
+
         Returns:
-            str: The output of the workflow state if found, None otherwise
+            Parsed JSON contents of the workflow's ``state_result.json``,
+            or ``None`` when the file is missing.
+
+        Raises:
+            ValueError: When the state file exists but cannot be read.
         """
         try:
             with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
@@ -111,8 +136,17 @@ class EvolutionEngine:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
 
     def load_workflow_genotype_code(self, workflow_id: str) -> str:
-        """
-        Load the workflow code for a given workflow ID.
+        """Load the workflow code for a given workflow ID.
+
+        Args:
+            workflow_id: UUID identifying the workflow folder.
+
+        Returns:
+            The Python source of the workflow genotype.
+
+        Raises:
+            ValueError: When the folder, the code file or its contents are
+                not accessible.
         """
         workflow_path = f"{self.workflow_dir}/{workflow_id}"
         if not os.path.exists(workflow_path):
@@ -130,8 +164,17 @@ class EvolutionEngine:
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
 
-    def get_total_rewards(self, wf_state: any, eval_type: str) -> float:
-        """Calculate the total rewards from the workflow state."""
+    def get_total_rewards(self, wf_state: Any, eval_type: str) -> float:
+        """Calculate the total rewards from the workflow state.
+
+        Args:
+            wf_state: Workflow state dict; falsy values short-circuit to 0.0.
+            eval_type: Either ``"generic"`` or ``"scenario"``; other values
+                yield ``0.0``.
+
+        Returns:
+            The reward extracted from the relevant evaluation slice.
+        """
         if not wf_state or not eval_type:
             return 0.0
         if eval_type == "generic":
@@ -141,8 +184,17 @@ class EvolutionEngine:
         else:
             return 0.0
 
-    def extract_agents_behavior(self, wf_state: any) -> str:
-        """Extract the answers from the workflow state."""
+    def extract_agents_behavior(self, wf_state: Any) -> str:
+        """Extract the answers from the workflow state.
+
+        Args:
+            wf_state: Workflow state dict, possibly ``None``.
+
+        Returns:
+            A newline-joined ``agent <name>: <truncated answer>...`` block, the
+            raw ``answers`` string for non-list values, or an empty string when
+            no answers were captured.
+        """
         if not wf_state or "answers" not in wf_state:
             return ""
 
@@ -153,13 +205,18 @@ class EvolutionEngine:
         )
         return agents_answers
 
-    def show_answers(self, agents_answers) -> None:
+    def show_answers(self, agents_answers: str) -> None:
+        """Render the per-agent answer block in a coloured CLI box.
+
+        Args:
+            agents_answers: Pre-formatted string of agent answers.
+        """
         print_box(agents_answers, title="Workflow Agents Answers", color=YELLOW)
 
     def select_parent_workflow(
         self,
         goal: str,
-        template_uuid: str = None,
+        template_uuid: str | None = None,
         crossover_rate: float = 0.4,
         n_parents: int = 2,
     ) -> tuple[list[WorkflowInfo], bool]:
@@ -212,9 +269,19 @@ class EvolutionEngine:
 
         return selected, use_crossover
 
-    def get_genotype_instructions(self, goal, wf, max_iterations: int = 10) -> str:
-        """
-        Get the genotype prompt for either mutation workflow or generating the first individual.
+    def get_genotype_instructions(
+        self, goal: str, wf: WorkflowInfo | None, max_iterations: int = 10
+    ) -> str:
+        """Get the genotype prompt for mutation or for the very first individual.
+
+        Args:
+            goal: Task description for the new workflow.
+            wf: Parent workflow info; when ``None`` a seed prompt is built.
+            max_iterations: Total planned attempts, passed through to the
+                variation engine.
+
+        Returns:
+            Either a mutation prompt (when `wf` is given) or a seed prompt.
         """
         if wf:
             return self.variation.mutation_prompt(
@@ -228,24 +295,31 @@ class EvolutionEngine:
         goal: str,
         template_uuid: str | None = "20260512_162504_70ccefbf",
         judge: bool = True,
-        scenario_rubric: str = None,
+        scenario_rubric: str | None = None,
         enable_evolution: bool = False,
-        original_task: str = None,
+        original_task: str | None = None,
         single_agent_mode: bool = False,
-        mockup_mode: bool = False
+        mockup_mode: bool = False,
     ) -> list[IndividualRun]:
-        """
-        Start the learning process for achieving a specified goal.
+        """Start the learning process for achieving a specified goal.
+
         Args:
-        - goal (str): The primary goal or objective to be accomplished (may be knowledge-wrapped).
-         template_uuid (str | None, optional): UUID of a workflow template to use.
-        - judge (bool, optional): Whether to enable judging mode for evaluation.
-        - scenario_rubric (str, optional): ID of scenario for evaluation.
-        - max_iteration (int): Maximum number of iterations.
-        - enable_evolution (bool): Whether in learning mode. Will keep attempt at improving workflow score even if all agents report success state.
-        - original_task (str, optional): Original unwrapped task for similarity matching.
-        - mockup_mode (bool, optional): If True, use existing workflow data from select_parent_workflow
-            instead of calling orchestrate_workflow. Useful for testing and debugging.
+            goal: The primary goal or objective to be accomplished (may be
+                knowledge-wrapped).
+            template_uuid: UUID of a workflow template to use.
+            judge: Whether to enable judging mode for evaluation.
+            scenario_rubric: ID of scenario for evaluation.
+            enable_evolution: Whether in learning mode. Will keep attempting
+                to improve the workflow score even if all agents report
+                success state.
+            original_task: Original unwrapped task for similarity matching.
+            single_agent_mode: Force single-agent orchestration.
+            mockup_mode: If True, use existing workflow data from
+                ``select_parent_workflow`` instead of calling
+                ``orchestrate_workflow``. Useful for testing and debugging.
+
+        Returns:
+            The list of :class:`IndividualRun` produced across the evolution.
         """
         wf = None
         max_iteration = 1
@@ -322,13 +396,30 @@ class EvolutionEngine:
     async def evolve_generation(
         self,
         runs: list[IndividualRun],
-        rewards_history: list[float] = None,
-        assertion_history: list[list[int]] = None,
+        rewards_history: list[float] | None = None,
+        assertion_history: list[list[int]] | None = None,
         enable_evolution: bool = False,
         single_agent_mode: bool = False,
-        workspace_mgr: WorkspaceManager = None,
-    ):
-        """Run a evolution loop for the workflow."""
+        workspace_mgr: WorkspaceManager | None = None,
+    ) -> list[IndividualRun]:
+        """Run one iteration of the evolution loop and recurse if needed.
+
+        Args:
+            runs: Mutable list of runs accumulated so far; the last element is
+                the current attempt being executed.
+            rewards_history: Per-iteration reward values, updated in place.
+            assertion_history: Per-iteration ``[passed, total]`` pairs for
+                scenario evaluation, updated in place.
+            enable_evolution: When True, keep evolving even past nominal
+                success up to a learning threshold.
+            single_agent_mode: Force single-agent orchestration.
+            workspace_mgr: Workspace lifecycle manager; ``None`` skips
+                snapshot/restore plumbing.
+
+        Returns:
+            The (mutated) runs list, with the final attempt populated and
+            ``plot`` set on the last run.
+        """
         self._log_iteration_start(runs[-1].goal, runs[-1].iteration_count, runs[-1].max_depth)
 
         iteration_start_time = time.time()
@@ -530,15 +621,25 @@ class EvolutionEngine:
         return runs
 
     def _get_human_validation(self) -> bool:
-        """Get human validation for continuing the workflow."""
+        """Get human validation for continuing the workflow.
+
+        Returns:
+            ``True`` if the user typed ``yes`` / ``y``, ``False`` otherwise.
+        """
         human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
         if human_validation not in ["yes", "y"]:
             print("Exiting evolution loop.")
             return False
         return True
 
-    def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int):
-        """Log the start of an iteration."""
+    def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int) -> None:
+        """Log the start of an iteration.
+
+        Args:
+            goal: Task description for the current iteration.
+            iteration_count: Zero-based iteration index.
+            max_depth: Total planned iterations.
+        """
         logger = logging.getLogger(__name__)
         print_iteration_header(iteration_count + 1, max_depth)
         print_box(goal, title="📋 CURRENT TASK", truncate=256)
@@ -548,7 +649,21 @@ class EvolutionEngine:
         self, executed: bool, judge: bool, uuid: str,
         agent_answers: str, scenario_rubric: str, assertion_history: list
     ) -> tuple[str, float]:
-        """Evaluate workflow and calculate cost."""
+        """Evaluate workflow and calculate cost.
+
+        Args:
+            executed: Whether the workflow ran to completion.
+            judge: Whether judging is enabled for this run.
+            uuid: Workflow UUID; falsy values short-circuit evaluation.
+            agent_answers: Pre-formatted agent answers passed to the judge.
+            scenario_rubric: Scenario rubric ID, when applicable.
+            assertion_history: Per-iteration ``[passed, total]`` pairs,
+                updated in place.
+
+        Returns:
+            ``(eval_type, exec_cost)`` — the evaluator type used (or ``None``)
+            and the USD cost computed for the workflow.
+        """
         logger = logging.getLogger(__name__)
         eval_type = None
         exec_cost = 0.0
@@ -567,7 +682,18 @@ class EvolutionEngine:
     async def _evaluate_workflow_phenotype(
         self, uuid: str, agent_answers: str, scenario_rubric: str, assertion_history: list
     ) -> str:
-        """Evaluate the workflow and update assertion history."""
+        """Evaluate the workflow and update assertion history.
+
+        Args:
+            uuid: Workflow UUID being evaluated.
+            agent_answers: Pre-formatted agent answers passed to the judge.
+            scenario_rubric: Scenario rubric ID, when applicable.
+            assertion_history: Per-iteration ``[passed, total]`` pairs,
+                updated in place for scenario evaluations.
+
+        Returns:
+            The evaluator type string reported by the judge.
+        """
         logger = logging.getLogger(__name__)
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
@@ -584,8 +710,13 @@ class EvolutionEngine:
             self._update_assertion_history(eval_result, assertion_history)
         return eval_type
 
-    def _update_assertion_history(self, eval_result: dict, assertion_history: list):
-        """Update assertion history with evaluation results."""
+    def _update_assertion_history(self, eval_result: dict, assertion_history: list) -> None:
+        """Update assertion history with evaluation results.
+
+        Args:
+            eval_result: Judge output containing assertion or point counts.
+            assertion_history: List of ``[passed, total]`` pairs, appended in place.
+        """
         passed = eval_result.get('passed_assertions', eval_result.get('earned_points', 0))
         total = eval_result.get('total_assertions', eval_result.get('total_points', 100))
         assertion_history.append([passed, total])
@@ -594,22 +725,41 @@ class EvolutionEngine:
 
     def _update_visualizations(
         self, rewards_history: list, assertion_history: list,
-        goal: str, scenario_rubric: str, uuid: str
-    ):
-        """Update all visualizations with current data."""
+        goal: str, scenario_rubric: str, uuid: str,
+    ) -> None:
+        """Update all visualizations with current data.
+
+        Args:
+            rewards_history: Per-iteration reward values.
+            assertion_history: Per-iteration ``[passed, total]`` pairs.
+            goal: Task description (unused but kept for symmetry).
+            scenario_rubric: Scenario rubric ID for assertion plots.
+            uuid: Workflow UUID, used to write the plot artefact.
+        """
         if assertion_history:
             self._update_assertion_plot(assertion_history, scenario_rubric, uuid)
         elif rewards_history:
             self._update_rewards_plot(rewards_history)
 
-    def _update_rewards_plot(self, rewards_history):
+    def _update_rewards_plot(self, rewards_history: list[float]) -> None:
+        """Refresh the rewards-over-iterations curve.
+
+        Args:
+            rewards_history: Per-iteration reward values.
+        """
         self.viz_utils.update_rewards_curve(rewards_history)
 
     def _update_assertion_plot(
         self, assertion_history: list,
-        scenario_rubric: str, uuid: str
-    ):
-        """Update assertion progress plot."""
+        scenario_rubric: str, uuid: str,
+    ) -> None:
+        """Update assertion progress plot.
+
+        Args:
+            assertion_history: Per-iteration ``[passed, total]`` pairs.
+            scenario_rubric: Scenario rubric ID used to look up totals.
+            uuid: Workflow UUID, used to write the plot artefact.
+        """
         from sources.evaluation.scenario_loader import ScenarioLoader
         scenario = ScenarioLoader().load_scenario(scenario_rubric)
         total_assertions = len(scenario.get("assertions", [])) if scenario else 0
@@ -621,9 +771,21 @@ class EvolutionEngine:
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
         wf_rewards: float, exec_cost: float, goal: str, uuid: str,
-        wf_state: any, rewards_history: list
-    ):
-        """Log iteration completion and send notification."""
+        wf_state: Any, rewards_history: list,
+    ) -> None:
+        """Log iteration completion and send notification.
+
+        Args:
+            iteration_count: Zero-based iteration index just completed.
+            max_depth: Total planned iterations.
+            iteration_start_time: ``time.time()`` taken at iteration start.
+            wf_rewards: Reward achieved this iteration.
+            exec_cost: USD cost spent this iteration.
+            goal: Task description, included in the notification body.
+            uuid: Workflow UUID just completed.
+            wf_state: Workflow state used to extract agent answers.
+            rewards_history: Per-iteration reward values, included verbatim.
+        """
         logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
         logger.info(
@@ -663,7 +825,13 @@ class EvolutionEngine:
             self.logger.warning(f"Failed to refresh evolution tree: {e}")
 
     def _save_evolution_prompt_artifact(self, uuid: str, prompt: str) -> None:
-        """Persist the variation/seed prompt that produced this workflow into its folder."""
+        """Persist the variation/seed prompt that produced this workflow into its folder.
+
+        Args:
+            uuid: Workflow UUID whose folder receives the artefact.
+            prompt: Prompt text to persist. No-op on falsy inputs or when
+                the folder does not yet exist; I/O errors are logged.
+        """
         if not uuid or not prompt:
             return
         workflow_path = os.path.join(self.workflow_dir, uuid)
@@ -678,7 +846,17 @@ class EvolutionEngine:
             self.logger.error(f"Failed to save evolution prompt: {e}")
 
     def _save_final_plots(self, assertion_history: list, reward_history: list, uuid: str) -> str:
-        """Save final assertion plots."""
+        """Save final assertion plots.
+
+        Args:
+            assertion_history: Per-iteration ``[passed, total]`` pairs.
+            reward_history: Per-iteration reward values.
+            uuid: Workflow UUID whose folder receives the plot.
+
+        Returns:
+            The path of the saved plot, or an empty string when neither
+            history contains data.
+        """
         plot_filename = ""
         if assertion_history or reward_history:
             plot_filename = f"{self.workflow_dir}/{uuid}/reward_progress.png"

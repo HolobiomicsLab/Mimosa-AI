@@ -14,12 +14,18 @@ from .tools_manager import ToolManager
 
 
 class Factory:
-    """Base factory class both for single agent and workflow generation. Handles common tasks like loading tools, creating folders, and saving files."""
+    """Base factory for both single-agent and workflow generation.
 
-    def __init__(self, config) -> None:
+    Handles common tasks like loading tools, creating folders, and saving files.
+    Subclasses (:class:`SingleAgentFactory`, :class:`WorkflowFactory`) reuse this
+    plumbing and add their own code-assembly logic on top.
+    """
+
+    def __init__(self, config: "Config") -> None:
         """Initialize the workflow crafting system.
+
         Args:
-            config: Configuration object containing paths and settings
+            config: Configuration object containing paths and settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -28,9 +34,16 @@ class Factory:
 
     async def load_tools_code(self) -> tuple[str, str]:
         """Discover all MCP servers and format their client code.
+
         Returns:
-            str: Combined code for all MCP clients.
-            str: Prompt of discovered MCP names for workflow generation tools-awareness.
+            Tuple of ``(tools_code, existing_tool_prompt)``:
+                - ``tools_code``: Combined Python code for all MCP clients.
+                - ``existing_tool_prompt``: Prompt listing discovered MCP names
+                  for workflow-generation tool-awareness.
+
+        Raises:
+            RuntimeError: If MCP server discovery fails.
+            ValueError: If no MCP servers are found.
         """
         tools_code = ""
         existing_tool_prompt = ""
@@ -60,9 +73,13 @@ class Factory:
         return tools_code, existing_tool_prompt
 
     async def load_single_agent_system_prompt(self) -> str:
-        """Load the system prompt for single agent mode.
+        """Load the system prompt for single-agent mode.
+
         Returns:
-            str: The system prompt content
+            The system prompt content read from disk.
+
+        Raises:
+            ValueError: If the system-prompt file cannot be read.
         """
         try:
             with open(self.config.prompt_smolagent) as f:
@@ -70,12 +87,14 @@ class Factory:
         except Exception as e:
             raise ValueError(f"Failed to load single agent system prompt: {str(e)}") from e
 
-    def create_folder_structure(self, uuid_str: str) -> tuple[str]:
-        """Create directory structure for new workflow.
+    def create_folder_structure(self, uuid_str: str) -> tuple[str, str]:
+        """Create the directory structure for a new workflow.
+
         Args:
-            uuid_str: Unique identifier for the workflow
+            uuid_str: Unique identifier for the workflow.
+
         Returns:
-            str: Path to created workflow directory
+            Tuple ``(workflow_path, memory_path)`` of the two created directories.
         """
         workflow_path = os.path.join(self.workflow_dir, uuid_str)
         self.logger.info(f"Created workflow directory: {workflow_path}")
@@ -86,13 +105,18 @@ class Factory:
         return workflow_path, memory_path
 
     def _extract_original_from_goal(self, goal: str) -> str:
-        """Extract original task from knowledge-wrapped goal.
+        """Extract the original task from a knowledge-wrapped goal string.
+
+        Looks for the marker ``"Now, use this knowledge to complete:"`` produced
+        by ``planner._build_knowledge_aware_task()`` and returns the text that
+        follows it. When the marker is absent, returns the goal unchanged.
 
         Args:
-            goal: Goal text that may be wrapped with knowledge context
+            goal: Goal text that may be wrapped with knowledge context.
 
         Returns:
-            str: Extracted original task or goal if not wrapped
+            The extracted original task, or the goal itself when not wrapped.
+            Returns an empty string when ``goal`` is falsy.
         """
         if not goal:
             return ""
@@ -107,16 +131,21 @@ class Factory:
         return goal
 
     def save_workflow_files(
-        self, path: str, uuid_str: str, workflow_genotype_code: str, goal: str, original_task: str = None
+        self, path: str, uuid_str: str, workflow_genotype_code: str, goal: str, original_task: str | None = None
     ) -> None:
         """Save workflow code and metadata to files.
 
+        Writes ``workflow_genotype_<uuid>.py``, ``system_prompt_<uuid>.md``,
+        ``goal_<uuid>.txt`` and, when available, ``original_task_<uuid>.txt``
+        into ``path``. Each write failure is logged and skipped without raising.
+
         Args:
-            path: Directory path to save files
-            uuid_str: Unique workflow identifier
-            workflow_genotype_code: Generated workflow code
-            goal: The goal description (may be knowledge-wrapped)
-            original_task: The original unwrapped task for similarity matching
+            path: Directory path to save files.
+            uuid_str: Unique workflow identifier.
+            workflow_genotype_code: Generated workflow code.
+            goal: The goal description (may be knowledge-wrapped).
+            original_task: The original unwrapped task for similarity matching.
+                When ``None``, an attempt is made to extract it from ``goal``.
         """
         try:
             with open(os.path.join(path, f"workflow_genotype_{uuid_str}.py"), "w") as f:
