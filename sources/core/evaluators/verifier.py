@@ -39,8 +39,8 @@ from sources.cli.pretty_print import (
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
-_VERIFIER_MAX_CLAIMS = 35
-_VERIFIER_MIN_CLAIMS = 15
+_VERIFIER_MAX_CLAIMS = 90
+_VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99 # temporary to disable so signal stay smooth
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
@@ -489,9 +489,7 @@ class VerifierEvaluator(BaseEvaluator):
 
     def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
         """Per-source min/max claim targets derived from the global bounds.
-
-        Scaled by the number of extraction sources so the union still respects
-        ``self.max_claims`` without starving later sources.
+        Scaled by the number of extraction sources to ensure the overall target ismet.
         """
         n_sources = max(1, n_sources)
         per_min = max(2, self.min_claims // n_sources)
