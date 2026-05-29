@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -280,7 +281,8 @@ Provide a structured analysis with:
             "goal": goal,
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
-            "total_eval": len(sab_runs)
+            "total_eval": len(sab_runs),
+            "git": self._get_git_info()
         }
 
         if sab_runs:
@@ -312,6 +314,36 @@ Provide a structured analysis with:
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
+
+    @staticmethod
+    def _get_git_info() -> dict:
+        """
+        Capture the current git commit, branch and working-tree state of the repo.
+
+        Recorded in run notes so each run can be tied back to the exact code that
+        produced it. Returns None values when git metadata is unavailable.
+        """
+        repo_dir = Path(__file__).resolve().parent
+
+        def _git(*args: str) -> str | None:
+            try:
+                return subprocess.run(
+                    ["git", *args],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5,
+                ).stdout.strip()
+            except (subprocess.SubprocessError, OSError):
+                return None
+
+        status = _git("status", "--porcelain")
+        return {
+            "commit": _git("rev-parse", "HEAD"),
+            "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+            "dirty": bool(status) if status is not None else None,
+        }
 
     @staticmethod
     def _compute_per_iteration_costs(runs_data: list) -> list[float]:
