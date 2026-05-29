@@ -45,11 +45,12 @@ You add new tools without touching Mimosa's core.
 </div>
 
 <div class="feature-card" markdown>
-### :material-magnify-scan: Goodhart-resistant evaluation
-A multi-source per-claim verifier scores each run by extracting success claims
-from six independent vantages (literature, user goal, agent narration, math
-invariants, computational reproducibility, statistical fingerprint) — and only
-an *abstracted prompt gradient* is fed back to the mutator.
+### :material-magnify-scan: Verifier-driven evaluation
+A multi-source per-claim verifier writes **deterministic Python programs**
+that confirm what the agents claim, against six vantages (literature, user
+goal, agent narration, math invariants, computational reproducibility,
+statistical fingerprint). Only a coarse *prompt gradient* — which does not
+leak the verified claims — is fed back to the mutator.
 </div>
 
 <div class="feature-card" markdown>

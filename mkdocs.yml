@@ -116,6 +116,7 @@ nav:
       - Evolution engine: concepts/evolution-engine.md
       - Evaluation pipeline: concepts/evaluation-pipeline.md
       - Tool discovery & MCP: concepts/tools-and-mcp.md
+      - Toolomics: concepts/toolomics.md
       - Scientific grounding: concepts/grounding.md
   - Usage:
       - Overview: usage/index.md

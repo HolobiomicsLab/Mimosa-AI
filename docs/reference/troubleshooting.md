@@ -48,17 +48,24 @@ Check:
   `AddressMCP("0.0.0.0", 5000, 5100)`.
 - Is a firewall blocking the port range?
 
-### Mimosa finds Toolomics but no tools have tags
+### A tool I expect to be discoverable doesn't show up
 
-Untagged providers are allowed since
-[commit 0adbbcc](https://github.com/HolobiomicsLab/Mimosa-AI/commit/0adbbcc).
-Verify that you're on a recent `mimosa_v2` build:
+Mimosa does **not** use tool tags. Every tool exposed by every reachable
+MCP server is made available to every agent in the generated workflow.
+If a tool is missing, it's one of:
 
-```bash
-git log -1 --oneline
-```
+- The MCP server hosting it isn't in `Config.discovery_addresses`. Check
+  the IP / port range and that the server answers a handshake on
+  `http://<ip>:<port>/mcp`.
+- The tool is registered with ToolHive but the ToolHive code path is
+  commented out in `tools_manager.py` (the default in this build). Use a
+  network-MCP exposure of the same tool, or re-enable ToolHive
+  discovery.
+- The Toolomics service is in `config_<instance_id>.json` with
+  `"enabled": false`. Flip it to `true` and re-run Toolomics' `./start.sh`.
 
-Tools without tags become available to every agent.
+Use `--manual` mode to list everything that *is* discoverable and
+confirm the tool name actually appears.
 
 ## OpenRouter quantization
 

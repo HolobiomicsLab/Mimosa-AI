@@ -37,10 +37,24 @@ generations seeded from a Quality-Diversity (QD) archive. See
 neuroevolution primitives (representation / selection / variation /
 evaluation).
 
-#### 3. Goodhart-resistant evaluation
+#### 3. Verifier-driven evaluation
 
-Abstracted, rubric-blind diagnosis (the only signal fed
-  back into the mutator).
+The judge that produces the evolutionary pressure signal is a
+multi-source, per-claim verifier. It writes **deterministic Python
+programs** that recompute the agent's claims from the workspace across
+six vantages (literature, user goal, agent narration, math invariants,
+computational reproducibility, statistical fingerprint), and falls back
+to LLM verdicts only when no executable check is possible. The single
+output handed to the mutator is a short **prompt gradient** describing
+what to change next — it does not name the verified claims back, so the
+mutator cannot turn the rubric vocabulary into an over-fitting target.
+
+> Note — this verifier is **not** the ScienceAgentBench or PaperBench
+> grader. Those benchmarks compare workflow outputs against author-
+> provided ground-truth files; the verifier here drives workflow
+> evolution. See
+> [ScienceAgentBench](science_agent_bench_evaluation.md) and
+> [PaperBench](papers_bench_evaluation.md).
 
 See [Evaluation pipeline](concepts/evaluation-pipeline.md).
 
@@ -241,8 +255,10 @@ Each recursive step:
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
-Termination: `overall_score > learned_score_threshold` (default 0.95) in
-`--learn` mode, or `max_depth` reached.
+Termination: `overall_score > learned_score_threshold` (default 0.97) in
+`--learn` mode, or `max_depth` reached
+(`max_learning_evolve_iterations`, default 35; single-shot uses
+`max_depth=1`).
 
 ### 2. `SelectionPressure` — [`sources/core/selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
 
@@ -448,11 +464,14 @@ For each generation:
    ```
    where `info_bonus(n_hard_pass) = 0.05 · (1 - exp(-n_hard_pass / 8))`
    (saturating reward for thoroughness).
-5. **Abstracted prompt gradient** — rubric-blind plain-language
-   single-sentence diagnosis prefixed with a short code name (e.g.
-   `FALLBACK_ECFP_CLASSIFIER`). It is the **only** verifier signal the
-   mutator sees, and recent history is included so recurring failure
-   modes reuse the same code names across generations.
+5. **Prompt gradient** — plain-language single-sentence diagnosis
+   prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`). It
+   is the **only** verifier signal the mutator sees, and recent history
+   is included so recurring failure modes reuse the same code names
+   across generations. The gradient deliberately does not name the
+   verified claims, scores, or which of the six sources raised them — so
+   the mutator can correct the workflow without being handed a rubric to
+   over-fit against.
 
 Detail: [Evaluation pipeline](concepts/evaluation-pipeline.md).
 

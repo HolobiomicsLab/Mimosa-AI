@@ -22,9 +22,13 @@ planner is bypassed and a single task is run.
 Two components live here:
 
 - **ToolManager** ([`tools_manager.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/tools_manager.py))
-  scans the IP / port range in `Config.discovery_addresses` for MCP servers
-  exposed by Toolomics, queries them for their tool schemas, and emits the
-  Python binding code injected into each generated workflow.
+  scans the IP / port range in `Config.discovery_addresses` for MCP
+  servers (typically exposed by [Toolomics](toolomics.md), but Mimosa
+  also supports any standalone MCP endpoint and has a ToolHive code path
+  for `thv`-managed servers). It queries each server for its tool
+  schemas and emits the Python binding code injected into each generated
+  workflow. Tools have no tags — every discovered tool is made
+  available to every agent in the generated workflow.
 - **Perspicacité client** ([`perspicacite_client.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/utils/perspicacite_client.py))
   fetches literature snippets that ground both workflow synthesis and the
   judge's soft-claim verdicts. See [Scientific grounding](grounding.md).

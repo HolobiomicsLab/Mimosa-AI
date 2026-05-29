@@ -52,8 +52,9 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score > learned_score_threshold` (default `0.95`) in `--learn` mode, *or*
-- `max_depth` reached (default `25`).
+- `overall_score > learned_score_threshold` (default `0.97`) in `--learn` mode, *or*
+- `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
+  (default `35`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 

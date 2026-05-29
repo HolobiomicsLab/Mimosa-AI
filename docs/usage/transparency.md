@@ -54,7 +54,7 @@ The verifier writes summary scores plus the workflow's final state to
 | `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |
 | `n_hard_pass` | Count of `hard` claims that passed (drives `information_bonus`). |
 | `cheat_penalty` | Cheat-detector penalty. Currently always `0.0` (detector disabled, pending rewrite). |
-| `abstracted_prompt_gradient` | Rubric-blind code-named summary — the only signal the mutator sees. |
+| `abstracted_prompt_gradient` | Code-named diagnostic summary — the only signal the mutator sees. Does not name the verified claims back. |
 
 The full per-claim detail (status, rationale, stderr tail, recomputed
 values) lives in `sources/workflows/<uuid>/evaluation.txt` alongside the
@@ -105,8 +105,10 @@ Important for understanding the audit trail: the mutator sees **only** the
 - Per-claim verdicts.
 - Which source (A–F) raised any given claim.
 
-This is by design — it stops the loop from learning to game the rubric.
-See [Evaluation pipeline](../concepts/evaluation-pipeline.md).
+This is by design — the prompt gradient tells the mutator what direction
+to push next without naming the verified claims back, so the loop cannot
+turn the rubric vocabulary into an optimization target. See
+[Evaluation pipeline](../concepts/evaluation-pipeline.md).
 
 ## See also
 

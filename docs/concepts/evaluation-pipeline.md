@@ -1,9 +1,24 @@
 # Evaluation pipeline
 
-Mimosa scores each workflow run with a **multi-source, per-claim verifier**
-designed to be Goodhart-resistant: the mutator can only see a coarse
-prompt gradient, never the rubric. This prevents the loop from learning to
-game whatever signal it's optimized against.
+> This page describes the **judge** that runs after every workflow
+> execution — the [`VerifierEvaluator`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/verifier.py)
+> in `sources/core/evaluators/`. It is the **pressure signal that drives
+> workflow evolution**, not a benchmark grader.
+>
+> If you are looking for ScienceAgentBench or PaperBench grading — those
+> are different systems that compare the workflow's output against
+> author-provided ground-truth files. See
+> [ScienceAgentBench evaluation](../science_agent_bench_evaluation.md)
+> and [PaperBench evaluation](../papers_bench_evaluation.md).
+
+Mimosa scores each workflow run with a **multi-source, per-claim
+verifier**. The verifier writes and executes **deterministic Python
+programs** in the workspace to confirm what the agents claim they did,
+across six independent vantage points (literature, user goal, agent
+narration, math invariants, computational reproducibility, statistical
+fingerprint). The single signal that flows back to the mutator is a short
+**prompt gradient** that summarizes failure modes without leaking the
+verified claims themselves.
 
 ![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
 
@@ -14,12 +29,15 @@ The verifier runs four stages per workflow run:
 1. **Multi-source claim extraction** — six independent prompts each look at
    the run from a different vantage point and emit success-polarity claims.
 2. **Per-claim verification** — for each claim, the judge either writes a
-   small Python script that recomputes the asserted value from workspace
-   files, or renders a soft LLM verdict when no deterministic check exists.
+   small Python program that recomputes the asserted value from workspace
+   files (the default path), or renders a soft LLM verdict when no
+   deterministic check is possible.
 3. **Aggregation** — per-claim scores combine into `overall_score` with a
    saturating thoroughness bonus and a hard-fail cap.
-4. **Abstracted prompt gradient** — a rubric-blind, plain-language summary
-   of what went wrong, the **only** signal that reaches the mutator.
+4. **Prompt gradient** — a plain-language summary of failure modes, the
+   **only** signal that reaches the mutator. It does not name claims,
+   scores, or sources, so the mutator cannot turn the verified-claim
+   vocabulary back into a rubric to optimize against.
 
 ## The six claim sources
 
@@ -50,16 +68,24 @@ A few important constraints on these sources, enforced via the shared
 
 ## Per-claim verification
 
-=== "Executable claims"
+The verifier prefers a deterministic Python program for every claim and
+only falls back to an LLM verdict when no executable check is possible.
 
-    An LLM writes a small verifier script. It opens workspace files and
-    *recomputes* the asserted value, then emits a single JSON line.
-    Scripts run in the agents' workspace with `numpy`, `pandas`, `scipy`,
-    and `scikit-learn` pre-installed by the verifier on first use.
+=== "Executable claims (preferred)"
+
+    An LLM writes a small Python program *per claim*. The program opens
+    workspace files and **recomputes the asserted value** from disk,
+    then emits a single JSON line. Programs run in the agents'
+    workspace with `numpy`, `pandas`, `scipy`, and `scikit-learn`
+    pre-installed by the verifier on first use.
+
+    Because the check is deterministic Python touching the same files
+    the agents produced, the verdict does not depend on the judge LLM
+    re-believing the agent's narration.
 
     **Anti-tautology tripwires:**
 
-    - Scripts must touch real I/O markers, not parse the agent's answer
+    - Programs must touch real I/O markers, not parse the agent's answer
       string back to themselves.
     - Embedding the workflow output as a string literal and comparing it
       to itself is rejected.
@@ -67,11 +93,11 @@ A few important constraints on these sources, enforced via the shared
     Each executable claim returns `pass / fail / error` → `1.0 / 0.0 /
     excluded from the mean`.
 
-=== "Soft claims"
+=== "Soft claims (fallback)"
 
-    Things that can't be recomputed (e.g. "this approach is appropriate
-    for X"). An LLM verdict is rendered against workspace previews and
-    literature grounding, with three outcomes:
+    Things that can't be recomputed from disk (e.g. "this approach is
+    appropriate for X"). An LLM verdict is rendered against workspace
+    previews and literature grounding, with three outcomes:
 
     - `pass` → `1.0`
     - `unsure` → `0.5`
@@ -96,16 +122,22 @@ overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_c
 - The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.
 
-## Abstracted prompt gradient
+## Prompt gradient
 
 After aggregation the verifier composes a single-sentence diagnosis (the
 **prompt gradient**) from the per-claim report and recent history of
-similar runs. It is deliberately *rubric-blind*:
+similar runs. It is the **only** verifier output that reaches the
+mutator, and it is written so it does not leak the verified claims back:
 
-- It does not name specific claims or scores.
-- It encodes failure modes by short code names (e.g. `FALLBACK_ECFP_CLASSIFIER`)
-  so recurring patterns can be tracked across generations.
-- It is the **only** verifier output that reaches the mutator.
+- It does not name specific claims, scores, or which of the six sources
+  raised the issue.
+- It encodes failure modes by short code names (e.g.
+  `FALLBACK_ECFP_CLASSIFIER`) so recurring patterns can be tracked across
+  generations without spelling out the underlying check.
+
+The intent is informational, not punitive: the mutator learns *what
+direction to push the workflow next* without being handed a vocabulary
+it can over-fit against.
 
 ## Cheat detector (currently disabled)
 
@@ -124,8 +156,8 @@ behavioral anti-cheat pressure today comes from:
 
 | Concern | Mitigation |
 | ------- | ---------- |
-| The judge LLM repeats the agent's claims verbatim. | Per-claim executable verifiers with anti-tautology tripwires. |
-| The mutator over-fits to a numeric rubric. | Only the abstracted prompt gradient is returned — no rubric-level signal. |
+| The judge LLM repeats the agent's claims verbatim. | Per-claim deterministic Python recomputation, with anti-tautology tripwires. |
+| The mutator over-fits to a numeric rubric. | Only the prompt gradient is returned — and it does not name the verified claims. |
 | The hard-fail cap collapses ranking among failed runs. | `overall_score_uncapped` keeps QD ordering meaningful. |
 | One vantage point misses the failure. | Six independent sources, claims merged. |
 | Cosmetic hygiene gets gamed as "quality". | Source E only verifies non-negotiable CS practice; docs/tests/style are forbidden. |

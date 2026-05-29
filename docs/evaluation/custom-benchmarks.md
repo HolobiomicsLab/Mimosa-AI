@@ -3,6 +3,14 @@
 Run Mimosa-AI on your own CSV of tasks. Useful for internal benchmarks,
 private datasets, or domain-specific reproductions.
 
+!!! info "Two systems again"
+    This page covers batch execution and per-task aggregation. The
+    **per-generation pressure signal** (and the prompt gradient that
+    drives evolution) still comes from the in-loop verifier described
+    in [Evaluation pipeline](../concepts/evaluation-pipeline.md). A
+    custom benchmark either layers a scenario rubric on top (see below)
+    or relies on the verifier alone for scoring.
+
 ## Minimum CSV schema
 
 `--papers` mode expects a CSV with at least:
