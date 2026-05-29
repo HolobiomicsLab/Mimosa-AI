@@ -40,18 +40,25 @@ spotting where the agent's understanding shifted.
 
 ## Reading `state_result.json`
 
-The verifier writes per-claim scores plus the workflow's final state to
-`sources/workflows/<uuid>/state_result.json`. Useful fields:
+The verifier writes summary scores plus the workflow's final state to
+`sources/workflows/<uuid>/state_result.json` under
+`evaluation.verifier.*`. Useful fields:
 
 | Field | What it tells you |
 | ----- | ----------------- |
-| `overall_score` | Capped (≤ 0.94 if hard fail). |
-| `reward_uncapped` | Same score without the hard-fail cap. |
-| `executable_claims` | Per-claim `pass`/`fail` from Layer 1 executable checks. |
-| `soft_claims` | Per-claim `pass`/`unsure`/`fail` from Layer 1 soft verdicts. |
-| `cheat_findings.behavioural` | Findings safe to feed the mutator. |
-| `cheat_findings.mechanism` | Audit-only findings (never fed back). |
-| `abstracted_diagnosis` | Plain-language summary — the only signal the mutator sees. |
+| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.99`) when a hard claim is refuted. |
+| `overall_score_uncapped` | Same score pre-cap — used as `reward_uncapped` for QD ranking. |
+| `base_mean` | Mean over non-error per-claim scores. |
+| `information_bonus` | Saturating thoroughness bonus, `α·(1 − exp(−n_hard_pass / β))`. |
+| `hard_fail_capped` | `true` when a hard claim was refuted (cap fired). |
+| `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |
+| `n_hard_pass` | Count of `hard` claims that passed (drives `information_bonus`). |
+| `cheat_penalty` | Cheat-detector penalty. Currently always `0.0` (detector disabled, pending rewrite). |
+| `abstracted_prompt_gradient` | Rubric-blind code-named summary — the only signal the mutator sees. |
+
+The full per-claim detail (status, rationale, stderr tail, recomputed
+values) lives in `sources/workflows/<uuid>/evaluation.txt` alongside the
+JSON.
 
 ## Inspecting the genotype
 
@@ -63,8 +70,8 @@ sources/workflows/<uuid>/workflow_genotype_<uuid>.py
 
 It's plain Python — readable end-to-end, no DSL. Look at it when:
 
-- The verifier diagnosis is vague and you want to see what the agents
-  actually do.
+- The abstracted prompt gradient is vague and you want to see what the
+  agents actually do.
 - You suspect a cheat the verifier missed.
 - You want to lift a successful workflow into another project as a
   starting point.
@@ -92,11 +99,11 @@ every LLM call.
 ## What's hidden from the mutator
 
 Important for understanding the audit trail: the mutator sees **only** the
-abstracted diagnosis. It cannot see:
+`abstracted_prompt_gradient`. It cannot see:
 
 - Numerical scores.
 - Per-claim verdicts.
-- Mechanism findings of the cheat detector.
+- Which source (A–F) raised any given claim.
 
 This is by design — it stops the loop from learning to game the rubric.
 See [Evaluation pipeline](../concepts/evaluation-pipeline.md).

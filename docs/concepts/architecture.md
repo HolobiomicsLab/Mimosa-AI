@@ -62,13 +62,14 @@ Once execution finishes, the **WorkflowEvaluator** facade
 ([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py))
 routes to one of:
 
-- **VerifierEvaluator** (default) — the three-layer verifier
+- **VerifierEvaluator** (default) — the multi-source per-claim verifier
   ([Evaluation pipeline](evaluation-pipeline.md)).
 - **GenericEvaluator** — legacy 4-criterion LLM judge.
 - **ScenarioEvaluator** — rubric/assertion-based scoring for benchmarks.
 
-The evaluator returns `(overall_score, reward_uncapped, abstracted diagnosis)`.
-Only the diagnosis feeds back into the mutator — the raw rubric never does.
+The evaluator returns `(overall_score, overall_score_uncapped,
+abstracted_prompt_gradient)`. Only the prompt gradient feeds back into the
+mutator — the raw rubric never does.
 
 ## Persistent storage
 

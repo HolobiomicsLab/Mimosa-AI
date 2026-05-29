@@ -46,9 +46,10 @@ You add new tools without touching Mimosa's core.
 
 <div class="feature-card" markdown>
 ### :material-magnify-scan: Goodhart-resistant evaluation
-A three-layer verifier scores each run with executable claim checks, soft-claim
-LLM verdicts, and a separate cheat detector — and only an *abstracted* diagnosis
-is fed back to the mutator.
+A multi-source per-claim verifier scores each run by extracting success claims
+from six independent vantages (literature, user goal, agent narration, math
+invariants, computational reproducibility, statistical fingerprint) — and only
+an *abstracted prompt gradient* is fed back to the mutator.
 </div>
 
 <div class="feature-card" markdown>
@@ -99,8 +100,8 @@ The framework is organized into five layers:
 3. **Meta-orchestration** — synthesizes a task-specific multi-agent workflow and
    evolves it generation by generation.
 4. **Agent execution** — code-generating agents run subtasks in a sandbox.
-5. **Judge & evaluation** — three-layer verifier scores outputs and drives the
-   next mutation.
+5. **Judge & evaluation** — multi-source per-claim verifier scores outputs and
+   drives the next mutation.
 
 ![Mimosa architecture overview](images/mimosa_overall.jpg){ width="90%" }
 
@@ -127,7 +128,7 @@ A 5-minute quickstart from a fresh checkout to a finished workflow.
 
 <div class="feature-card" markdown>
 ### :material-graph: Understand the engine
-How workflow evolution, QD selection, and the three-layer verifier work.
+How workflow evolution, QD selection, and the multi-source verifier work.
 [Concepts →](concepts/index.md)
 </div>
 

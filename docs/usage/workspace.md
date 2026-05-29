@@ -84,9 +84,9 @@ When the verifier scores a generation, it reads:
 2. **Workspace snapshot** — for files to verify executable claims against.
 3. **Perspicacité** — for literature grounding on soft claims.
 
-It writes back **only** to the diagnosis fields in the response — not to
-the workspace. The mutator sees the abstracted diagnosis, not the raw
-verifier output.
+It writes back **only** to the evaluation fields in the response — not to
+the workspace. The mutator sees the `abstracted_prompt_gradient`, not the
+raw verifier output.
 
 ## Resetting between benchmarks
 

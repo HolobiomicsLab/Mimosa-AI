@@ -22,7 +22,7 @@ flowchart TB
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
     Mut --> Orch
     Cross --> Orch
-    Orch --> Eval[3-layer verifier<br/>reward + diagnosis]
+    Orch --> Eval[multi-source per-claim verifier<br/>reward + prompt gradient]
     Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
@@ -41,8 +41,9 @@ A more detailed view lives in the source diagram
 1. **Reset** the workspace to the initial state.
 2. **Orchestrate** a workflow run (LLM writes Python → sandbox runs it).
 3. **Snapshot** the workspace.
-4. **Evaluate** — get `overall_score` and `reward_uncapped` plus an
-   abstracted diagnosis.
+4. **Evaluate** — get `overall_score` and `reward_uncapped` (i.e.
+   `overall_score_uncapped` in the persisted JSON) plus an
+   `abstracted_prompt_gradient`.
 5. **`validate_survivor()`** — admit to the archive when the candidate
    improves over baseline or clears `qd_score > admit_threshold`;
    capacity is curated by lowest-`qd_score` eviction.

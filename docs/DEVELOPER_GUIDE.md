@@ -8,7 +8,7 @@
 3. [Directory Structure](#directory-structure)
 4. [Core Components](#core-components)
 5. [Execution Flow](#execution-flow)
-6. [Evaluation & the 3-layer Verifier](#evaluation-the-3-layer-verifier)
+6. [Evaluation & the multi-source per-claim verifier](#evaluation--the-multi-source-per-claim-verifier)
 7. [Testing & Evaluation](#testing-evaluation)
 8. [Contributing Guidelines](#contributing-guidelines)
 
@@ -69,8 +69,9 @@ Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.me
   via the `EvolutionEngine` (QD selection over a session archive).
 - Layer `3` executes those workflows in a sandboxed runner with
   SmolAgents.
-- Layer `4` runs the 3-layer verifier and reports `overall_score`,
-  `reward_uncapped`, and abstracted diagnosis back into the loop.
+- Layer `4` runs the multi-source per-claim verifier and reports
+  `overall_score`, `reward_uncapped`, and `abstracted_prompt_gradient`
+  back into the loop.
 
 ---
 
@@ -105,7 +106,7 @@ mimosa-ai/
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, SelectionLog
 │   │   └── evaluators/
 │   │       ├── evaluator.py               # WorkflowEvaluator facade (routes to backends)
-│   │       ├── verifier.py                # Per-claim 3-layer verifier (default)
+│   │       ├── verifier.py                # Multi-source per-claim verifier (default)
 │   │       ├── grounding.py               # Perspicacite literature-grounding adapter
 │   │       ├── generic.py                 # Legacy LLM judge (4-criterion)
 │   │       ├── scenario.py                # Rubric-based evaluation
@@ -226,7 +227,7 @@ Key collaborators (instantiated in `__init__`):
 - `WorkflowSelector` — parent retrieval.
 - `WorkflowOrchestrator` — grounding → factory → sandbox.
 - `VariationEngine` — mutation / crossover prompt assembly.
-- `WorkflowEvaluator` — 3-layer verifier (default).
+- `WorkflowEvaluator` — multi-source per-claim verifier (default).
 - `SelectionPressure` — QD archive (population_size=50, k=25,
   novelty_weight=0.4).
 
@@ -249,7 +250,8 @@ Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
 (`w = novelty_weight = 0.4`). Quality is sourced from `reward_uncapped`
-so the 0.94 hard-fail cap doesn't flatten rank ordering. Admission is
+so the hard-fail cap (`_HARD_FAIL_CAP`, currently `0.99`) doesn't
+flatten rank ordering. Admission is
 gated by the validity check (improvement over baseline or
 `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
@@ -317,7 +319,7 @@ genotype.
 
 | Backend          | File              | Use                                   |
 |------------------|-------------------|---------------------------------------|
-| `VerifierEvaluator` | `verifier.py`     | **Default**: 3-layer per-claim defense |
+| `VerifierEvaluator` | `verifier.py`     | **Default**: multi-source per-claim verifier |
 | `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
 | `ScenarioEvaluator` | `scenario.py`    | Rubric / assertion-based scoring      |
 | `Perspicacite grounding` | `grounding.py` | Adapter used by verifier |
@@ -395,7 +397,7 @@ main.py --evaluation_cli      # guided model/workspace/mode picker (EvaluationCL
 
 ---
 
-## Evaluation & the 3-layer Verifier
+## Evaluation & the multi-source per-claim verifier
 
 ![Evaluation pipeline](images/evaluation_pipeline.png)
 
@@ -403,29 +405,43 @@ Source diagram: [`docs/diagrams/verifiers_judge.mermaid`](https://github.com/Hol
 
 For each generation:
 
+1. **Multi-source claim extraction**: six independent prompts emit
+   success-polarity claims from different vantage points — `A` literature
+   (Perspicacité), `B` user goal, `C` agent narration (anti-hallucination),
+   `D` math invariants, `E` non-negotiable computational reproducibility
+   (deps manifest covers used imports, no absolute paths, seeds on
+   stochastic ops; **explicitly forbids** README / docs / tests / style /
+   type-hint claims), `F` statistical fingerprint (baseline, degeneracy,
+   leakage). Claims are tagged `hard` or `soft`; bare file-existence is
+   never `hard`.
 2. **Per-claim verification**: each claim is classified as executable or
    soft. Executable claims get an LLM-written verifier script that opens
    workspace files and recomputes the asserted value; anti-tautology
    tripwires (literal/output overlap ≥ 80 chars, I/O markers presence)
-   reject scripts that parse the agent's answer back to itself. Soft
-   claims get a `pass/unsure/fail` LLM verdict against workspace
-   previews + literature grounding (mapped to `1.0 / 0.5 / 0.0`).
-3. **Layer 3 cheat detector** reads only the task spec and the workflow
-   source. Findings are split into *behavioral* (safe to feed back to
-   mutator) and *mechanism* (audit only — leaking would teach the
-   mutator to hide cheats).
+   reject scripts that parse the agent's answer back to itself. The
+   verifier runner has `numpy`, `pandas`, `scipy`, and `scikit-learn`
+   pre-installed (lazy one-shot install per process). Soft claims get a
+   `pass/unsure/fail` LLM verdict against workspace previews + literature
+   grounding (mapped to `1.0 / 0.5 / 0.0`).
+3. **Independent cheat detector**: present in the codebase but currently
+   **disabled** pending a rewrite. The aggregation path still has a slot
+   for `cheat_penalty`. Behavioral anti-cheat pressure today comes from
+   Source C's recompute-from-disk verifiers, the inverted-score "Used
+   fallback" claim type, and the anti-tautology tripwires.
 4. **Aggregation**:
    ```
    overall = clamp(base_mean + info_bonus, 0, 1)
    if any hard claim refuted:
-       overall = min(overall, 0.94)        # _HARD_FAIL_CAP
-   overall = max(0, overall - cheat_penalty)
+       overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
+   overall = max(0, overall - cheat_penalty)  # cheat_penalty = 0.0 today
    ```
-   where `info_bonus(n_hard_pass) = 0.15 · (1 - exp(-n_hard_pass / 8))`
+   where `info_bonus(n_hard_pass) = 0.05 · (1 - exp(-n_hard_pass / 8))`
    (saturating reward for thoroughness).
-5. **Layer 1 abstracted diagnosis** — rubric-blind plain-language
-   summary of what failed — is the **only** verifier signal the mutator
-   sees.
+5. **Abstracted prompt gradient** — rubric-blind plain-language
+   single-sentence diagnosis prefixed with a short code name (e.g.
+   `FALLBACK_ECFP_CLASSIFIER`). It is the **only** verifier signal the
+   mutator sees, and recent history is included so recurring failure
+   modes reuse the same code names across generations.
 
 Detail: [Evaluation pipeline](concepts/evaluation-pipeline.md).
 

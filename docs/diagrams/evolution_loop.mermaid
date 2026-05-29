@@ -33,7 +33,7 @@ flowchart TB
 
         Orch["WorkflowOrchestrator<br/>LLM → workflow code → install deps → sandbox run"]
         State["state_result.json<br/>+ workspace artefacts"]
-        Verify["3-layer verifier<br/>(see evaluation_pipeline.mermaid)<br/>→ overall_score / reward_uncapped<br/>→ abstracted diagnosis"]
+        Verify["multi-source per-claim verifier<br/>(see evaluation_pipeline.mermaid)<br/>→ overall_score / overall_score_uncapped<br/>→ abstracted_prompt_gradient"]
 
         Validate["SelectionPressure.validate_survivor()<br/>relative_improvement > θ<br/>OR qd_score > admit_threshold"]
         Admit{{"_try_admit()<br/>is_valid?"}}

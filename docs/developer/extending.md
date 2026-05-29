@@ -39,8 +39,11 @@ To add a new scoring strategy:
 The returned `EvaluationResult` must include at minimum:
 
 - `overall_score: float ∈ [0, 1]`
-- `reward_uncapped: float ∈ [0, 1]` (or `None` for backends without a cap)
-- `abstracted_diagnosis: str` — the **only** signal fed back to the mutator.
+- `overall_score_uncapped: float ∈ [0, 1]` — surfaced as `reward_uncapped`
+  on the in-memory `WorkflowRun`/`ArchiveMember`; pass through unchanged
+  (or set equal to `overall_score`) for backends without a cap.
+- `abstracted_prompt_gradient: str` — the **only** signal fed back to the
+  mutator.
 
 Anything else you put on the result is fine — it's just persisted to
 `state_result.json` for auditing.

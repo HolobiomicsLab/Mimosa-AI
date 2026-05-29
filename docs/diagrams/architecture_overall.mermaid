@@ -37,9 +37,8 @@ flowchart TB
     subgraph L4["Layer 4 — Judge / Evaluation"]
         direction TB
         Eval["WorkflowEvaluator<br/>(evaluators/evaluator.py)"]
-        Verifier["VerifierEvaluator<br/>3-layer defense<br/>(evaluators/verifier.py)"]
-        Checklist["TaskChecklist<br/>(task_checklist.py)"]
-        Cheat["CheatDetector<br/>(verifier internal Layer 3)"]
+        Verifier["VerifierEvaluator<br/>6-source per-claim<br/>(evaluators/verifier.py)"]
+        Sources["claim sources A–F<br/>literature · user goal · narration<br/>math · CS-reproducibility · stats"]
         Generic["GenericEvaluator<br/>(generic.py)"]
         Scenario["ScenarioEvaluator<br/>(scenario.py)"]
     end
@@ -68,8 +67,7 @@ flowchart TB
 
     State --> Eval
     Eval --> Verifier
-    Verifier --> Checklist
-    Verifier --> Cheat
+    Verifier --> Sources
     Eval --> Generic
     Eval --> Scenario
 

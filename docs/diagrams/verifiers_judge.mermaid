@@ -7,34 +7,48 @@
 }} }%%
 flowchart TB
     %% ===== inputs =====
-    Run[/"workflow run<br/>state_result.json + workspace files"/]
+    Run[/"workflow run<br/>state_result.json + workspace files<br/>+ agent narration"/]
     TaskSpec[/"task specification<br/>(user goal / benchmark row)"/]
-    Lit[/"literature grounding<br/>via Perspicacite (optional)"/]
+    Lit[/"literature grounding<br/>via Perspicacite (Source A only)"/]
 
-    %% ===== Layer 2: task checklist (built once per task hash) =====
-    subgraph L2box["Layer 2 — task-locked checklist (built once per task_hash, cached)"]
-        Builder["TaskChecklistBuilder<br/>(evaluators/task_checklist.py)"]
-        Checklist["checklist items<br/>(must-haves, methodology, metrics)"]
+    %% ===== Stage 1: multi-source claim extraction =====
+    subgraph Extract["Stage 1 — multi-source claim extraction (6 sources, merged)"]
+        direction LR
+        SA["A · literature<br/>methodology bar"]
+        SB["B · user goal<br/>explicit deliverables"]
+        SC["C · agent narration<br/>recompute claimed values"]
+        SD["D · math invariants<br/>probabilities / shape / NaN / PSD"]
+        SE["E · CS reproducibility<br/>deps · seeds · no abs paths<br/>(no docs/tests/style)"]
+        SF["F · statistical fingerprint<br/>baselines · degeneracy · leakage"]
     end
-    TaskSpec --> Builder
-    Lit --> Builder
-    Builder --> Checklist
+    TaskSpec --> SA
+    TaskSpec --> SB
+    Run --> SC
+    Run --> SD
+    Run --> SE
+    Run --> SF
+    Lit --> SA
 
-    %% ===== claim pipeline =====
-    subgraph Pipeline["VerifierEvaluator pipeline (evaluators/verifier.py)"]
+    Claims["merged claim set<br/>polarity = success assertion<br/>each tagged hard / soft"]
+    SA --> Claims
+    SB --> Claims
+    SC --> Claims
+    SD --> Claims
+    SE --> Claims
+    SF --> Claims
+
+    %% ===== Stage 2: per-claim verification =====
+    subgraph Pipeline["Stage 2 — per-claim verification"]
         direction TB
-        Extract["extract atomic claims<br/>(checklist-driven OR narration<br/>fallback) — typ. 5-20 claims"]
-        Classify{"per claim:<br/>executable in code?"}
-        GenScript["generate verifier script<br/>(LLM, opens workspace files,<br/>recomputes value)"]
+        Classify{"executable<br/>in code?"}
+        GenScript["generate verifier script<br/>(LLM, opens workspace files,<br/>recomputes value;<br/>numpy / pandas / scipy / sklearn)"]
         AntiTaut["anti-tautology tripwires:<br/>literal/output overlap +<br/>I/O markers check"]
         Sandbox[["WorkflowRunner sandbox<br/>per-claim execution"]]
-        Soft["soft LLM verdict<br/>(pass/unsure/fail<br/>→ 1.0 / 0.5 / 0.0)<br/>anchored on previews+grounding"]
-        ScoreClaim["per-claim score ∈ {0, 0.5, 1}<br/>+ status (pass/fail/error)"]
+        Soft["soft LLM verdict<br/>(pass / unsure / fail<br/>→ 1.0 / 0.5 / 0.0)<br/>anchored on previews + grounding"]
+        ScoreClaim["per-claim score<br/>+ status (pass / fail / error)"]
     end
 
-    Run --> Extract
-    Checklist --> Extract
-    Extract --> Classify
+    Claims --> Classify
     Classify -- yes --> GenScript
     GenScript --> AntiTaut
     AntiTaut --> Sandbox
@@ -42,38 +56,28 @@ flowchart TB
     Classify -- no --> Soft
     Soft --> ScoreClaim
 
-    %% ===== Layer 3: independent cheat audit =====
-    subgraph L3box["Layer 3 — independent cheat detector"]
-        Cheat["CheatDetector<br/>reads task spec + workflow .py only<br/>(NEVER claims / evaluation output)"]
-        Findings["behavioral findings → mutator<br/>mechanism findings → audit only"]
-    end
-    Run -. "workflow source" .-> Cheat
-    TaskSpec --> Cheat
-    Cheat --> Findings
-
-    %% ===== Aggregation =====
-    subgraph Aggregate["Aggregation (_aggregate)"]
-        Mean["base_mean = mean(per-claim scores)"]
-        Bonus["info_bonus = α·(1 − exp(−n_hard_pass / β))<br/>α=0.15, β=8 — saturating reward for thoroughness"]
-        Cap["hard-fail cap (0.94):<br/>any refuted hard claim → overall ≤ cap"]
-        Penalty["cheat_penalty subtracted<br/>overall_score = max(0, …)"]
+    %% ===== Stage 3: aggregation =====
+    subgraph Aggregate["Stage 3 — aggregation"]
+        Mean["base_mean = mean(non-error claims)"]
+        Bonus["info_bonus = α·(1 − exp(−n_hard_pass / β))<br/>α=0.05, β=8 — saturates"]
+        Cap["hard-fail cap (0.99, soft):<br/>any refuted hard claim flags hard_fail_capped"]
+        Cheat["cheat_penalty<br/>(currently disabled — pending rewrite)"]
     end
 
     ScoreClaim --> Mean
     ScoreClaim --> Bonus
     Mean --> Cap
     Bonus --> Cap
-    Cap --> Penalty
-    Findings -- penalty --> Penalty
+    Cap --> Cheat
 
-    %% ===== outputs =====
-    Penalty --> Overall["overall_score ∈ [0, 1]<br/>(reward) + reward_uncapped<br/>(base+bonus−cheat, no cap)"]
-    Penalty --> Diag["Layer 1 — abstracted diagnosis<br/>(rubric-blind plain text)<br/>→ only signal fed back to mutator"]
+    %% ===== Stage 4: abstracted prompt gradient =====
+    Cheat --> Overall["overall_score ∈ [0, 1]<br/>+ overall_score_uncapped<br/>(pre-cap, drives QD ranking)"]
+    Cheat --> Diag["Stage 4 — abstracted_prompt_gradient<br/>(rubric-blind code-name + sentence)<br/>→ only signal fed back to mutator"]
     Overall -. drives .-> Loop[/"EvolutionEngine.evolve_generation()"/]
     Diag -. drives .-> Loop
 
     %% ===== styling =====
     classDef stage fill:#F1FBF6,stroke:#2E8B57,stroke-width:1px,color:#0E2A1A;
     classDef external fill:#FFF7E6,stroke:#A36A00,color:#202020;
-    class L2box,L3box,Pipeline,Aggregate stage;
+    class Extract,Pipeline,Aggregate stage;
     class Run,TaskSpec,Lit external;

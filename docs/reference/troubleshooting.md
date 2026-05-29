@@ -129,13 +129,16 @@ If you *did* set them, check Langfuse is actually running
 A few likely causes:
 
 - **Verifier hard fails.** If every generation has a refuted hard claim,
-  `overall_score` is capped at `0.94` and `reward_uncapped` still drives
+  `hard_fail_capped` flips `true` and `overall_score` is capped at
+  `_HARD_FAIL_CAP` (currently `0.99`, kept permissive on purpose).
+  `reward_uncapped` (`overall_score_uncapped` in the JSON) still drives
   selection, but you may have a structural mismatch between the task
   description and what the workflow can actually verify against.
-- **Cheat penalty.** The cheat detector is finding the same pattern across
-  generations. Inspect `sources/workflows/<uuid>/state_result.json` →
-  `cheat_findings.mechanism` (this field is audit-only — the mutator
-  doesn't see it, so the loop keeps re-discovering the cheat).
+- **Recurring failure code.** The `abstracted_prompt_gradient` is
+  prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`).
+  If the same code recurs across generations, the loop is re-discovering
+  the same failure mode — inspect `evaluation.txt` for the per-claim
+  detail behind it.
 - **Tool gap.** The agents may need a tool that Toolomics doesn't expose.
   Use `--manual` mode to confirm the tool you need is actually
   discoverable.

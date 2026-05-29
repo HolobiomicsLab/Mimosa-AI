@@ -32,7 +32,7 @@ mimosa-ai/
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, …
 │   │   └── evaluators/                    # Verifier backends
 │   │       ├── evaluator.py               # Facade (routes to backends)
-│   │       ├── verifier.py                # Default 3-layer verifier
+│   │       ├── verifier.py                # Default multi-source per-claim verifier
 │   │       ├── grounding.py               # Perspicacité adapter
 │   │       ├── generic.py                 # Legacy 4-criterion judge
 │   │       ├── scenario.py                # Rubric-based scoring

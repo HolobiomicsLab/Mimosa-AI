@@ -47,7 +47,7 @@ Mimosa will:
 1. Discover Toolomics MCP tools on your network.
 2. Synthesize a multi-agent workflow as Python code.
 3. Execute it in a sandbox against your workspace.
-4. Score the result with the three-layer verifier.
+4. Score the result with the multi-source per-claim verifier.
 5. Archive the run under `runs_capsule/`.
 
 ## 3. Add learning
