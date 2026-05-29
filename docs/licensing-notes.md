@@ -17,12 +17,6 @@ This note explains the current repository licensing terms in plain English.
 - The project does not require copyright assignment for normal external contributions.
 - The contribution paperwork is intended to confirm submission authority and Apache 2.0 compatibility, not to create a second public licensing track.
 
-## Contribution-governance contact
-
-- Contact for contribution-governance questions: `dr20.spv@listes.cnrs.fr`.
-
-This wording is intended for repository governance documentation and remains subject to legal validation where applicable.
-
 ## Co-authorship context (informational)
 
 Current named research co-authors: Martin Legrand, Tao Jiang, Matthieu Feraud, Benjamin Navet, and Louis-Felix Nothias.
