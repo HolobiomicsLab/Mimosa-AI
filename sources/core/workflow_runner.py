@@ -37,11 +37,12 @@ class ExecutionResult:
 
 @dataclass
 class RuntimeConfig:
-    python_version: str = "3.10"
+    python_version: str = "3.12"
     timeout: int = 1800
     max_memory_mb: int = 1024
     max_cpu_percent: int = 100
     temp_dir: Path | None = None
+    # optional replacement for config requirements list
     requirements_file: Path | None = "requirements.txt"
     # When False, the runner skips the PTY/color path and uses plain pipes.
     # Useful for short, non-interactive scripts (e.g. verifier checks) where

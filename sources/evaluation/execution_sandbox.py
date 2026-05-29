@@ -10,12 +10,13 @@ import subprocess
 import shutil
 import sys
 import tempfile
-import venv
 from pathlib import Path
 from typing import Tuple
 
 
 logger = logging.getLogger(__name__)
+
+SANDBOX_PYTHON_VERSION = "3.12"
 
 
 class ExecutionSandbox:
@@ -71,16 +72,61 @@ class ExecutionSandbox:
         # Install basic packages and analyze/setup dependencies
         self._setup_environment()
 
+    def _resolve_sandbox_python(self) -> str:
+        """Resolve a Python SANDBOX_PYTHON_VERSION interpreter for the venv.
+
+        Resolution order: the ``$MIMOSA_SANDBOX_PYTHON`` override, then
+        ``python<version>`` on PATH. The interpreter's ``--version`` is verified
+        so we never silently build the venv with the wrong Python (which is how
+        the eval previously drifted onto the harness interpreter).
+        """
+        candidates = []
+        override = os.environ.get("MIMOSA_SANDBOX_PYTHON")
+        if override:
+            candidates.append(override)
+        which = shutil.which(f"python{SANDBOX_PYTHON_VERSION}")
+        if which:
+            candidates.append(which)
+
+        for cand in candidates:
+            try:
+                out = subprocess.run(
+                    [cand, "--version"], capture_output=True, text=True, timeout=10
+                )
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if (out.stdout or out.stderr).strip().startswith(
+                f"Python {SANDBOX_PYTHON_VERSION}."
+            ):
+                return cand
+
+        raise RuntimeError(
+            f"Eval sandbox requires Python {SANDBOX_PYTHON_VERSION}; none found "
+            f"(looked at $MIMOSA_SANDBOX_PYTHON and python{SANDBOX_PYTHON_VERSION} on "
+            f"PATH). Install it (apt install python{SANDBOX_PYTHON_VERSION} "
+            f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
+        )
+
     def _create_virtual_environment(self) -> Path:
-        """Create a virtual environment for isolated execution."""
+        """Create a Python SANDBOX_PYTHON_VERSION venv for isolated execution."""
         venv_path = self.temp_dir / "venv"
 
-        self.logger.info(f"[SANDBOX] Creating virtual environment at {venv_path}")
+        py = self._resolve_sandbox_python()
+        self.logger.info(
+            f"[SANDBOX] Creating Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py}"
+        )
 
-        try:
-            venv.create(venv_path, with_pip=True)
-        except Exception as e:
-            raise RuntimeError(f"Failed to create virtual environment at {venv_path}: {e}")
+        result = subprocess.run(
+            [py, "-m", "venv", str(venv_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"venv creation failed via {py}: {result.stderr[:500]} "
+                f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
+            )
 
         # Verify the venv was created successfully
         if sys.platform == "win32":
@@ -94,7 +140,20 @@ class ExecutionSandbox:
                 f"This may indicate a problem with the Python installation or venv module."
             )
 
-        self.logger.info(f"[SANDBOX] Virtual environment created successfully at {venv_path}")
+        # Assert the venv really is the pinned version, so a mismatch fails loudly
+        # instead of silently evaluating on the wrong interpreter.
+        ver = subprocess.run(
+            [str(python_exe), "--version"], capture_output=True, text=True, timeout=10
+        )
+        got = (ver.stdout or ver.stderr).strip()
+        if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
+            raise RuntimeError(
+                f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
+            )
+
+        self.logger.info(
+            f"[SANDBOX] Virtual environment created successfully at {venv_path} ({got})"
+        )
         return venv_path
 
     def _setup_environment(self) -> None:
