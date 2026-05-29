@@ -286,7 +286,7 @@ if __name__ == "__main__":
     for _ in range(4):
         ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
     assert ve._compute_stagnation() > 0.8
-    assert "prompt-only tweak" in ve._get_prompt_step_size(parent_score=0.97)
+    assert "prompt-only little tweak" in ve._get_prompt_step_size(parent_score=0.97)
     low = ve._get_prompt_step_size(parent_score=0.10)
     assert "rethink" in low or "rewire" in low
 
