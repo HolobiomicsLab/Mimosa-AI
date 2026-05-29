@@ -10,6 +10,8 @@ import json
 import math
 import os
 import re
+import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Any, Callable, Coroutine, TypeVar
@@ -1147,13 +1149,18 @@ Return STRICT JSON only, in one of these two shapes:
             return {"executable": False, "reason": "verifier JSON not an object"}
         return spec
 
-    def _ensure_verifier_packages(self) -> None:
-        """Install verifier helper packages once per process.
+    # Python module names corresponding to ``_VERIFIER_BASE_PACKAGES``
+    # (scikit-learn → sklearn). Used by the post-install smoke check.
+    _VERIFIER_BASE_IMPORTS: tuple[str, ...] = ("numpy", "pandas", "scipy", "sklearn")
 
-        Idempotent across evaluator instances via a module-level flag + lock so
-        verifier scripts can rely on numpy / pandas / scipy / scikit-learn
-        being importable. Logged-and-skipped on failure — the runner still
-        works with the stdlib subset.
+    def _ensure_verifier_packages(self) -> None:
+        """Make verifier helper packages importable under ``sys.executable``.
+
+        The verifier ``WorkflowRunner`` is forced to use ``sys.executable`` so
+        installs and runs target the same interpreter (the one running
+        Mimosa, typically a uv-managed venv). Idempotent across evaluator
+        instances via a module-level flag + lock. Logged-and-skipped on
+        failure — verifier scripts must then restrict themselves to stdlib.
         """
         global _VERIFIER_PACKAGES_INSTALLED
         if _VERIFIER_PACKAGES_INSTALLED:
@@ -1161,43 +1168,79 @@ Return STRICT JSON only, in one of these two shapes:
         with _VERIFIER_INSTALL_LOCK:
             if _VERIFIER_PACKAGES_INSTALLED:
                 return
-            install_root = self._runner_temp_root / "_pkg_install"
-            install_root.mkdir(parents=True, exist_ok=True)
-            runner_config = RuntimeConfig(
-                timeout=600,
-                temp_dir=install_root,
-                requirements_file=None,
-                use_pty=False,
-            )
-            runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
-            try:
-                result = _run_coro_sync(
-                    lambda: runner.install_dependencies(list(_VERIFIER_BASE_PACKAGES)),
-                    thread_timeout=620,
-                )
-            except Exception as e:
-                self.logger.warning(
-                    f"Verifier base package install raised: {type(e).__name__}: {e}"
-                )
-                return
-            finally:
-                try:
-                    _run_coro_sync(runner.cleanup, thread_timeout=15)
-                except Exception as e:
-                    self.logger.debug(f"verifier install cleanup failed: {e}")
 
-            if result.status == ExecutionStatus.COMPLETED:
+            smoke_cmd = [
+                sys.executable, "-c",
+                "import " + ", ".join(self._VERIFIER_BASE_IMPORTS),
+            ]
+
+            # Early-exit if the helper packages are already importable —
+            # common when Mimosa runs in a venv that already has them.
+            if self._smoke_check(smoke_cmd):
                 _VERIFIER_PACKAGES_INSTALLED = True
                 self.logger.info(
-                    f"Verifier base packages ready: {list(_VERIFIER_BASE_PACKAGES)}"
+                    f"Verifier helper packages already importable under "
+                    f"{sys.executable}"
+                )
+                return
+
+            # ``--break-system-packages`` is the documented escape from PEP 668
+            # on system Pythons; inside a venv it is silently ignored. Modern
+            # uv-managed envs have a recent pip that supports the flag.
+            pip_cmd = [
+                sys.executable, "-m", "pip", "install", "--quiet",
+                "--disable-pip-version-check", "--break-system-packages",
+                *_VERIFIER_BASE_PACKAGES,
+            ]
+            try:
+                r = subprocess.run(pip_cmd, capture_output=True, timeout=600)
+            except subprocess.TimeoutExpired:
+                self.logger.warning(
+                    "Verifier helper package install timed out after 600s"
+                )
+                return
+            except FileNotFoundError as e:
+                self.logger.warning(
+                    f"pip not found for verifier helper install: {e}"
+                )
+                return
+            except Exception as e:
+                self.logger.warning(
+                    f"Verifier helper install raised: {type(e).__name__}: {e}"
+                )
+                return
+
+            if r.returncode != 0:
+                stderr_tail = r.stderr.decode(errors="replace")[-400:]
+                self.logger.warning(
+                    f"Verifier helper install failed (rc={r.returncode}); "
+                    f"scripts must restrict themselves to stdlib. "
+                    f"stderr tail: {stderr_tail}"
+                )
+                return
+
+            # Pip can exit 0 yet land packages where the runtime Python can't
+            # see them — verify by actually importing.
+            if self._smoke_check(smoke_cmd):
+                _VERIFIER_PACKAGES_INSTALLED = True
+                self.logger.info(
+                    f"Verifier helper packages ready: "
+                    f"{list(_VERIFIER_BASE_PACKAGES)} (via {sys.executable})"
                 )
             else:
-                stderr_tail = (result.stderr or "")[-300:]
                 self.logger.warning(
-                    f"Verifier base package install failed "
-                    f"(status={result.status}, rc={result.return_code}); "
-                    f"scripts must restrict themselves to stdlib. stderr tail: {stderr_tail}"
+                    "Verifier helper packages installed but not importable "
+                    "under sys.executable; scripts will see ImportError."
                 )
+
+    @staticmethod
+    def _smoke_check(cmd: list[str], timeout: float = 15.0) -> bool:
+        """Return True iff *cmd* exits 0 within *timeout*."""
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        except Exception:
+            return False
+        return r.returncode == 0
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
         """Execute a single verifier script in the agents' workspace."""
@@ -1210,6 +1253,10 @@ Return STRICT JSON only, in one of these two shapes:
             use_pty=False,
         )
         runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
+        # Use the Python that's running Mimosa, not the system python3.12 the
+        # runner's resolver picks: that interpreter is where the verifier
+        # helper packages were installed.
+        runner._python_cmd = [sys.executable]
         execution_id = f"verify_{claim_id}"
         thread_timeout = self.verifier_timeout + 10
         result = None
