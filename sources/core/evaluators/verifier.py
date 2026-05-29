@@ -101,6 +101,20 @@ _IO_MARKERS = (
     "glob.glob",
 )
 
+# ----- Verifier helper packages ----------------------------------------------
+# Installed once per process so verifier scripts can rely on them being
+# importable. Kept deliberately minimal: numerical + tabular + classical stats
+# + standard ML primitives. Anything heavier should be inferred from the
+# workflow's own declared dependencies, not bolted onto the verifier.
+_VERIFIER_BASE_PACKAGES: tuple[str, ...] = (
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+)
+_VERIFIER_PACKAGES_INSTALLED = False
+_VERIFIER_INSTALL_LOCK = threading.Lock()
+
 
 # ----- Claim extraction: rules shared across all three source prompts ---------
 _CLAIM_RULES_BLOCK = """For each claim, also estimate `criticality`:
@@ -346,6 +360,8 @@ class VerifierEvaluator(BaseEvaluator):
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
+        self._ensure_verifier_packages()
+
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
             result = self._verify_claim(
@@ -429,11 +445,14 @@ class VerifierEvaluator(BaseEvaluator):
                 "criticality": "hard",
                 "likely_relevant_files": [],
             }]
-        per_source_min, per_source_max = self._per_source_targets()
+        per_source_min, per_source_max = self._per_source_targets(n_sources=6)
         sources = (
             ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
             ("b", self._build_source_b_prompt(goal, workspace_listing, per_source_min, per_source_max)),
             ("c", self._build_source_c_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
+            ("d", self._build_source_d_prompt(goal, workspace_listing, per_source_min, per_source_max)),
+            ("e", self._build_source_e_prompt(goal, workspace_listing, per_source_min, per_source_max)),
+            ("f", self._build_source_f_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
         )
 
         merged: list[dict[str, Any]] = []
@@ -466,10 +485,15 @@ class VerifierEvaluator(BaseEvaluator):
             )
         return merged
 
-    def _per_source_targets(self) -> tuple[int, int]:
-        """Per-source min/max claim targets derived from the global bounds."""
-        per_min = max(2, self.min_claims // 3)
-        per_max = max(per_min, self.max_claims // 3)
+    def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
+        """Per-source min/max claim targets derived from the global bounds.
+
+        Scaled by the number of extraction sources so the union still respects
+        ``self.max_claims`` without starving later sources.
+        """
+        n_sources = max(1, n_sources)
+        per_min = max(2, self.min_claims // n_sources)
+        per_max = max(per_min, max(2, self.max_claims // n_sources))
         return per_min, per_max
 
     def _build_source_a_prompt(
@@ -613,6 +637,203 @@ or computed results.
 {_CLAIM_RULES_BLOCK}
 
 Aim for {target_min}–{target_max} Source-C claims.
+"""
+
+    def _build_source_d_prompt(
+        self,
+        goal: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source D — mathematical sanity properties of the produced artefacts."""
+        return f"""You are extracting SOURCE D claims for a verification rubric: closed-form mathematical sanity properties any correct solution to this task must satisfy, derivable from the TYPE of objects the task produces — independent of the literature, the user wording, and what the agents reported.
+
+WORKFLOW GOAL:
+{goal}
+
+WORKSPACE FILES (relative to workspace root):
+{workspace_listing}
+
+TASK:
+Extract Source-D claims. These are mathematical invariants and structural
+properties that follow from the type of object produced and that a small
+numerical check can confirm directly against the on-disk artefact. A
+Source-D claim FAILS if the artefact violates a property any correct
+solution would have respected.
+
+Look for properties such as:
+- Probability constraints (values in [0,1]; rows of a probability matrix
+  sum to 1; class probabilities non-negative).
+- Matrix / tensor properties (symmetry of distance or covariance matrices;
+  positive semi-definiteness of covariance; zero diagonal of distance
+  matrices; triangle inequality; correct shapes / dimensions).
+- Numerical sanity (no NaN, no infinity, no negative variances, no
+  negative counts, no out-of-domain values for log/sqrt).
+- Conservation, monotonicity, dimensional consistency (an energy below a
+  physical upper bound; cumulative distributions monotonic; unit
+  consistency between inputs and outputs).
+- Structural validity (a self-avoiding walk has no repeated coordinates;
+  a tree on n nodes has n-1 edges; an alignment has matching sequence
+  lengths; a graph's adjacency matrix matches its edge list).
+- Cardinality / shape consistency (output row count matches input row
+  count on a per-row task; predictions equal the test set size; feature
+  counts agree across train and test).
+
+Do NOT extract:
+- Methodology choices — those are Source A.
+- Literal user-required values — those are Source B.
+- Things the agents merely claim — those are Source C.
+- Bare existence of files — forbidden by the artifact-claim rule below.
+
+Prefer claims that can be checked with a tiny numpy / pandas script
+reading the relevant artefact. Most Source-D claims are "hard" by default:
+violating a mathematical invariant means the result is not just
+suboptimal, it is incorrect.
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for {target_min}–{target_max} Source-D claims, but only ones grounded
+in the actual artefacts visible in the workspace listing. Do not invent
+properties for objects the task does not produce.
+"""
+
+    def _build_source_e_prompt(
+        self,
+        goal: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source E — non-negotiable computational reproducibility / CS practice."""
+        return f"""You are extracting SOURCE E claims for a verification rubric: NON-NEGOTIABLE computational reproducibility requirements an independent computer scientist would demand to re-run this work on a fresh machine — independent of the science, the user wording, and the agents' narration.
+
+WORKFLOW GOAL:
+{goal}
+
+WORKSPACE FILES (relative to workspace root):
+{workspace_listing}
+
+TASK:
+Extract Source-E claims that capture HARD computational-reproducibility
+requirements. The scope is intentionally narrow: only things without
+which a second party CANNOT re-run this work on a fresh machine. The
+bar is "can it be re-run", NOT "is it nicely engineered".
+
+ALLOWED claim shapes (each MUST chain a file / structural property to a
+functional reproducibility consequence — never bare existence):
+- The workspace declares its dependencies in a standard manifest
+  (`requirements.txt`, `pyproject.toml`, or `environment.yml`) AND the
+  declared packages cover the third-party imports actually used by the
+  produced code — i.e. the manifest is non-empty and is not missing a
+  library that the workspace's `.py` files import.
+- The produced code contains no hard-coded absolute filesystem paths
+  outside the workspace (no `/home/...`, no `/Users/...`, no `C:\\...`)
+  that would break on another machine.
+- If the produced code uses stochastic operations (random sampling,
+  shuffling, model training, weight init, train/test split), a random
+  seed is fixed in code (`numpy.random.seed`, `random.seed`,
+  `torch.manual_seed`, `random_state=...`) so the run is reproducible.
+- A clearly identifiable runnable entrypoint exists (a single top-level
+  `.py` such as `main.py`, `run.py`, `pipeline.py`, or unambiguous from
+  the layout) so a re-runner knows what to launch.
+- The workspace is not pathologically cluttered with junk (no thousands
+  of unrelated files; no obvious accumulation of failed intermediate
+  dumps that would confuse a re-runner).
+- Outputs are written to relative paths inside the workspace, not to
+  system or user-home locations.
+
+EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
+- README files, documentation, markdown, or doc presence of any kind.
+- Docstrings, comments, or in-code documentation.
+- Tests, test coverage, or test presence.
+- Code style (PEP8, line length, naming conventions, formatting).
+- Type hints / type annotations.
+- Logging structure, log file presence, or log verbosity.
+- Module organisation, package layout, "clean architecture".
+This source verifies non-negotiable computer-science PRACTICE — not
+engineering aesthetics. If a property is merely "nice to have", drop it.
+
+Each Source-E claim MUST chain a file / structural property to a
+functional reproducibility consequence — never bare existence. Example
+WELL-FORMED claim: "the workspace declares its dependencies in a standard
+manifest covering the packages actually imported by the produced code".
+Example MALFORMED claim: "a requirements.txt file exists in the workspace".
+
+Use "hard" criticality ONLY for the deps-manifest, absolute-paths, and
+seed-on-stochastic claims — those genuinely block re-execution. Use
+"soft" for the entrypoint, clutter, and output-location claims.
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for up to {target_max} Source-E claims, but only as many as the
+workspace actually warrants — fewer is fine. Do not pad.
+"""
+
+    def _build_source_f_prompt(
+        self,
+        goal: str,
+        execution_text: str,
+        workspace_listing: str,
+        target_min: int,
+        target_max: int,
+    ) -> str:
+        """Source F — statistical fingerprint / non-triviality of the result."""
+        return f"""You are extracting SOURCE F claims for a verification rubric: statistical-fingerprint and non-triviality checks that distinguish a REAL scientific result from a vacuous, degenerate, or leakage-inflated one — independent of the literature, the user wording, and the agents' narration.
+
+WORKFLOW GOAL:
+{goal}
+
+WORKFLOW OUTPUT (agents narration — names the headline metrics they report):
+{execution_text}
+
+WORKSPACE FILES (relative to workspace root):
+{workspace_listing}
+
+TASK:
+Extract Source-F claims. These check that the produced result is
+NON-TRIVIAL and STATISTICALLY REAL — i.e. that it could not have been
+achieved by a degenerate, leaking, or hard-coded "solution". A Source-F
+claim FAILS if the on-disk artefact bears the fingerprint of a vacuous
+success.
+
+Look for properties such as:
+- The headline metric beats a trivial baseline by a non-trivial margin
+  (random / majority-class / mean predictor / shuffled-label baseline);
+  on a balanced binary task, accuracy is above 0.55; on a regression
+  task, the model beats the mean predictor in R² or RMSE.
+- The prediction distribution is not degenerate: not constant, not all
+  one class, not a single value repeated, not uniformly 0.5, with non-zero
+  variance across rows in continuous outputs.
+- No data-leakage signatures: train and test sets are disjoint (no
+  overlapping IDs or rows); the test set is not a subset of training data;
+  perfect or near-perfect scores on a known-hard task are flagged as
+  suspect unless the artefact explicitly justifies them.
+- No suspicious hard-coded or fallback patterns in outputs (predictions
+  all identical, all integers when probabilities were expected, exact
+  reproduction of an input column as the "prediction").
+- Sample sizes are adequate for the test (n above a sensible floor for
+  the statistic being claimed; enough samples per class for stratified
+  metrics).
+- Where probabilities are produced, they show inter-class separation
+  rather than collapsing to a single point.
+
+Do NOT extract:
+- Methodology requirements — Source A.
+- Literal user-required values — Source B.
+- Things the agents merely report — Source C.
+- Mathematical invariants like "probabilities in [0,1]" — Source D.
+- Reproducibility / CS-hygiene properties — Source E.
+
+Source-F claims are typically "hard" when they target the headline
+result: a result statistically indistinguishable from a baseline is not
+a scientific success. Skip baseline claims for tasks with no obvious
+null to compare against — do not invent one.
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for {target_min}–{target_max} Source-F claims, only as many as the
+on-disk artefacts can actually support.
 """
 
     def _parse_and_filter_claims(
@@ -857,8 +1078,9 @@ RULES FOR YOUR SCRIPT:
 - Print EXACTLY ONE JSON line to stdout, structured as:
   {{"claim_id": "{claim['id']}", "status": "pass" | "fail" | "error",
     "actual": <observed value or null>, "details": "<short string>"}}
-- Use only the standard library plus numpy/pandas if needed. Read files with
-  relative paths (cwd is the workspace).
+- Use only the standard library plus the verifier helper packages
+  (numpy, pandas, scipy, scikit-learn). Read files with relative paths
+  (cwd is the workspace).
 - Recompute or directly check; do not trust the agent's reported numbers.
 - For property checks (symmetry, range, no duplicates, ...), assert the
   property and emit "pass"/"fail" accordingly.
@@ -924,6 +1146,58 @@ Return STRICT JSON only, in one of these two shapes:
         if not isinstance(spec, dict):
             return {"executable": False, "reason": "verifier JSON not an object"}
         return spec
+
+    def _ensure_verifier_packages(self) -> None:
+        """Install verifier helper packages once per process.
+
+        Idempotent across evaluator instances via a module-level flag + lock so
+        verifier scripts can rely on numpy / pandas / scipy / scikit-learn
+        being importable. Logged-and-skipped on failure — the runner still
+        works with the stdlib subset.
+        """
+        global _VERIFIER_PACKAGES_INSTALLED
+        if _VERIFIER_PACKAGES_INSTALLED:
+            return
+        with _VERIFIER_INSTALL_LOCK:
+            if _VERIFIER_PACKAGES_INSTALLED:
+                return
+            install_root = self._runner_temp_root / "_pkg_install"
+            install_root.mkdir(parents=True, exist_ok=True)
+            runner_config = RuntimeConfig(
+                timeout=600,
+                temp_dir=install_root,
+                requirements_file=None,
+                use_pty=False,
+            )
+            runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
+            try:
+                result = _run_coro_sync(
+                    lambda: runner.install_dependencies(list(_VERIFIER_BASE_PACKAGES)),
+                    thread_timeout=620,
+                )
+            except Exception as e:
+                self.logger.warning(
+                    f"Verifier base package install raised: {type(e).__name__}: {e}"
+                )
+                return
+            finally:
+                try:
+                    _run_coro_sync(runner.cleanup, thread_timeout=15)
+                except Exception as e:
+                    self.logger.debug(f"verifier install cleanup failed: {e}")
+
+            if result.status == ExecutionStatus.COMPLETED:
+                _VERIFIER_PACKAGES_INSTALLED = True
+                self.logger.info(
+                    f"Verifier base packages ready: {list(_VERIFIER_BASE_PACKAGES)}"
+                )
+            else:
+                stderr_tail = (result.stderr or "")[-300:]
+                self.logger.warning(
+                    f"Verifier base package install failed "
+                    f"(status={result.status}, rc={result.return_code}); "
+                    f"scripts must restrict themselves to stdlib. stderr tail: {stderr_tail}"
+                )
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
         """Execute a single verifier script in the agents' workspace."""
