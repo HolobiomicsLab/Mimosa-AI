@@ -259,20 +259,31 @@ penalty `÷(1 + n_children_already)` to spread offspring.
 
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
-Prompt assembly for mutation and crossover. A phase-aware annealing
-schedule (`_get_temperature_phase`) gates topology complexity by
-iteration progress:
+Prompt assembly for mutation and crossover. Mutation boldness is a
+continuous function of population stagnation, not a fixed phase
+schedule.
 
-| Phase     | Progress | Agent count       | Permitted mutations            |
-|-----------|----------|-------------------|--------------------------------|
-| SEED      | <0.25    | 1–2               | prompt only                    |
-| ANCHOR    | <0.50    | 1–3               | prompt (primary), topology, tools |
-| DECOMPOSE | <0.65    | 2–5               | topology, prompt, handoff      |
-| ENGAGE    | <0.85    | 2–6               | prompt, handoff, restricted topology |
-| POLISH    | ≥0.85    | frozen            | prompt only                    |
+- `_compute_stagnation(window=4)` — mean pairwise MiniLM cosine
+  similarity over the last 4 non-failure prompt gradients, rescaled so
+  the unrelated baseline (`≈0.4`) maps to `0` and full repetition
+  (`≥0.8`) maps to `1`.
+- `_get_prompt_step_size(parent_score)` — computes
+  `stagnation_effective = raw_stagnation · (1 − parent_score)`, grows
+  the agent budget from the previous generation's count toward
+  `max_possible_agents = 7` proportionally to it, then samples the
+  actual agent count with a Beta-Binomial biased upward by stagnation.
 
-Progress is `(iter / (max_iter-1)) ** (1 - α·score)` with α=0.5 — high
-scorers progress slower (stay exploratory longer).
+| Stagnation effective | Agent budget | Mutation scope (advisory)                                  |
+|----------------------|--------------|-------------------------------------------------------------|
+| <0.20                | ≈ current    | prompt-only little tweak                                    |
+| <0.40                | current+1    | prompt, handoff, tools — improve information flow           |
+| <0.60                | current+2    | significant redesign while keeping topology                 |
+| <0.80                | current+3    | bold rewire — restructure or grow the agent set             |
+| ≥0.80                | up to 7      | complete rethink — discard inherited topology / prompts     |
+
+Scope is an advisory line injected into the mutation prompt; the LLM
+may still pick any topology. The hard control is the agent-count
+budget carried in the same block.
 
 ### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 

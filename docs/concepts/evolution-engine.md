@@ -18,7 +18,7 @@ flowchart TB
     Seed -- no --> Pick[Pick parents via QD-roulette<br/>fallback to disk similarity scan]
     SeedPrompt --> Orch[Orchestrate workflow<br/>LLM → sandbox]
     Pick --> Decide{Crossover ≈ 0.3?}
-    Decide -- mutation --> Mut[Mutation prompt<br/>phase-annealed]
+    Decide -- mutation --> Mut[Mutation prompt<br/>stagnation-scoped]
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
     Mut --> Orch
     Cross --> Orch
@@ -81,25 +81,42 @@ falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.5` on MiniLM
 embeddings of `original_task`, `score ≥ 0.05`) — this lets useful workflows
 transfer across tasks.
 
-## Variation: phase-aware annealing
+## Variation: stagnation-driven mutation scope
 
 [`VariationEngine`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
-assembles mutation and crossover prompts. A phase-aware annealing schedule
-gates topology complexity by iteration progress:
+assembles mutation and crossover prompts. There is no fixed phase
+schedule by iteration progress; mutation boldness is a continuous
+function of how much the population is repeating itself.
 
-| Phase     | Progress | Agent count | Permitted mutations                  |
-| --------- | -------- | ----------- | ------------------------------------ |
-| SEED      | < 0.25   | 1–2         | prompt only                          |
-| ANCHOR    | < 0.50   | 1–3         | prompt (primary), topology, tools    |
-| DECOMPOSE | < 0.65   | 2–5         | topology, prompt, handoff            |
-| ENGAGE    | < 0.85   | 2–6         | prompt, handoff, restricted topology |
-| POLISH    | ≥ 0.85   | frozen      | prompt only                          |
+**Stagnation signal.** `_compute_stagnation()` takes the last 4
+non-failure prompt gradients, computes their pairwise MiniLM cosine
+similarity, and rescales the mean (`0.4` ≈ unrelated → `0`,
+`0.8+` ≈ fully stagnated → `1`).
 
-Progress is computed as `(iter / (max_iter − 1)) ** (1 − α·score)` with
-`α = 0.5` — high scorers progress slower (stay exploratory longer).
+**Effective boldness.** `stagnation_effective = raw_stagnation · (1 −
+parent_score)`. Near-winners stay protected from disruption even when
+the population stagnates.
 
-A small random bias on `agent_count` softens hard transitions between
-phases.
+**Agent budget.** The current agent count grows toward
+`max_possible_agents = 7` proportionally to `stagnation_effective`,
+then a Beta-Binomial draw samples the actual count inside that window
+(biased upward by stagnation). The seed generation samples agents from
+`[1, 4]` with stagnation prior `0.5`.
+
+**Scope band.** A single advisory line is added to the mutation prompt,
+chosen by `stagnation_effective`:
+
+| Stagnation effective | Mutation scope                                                         |
+| -------------------- | ---------------------------------------------------------------------- |
+| < 0.20               | prompt-only little tweak                                               |
+| < 0.40               | prompt, handoff, tools — improve information flow                      |
+| < 0.60               | significant redesign while keeping topology                            |
+| < 0.80               | bold rewire — restructure or grow the agent set                        |
+| ≥ 0.80               | complete rethink — discard inherited topology / prompts                |
+
+The bands are advisory text steered to the LLM, not hard gates: the
+LLM can still pick any topology. The hard control is the agent-count
+budget passed in the same prompt block.
 
 ## Crossover
 

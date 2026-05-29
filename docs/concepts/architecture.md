@@ -41,7 +41,9 @@ recursively evolves workflows, with help from:
   (improvement over baseline or `qd_score > admit_threshold`); capacity is
   curated by lowest-`qd_score` eviction.
 - **VariationEngine** — assembles mutation or crossover prompts, with a
-  phase-aware annealing schedule that gates topology complexity by progress.
+  stagnation-driven mutation scope: boldness grows as recent prompt
+  gradients converge (the offspring keep failing the same way) and is
+  damped by the parent's score so near-winners stay protected.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
   callable per generation.
 

@@ -59,17 +59,20 @@ the run's final state.
 
 ## What evolves between generations
 
-| Phase     | Progress | Permitted mutations                  |
-| --------- | -------- | ------------------------------------ |
-| SEED      | < 0.25   | prompt only                          |
-| ANCHOR    | < 0.50   | prompt (primary), topology, tools    |
-| DECOMPOSE | < 0.65   | topology, prompt, handoff            |
-| ENGAGE    | < 0.85   | prompt, handoff, restricted topology |
-| POLISH    | ≥ 0.85   | prompt only                          |
+| Stagnation effective | Mutation scope                                          |
+| -------------------- | ------------------------------------------------------- |
+| < 0.20               | prompt-only little tweak                                |
+| < 0.40               | prompt, handoff, tools — improve information flow       |
+| < 0.60               | significant redesign while keeping topology             |
+| < 0.80               | bold rewire — restructure or grow the agent set         |
+| ≥ 0.80               | complete rethink — discard inherited topology / prompts |
 
-The intent: explore wildly early (broad topology mutations), narrow as the
-loop progresses (only prompt tweaks). Phase progress is delayed for
-high-scoring lineages so they stay exploratory.
+Stagnation is the MiniLM cosine similarity between the last 4
+non-failure prompt gradients (rescaled so unrelated diagnoses ≈ 0,
+near-identical ≈ 1). Effective stagnation is damped by parent score
+(`stagnation · (1 − parent_score)`) so near-winners stay protected
+from disruption. The agent budget grows with stagnation up to a hard
+ceiling of 7.
 
 Roughly ~30 % of generations do **crossover** instead of mutation — two
 parents combined, best-parent-first.

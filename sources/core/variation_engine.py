@@ -20,8 +20,9 @@ class VariationEngine:
     Orchestrates iterative LLM-driven workflow search via structured prompt mutation.
     Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
       - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
-      - Applies a step-aware annealing schedule that governs exploration breadth
-        and permitted topology complexity as progress stagnate.
+      - Applies a stagnation-driven mutation scope that widens exploration
+        breadth and grows the agent budget as recent offspring keep failing
+        the same way, damped by parent score so near-winners stay protected.
     """
 
     def __init__(self):
