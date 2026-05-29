@@ -93,11 +93,11 @@ class VariationEngine:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
         bands = [
-            (0.20, "prompt-only tweak"),
-            (0.40, "prompt, optional tool change"),
-            (0.60, "topology, prompts, handoff format"),
+            (0.20, "prompt-only little tweak"),
+            (0.40, "prompt, handoff information and tool change - improve the information flow"),
+            (0.60, "topology, prompts, handoff format, tools — significant redesign while keeping topology"),
             (0.80, "bold rewire — restructure or grow the agent set"),
-            (1.01, "complete rethink — discard inherited topology"),
+            (1.01, "complete rethink — discard inherited topology/prompts and innovate freely"),
         ]
         scope = next(label for threshold, label in bands if stagnation < threshold)
         return f"Mutation scope: {scope}. Stagnation: {stagnation*100:.2f}%. Use at most {n_agents} agent(s).\n"
@@ -139,7 +139,7 @@ class VariationEngine:
         """
         Prompt for very first workflow generation (generation 0).
         """
-        n_agents = self._sample_agent_count(0.5, 1, 5)  # start with small random agent count
+        n_agents = self._sample_agent_count(0.5, 1, 4)  # start with small random agent count
         topology = self.random_topology_prompt()
         return (
             "## First workflow generation\n"
@@ -193,9 +193,6 @@ class VariationEngine:
                 "</python>",
                 "",
                 "## EXECUTION RESULTS:",
-                "<agents_answers>",
-                agent_answers,
-                "</agents_answers>",
                 "<diagnosis>",
                 "",
                 prompt_gradient_block,

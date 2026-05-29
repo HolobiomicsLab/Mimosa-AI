@@ -86,7 +86,7 @@ class Config:
         self.openrouter_provider: list[str] | None = [
             "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
             "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
-             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes", "friendli",
+             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
              "groq", "cerebras", "sambanova", "nvidia"
         ]
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
