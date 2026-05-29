@@ -176,7 +176,7 @@ class VariationEngine:
             prompt_gradient.strip()
             if prompt_gradient and prompt_gradient.strip()
             else (run_stderr or fail_msg).strip()
-            or fail_msg
+            or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
         ).replace('_', ' ')[:2048]
         step_block = self._get_prompt_step_size(parent_score=score)
 

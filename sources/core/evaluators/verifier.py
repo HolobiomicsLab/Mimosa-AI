@@ -1041,6 +1041,7 @@ CLAIM TO CHECK:
 - acceptable_variation:     {claim.get('acceptable_variation') or '(none)'}
 
 Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer files the agents explicitly mention writing for this artefact. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
+Do not include any tests or debugging files that are unlikely to be part of the final artefact (e.g. "debug.log", "debug_2.py", "tmp_results.jsonl"). Focus on files that are central to the workflow's deliverable.
 
 Return STRICT JSON only:
   {{"files": ["<relative/path>", ...]}}
