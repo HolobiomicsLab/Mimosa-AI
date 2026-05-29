@@ -82,7 +82,7 @@ def test_step_size_damped_by_high_parent_score():
     for _ in range(4):
         ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
     block = ve._get_prompt_step_size(parent_score=0.97)
-    assert "prompt-only tweak" in block, block
+    assert "prompt-only little tweak" in block, block
 
 
 def test_step_size_unleashed_when_parent_score_low():
@@ -100,7 +100,7 @@ def test_step_size_parent_score_clipped_to_unit_interval():
     for _ in range(4):
         ve.record_offspring_gradient("repeating failure")
     block = ve._get_prompt_step_size(parent_score=1.5)
-    assert "prompt-only tweak" in block
+    assert "prompt-only little tweak" in block
 
 
 def test_mutation_prompt_does_not_touch_gradient_history():
