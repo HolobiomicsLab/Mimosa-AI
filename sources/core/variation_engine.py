@@ -25,19 +25,38 @@ class VariationEngine:
         the same way, damped by parent score so near-winners stay protected.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialise empty history buffers and lazy embedder state."""
         self.prompt_gradient_history: list[tuple[str, bool]] = []
-        self.agent_count_history = []
+        self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
-        self._embedder = None
+        self._embedder: SentenceTransformer | None = None
 
     def record_offspring_gradient(self, gradient: str, *, is_failure: bool = False) -> None:
+        """Append an offspring's prompt-gradient diagnosis to the history.
+
+        Args:
+            gradient: Free-text diagnosis of the offspring's failure mode.
+                Empty values are replaced with a sentinel placeholder.
+            is_failure: Whether the offspring failed to execute at all
+                (excluded from semantic stagnation computation).
+        """
         text = (gradient or "").strip() or "UNKNOWN_GRADIENT: No feedback captured."
         self.prompt_gradient_history.append((text, bool(is_failure)))
 
     def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
-        """
-        Sample agent random count within [lo, hi], biased upward by stagnation.
+        """Sample a random agent count within ``[lo, hi]``, biased upward by stagnation.
+
+        Args:
+            stagnation: Stagnation level in ``[0, 1]`` pulling the mean toward
+                ``hi``.
+            lo: Inclusive lower bound on the agent count.
+            hi: Inclusive upper bound on the agent count.
+            concentration: Beta concentration parameter; higher values
+                tighten the sample around the target mean.
+
+        Returns:
+            An integer in ``[lo, hi]`` sampled from a Beta-Binomial.
         """
         if lo == hi:
             return lo
@@ -49,7 +68,15 @@ class VariationEngine:
         return lo + int(np.random.binomial(hi - lo, prob))
 
     def _prompt_gradient_similarity(self, a: str, b: str) -> float:
-        """Cosine similarity over MiniLM-encoded diagnoses."""
+        """Cosine similarity over MiniLM-encoded diagnoses.
+
+        Args:
+            a: First diagnosis text.
+            b: Second diagnosis text.
+
+        Returns:
+            Cosine similarity in ``[-1, 1]``, or ``0.0`` when either text is empty.
+        """
         if not a or not b:
             return 0.0
         if self._embedder is None:
@@ -59,7 +86,15 @@ class VariationEngine:
         return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
     def _compute_stagnation(self, window: int = 4) -> float:
-        """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1]."""
+        """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1].
+
+        Args:
+            window: How many recent semantic gradients to consider.
+
+        Returns:
+            Stagnation in ``[0, 1]``; ``0.0`` when fewer than two non-failure
+            gradients are available.
+        """
         semantic = [g for g, is_failure in self.prompt_gradient_history if not is_failure]
         recent = semantic[-window:]
         if len(recent) < 2:
@@ -74,7 +109,19 @@ class VariationEngine:
         return float(np.clip((raw - 0.4) / 0.4, 0, 1))
 
     def _get_prompt_step_size(self, parent_score: float = 0.0) -> str:
-        """Boldness = raw_stagnation · (1 − parent_score). Near-winners stay protected."""
+        """Boldness = raw_stagnation · (1 − parent_score). Near-winners stay protected.
+
+        Updates ``self.agent_count_history`` as a side effect and emits a
+        user-facing status line through the pretty-print helpers.
+
+        Args:
+            parent_score: Parent reward in ``[0, 1]``; higher values damp
+                boldness so strong parents only see small tweaks.
+
+        Returns:
+            A one-line human-readable mutation-scope directive embeddable in
+            the LLM prompt.
+        """
         raw_stagnation = self._compute_stagnation()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
         stagnation = raw_stagnation * (1.0 - parent_score)
@@ -107,7 +154,17 @@ class VariationEngine:
 
     @staticmethod
     def _extract_agent_answers(wf_state: dict | None) -> str:
-        """Flatten per-agent answers from workflow state into a readable string."""
+        """Flatten per-agent answers from workflow state into a readable string.
+
+        Args:
+            wf_state: Workflow state dict containing ``answers`` and (when a
+                list) parallel ``step_name`` entries.
+
+        Returns:
+            A newline-joined ``agent <name>: <truncated answer>...`` block, or
+            the raw ``answers`` string for non-list values; a sentinel string
+            when no answers were captured.
+        """
         if not wf_state or "answers" not in wf_state:
             return "No agent answers captured."
         answers = wf_state["answers"]
@@ -121,6 +178,12 @@ class VariationEngine:
     # ── Prompt builders ───────────────────────────────────────────────────────
 
     def random_topology_prompt(self) -> str:
+        """Pick a random workflow-topology suggestion as a short label.
+
+        Returns:
+            One of a curated set of human-readable topology descriptions used
+            to seed initial workflow generations.
+        """
         return np.random.choice([
             "simple linear chain",
             "hub-and-spoke with 3-4 agents",
@@ -137,8 +200,13 @@ class VariationEngine:
         ])
 
     def seed_genome_prompt(self, goal: str) -> str:
-        """
-        Prompt for very first workflow generation (generation 0).
+        """Build the prompt for the very first workflow generation (generation 0).
+
+        Args:
+            goal: Task description the seeded workflow should target.
+
+        Returns:
+            A prompt suggesting a random topology and a small starting agent budget.
         """
         n_agents = self._sample_agent_count(0.5, 1, 4)  # start with small random agent count
         topology = self.random_topology_prompt()
@@ -158,12 +226,25 @@ class VariationEngine:
         iteration_count: int,
         max_iterations: int = 10,
     ) -> str:
-        """
-        Build a prompt for one mutation step in the evolutionary search.
+        """Build a prompt for one mutation step in the evolutionary search.
 
         The prompt has three layers:
           1. Voice framing   — sets the LLM's reasoning tone for this iteration.
           2. Execution grounding — previous code, agent answers, and judge eval.
+
+        Args:
+            goal: Task description for the mutated workflow.
+            wf_info: Parent workflow info supplying score, gradient and state;
+                ``None`` for cold-start variants.
+            genotype: Source code of the parent workflow; ``None`` means the
+                previous attempt failed before producing code.
+            run_stderr: Stderr tail used as a fallback gradient when no
+                semantic diagnosis is available.
+            iteration_count: Zero-based index of the current attempt.
+            max_iterations: Total planned attempts (used for prompt context).
+
+        Returns:
+            The fully assembled mutation prompt string.
         """
         score      = wf_info.overall_score        if wf_info else 0.0
         prompt_gradient  = wf_info.abstracted_prompt_gradient if wf_info else ""
@@ -221,9 +302,20 @@ class VariationEngine:
         iteration_count: int,
         max_iterations: int = 10,
     ) -> str:
-        """
-        Build a prompt for a crossover step: recombine N parent workflows into one offspring.
+        """Build a prompt for a crossover step: recombine N parent workflows into one offspring.
+
         Parents are sorted best → worst so the LLM sees the strongest candidates first.
+
+        Args:
+            goal: Task description for the recombined workflow.
+            wf_infos: Parent workflow infos, one per genotype.
+            genotypes: Parent source code strings, parallel to `wf_infos`.
+            run_stderrs: Parent stderr tails used as fallback gradients.
+            iteration_count: Zero-based index of the current attempt.
+            max_iterations: Total planned attempts (used for prompt context).
+
+        Returns:
+            The fully assembled crossover prompt string.
         """
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []

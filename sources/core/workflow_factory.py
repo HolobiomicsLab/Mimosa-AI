@@ -24,12 +24,18 @@ from sources.cli.pretty_print import (
 
 
 class WorkflowFactory(Factory):
-    """Handles the creation and management of Langraph-SmolAgent workflow generation"""
+    """Build executable LangGraph + SmolAgent workflow scripts.
 
-    def __init__(self, config) -> None:
+    Drives the LLM to author the workflow ``StateGraph`` body, validates the
+    resulting code, then assembles a runnable Python module that wires in the
+    state schema, MCP tool clients, and the SmolAgent factory.
+    """
+
+    def __init__(self, config: "Config") -> None:
         """Initialize the workflow crafting system.
+
         Args:
-            config: Configuration object containing paths and settings
+            config: Configuration object containing paths and settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -40,9 +46,13 @@ class WorkflowFactory(Factory):
         self.logger = logging.getLogger(__name__)
 
     def get_system_prompt(self) -> str:
-        """Load the system prompt for workflow generation.
+        """Load the system prompt used to drive workflow generation.
+
         Returns:
-            str: The system prompt content
+            The system-prompt content read from disk.
+
+        Raises:
+            ValueError: If the prompt file cannot be read.
         """
         try:
             with open(self.prompt_workflow_creator) as f:
@@ -52,11 +62,16 @@ class WorkflowFactory(Factory):
 
     @staticmethod
     def extract_python_code(code: str) -> str:
-        """Extract Python code blocks from text.
+        """Extract Python code blocks from arbitrary LLM-produced text.
+
+        Joins the content of every ```` ```python ... ``` ```` fence into a
+        single string, preserving line order.
+
         Args:
-            code: Text potentially containing Python code blocks
+            code: Text potentially containing Python code blocks.
+
         Returns:
-            str: Extracted Python code
+            The concatenated Python code (empty string when no fences exist).
         """
         code_blocks = []
         in_code_block = False
@@ -72,8 +87,18 @@ class WorkflowFactory(Factory):
         return "\n".join(code_blocks)
 
     def remove_imports(self, code: str) -> str:
-        """
-        Remove attempt from LLM to import modules/class
+        """Strip ``import``/``from ... import`` lines from LLM-generated code.
+
+        The generated workflow body is concatenated with a host script that
+        already provides the standard imports, so any LLM-emitted imports are
+        stripped here to avoid duplication and unauthorised modules.
+
+        Args:
+            code: Source code potentially containing import statements.
+
+        Returns:
+            The code with every line whose stripped form starts with
+            ``import`` or ``from`` removed.
         """
         lines = code.splitlines()
         return "\n".join(
@@ -90,9 +115,25 @@ class WorkflowFactory(Factory):
         craft_instructions: str,
         existing_tool_prompt: str,
         path: str,
-        allow_cache: bool
+        allow_cache: bool,
     ) -> str:
-        """Generate a workflow using the LLM."""
+        """Ask the LLM to generate a workflow body.
+
+        Builds the user prompt from ``craft_instructions`` and
+        ``existing_tool_prompt`` and dispatches a single LLM call via
+        :class:`LLMProvider`.
+
+        Args:
+            system_prompt: System prompt that steers the workflow-creator LLM.
+            craft_instructions: User-level instructions / goal for the workflow.
+            existing_tool_prompt: Pre-formatted description of available MCP tools.
+            path: Directory used by ``LLMProvider`` to persist cache/log artefacts.
+            allow_cache: When True, allow the provider to reuse a cached response.
+
+        Returns:
+            The raw LLM completion (typically containing one or more
+            ```` ```python ``` ```` blocks).
+        """
 
         prompt = f"""
 # INSTRUCTIONS:
@@ -120,12 +161,23 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
     def create_workflow_genotype_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
     ) -> str:
-        """Generate and validate workflow code.
+        """Generate, clean, and syntax-validate a workflow genotype.
+
+        Runs the LLM, extracts the Python code block, strips imports, and
+        compiles the result to surface syntax errors early.
+
         Args:
-            craft_instructions: The goal description
-            existing_tool_prompt: Description of available tools
+            craft_instructions: The goal description / instructions.
+            existing_tool_prompt: Description of available MCP tools.
+            path: Directory passed to ``llm_make_workflow`` for caching.
+            allow_cache: When True, allow the LLM provider to use its cache.
+
         Returns:
-            str: Validated workflow code
+            The validated workflow code (Python source).
+
+        Raises:
+            ValueError: If the LLM produces no code, returns invalid syntax,
+                or extraction otherwise fails.
         """
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
@@ -159,7 +211,20 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         return workflow_genotype_code
 
     def validate_workflow_structure(self, workflow_genotype_code: str) -> None:
-        """Validate LangGraph workflow structure before execution."""
+        """Validate the LangGraph workflow structure before execution.
+
+        Checks the generated source for required boilerplate (StateGraph
+        initialisation, conditional edges, SmolAgentFactory and
+        WorkflowNodeFactory usage, START edge, and at least one node), and
+        confirms the START edge target exists.
+
+        Args:
+            workflow_genotype_code: Workflow source code to validate.
+
+        Raises:
+            ValueError: If any required structural element is missing or the
+                START edge points to a non-existent node.
+        """
         self.logger.info("Validating workflow structure...")
 
         # Pre-compile regex patterns for efficiency
@@ -222,20 +287,30 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         memory_path: str,
         uuid_str: str,
         goal: str,
-        smolagent_system_prompt: str = None
+        smolagent_system_prompt: str | None = None,
     ) -> str:
-        """Assemble the complete workflow code.
+        """Assemble the complete, runnable workflow script.
+
+        Splices together the MCP client code, the workflow state schema, the
+        SmolAgent factory, and the LLM-generated workflow body into a single
+        Python module. The resulting script compiles the LangGraph workflow,
+        attempts to render its PNG diagram, then invokes it on an initial
+        state derived from ``state_schema.WorkflowState``.
+
         Args:
-            tools_code: Code for all MCP clients
-            state_code: Code for the workflow state schema
-            smolagent_factory_code: Code for the SmolAgent factory
-            workflow_genotype_code: Generated workflow code by LLM
-            workflow_path: Path to save the workflow
-            memory_path: Path to save the workflow memory
-            uuid_str: Unique identifier for the workflow
-            goal: The goal for the workflow
+            tools_code: Code for all MCP clients.
+            state_code: Code for the workflow state schema.
+            smolagent_factory_code: Code for the SmolAgent factory.
+            workflow_genotype_code: Generated workflow code by the LLM.
+            workflow_path: Path to save the workflow artefacts.
+            memory_path: Path to save the workflow memory.
+            uuid_str: Unique identifier for the workflow.
+            goal: The goal for the workflow.
+            smolagent_system_prompt: Optional system prompt embedded in the
+                generated script as ``SYSTEM_PROMPT``.
+
         Returns:
-            str: Complete workflow code ready for execution
+            Complete workflow code ready for execution.
         """
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
@@ -325,17 +400,30 @@ if WORKFLOW_PATH:
         goal: str,
         craft_instructions: str,
         save_workflow: bool = True,
-        original_task: str = None,
-    ) -> tuple[str, str]:
-        """Main method to craft a complete workflow.
+        original_task: str | None = None,
+    ) -> tuple[str, str, str]:
+        """Craft a complete workflow end-to-end.
+
+        Generates a chronologically sortable UUID, loads MCP tools, prepares
+        directories, asks the LLM for a workflow body, validates and assembles
+        it, then optionally persists artefacts to disk.
+
         Args:
-            goal: The goal description (may be knowledge-wrapped)
-            craft_instructions: The instructions for crafting the workflow
-            template_workflow: pre-existing workflow template UUID
-            save_workflow: Whether to save the workflow
-            original_task: The original unwrapped task for similarity matching
+            goal: The goal description (may be knowledge-wrapped).
+            craft_instructions: The instructions for crafting the workflow.
+            save_workflow: Whether to save the workflow artefacts to disk.
+            original_task: The original unwrapped task for similarity matching.
+
         Returns:
-            str: Complete executable workflow code
+            Tuple ``(complete_code, workflow_genotype_code, uuid_str)`` where
+            ``complete_code`` is the assembled executable script,
+            ``workflow_genotype_code`` is the LLM-produced workflow body, and
+            ``uuid_str`` is the workflow identifier.
+
+        Raises:
+            RuntimeError: If loading tools, building directories, or reading
+                template code files fails.
+            ValueError: If workflow generation or structural validation fails.
         """
         # Generate chronologically sortable workflow ID: YYYYMMDD_HHMMSS_shortUUID
         timestamp = time.strftime("%Y%m%d_%H%M%S")

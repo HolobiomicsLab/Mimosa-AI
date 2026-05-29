@@ -5,7 +5,21 @@ from pathlib import Path
 from statistics import mean
 
 class WorkflowInfo:
-    def __init__(self, uuid, workflow_folder: Path | str):
+    """Lazy accessor for the artefacts of one workflow folder.
+
+    Caches per-property reads so repeated access (e.g. during selection or
+    visualisation) doesn't repeatedly hit disk. Construction is cheap; I/O
+    happens only when properties are first read.
+    """
+
+    def __init__(self, uuid: str, workflow_folder: Path | str) -> None:
+        """Bind the accessor to a workflow folder on disk.
+
+        Args:
+            uuid: Workflow UUID (the folder name and embedded in filenames).
+            workflow_folder: Filesystem path to the workflow's folder. Accepts
+                a string or a :class:`~pathlib.Path`.
+        """
         self.uuid = uuid
         self.workflow_folder = workflow_folder if isinstance(workflow_folder, Path) else Path(workflow_folder)
         self._goal = None
@@ -16,6 +30,7 @@ class WorkflowInfo:
 
     @property
     def goal(self) -> str:
+        """Return the workflow goal as recorded in ``state_result.json``."""
         if self._goal is None:
             state_result = self.load_state_result()
             self._goal = state_result.get("goal", "") if state_result else ""
@@ -45,13 +60,17 @@ class WorkflowInfo:
         return self._original_task
 
     def _extract_original_from_wrapped(self, text: str) -> str:
-        """Extract original task from knowledge-wrapped text.
+        """Extract the original task from a knowledge-wrapped text.
+
+        Looks for the marker ``"complete the following task:"`` and returns
+        the text that follows it; otherwise returns the input unchanged.
 
         Args:
-            text: Potentially wrapped text
+            text: Potentially wrapped text.
 
         Returns:
-            str: Extracted task or original text if not wrapped
+            The extracted task or the original text if not wrapped. Returns
+            an empty string when ``text`` is falsy.
         """
         if not text:
             return ""
@@ -66,12 +85,14 @@ class WorkflowInfo:
 
     @property
     def state_result(self) -> dict:
+        """Cached contents of ``state_result.json``."""
         if self._state_result is None:
             self._state_result = self.load_state_result()
         return self._state_result
 
     @property
     def answers(self) -> list:
+        """List of per-step answers recorded in ``state_result.json``."""
         state_result = self.load_state_result()
         if state_result is None:
             return []
@@ -79,23 +100,27 @@ class WorkflowInfo:
 
     @property
     def success(self) -> list:
+        """List of per-step success booleans recorded in ``state_result.json``."""
         state_result = self.load_state_result()
         return state_result.get('success', [])
 
     @property
     def is_success(self) -> bool:
+        """True when the last recorded success flag is True."""
         state_result = self.load_state_result()
         success_list = state_result.get('success', [False]) if isinstance(state_result, dict) else [False]
         return success_list[-1]
 
     @property
     def code(self) -> str:
+        """Cached workflow genotype source code."""
         if self._code is None:
             self._code = self.load_code()
         return self._code
 
     @property
     def overall_score(self) -> float:
+        """Cached overall (post-cap) workflow score."""
         if self._overall_score is None:
             self._overall_score = self.calculate_overall_score()
         return self._overall_score
@@ -118,7 +143,16 @@ class WorkflowInfo:
 
     @property
     def judge_evaluation(self) -> dict:
-        """Load state_result.json file."""
+        """Return the contents of ``evaluation.txt`` for this workflow.
+
+        Despite the annotation, this returns the raw string contents of the
+        sidecar ``evaluation.txt`` file (or an empty dict / fallback string
+        when the file is missing or unreadable).
+
+        Returns:
+            Stripped evaluation text, ``{}`` if the file does not exist, or a
+            fallback string if it cannot be read.
+        """
         eval_file = self.workflow_folder / "evaluation.txt"
         if not eval_file.exists():
             return {}
@@ -157,7 +191,12 @@ class WorkflowInfo:
         return ""
 
     def load_state_result(self) -> dict:
-        """Load state_result.json file."""
+        """Load and parse ``state_result.json`` from disk.
+
+        Returns:
+            Parsed JSON dictionary, or an empty dict when the file is missing,
+            empty, or cannot be parsed.
+        """
         state_file = self.workflow_folder / "state_result.json"
         if not state_file.exists():
             return {}
@@ -173,7 +212,12 @@ class WorkflowInfo:
             return {}
 
     def load_code(self) -> str:
-        """Load workflow code file."""
+        """Load the workflow genotype Python file from disk.
+
+        Returns:
+            Source code as a string, or an empty string when the file is
+            missing or cannot be read.
+        """
         genotype_file = self.workflow_folder / f"workflow_genotype_{self.uuid}.py"
         if not genotype_file.exists():
             print(f"❌ Workflow code file {genotype_file} does not exist for UUID {self.uuid}.")
@@ -187,7 +231,15 @@ class WorkflowInfo:
             return ""
 
     def calculate_overall_score(self) -> float:
-        """Calculate overall score from evaluation data."""
+        """Compute the overall score from the workflow's evaluation block.
+
+        Uses the first matching evaluator in priority order (``generic`` →
+        ``verifier`` → ``scenario``) and returns the mean of the collected
+        scores. Returns ``0.0`` when no evaluation data is available.
+
+        Returns:
+            The mean of the collected score(s), or ``0.0`` when none exist.
+        """
         state_result = self.load_state_result()
         if not state_result:
             return 0.0
@@ -207,13 +259,13 @@ class WorkflowInfo:
         return mean(scores) if scores else 0.0
 
     def is_valid(self) -> bool:
-        """Check if workflow has all required files."""
+        """Return True when both ``state_result.json`` and the genotype file exist."""
         state_file = self.workflow_folder / "state_result.json"
         genotype_file = self.workflow_folder / f"workflow_genotype_{self.uuid}.py"
         return state_file.exists() and genotype_file.exists()
 
     def __str__(self) -> str:
-        """Return a string representation of the WorkflowInfo."""
+        """Return a human-readable summary of the WorkflowInfo."""
         goal_preview = self.goal[:100] + "..." if len(self.goal) > 100 else self.goal
         return (
             f"WorkflowInfo(uuid={self.uuid}, "

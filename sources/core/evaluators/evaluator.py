@@ -22,21 +22,25 @@ class WorkflowEvaluator:
     three evaluators are independent and can be invoked separately.
     """
 
-    def __init__(self, config, scenarios_dir="datasets/scenarios",
+    def __init__(self, config: "Config", scenarios_dir: str = "datasets/scenarios",
                  use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0,
-                 verifier_workspace_dir: str | None = None):
+                 verifier_workspace_dir: str | None = None) -> None:
         """Initialize the WorkflowEvaluator with configuration.
 
         Args:
-            config: Configuration object containing memory_dir, workflow_dir, model_pricing, and reasoning_effort
-            scenarios_dir: Directory containing scenario rubric files
+            config: Configuration object containing memory_dir, workflow_dir,
+                model_pricing, and reasoning_effort.
+            scenarios_dir: Directory containing scenario rubric files.
             use_bs_penalty: Forwarded to GenericEvaluator — enables the
                 BullshitDetectorNumerical penalty on the generic overall score.
             bs_fraud_threshold: Per-value fraud-score threshold (0-10) for the
                 short fraud report.
+            verifier_workspace_dir: Optional workspace directory for the
+                verifier evaluator. If ``None``, the verifier uses its default.
 
         Raises:
-            EvaluatorError: If configuration is invalid or required directories don't exist
+            EvaluatorError: If configuration is invalid or required directories
+                don't exist.
         """
         try:
             self.generic_evaluator = GenericEvaluator(
@@ -56,9 +60,9 @@ class WorkflowEvaluator:
     def evaluate(
         self,
         uuid: str,
-        agent_answers: str = None,
+        agent_answers: str | None = None,
         evaluator_type: str = "verifier",
-        scenario_rubric: str = None,
+        scenario_rubric: str | None = None,
     ) -> dict[str, Any]:
         """Route to the requested evaluator.
 

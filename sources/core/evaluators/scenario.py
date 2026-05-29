@@ -16,13 +16,23 @@ from sources.evaluation.scenario_loader import ScenarioLoader
 from .base import *
 
 class ScenarioEvaluator(BaseEvaluator):
-    """Evaluator for scenario-based workflow evaluation."""
+    """Evaluator for scenario-based workflow evaluation.
 
-    def __init__(self, config, scenarios_dir = "datasets/scenarios"):
+    Loads scenario rubrics from disk and scores workflows either with the
+    legacy assertion format or the ScienceAgentBench rubric format, delegating
+    individual checks to an LLM judge.
+    """
+
+    def __init__(self, config: "Config", scenarios_dir: str = "datasets/scenarios") -> None:
         """Initialize the ScenarioEvaluator.
 
         Args:
-            config: Configuration object
+            config: Configuration object forwarded to ``BaseEvaluator``.
+            scenarios_dir: Directory containing scenario rubric files used by
+                the underlying ``ScenarioLoader``.
+
+        Raises:
+            EvaluatorError: If the scenario loader cannot be initialized.
         """
         super().__init__(config)
 
@@ -36,15 +46,21 @@ class ScenarioEvaluator(BaseEvaluator):
     def evaluate(self, uuid: str, scenario_rubric: str) -> dict[str, Any]:
         """Evaluate a workflow against a scenario with scoring.
 
+        Dispatches to the rubric or legacy evaluation path depending on the
+        scenario's structure. If ``uuid`` is ``None``, returns a zero-score
+        placeholder result.
+
         Args:
-            uuid: UUID of the workflow to evaluate
-            scenario_rubric: ID of the scenario to evaluate against
+            uuid: UUID of the workflow to evaluate.
+            scenario_rubric: ID of the scenario to evaluate against.
 
         Returns:
             Dictionary containing scenario evaluation results
+            (``earned_points``/``total_points``/``score``/``scenario_rubric``
+            or the legacy equivalents).
 
         Raises:
-            ScenarioError: If scenario evaluation fails
+            ScenarioError: If scenario evaluation fails.
         """
         try:
             self.logger.info(f"Evaluating workflow {uuid} against scenario {scenario_rubric}")
@@ -96,12 +112,16 @@ class ScenarioEvaluator(BaseEvaluator):
         """Evaluate workflow using legacy assertion format.
 
         Args:
-            uuid: UUID of the workflow
-            scenario_rubric: ID of the scenario
-            scenario: Scenario dictionary with assertions
+            uuid: UUID of the workflow.
+            scenario_rubric: ID of the scenario.
+            scenario: Scenario dictionary with an ``"assertions"`` list.
 
         Returns:
-            Dictionary containing evaluation results
+            Dictionary with ``passed_assertions``, ``total_assertions``,
+            ``score`` and ``scenario_rubric`` for evolution tracking.
+
+        Raises:
+            ScenarioError: If the scenario is missing or malformed.
         """
         if "assertions" not in scenario:
             raise ScenarioError(f"Scenario {scenario_rubric} missing 'assertions' field")
@@ -188,13 +208,19 @@ class ScenarioEvaluator(BaseEvaluator):
     def _evaluate_rubric_format(self, uuid: str, scenario_rubric: str, scenario: dict[str, Any]) -> dict[str, Any]:
         """Evaluate workflow using ScienceAgentBench rubric format.
 
+        Iterates over standard ScienceAgentBench categories (data loading,
+        data processing, modeling/analysis/visualization, output formatting,
+        output saving) and sums earned points across all rubric items.
+
         Args:
-            uuid: UUID of the workflow
-            scenario_rubric: ID of the scenario
-            scenario: Scenario dictionary with rubric categories
+            uuid: UUID of the workflow.
+            scenario_rubric: ID of the scenario.
+            scenario: Scenario dictionary with ``total_points`` and rubric
+                category lists.
 
         Returns:
-            Dictionary containing evaluation results
+            Dictionary with ``earned_points``, ``total_points``, ``score``
+            (fraction of points earned) and ``scenario_rubric``.
         """
         total_possible_points = scenario.get("total_points", 0)
 
@@ -308,14 +334,17 @@ class ScenarioEvaluator(BaseEvaluator):
         """Evaluate single rubric item using LLM.
 
         Args:
-            uuid: UUID of the workflow
-            item: Rubric item dictionary with name, description, points, and category
+            uuid: UUID of the workflow.
+            item: Rubric item dictionary with ``name``, ``description``,
+                ``points`` and ``category`` keys.
 
         Returns:
-            Dictionary containing rubric item evaluation results
+            Dictionary with ``name``, ``category``, ``description``,
+            ``possible_points``, ``earned_points``, ``passed``, ``evidence``,
+            and ``confidence``.
 
         Raises:
-            LLMEvaluationError: If rubric item evaluation fails
+            LLMEvaluationError: If rubric item evaluation fails.
         """
         try:
             # Validate item structure
@@ -389,14 +418,14 @@ class ScenarioEvaluator(BaseEvaluator):
         """Build judge prompt for rubric item evaluation.
 
         Args:
-            uuid: UUID of the workflow
-            item: Rubric item dictionary
+            uuid: UUID of the workflow.
+            item: Rubric item dictionary.
 
         Returns:
-            Formatted judge prompt string
+            Formatted judge prompt string ready to be sent to the LLM.
 
         Raises:
-            WorkflowDataError: If workflow execution text cannot be generated
+            WorkflowDataError: If workflow execution text cannot be generated.
         """
         try:
             execution_text, _ = self.workflow_execution_text(uuid)
@@ -437,14 +466,18 @@ Respond in this exact format:
             raise WorkflowDataError(f"Failed to build rubric item prompt: {str(e)}") from e
 
     def _evaluate_assertion(self, uuid: str, assertion: dict[str, Any]) -> dict[str, Any]:
-        """Evaluate single assertion using existing LLM prompt format.
+        """Evaluate single assertion using the existing LLM prompt format.
+
         Args:
-            uuid: UUID of the workflow
-            assertion: Assertion dictionary to evaluate
+            uuid: UUID of the workflow.
+            assertion: Assertion dictionary to evaluate.
+
         Returns:
-            Dictionary containing assertion evaluation results
+            Dictionary with ``id``, ``description``, ``passed``, ``evidence``,
+            and ``confidence``.
+
         Raises:
-            LLMEvaluationError: If assertion evaluation fails
+            LLMEvaluationError: If assertion evaluation fails.
         """
         try:
             # Validate assertion structure
@@ -506,14 +539,14 @@ Respond in this exact format:
         """Build judge prompt with workflow data.
 
         Args:
-            uuid: UUID of the workflow
-            assertion: Assertion dictionary
+            uuid: UUID of the workflow.
+            assertion: Assertion dictionary.
 
         Returns:
-            Formatted judge prompt string
+            Formatted judge prompt string ready to be sent to the LLM.
 
         Raises:
-            WorkflowDataError: If workflow execution text cannot be generated
+            WorkflowDataError: If workflow execution text cannot be generated.
         """
         try:
             execution_text, _ = self.workflow_execution_text(uuid)
@@ -554,13 +587,18 @@ Respond in this exact format:
         """Parse LLM judge response from JSON format.
 
         Args:
-            judge_text: Raw response text from LLM
+            judge_text: Raw response text from the LLM.
 
         Returns:
-            Tuple of (verdict, evidence, confidence)
+            Tuple ``(verdict, evidence, confidence)`` where ``verdict`` is a
+            boolean parsed from ``"TRUE"``/``"FALSE"``, ``evidence`` is the
+            judge's free-text justification, and ``confidence`` is a float in
+            ``[0.0, 1.0]``. On unexpected internal errors, returns a falsy
+            placeholder triple instead of raising.
 
         Raises:
-            ScoreExtractionError: If response cannot be parsed
+            ScoreExtractionError: If the response is empty/invalid or cannot
+                be parsed as the expected JSON structure.
         """
         if not judge_text or not isinstance(judge_text, str):
             raise ScoreExtractionError("Judge response is empty or invalid")

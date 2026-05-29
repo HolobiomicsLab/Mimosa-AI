@@ -27,7 +27,20 @@ class SelectionStrategy(Enum):
 
 @dataclass
 class PopulationMember:
-    """A single individual in the evolution archive."""
+    """A single individual in the evolution archive.
+
+    Attributes:
+        iteration: Iteration index at which this member was produced.
+        reward: Capped reward used for greedy comparisons.
+        cost: Monetary or compute cost spent to produce this member.
+        uuid: Workflow UUID; ``None`` for members without on-disk artifacts.
+        behaviour_descriptor: Fixed-length structural feature vector used
+            for novelty distance.
+        novelty_score: k-NN novelty against the rest of the archive.
+        qd_score: Combined quality-diversity score.
+        reward_uncapped: Base + info-bonus − cheat, with no hard-fail cap.
+        created_at: Wall-clock timestamp of construction.
+    """
     iteration: int
     reward: float
     cost: float
@@ -60,9 +73,10 @@ class SelectionPressure:
         novelty_k_neighbours: int = 10,
         novelty_weight: float = 0.4,
         admit_threshold: float = 0.3,
-        max_children: int = MAX_CHILDREN_PER_PARENT
-    ):
-        """
+        max_children: int = MAX_CHILDREN_PER_PARENT,
+    ) -> None:
+        """Configure thresholds and the active selection strategy.
+
         Args:
             min_improvement_threshold: Minimum relative improvement for greedy mode (5% default).
             strategy: Selection strategy (greedy | tournament | novelty | qd).
@@ -70,6 +84,8 @@ class SelectionPressure:
             novelty_k_neighbours: k for k-nearest novelty calculation.
             novelty_weight: Weight of novelty vs quality in QD score (0 = pure quality, 1 = pure novelty).
             admit_threshold: Minimum qd_score for admission when greedy validity fails.
+            max_children: Maximum offspring drawn from a single parent before
+                its inverse-child-count weight pushes it below peers.
         """
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
@@ -96,14 +112,22 @@ class SelectionPressure:
         threshold: float | None = None,
     ) -> dict[str, Any]:
         """Validate whether the new run(s) represent a meaningful step forward.
+
+        Dispatches to the strategy-specific validator based on
+        ``self.strategy``.
+
         Args:
             baseline_runs: One or more previous runs (list or single IndividualRun).
             new_runs: One or more candidate runs (list or single IndividualRun).
-            threshold: Override for min_improvement_threshold.
+            threshold: Override for ``min_improvement_threshold``.
+
         Returns:
-            dict with keys: valid, relative_improvement, absolute_improvement,
-            baseline_reward, new_reward, confidence, threshold_used, strategy,
-            validated_at.
+            Dict with keys: ``valid``, ``relative_improvement``,
+            ``absolute_improvement``, ``baseline_reward``, ``new_reward``,
+            ``confidence``, ``threshold_used``, ``strategy``, ``validated_at``
+            (open-ended modes additionally include ``novelty_score``,
+            ``qd_score``, ``archive_size``, ``admit_rejected``,
+            ``admit_rejected_total``).
         """
         threshold = threshold if threshold is not None else self.min_improvement_threshold
 
@@ -142,6 +166,10 @@ class SelectionPressure:
                 QD/novelty mode to apply a ``1/(1+n_children)`` penalty so
                 already-mined parents don't keep dominating the offspring stream.
                 v2_evolution §7 leveraged-move #4.
+
+        Returns:
+            The chosen parent (a run object or a ``PopulationMember``), or
+            ``None`` if neither `runs` nor the archive holds any candidates.
         """
         if not runs and not self._archive:
             return None
@@ -183,15 +211,19 @@ class SelectionPressure:
         crossover_rate: float = 0.3,
         child_counts: dict[str, int] | None = None,
     ) -> tuple[list[Any], bool]:
-        """Select one or more parents from a candidate pool
+        """Select one or more parents from a candidate pool.
+
         Args:
-            candidates: Pool of objects with a reward (or overall_score) attribute
+            candidates: Pool of objects with a reward (or overall_score) attribute.
             n_parents:  Number of parents to pick when crossover fires (≥2).
             crossover_rate: Probability ∈ [0, 1] of choosing crossover over mutation.
             child_counts: Optional ``{uuid: n_children_already}`` map forwarded to
                 `select_parent` to apply an inverse-child-count penalty.
+
         Returns:
-            (list[parent], bool) — selected parents and whether to crossover.
+            ``(parents, use_crossover)`` — the chosen parents and whether to
+            apply crossover; ``use_crossover`` is ``False`` when fewer than two
+            distinct parents could be drawn.
         """
         if not candidates:
             return [], False
@@ -237,7 +269,16 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Classic greedy validation: best-of-new must beat mean-of-baseline."""
+        """Classic greedy validation: best-of-new must beat mean-of-baseline.
+
+        Args:
+            baseline_list: Previous runs whose mean reward forms the bar.
+            new_list: Candidate run(s) being evaluated.
+            threshold: Relative-improvement threshold for acceptance.
+
+        Returns:
+            Validation result dict from :meth:`_build_result`.
+        """
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
 
@@ -264,7 +305,16 @@ class SelectionPressure:
         threshold: float,
     ) -> dict[str, Any]:
         """Tournament selection: new run wins with probability proportional
-        to its advantage over a random baseline sample."""
+        to its advantage over a random baseline sample.
+
+        Args:
+            baseline_list: Previous runs used to sample a small baseline.
+            new_list: Candidate run(s) being evaluated.
+            threshold: Relative-improvement threshold for unconditional accept.
+
+        Returns:
+            Validation result dict from :meth:`_build_result`.
+        """
         baseline_sample = random.sample(baseline_list, min(3, len(baseline_list)))
         baseline_reward = _mean_reward(baseline_sample)
         new_reward = _best_reward(new_list)
@@ -304,7 +354,18 @@ class SelectionPressure:
         threshold: float,
     ) -> dict[str, Any]:
         """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
-        QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat)
+
+        QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat).
+
+        Args:
+            baseline_list: Previous runs whose mean reward forms the bar.
+            new_list: Candidate run(s) being evaluated.
+            threshold: Relative-improvement threshold for greedy validity.
+
+        Returns:
+            Validation result dict from :meth:`_build_result`, extended with
+            ``novelty_score``, ``qd_score``, ``archive_size``,
+            ``admit_rejected`` and ``admit_rejected_total``.
         """
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
@@ -356,12 +417,27 @@ class SelectionPressure:
 
     def _extract_behaviour_descriptor(self, run: Any) -> list[float]:
         """Topology-based descriptor parsed from the workflow source.
-           Reads run.code and returns a fixed-length vector of structural features.
+
+        Reads ``run.code`` and returns a fixed-length vector of structural features.
+
+        Args:
+            run: Object exposing a ``code`` attribute with workflow source.
+
+        Returns:
+            Fixed-length feature vector used as a behaviour descriptor.
         """
         return extract_code_features(_safe_attr(run, "code", None))
 
     def _compute_novelty(self, descriptor: list[float]) -> float:
-        """Compute novelty as mean distance to k-nearest archive members."""
+        """Compute novelty as mean distance to k-nearest archive members.
+
+        Args:
+            descriptor: Behaviour descriptor of the candidate.
+
+        Returns:
+            Mean Euclidean distance to the k nearest archive members; ``1.0``
+            when the archive is empty (first individual is maximally novel).
+        """
         if not self._archive:
             return 1.0  # First individual is maximally novel
 
@@ -374,14 +450,28 @@ class SelectionPressure:
         return sum(distances[:k]) / k if k > 0 else 0.0
 
     def _novelty_range(self) -> float:
-        """Estimate the typical novelty scale from the archive."""
+        """Estimate the typical novelty scale from the archive.
+
+        Returns:
+            Maximum positive ``novelty_score`` across the archive, or ``1.0``
+            when the archive has fewer than two members.
+        """
         if len(self._archive) < 2:
             return 1.0
         novelties = [m.novelty_score for m in self._archive if m.novelty_score > 0]
         return max(novelties) if novelties else 1.0
 
     def _try_admit(self, member: PopulationMember, is_valid: bool) -> bool:
-        """Admit `member` to the archive when it passes the validity check."""
+        """Admit `member` to the archive when it passes the validity check.
+
+        Args:
+            member: Candidate population member.
+            is_valid: Result of the upstream validity check.
+
+        Returns:
+            ``True`` if the member was added, ``False`` if rejected (and the
+            internal rejection counter is incremented).
+        """
         if not is_valid:
             self._n_admit_rejected += 1
             self.logger.info(
@@ -394,7 +484,11 @@ class SelectionPressure:
         return True
 
     def _add_to_archive(self, member: PopulationMember) -> None:
-        """Append member; evict the lowest-qd_score peer if over capacity."""
+        """Append member; evict the lowest-qd_score peer if over capacity.
+
+        Args:
+            member: The population member to admit.
+        """
         self._archive.append(member)
 
         if len(self._archive) > self.population_size:
@@ -448,6 +542,20 @@ class SelectionPressure:
         confidence: float,
         threshold: float,
     ) -> dict[str, Any]:
+        """Assemble the common validation-result dictionary.
+
+        Args:
+            is_valid: Whether the candidate passed validation.
+            relative_improvement: Reward delta relative to baseline.
+            absolute_improvement: Raw reward delta.
+            baseline_reward: Reward summary of the baseline runs.
+            new_reward: Reward summary of the new runs.
+            confidence: Bounded confidence score in [0, 1].
+            threshold: Threshold used for the decision.
+
+        Returns:
+            Dict of standardised keys consumed by callers and downstream logs.
+        """
         return {
             "valid": is_valid,
             "relative_improvement": relative_improvement,
@@ -469,6 +577,16 @@ class SelectionPressure:
         confidence: float,
         threshold: float,
     ) -> None:
+        """Emit an info/warning log line summarising the validation outcome.
+
+        Args:
+            is_valid: Whether the candidate passed validation.
+            relative_improvement: Reward delta relative to baseline.
+            baseline_reward: Reward summary of the baseline runs.
+            new_reward: Reward summary of the new runs.
+            confidence: Bounded confidence score in [0, 1].
+            threshold: Threshold used for the decision.
+        """
         if is_valid:
             self.logger.info(
                 f"✅ ACCEPTED ({self.strategy.value}): {relative_improvement:+.1%} "
@@ -488,24 +606,56 @@ class SelectionPressure:
 # ------------------------------------------------------------------
 
 def _safe_attr(obj: Any, attr: str, default: Any = 0.0) -> Any:
-    """Safely get an attribute from an object, returning default if missing."""
+    """Safely get an attribute from an object, returning default if missing.
+
+    Args:
+        obj: Source object, possibly ``None``.
+        attr: Attribute name to look up.
+        default: Value returned when `obj` is ``None`` or `attr` is missing.
+
+    Returns:
+        Attribute value or `default`.
+    """
     return getattr(obj, attr, default) if obj is not None else default
 
 
 def _mean_reward(runs: list[Any]) -> float:
-    """Mean reward across a list of runs."""
+    """Mean reward across a list of runs.
+
+    Args:
+        runs: Iterable of run-like objects with a ``reward`` attribute.
+
+    Returns:
+        Arithmetic mean of available rewards; ``0.0`` when `runs` is empty.
+    """
     rewards = [_safe_attr(r, "reward", 0.0) for r in runs if r is not None]
     return sum(rewards) / max(len(rewards), 1)
 
 
 def _best_reward(runs: list[Any]) -> float:
-    """Best (max) reward across a list of runs."""
+    """Best (max) reward across a list of runs.
+
+    Args:
+        runs: Iterable of run-like objects with a ``reward`` attribute.
+
+    Returns:
+        Maximum reward seen, or ``0.0`` when `runs` is empty.
+    """
     rewards = [_safe_attr(r, "reward", 0.0) for r in runs if r is not None]
     return max(rewards) if rewards else 0.0
 
 
 def _euclidean(a: list[float], b: list[float]) -> float:
-    """Euclidean distance between two vectors of equal length."""
+    """Euclidean distance between two vectors of equal length.
+
+    Args:
+        a: First vector.
+        b: Second vector.
+
+    Returns:
+        Euclidean distance, or ``float("inf")`` when the vectors differ in
+        length (used as a sentinel for incomparable descriptors).
+    """
     if len(a) != len(b):
         return float("inf")
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))

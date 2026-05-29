@@ -85,7 +85,16 @@ def record_lineage(
 
 
 def load_lineage(workflow_dir: str | Path, uuid: str) -> dict | None:
-    """Read a lineage record. Returns None if missing or unreadable."""
+    """Read a lineage record from disk.
+
+    Args:
+        workflow_dir: Project's workflow directory (parent of ``<uuid>/``).
+        uuid: Workflow UUID whose lineage record should be read.
+
+    Returns:
+        The parsed lineage dictionary, or ``None`` when the file is missing,
+        unreadable, or not a JSON object.
+    """
     target = Path(workflow_dir) / uuid / LINEAGE_FILE_TEMPLATE.format(uuid=uuid)
     if not target.exists():
         return None
@@ -107,6 +116,14 @@ def scan_all(workflow_dir: str | Path) -> dict[str, dict]:
     the tree visualizer can still place them. This makes the tooling
     backward-compatible with workflows generated before lineage tracking
     landed.
+
+    Args:
+        workflow_dir: Project's workflow directory to scan.
+
+    Returns:
+        Dictionary mapping each workflow UUID to its lineage record. Records
+        synthesised for legacy workflows include ``"_synthetic": True``.
+        Returns an empty dict when ``workflow_dir`` does not exist.
     """
     root = Path(workflow_dir)
     if not root.is_dir():

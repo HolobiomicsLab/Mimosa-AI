@@ -5,6 +5,7 @@ import re
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
 from .schema import Task, Plan, PlanStep, TaskStatus, IndividualRun
@@ -41,7 +42,18 @@ class Planner:
     and input/output verification.
     """
 
-    def __init__(self, config, enable_tts=True) -> None:
+    def __init__(self, config: "Config", enable_tts: bool = True) -> None:
+        """Initialize the planner.
+
+        Args:
+            config: Configuration object exposing workspace paths, planner
+                LLM settings, Pushover credentials, and reasoning effort.
+            enable_tts: When True, instantiate a text-to-speech service used
+                for announcing task lifecycle events.
+
+        Raises:
+            ValueError: If ``config`` is ``None``.
+        """
         if config is None:
             raise ValueError("❌ Planner: Configuration cannot be None")
 
@@ -68,7 +80,16 @@ class Planner:
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
 
-    def perspicacite_grounding(self, goal):
+    def perspicacite_grounding(self, goal: str) -> str:
+        """Query Perspicacite-AI for literature-grounded planning guidance.
+
+        Args:
+            goal: The task description for which scientific context is needed.
+
+        Returns:
+            The literature-grounded response text, or a fallback message when
+            the service is unavailable or returns no relevant context.
+        """
         prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
 
 TASK TO SUPPORT:
@@ -199,15 +220,21 @@ Important: Every task description should be very detailled and specific with the
         )
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
-    def _parse_and_validate_plan(self, plan_dict: dict, goal: str) -> Plan:
+    def _parse_and_validate_plan(self, plan_dict: dict[str, Any], goal: str) -> Plan:
         """
         Parse and validate a plan dictionary into a Plan object.
+
         Args:
-            plan_dict: Dictionary containing plan data
+            plan_dict: Dictionary containing plan data, with at least a
+                non-empty ``"steps"`` list and optionally a ``"goal"`` string.
+            goal: Fallback goal text used when ``plan_dict`` does not supply
+                one, and as the canonical goal stored on the returned plan.
+
         Returns:
-            Plan: Validated plan object
+            Plan: Validated plan object.
+
         Raises:
-            PlanValidationError: If plan validation fails
+            PlanValidationError: If plan validation fails.
         """
         if "steps" not in plan_dict:
             raise PlanValidationError("❌ Planner: No steps found in the generated plan")
@@ -248,8 +275,19 @@ Important: Every task description should be very detailled and specific with the
         return plan
 
     @staticmethod
-    def _extract_json_from_code_block(text: str) -> dict | None:
-        """Extract JSON from markdown code blocks (```json ... ```)"""
+    def _extract_json_from_code_block(text: str) -> dict[str, Any] | None:
+        """Extract JSON from markdown code blocks (```json ... ```).
+
+        Args:
+            text: Raw text potentially containing a fenced JSON code block.
+
+        Returns:
+            The decoded JSON object, or ``None`` when no JSON code block is
+            found.
+
+        Raises:
+            json.JSONDecodeError: If the extracted block is not valid JSON.
+        """
         code_blocks = []
         in_code_block = False
 
@@ -338,6 +376,16 @@ Original request:
         ])
 
     def _check_stop_condition(self, plan: Plan) -> bool:
+        """Return True if the plan contains an explicit ``stop`` step.
+
+        Args:
+            plan: The plan whose steps are scanned for a sentinel ``stop`` name
+                or task.
+
+        Returns:
+            True when any step's task or name (case-insensitive, stripped)
+            equals ``"stop"``; False otherwise.
+        """
         for step in plan.steps:
             if step.task.lower().strip() == "stop" or step.name.lower().strip() == "stop":
                 return True
@@ -365,10 +413,15 @@ Original request:
     def _request_human_plan_validation(self, plan: Plan) -> tuple[bool, str]:
         """
         Request human validation of the generated plan.
+
+        Args:
+            plan: The plan presented to the user for review (used by the
+                surrounding flow that calls :meth:`_display_plan` first).
+
         Returns:
             tuple[bool, str]: (is_approved, feedback)
-                - is_approved: True if human pressed Enter (approve), False otherwise
-                - feedback: User's correction/feedback if plan not approved
+                - is_approved: True if human pressed Enter (approve), False otherwise.
+                - feedback: User's correction/feedback if plan not approved.
         """
         print_section("👤 HUMAN VALIDATION REQUIRED")
         print(f"  {DIM}Please review the plan above.{RESET}")
@@ -383,16 +436,21 @@ Original request:
             print_info("Regenerating plan based on your feedback…")
             return False, user_input
 
-    def _generate_plan_with_human_validation(self, goal: str, human_approve = False) -> Plan:
+    def _generate_plan_with_human_validation(self, goal: str, human_approve: bool = False) -> Plan:
         """
         Generate a plan with iterative human validation and feedback loop.
+
         Args:
-            goal: The goal description for the planner
-            max_attempts: Maximum number of plan generation attempts (default: 10)
+            goal: The goal description for the planner.
+            human_approve: When True, prompt the user to approve or revise the
+                generated plan before accepting it; when False, the first
+                successfully generated plan is returned immediately.
+
         Returns:
-            Plan: Human-approved plan object
+            Plan: Human-approved plan object.
+
         Raises:
-            ValueError: If maximum attempts reached without approval or plan generation fails
+            ValueError: If plan generation fails.
         """
         system_prompt = self._read_prompt()
         plan_approved = False
@@ -525,9 +583,13 @@ Original request:
 
         return files
 
-    def _capture_workspace_snapshot(self) -> None:
+    def _capture_workspace_snapshot(self) -> list[str]:
         """
         Capture a snapshot of current workspace files before step execution.
+
+        Returns:
+            list[str]: The list of workspace files captured (also stored on
+            ``self._workspace_files_before_step`` for later diffing).
         """
         self._workspace_files_before_step = self._get_workspace_files()
         print_info(f"Workspace snapshot: {len(self._workspace_files_before_step)} file(s)")
@@ -597,6 +659,12 @@ Original request:
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
+        """Send a notification and prompt the user to continue or exit.
+
+        Args:
+            msg: Message shown both in the Pushover notification body and
+                printed to stdout before the prompt.
+        """
         self.notifier.send_message(
             f"Mimosa is requesting exit:\n{msg}",
             title="Mimosa exit request."
@@ -608,18 +676,31 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
-    async def evolve_runs(self, task, judge, cached_wf_allow=True, original_task=None):
+    async def evolve_runs(
+        self,
+        task: str,
+        judge: bool,
+        cached_wf_allow: bool = True,
+        original_task: str | None = None,
+    ) -> list[IndividualRun]:
         """
         Execute Iterative-Learning for a given task.
+
         Args:
-            task: Task description string (may be knowledge-wrapped)
-            judge: Whether to use judge evaluation
-            cached_wf_allow: Whether to allow using cached workflows
-            original_task: Original unwrapped task for similarity matching
+            task: Task description string (may be knowledge-wrapped).
+            judge: Whether to use judge evaluation.
+            cached_wf_allow: Whether to allow reusing high-quality cached
+                workflows discovered by the workflow selector.
+            original_task: Original unwrapped task for similarity matching;
+                used in preference to ``task`` for cache lookup.
+
         Returns:
-            List[IndividualRun]: List of Evolution runs
+            List[IndividualRun]: List of Evolution runs (possibly a single
+            cached run, the runs produced by the evolution engine, or an
+            empty list when no runs were produced).
+
         Raises:
-            ValueError: If task is invalid or Evolution execution fails
+            ValueError: If task is invalid or Evolution execution fails.
         """
         if not task or not isinstance(task, str):
             raise ValueError("❌ Planner: Task must be a non-empty string")
@@ -678,11 +759,27 @@ Original request:
             raise ValueError(f"❌ Planner: Evolution execution failed: {str(e)}") from e
 
     def _get_evolve_success(self, run: IndividualRun) -> bool:
+        """Return the final success flag recorded in ``run.state_result``.
+
+        Args:
+            run: An individual evolution run whose ``state_result`` carries a
+                ``"success"`` list of booleans.
+
+        Returns:
+            The last element of the ``success`` list, or ``False`` when the
+            field is missing or malformed.
+        """
         run_state_result = getattr(run, 'state_result', None) or {}
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
         return success_list[-1]
 
-    async def run_attempts(self, attempt_counts, max_attempts, step, judge):
+    async def run_attempts(
+        self,
+        attempt_counts: dict[str, int],
+        max_attempts: int,
+        step: PlanStep,
+        judge: bool,
+    ) -> PlanStep:
         """
         Execute multiple attempts for a step with comprehensive error handling.
         Args:

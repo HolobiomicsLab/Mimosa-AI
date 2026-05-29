@@ -9,6 +9,7 @@ import json
 import time
 import re
 from pathlib import Path
+from typing import Any
 
 import dotenv
 
@@ -42,17 +43,28 @@ def extract_json(code: str) -> str:
     return "\n".join(code_blocks)
 
 class MemoryExtraction:
-    def __init__(self, uuid, memory_dir: Path | str = DEFAULT_MEMORY_DIR):
+    """Load and filter agent memory traces stored on disk under a UUID folder."""
+
+    def __init__(self, uuid: str, memory_dir: Path | str = DEFAULT_MEMORY_DIR) -> None:
+        """Initialise the extractor.
+
+        Args:
+            uuid: Identifier of the workflow whose memory directory should be read.
+            memory_dir: Root directory containing per-uuid agent memory folders.
+        """
         self.uuid = uuid
         self.memory_dir = Path(memory_dir)
 
-    def get_agent_memories(self, target: list[str]) -> tuple[str, dict]:
-        """
+    def get_agent_memories(self, target: list[str]) -> list[tuple[str, list]]:
+        """Return per-agent memories filtered by role.
+
         Get the memory of all agent within a uuid folder and select only the role defined by target.
+
         Args:
             target: The list of role in the memory to include.
+
         Returns:
-            A list of Tuple containing the agent name and it's json memory.
+            A list of tuples containing the agent name and its filtered memory.
         """
         agents_memory = []
         for p in self._load_path_memories(self.uuid):
@@ -63,7 +75,18 @@ class MemoryExtraction:
             agents_memory.append((agent_name, memory_selected))
         return agents_memory
 
-    def _load_path_memories(self, uuid):
+    def _load_path_memories(self, uuid: str) -> list[str]:
+        """List the memory filenames present for a given workflow UUID.
+
+        Args:
+            uuid: Workflow identifier whose memory folder should be inspected.
+
+        Returns:
+            File names found at the top level of the uuid's memory folder.
+
+        Raises:
+            FileNotFoundError: When no memory folder exists for the uuid.
+        """
         paths = []
         if not os.path.exists(self.memory_dir / uuid):
             raise FileNotFoundError(f"Error: No memory file with uuid: {uuid}.\n")
@@ -74,7 +97,19 @@ class MemoryExtraction:
             raise e
         return paths[0][2]
 
-    def _load_agent_memory(self, filepath):
+    def _load_agent_memory(self, filepath: Path | str) -> list | dict:
+        """Load the most recent ``model_input_messages`` block from a memory file.
+
+        Args:
+            filepath: Path to a single agent's JSON memory file.
+
+        Returns:
+            The parsed list of memory entries, or an empty dict when the expected
+            key is missing.
+
+        Raises:
+            FileNotFoundError: When ``filepath`` does not exist.
+        """
         print("Loading:", filepath)
         json_content = None
         if not os.path.exists(filepath):
@@ -89,14 +124,15 @@ class MemoryExtraction:
         except Exception as _:
             return {}
 
-    def get_memories_by_role(self, memory: dict, target: list[str]) -> list:
-        """
-        Filter memory entries by role.
+    def get_memories_by_role(self, memory: list | dict, target: list[str]) -> list:
+        """Filter memory entries by role.
+
         Args:
-            memory: The memory dictionary
-            target: List of roles to include
+            memory: The memory dictionary or list of entries.
+            target: List of roles to include.
+
         Returns:
-            Filtered memory entries
+            Filtered memory entries that match one of the target roles.
         """
         if not memory:
             return []
@@ -113,9 +149,8 @@ class BullshitDetectorNumerical:
     of numerical values and analyzing their evolution through the conversation history.
     """
 
-    def __init__(self, llm_config: LLMConfig = None, memory_dir: Path | str = DEFAULT_MEMORY_DIR):
-        """
-        Initialize the BullshitDetectorNumerical.
+    def __init__(self, llm_config: LLMConfig | None = None, memory_dir: Path | str = DEFAULT_MEMORY_DIR) -> None:
+        """Initialize the BullshitDetectorNumerical.
 
         Args:
             llm_config: Configuration for the LLM judge. If None, uses default.
@@ -144,7 +179,11 @@ class BullshitDetectorNumerical:
         self.compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.number_patterns]
 
     def _create_numerical_judge_system_prompt(self) -> str:
-        """Create the system prompt for the numerical LLM judge."""
+        """Create the system prompt for the numerical LLM judge.
+
+        Returns:
+            The forensic-analyst system prompt used to seed every judge call.
+        """
         return """
 You are a forensic analyst specializing in numerical integrity verification within AI agent memory traces. Your mission: trace numerical values backward through computational history to establish legitimacy.
 
@@ -185,7 +224,14 @@ Specificity = 0.9 ✓
 
 
     def is_csv_content(self, text: str) -> bool:
-        """Simple CSV detection - check if most lines have commas"""
+        """Detect CSV-shaped text by counting comma-containing lines.
+
+        Args:
+            text: Arbitrary text to classify.
+
+        Returns:
+            True when at least 60% of non-trivial lines contain a comma.
+        """
         lines = text.strip().split('\n')
         if len(lines) < 3:
             return False
@@ -194,6 +240,17 @@ Specificity = 0.9 ✓
         return comma_lines / len(lines) > 0.6
 
     def extract_numerical_values(self, text: str) -> list[str]:
+        """Extract numerical literals worth fraud-checking from a piece of text.
+
+        Skips CSV-shaped content and applies several context-based filters
+        (uppercase neighbours, version-string shape, magnitude >= 100, integers).
+
+        Args:
+            text: Source text to scan.
+
+        Returns:
+            Ordered list of unique numerical token strings.
+        """
         numbers = []
         if self.is_csv_content(text):
             return []
@@ -241,7 +298,15 @@ Specificity = 0.9 ✓
 
         return numbers
 
-    def is_coding(self, cmd):
+    def is_coding(self, cmd: str) -> bool:
+        """Return True when ``cmd`` looks like a code-writing/execution tool call.
+
+        Args:
+            cmd: Stringified tool-call entry from the agent memory.
+
+        Returns:
+            True when a known Python or R coding marker is present in ``cmd``.
+        """
         py_attempt = ["replace_line_range", "replace_method_implementation", "add_method_to_class", "create_python_file", "python3"]
         r_attempt = ["execute_r_code", "write_r_script"]
         if any([py in cmd for py in py_attempt]):
@@ -251,17 +316,18 @@ Specificity = 0.9 ✓
         return False
 
     def backtrace_numerical_values(self, agent_name: str, memory_data: list[dict], last_steps_count: int = 1) -> dict[str, list[dict]]:
-        """
-        Backtrace numerical values through agent memory, focusing on values from the last steps.
-        Only backtraces values that appear in the last N steps of the agent's memory.
+        """Backtrace numerical values through agent memory.
+
+        Focuses on values from the last steps. Only backtraces values that
+        appear in the last N steps of the agent's memory.
 
         Args:
-            agent_name: Name of the agent
-            memory_data: List of memory entries (chronologically ordered)
-            last_steps_count: Number of last steps to consider for initial value detection
+            agent_name: Name of the agent.
+            memory_data: List of memory entries (chronologically ordered).
+            last_steps_count: Number of last steps to consider for initial value detection.
 
         Returns:
-            Dictionary mapping numerical values to their chronological appearances
+            Dictionary mapping numerical values to their chronological appearances.
         """
         if not memory_data:
             return {}
@@ -295,7 +361,14 @@ Specificity = 0.9 ✓
         return value_timeline
 
     def _extract_content_text(self, entry: dict) -> str:
-        """Extract text content from a memory entry."""
+        """Extract text content from a memory entry.
+
+        Args:
+            entry: Single memory entry from an agent trace.
+
+        Returns:
+            The concatenated text payload of the entry as a string.
+        """
         content = entry.get('content', '')
 
         if isinstance(content, list):
@@ -315,7 +388,18 @@ Specificity = 0.9 ✓
             return str(content)
 
     def _extract_number_context(self, text: str, number: str, context_chars: int = 512) -> str:
-        """Extract surrounding context for a numerical value."""
+        """Extract surrounding context for a numerical value.
+
+        Args:
+            text: Source text containing the value.
+            number: The numerical token to locate.
+            context_chars: Characters of left-context to include (right-context
+                uses a quarter of this budget).
+
+        Returns:
+            A windowed substring around ``number`` with ellipsis markers when
+            truncated, or a placeholder when the token is not found.
+        """
         # Find the position of the number in text
         pattern = re.escape(number)
         match = re.search(pattern, text, re.IGNORECASE)
@@ -330,7 +414,19 @@ Specificity = 0.9 ✓
             context = context + "..."
         return context
 
-    def analyse_backtrace(self, agent_name, analysis_text):
+    def analyse_backtrace(self, agent_name: str, analysis_text: str) -> dict[str, Any]:
+        """Ask the LLM judge to score one formatted backtrace block.
+
+        Args:
+            agent_name: Name of the agent whose backtrace is being judged.
+            analysis_text: Pre-formatted numerical timeline for one or more values.
+
+        Returns:
+            Parsed JSON dict from the judge, augmented with ``agent_name``.
+
+        Raises:
+            ValueError: When the LLM response cannot be parsed as JSON.
+        """
         analysis_prompt = f"""
 AGENT: {agent_name}
 NUMERICAL VALUES TIMELINE:
@@ -384,16 +480,15 @@ Provide your analysis in JSON format:
 
 
     def _format_numerical_analysis(self, agent_name: str, value_timeline: dict[str, list[dict]], max_context_per_value: int = 1024) -> list[str]:
-        """
-        Format the numerical timeline for LLM analysis with optimized context management.
+        """Format the numerical timeline for LLM analysis with optimized context management.
 
         Args:
-            agent_name: Name of the agent
-            value_timeline: Timeline of numerical value appearances
-            max_context_per_value: Maximum characters of context per value to minimize token usage
+            agent_name: Name of the agent.
+            value_timeline: Timeline of numerical value appearances.
+            max_context_per_value: Maximum characters of context per value to minimize token usage.
 
         Returns:
-            Formatted list of text for LLM analysis
+            Formatted list of text blocks, one per numerical value, ready for the LLM judge.
         """
         formatted_sections = []
 
@@ -429,15 +524,15 @@ Provide your analysis in JSON format:
 
 
     def analyze_agent_numerical_fraud(self, agent_name: str, memory_data: list[dict]) -> list[dict]:
-        """
-        Complete numerical fraud analysis for a single agent.
+        """Complete numerical fraud analysis for a single agent.
 
         Args:
-            agent_name: Name of the agent
-            memory_data: Agent's memory data
+            agent_name: Name of the agent.
+            memory_data: Agent's memory data.
 
         Returns:
-            Complete analysis results
+            One analysis dict per analysed value group, or a single zero-score
+            placeholder when no values were detected.
         """
         value_timeline = self.backtrace_numerical_values(agent_name, memory_data)
         if not value_timeline:
@@ -455,16 +550,16 @@ Provide your analysis in JSON format:
             analysis_values.append(self.analyse_backtrace(agent_name, prompt))
         return analysis_values
 
-    def analyze_all_agents_numerical(self, uuid: str, target_roles: list[str] = None) -> dict:
-        """
-        Analyze all agents for numerical fraud.
+    def analyze_all_agents_numerical(self, uuid: str, target_roles: list[str] | None = None) -> dict:
+        """Analyze all agents for numerical fraud.
 
         Args:
-            uuid: Memory UUID to analyze
-            target_roles: List of roles to include in analysis
+            uuid: Memory UUID to analyze.
+            target_roles: List of roles to include in analysis. Defaults to a
+                broad set covering assistant/tool/code/observation/user roles.
 
         Returns:
-            Comprehensive numerical fraud analysis results
+            Dict bundling the per-agent analyses with metadata about the run.
         """
         memory_extraction = MemoryExtraction(uuid, memory_dir=self.memory_dir)
         if target_roles is None:
@@ -484,16 +579,15 @@ Provide your analysis in JSON format:
             "agent_analyses": agent_analyses
         }
 
-    def generate_numerical_report(self, analysis_results: dict, output_path: str = None) -> tuple[str, list[int]]:
-        """
-        Generate a comprehensive numerical fraud detection report.
+    def generate_numerical_report(self, analysis_results: dict, output_path: str | None = None) -> tuple[str, list[int]]:
+        """Generate a comprehensive numerical fraud detection report.
 
         Args:
-            analysis_results: Results from analyze_all_agents_numerical
-            output_path: Optional path to save the report
+            analysis_results: Results from ``analyze_all_agents_numerical``.
+            output_path: Optional path to save the report.
 
         Returns:
-            Report as a string
+            Tuple of the formatted report string and the list of per-agent fraud scores.
         """
         report_lines = []
         scores = []
@@ -544,15 +638,14 @@ Provide your analysis in JSON format:
         return report, scores
 
     def generate_short_fraud_report(self, analysis_results: dict, threshold: float = 5.0) -> str:
-        """
-        Generate a concise fraud report showing only high-risk fraudulent values.
+        """Generate a concise fraud report showing only high-risk fraudulent values.
 
         Args:
-            analysis_results: Results from analyze_all_agents_numerical
-            threshold: Minimum fraud score to include (default: 5.0)
+            analysis_results: Results from ``analyze_all_agents_numerical``.
+            threshold: Minimum fraud score to include (default: 5.0).
 
         Returns:
-            Short fraud report as a string
+            Short fraud report as a string.
         """
         report_lines = []
         report_lines.append("=" * 80)

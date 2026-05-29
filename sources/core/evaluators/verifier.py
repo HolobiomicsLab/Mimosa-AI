@@ -179,6 +179,18 @@ def _run_coro_sync(
     """Run an async coroutine from sync code, even if a loop is already running.
 
     The coroutine is built lazily so it can never be orphaned on a failed run.
+
+    Args:
+        coro_factory: Zero-arg callable that constructs the coroutine to await.
+        thread_timeout: When already inside a running loop, time budget in
+            seconds for the worker thread to finish before raising.
+
+    Returns:
+        The value returned by the coroutine.
+
+    Raises:
+        TimeoutError: When the worker thread exceeds ``thread_timeout``.
+        BaseException: Re-raises any exception raised by the coroutine.
     """
     try:
         asyncio.get_running_loop()
@@ -192,6 +204,7 @@ def _run_coro_sync(
     holder: dict[str, Any] = {}
 
     def _target() -> None:
+        """Run the coroutine inside a worker thread and stash result/error."""
         try:
             holder["result"] = asyncio.run(coro_factory())
         except BaseException as exc:
@@ -208,7 +221,16 @@ def _run_coro_sync(
 
 
 def _extract_json_payload(text: str) -> str:
-    """First balanced JSON object/array in *text*, tolerant of fences and prose."""
+    """First balanced JSON object/array in *text*, tolerant of fences and prose.
+
+    Args:
+        text: Arbitrary string possibly containing a JSON document, with or
+            without ``` fences and with prose around it.
+
+    Returns:
+        The substring spanning the first balanced ``{...}`` or ``[...]``
+        block, or an empty string when none is found.
+    """
     if not text:
         return ""
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
@@ -247,7 +269,7 @@ class VerifierEvaluator(BaseEvaluator):
 
     def __init__(
         self,
-        config,
+        config: "Config",
         workspace_dir: str | Path | None = None,
         verifier_timeout: int = _VERIFIER_TIMEOUT_SECONDS,
         max_claims: int = _VERIFIER_MAX_CLAIMS,
@@ -260,8 +282,24 @@ class VerifierEvaluator(BaseEvaluator):
         info_bonus_alpha: float = _INFO_BONUS_ALPHA,
         info_bonus_beta: float = _INFO_BONUS_BETA,
         use_cheat_detector: bool = True,
-    ):
-        """Initialise; workspace_dir defaults to ``config.workspace_dir``."""
+    ) -> None:
+        """Initialise the evaluator; ``workspace_dir`` defaults to ``config.workspace_dir``.
+
+        Args:
+            config: Mimosa Config object; provides paths, logger, judge config.
+            workspace_dir: Override for the agents' workspace root.
+            verifier_timeout: Per-script execution timeout, in seconds.
+            max_claims: Hard upper bound on the number of claims verified.
+            min_claims: Soft lower bound (logs a warning when extraction yields fewer).
+            hard_fail_cap: Maximum overall score allowed when a hard claim fails.
+            preview_head_bytes: Bytes of file head to render in previews.
+            preview_tail_bytes: Bytes of file tail to render in previews.
+            preview_per_claim_cap: Total preview budget allowed per claim.
+            use_grounding: When True, fetch peer-reviewed literature grounding.
+            info_bonus_alpha: Asymptotic ceiling of the information bonus.
+            info_bonus_beta: Saturation rate of the information bonus.
+            use_cheat_detector: Reserved; cheat detector currently disabled.
+        """
         super().__init__(config)
         self.workspace_dir = Path(
             workspace_dir
@@ -295,8 +333,16 @@ class VerifierEvaluator(BaseEvaluator):
         self._prompt_gradient_history: list[str] = []
 
 
-    def _build_abstracted_prompt_gradient(self, uuid, report: str) -> str:
-        """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating"""
+    def _build_abstracted_prompt_gradient(self, uuid: str, report: str) -> str:
+        """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating.
+
+        Args:
+            uuid: Workflow identifier being summarised.
+            report: Full verifier report text to abstract.
+
+        Returns:
+            Short code-tagged single-sentence diagnosis usable by the mutator.
+        """
         history = "\n".join(self._prompt_gradient_history[-5:])  # include recent prompt_gradient history for context, up to 5 past runs
         prompt = f"""
         You must summarise the judge's detailed report into a concise prompt_gradient of the agents's behavior and failure modes, in plain language that a human user can understand.
@@ -327,7 +373,18 @@ class VerifierEvaluator(BaseEvaluator):
     # ------------------------------------------------------------------
 
     def evaluate(self, uuid: str) -> dict[str, Any]:
-        """Run the verifier pipeline; persists scores under ``evaluation.verifier``."""
+        """Run the verifier pipeline; persists scores under ``evaluation.verifier``.
+
+        Args:
+            uuid: Workflow identifier to evaluate.
+
+        Returns:
+            Dict with ``uuid``, the per-claim results, and aggregate scores.
+
+        Raises:
+            EvaluatorError: When ``uuid`` is not a non-empty string.
+            WorkflowDataError: When no execution text can be derived.
+        """
         if not uuid or not isinstance(uuid, str):
             raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
@@ -391,7 +448,14 @@ class VerifierEvaluator(BaseEvaluator):
         return {"uuid": uuid, "claims": per_claim, **scores}
 
     def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
-        """Return 0.0 without running scripts when the workflow produced nothing."""
+        """Return 0.0 without running scripts when the workflow produced nothing.
+
+        Args:
+            uuid: Workflow identifier of the failed run.
+
+        Returns:
+            Score dict with ``overall_score=0.0`` and a ``skipped_reason`` marker.
+        """
         print_box(
             f"workflow {uuid} produced no code and no state_result; verifier "
             f"returns 0.0 without running scripts.",
@@ -436,9 +500,22 @@ class VerifierEvaluator(BaseEvaluator):
         grounding: str = "",
     ) -> list[dict[str, Any]]:
         """Extract atomic claims by polling three independent source prompts.
+
         Source A asks an LLM for what the LITERATURE demands of a correct
         solution; Source B asks what the USER explicitly required in the goal
         text; Source C asks what the AGENTS reported doing in their narration.
+
+        Args:
+            uuid: Workflow identifier (used for logging and judge calls).
+            goal: Original workflow goal text.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            is_truly_empty: When True, returns a single sentinel "execution
+                succeeded" claim and skips extraction.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Deduplicated list of claim dicts with stable ids and source labels.
         """
         if is_truly_empty:
             return [{
@@ -489,7 +566,14 @@ class VerifierEvaluator(BaseEvaluator):
 
     def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
         """Per-source min/max claim targets derived from the global bounds.
-        Scaled by the number of extraction sources to ensure the overall target ismet.
+
+        Scaled by the number of extraction sources to ensure the overall target is met.
+
+        Args:
+            n_sources: Number of extraction sources to share the global budget across.
+
+        Returns:
+            Tuple ``(per_source_min, per_source_max)`` of target claim counts.
         """
         n_sources = max(1, n_sources)
         per_min = max(2, self.min_claims // n_sources)
@@ -504,7 +588,18 @@ class VerifierEvaluator(BaseEvaluator):
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source A — what the LITERATURE demands of a correct solution."""
+        """Source A — what the LITERATURE demands of a correct solution.
+
+        Args:
+            goal: Workflow goal text.
+            grounding: Literature grounding block; may be empty.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
         return f"""You are extracting SOURCE A claims for a verification rubric: requirements the peer-reviewed literature places on any correct solution to this task, independent of what the agents actually did.
 
@@ -551,7 +646,17 @@ Aim for {target_min}–{target_max} Source-A claims.
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source B — what the USER explicitly required in the goal text."""
+        """Source B — what the USER explicitly required in the goal text.
+
+        Args:
+            goal: Workflow goal text.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are extracting SOURCE B claims for a verification rubric: requirements the user explicitly stated in the workflow goal, independent of what the literature would have demanded and independent of what the agents actually did.
 
 WORKFLOW GOAL:
@@ -603,7 +708,18 @@ text actually warrants.
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source C — what the AGENTS reported doing in their narration."""
+        """Source C — what the AGENTS reported doing in their narration.
+
+        Args:
+            goal: Workflow goal text.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are extracting SOURCE C claims for a verification rubric: concrete computations and artefacts the agents reported producing, so the verifier can check the agents did not lie or hallucinate.
 
 WORKFLOW GOAL:
@@ -646,7 +762,17 @@ Aim for {target_min}–{target_max} Source-C claims.
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source D — mathematical sanity properties of the produced artefacts."""
+        """Source D — mathematical sanity properties of the produced artefacts.
+
+        Args:
+            goal: Workflow goal text.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are extracting SOURCE D claims for a verification rubric: closed-form mathematical sanity properties any correct solution to this task must satisfy, derivable from the TYPE of objects the task produces — independent of the literature, the user wording, and what the agents reported.
 
 WORKFLOW GOAL:
@@ -705,7 +831,17 @@ properties for objects the task does not produce.
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source E — non-negotiable computational reproducibility / CS practice."""
+        """Source E — non-negotiable computational reproducibility / CS practice.
+
+        Args:
+            goal: Workflow goal text.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are extracting SOURCE E claims for a verification rubric: NON-NEGOTIABLE computational reproducibility requirements an independent computer scientist would demand to re-run this work on a fresh machine — independent of the science, the user wording, and the agents' narration.
 
 WORKFLOW GOAL:
@@ -778,7 +914,18 @@ workspace actually warrants — fewer is fine. Do not pad.
         target_min: int,
         target_max: int,
     ) -> str:
-        """Source F — statistical fingerprint / non-triviality of the result."""
+        """Source F — statistical fingerprint / non-triviality of the result.
+
+        Args:
+            goal: Workflow goal text.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            target_min: Lower bound on the number of claims to elicit.
+            target_max: Upper bound on the number of claims to elicit.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are extracting SOURCE F claims for a verification rubric: statistical-fingerprint and non-triviality checks that distinguish a REAL scientific result from a vacuous, degenerate, or leakage-inflated one — independent of the literature, the user wording, and the agents' narration.
 
 WORKFLOW GOAL:
@@ -841,7 +988,20 @@ on-disk artefacts can actually support.
         uuid: str,
         data: Any,
     ) -> list[dict[str, Any]]:
-        """Validate the LLM JSON, normalise each claim, drop confabulated paths."""
+        """Validate the LLM JSON, normalise each claim, drop confabulated paths.
+
+        Args:
+            uuid: Workflow identifier (used in error context).
+            data: Parsed JSON payload from the judge; expected to contain a
+                ``claims`` list or to be a list itself.
+
+        Returns:
+            List of normalised claim dicts with stable ids, criticality, and
+            workspace-validated relevant file lists.
+
+        Raises:
+            LLMEvaluationError: When ``data`` does not carry a usable claims list.
+        """
         claims = data.get("claims", []) if isinstance(data, dict) else data
         if not isinstance(claims, list):
             raise LLMEvaluationError(f"Claim extractor JSON has no 'claims' list for {uuid}")
@@ -877,6 +1037,15 @@ on-disk artefacts can actually support.
         ``allowed`` is given, paths not in that set are logged and dropped
         (hallucination guard). When ``max_count`` is given, truncates to that
         cap. Returns paths in input order.
+
+        Args:
+            raw: Candidate iterable of path strings from a model response.
+            allowed: Optional whitelist of workspace-relative paths.
+            max_count: Optional cap on the number of returned paths.
+            label: Identifier for the calling claim, used in debug logs.
+
+        Returns:
+            Ordered list of cleaned, deduplicated, validated relative paths.
         """
         if not isinstance(raw, list):
             return []
@@ -909,7 +1078,18 @@ on-disk artefacts can actually support.
         workspace_listing: str,
         grounding: str = "",
     ) -> dict[str, Any]:
-        """Generate, execute (if executable) and score a single claim."""
+        """Generate, execute (if executable) and score a single claim.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls and logs).
+            claim: Normalised claim dict with id, criticality, description.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Scored claim dict including verifier spec, status and score.
+        """
         rel_files = self._llm_select_files(
             uuid, claim, execution_text, workspace_listing
         )
@@ -995,6 +1175,16 @@ on-disk artefacts can actually support.
         workspace — hallucinated entries are dropped. On parse or provider
         failure falls back to all eligible workspace files so the downstream
         verifier-gen step is never blind.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claim: Normalised claim dict.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            max_files: Maximum number of files to return.
+
+        Returns:
+            List of workspace-relative paths the verifier should open.
         """
         eligible = self._eligible_workspace_files()
         if not eligible:
@@ -1025,7 +1215,17 @@ on-disk artefacts can actually support.
         workspace_listing: str,
         max_files: int,
     ) -> str:
-        """Build the per-claim file-selection prompt sent to the judge."""
+        """Build the per-claim file-selection prompt sent to the judge.
+
+        Args:
+            claim: Normalised claim dict.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            max_files: Maximum number of files to request.
+
+        Returns:
+            Fully formatted prompt string for the judge.
+        """
         return f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
 
 WORKSPACE FILES (name<TAB>size, relative to workspace root, cwd at runtime):
@@ -1054,6 +1254,18 @@ Return STRICT JSON only:
         execution_text: str,
         workspace_listing: str,
     ) -> dict[str, Any]:
+        """Ask the judge for a verifier script (or a non-executable rationale).
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claim: Normalised claim dict.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+
+        Returns:
+            Spec dict with either ``executable=True`` and ``code``, or
+            ``executable=False`` and a ``reason``.
+        """
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
@@ -1135,7 +1347,17 @@ Return STRICT JSON only, in one of these two shapes:
         prompt: str,
         attempt: int,
     ) -> dict[str, Any]:
-        """Call the judge for a verifier spec; soft-fail to ``executable: False``."""
+        """Call the judge for a verifier spec; soft-fail to ``executable: False``.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claim: Normalised claim dict.
+            prompt: Pre-built verifier-generation prompt.
+            attempt: 1 for the first try, >1 for retries (suffixes the agent name).
+
+        Returns:
+            Spec dict; on errors returns ``{"executable": False, "reason": ...}``.
+        """
         agent_name = (
             f"verifier_gen_{claim['id']}"
             if attempt == 1
@@ -1234,7 +1456,15 @@ Return STRICT JSON only, in one of these two shapes:
 
     @staticmethod
     def _smoke_check(cmd: list[str], timeout: float = 15.0) -> bool:
-        """Return True iff *cmd* exits 0 within *timeout*."""
+        """Return True iff *cmd* exits 0 within *timeout*.
+
+        Args:
+            cmd: Command and arguments to invoke via ``subprocess.run``.
+            timeout: Wall-clock seconds before treating the run as a failure.
+
+        Returns:
+            True when the command exits with status 0; False otherwise.
+        """
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=timeout)
         except Exception:
@@ -1242,7 +1472,17 @@ Return STRICT JSON only, in one of these two shapes:
         return r.returncode == 0
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
-        """Execute a single verifier script in the agents' workspace."""
+        """Execute a single verifier script in the agents' workspace.
+
+        Args:
+            uuid: Workflow identifier (used to name the scratch directory).
+            claim_id: Identifier of the claim being verified.
+            code: Python source code of the verifier script.
+
+        Returns:
+            Dict with ``status``, ``actual``, ``details`` plus raw stdout/stderr
+            and the underlying execution ``exit_status``.
+        """
         scratch = self._runner_temp_root / uuid
         scratch.mkdir(parents=True, exist_ok=True)
         runner_config = RuntimeConfig(
@@ -1304,7 +1544,16 @@ Return STRICT JSON only, in one of these two shapes:
 
     @staticmethod
     def _parse_verifier_stdout(stdout: str, claim_id: str) -> dict[str, Any]:
-        """Pull the last JSON line matching ``claim_id`` from the script stdout."""
+        """Pull the last JSON line matching ``claim_id`` from the script stdout.
+
+        Args:
+            stdout: Raw captured stdout from the verifier script.
+            claim_id: Identifier the JSON line must reference.
+
+        Returns:
+            Dict with ``status``, ``actual`` and ``details``; status is set to
+            ``"error"`` when no matching line is found.
+        """
         if not stdout:
             return {"status": "error", "actual": None, "details": "no stdout from verifier"}
         for line in reversed(stdout.splitlines()):
@@ -1336,6 +1585,16 @@ Return STRICT JSON only, in one of these two shapes:
         spec: dict[str, Any],
         exec_result: dict[str, Any],
     ) -> dict[str, Any]:
+        """Convert an executable-verifier run into a scored result dict.
+
+        Args:
+            claim: Normalised claim dict (unused but kept for signature parity).
+            spec: Verifier spec returned by the judge (unused here).
+            exec_result: Dict produced by ``_run_verifier``.
+
+        Returns:
+            Scored claim dict with ``score`` 1.0 for ``pass`` and 0.0 otherwise.
+        """
         status = exec_result.get("status")
         score = 1.0 if status == "pass" else 0.0
         return {
@@ -1358,7 +1617,20 @@ Return STRICT JSON only, in one of these two shapes:
         reason: str,
         grounding: str = "",
     ) -> dict[str, Any]:
-        """Narrow LLM verdict for one non-executable claim, anchored on grounding."""
+        """Narrow LLM verdict for one non-executable claim, anchored on grounding.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claim: Normalised claim dict.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            reason: Justification string for why the claim is non-executable.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Scored claim dict with ``score`` in {0.0, 0.5, 1.0} and a
+            ``rationale`` from the judge.
+        """
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
@@ -1436,6 +1708,12 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         bonus(n) = α · (1 − exp(−n / β)). Bounded above by α, monotonic in n,
         and conditional on the *passing hard* claim count so trivial or failed
         claims contribute nothing.
+
+        Args:
+            n_hard_pass: Number of hard claims that the verifier passed.
+
+        Returns:
+            Non-negative bonus value, asymptotically bounded by ``info_bonus_alpha``.
         """
         if n_hard_pass <= 0 or self.info_bonus_alpha <= 0.0:
             return 0.0
@@ -1444,7 +1722,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         )
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Mean over scored claims + information bonus; hard-fail caps the result."""
+        """Mean over scored claims + information bonus; hard-fail caps the result.
+
+        Args:
+            per_claim: List of per-claim scored dicts from ``_verify_claim``.
+
+        Returns:
+            Aggregate score dict with overall/base/bonus/cap and per-status counts.
+        """
         if not per_claim:
             return {
                 "overall_score": 0.0,
@@ -1521,7 +1806,15 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # ------------------------------------------------------------------
 
     def _list_workspace(self, max_entries: int = 200) -> str:
-        """Workspace listing for the prompt; also populates ``_workspace_files``."""
+        """Workspace listing for the prompt; also populates ``_workspace_files``.
+
+        Args:
+            max_entries: Soft cap on the number of files included in the listing.
+
+        Returns:
+            Newline-joined ``<rel_path>\\t<size>B`` lines, or a placeholder
+            string when the workspace is missing or empty.
+        """
         ws = self.workspace_dir
         self._workspace_files = set()
         if not ws.exists():
@@ -1553,7 +1846,17 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
 
     def _get_grounding(self, uuid: str, execution_text: str, goal: str) -> str:
-        """One Perspicacite round-trip per uuid; cached + opt-out."""
+        """One Perspicacite round-trip per uuid; cached + opt-out.
+
+        Args:
+            uuid: Workflow identifier used as the cache key.
+            execution_text: Agent narration / produced output text (unused but
+                kept for callers that may key on it).
+            goal: Workflow goal text submitted to the grounding service.
+
+        Returns:
+            Grounding text, the failure marker, or the disabled sentinel.
+        """
         if not self.use_grounding:
             return self._GROUNDING_DISABLED
         if uuid in self._grounding_cache:
@@ -1587,6 +1890,9 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         Filters out compiled artefacts and obvious binaries by suffix; the
         deeper magic-byte check inside ``_preview_file`` still catches
         anything that slips through.
+
+        Returns:
+            Sorted list of workspace-relative paths eligible for text preview.
         """
         out: list[str] = []
         for f in self._workspace_files:
@@ -1600,7 +1906,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
     @staticmethod
     def _looks_binary(sample: bytes) -> bool:
-        """Heuristic: NUL bytes or > 30% non-printables → treat as binary."""
+        """Heuristic: NUL bytes or > 30% non-printables → treat as binary.
+
+        Args:
+            sample: Leading byte sample read from a file.
+
+        Returns:
+            True when the sample looks binary; False for plausibly textual data.
+        """
         if not sample:
             return False
         if b"\x00" in sample:
@@ -1614,7 +1927,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return printable / len(sample) < 0.7
 
     def _preview_file(self, rel_path: str) -> str:
-        """Cached LLM-friendly preview: text head+tail, binary magic bytes, fenced."""
+        """Cached LLM-friendly preview: text head+tail, binary magic bytes, fenced.
+
+        Args:
+            rel_path: Workspace-relative path to the file to preview.
+
+        Returns:
+            Fenced preview string suitable for inclusion in a judge prompt.
+        """
         if rel_path in self._preview_cache:
             return self._preview_cache[rel_path]
 
@@ -1691,7 +2011,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return rendered
 
     def _render_relevant_previews(self, rel_paths: list[str]) -> str:
-        """Concatenate file previews under ``preview_per_claim_cap``."""
+        """Concatenate file previews under ``preview_per_claim_cap``.
+
+        Args:
+            rel_paths: Workspace-relative paths to preview, in priority order.
+
+        Returns:
+            Concatenated previews; exhausted/over-budget entries are noted inline.
+        """
         if not rel_paths:
             return "(no relevant files declared for this claim)"
         chunks: list[str] = []
@@ -1709,7 +2036,16 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return "\n".join(chunks)
 
     def _call_judge(self, uuid: str, agent_name: str, prompt: str) -> str:
-        """One judge round-trip; raises whatever the LLM provider raises."""
+        """One judge round-trip; raises whatever the LLM provider raises.
+
+        Args:
+            uuid: Workflow identifier (used to scope per-uuid memory).
+            agent_name: Logical name for this judge call (used for memory file).
+            prompt: User-side prompt to send to the judge.
+
+        Returns:
+            Raw text response from the LLM provider.
+        """
         memory_path = Path(self.memory_dir) / uuid
         memory_path.mkdir(parents=True, exist_ok=True)
         provider = LLMProvider(
@@ -1733,9 +2069,16 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     ) -> tuple[Any, str | None]:
         """Call the judge expecting JSON; one retry on parse failure.
 
-        Returns ``(parsed, None)`` on success or ``(None, error_str)`` on
-        terminal failure. Both call exceptions and JSON-parse errors are
-        absorbed so callers never have to wrap in try/except.
+        Both call exceptions and JSON-parse errors are absorbed so callers
+        never have to wrap in try/except.
+
+        Args:
+            uuid: Workflow identifier.
+            agent_name: Logical name for the call (a ``_retry`` suffix is added on retry).
+            prompt: User-side prompt to send to the judge.
+
+        Returns:
+            ``(parsed, None)`` on success or ``(None, error_str)`` on terminal failure.
         """
         last_err: str | None = None
         cur_prompt = prompt
@@ -1770,9 +2113,18 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
     @staticmethod
     def _apply_cheat_penalty(
-        scores: dict[str, Any], cheat
+        scores: dict[str, Any], cheat: Any
     ) -> dict[str, Any]:
-        """Subtract cheat penalty from the capped overall score; floor at 0.0."""
+        """Subtract cheat penalty from the capped overall score; floor at 0.0.
+
+        Args:
+            scores: Mutable score dict from ``_aggregate`` to be amended.
+            cheat: Cheat-detector report exposing ``penalty`` and ``to_dict()``,
+                or ``None`` to apply a zero penalty.
+
+        Returns:
+            The same ``scores`` dict, updated with cheat-related fields.
+        """
         penalty = float(cheat.penalty) if cheat is not None else 0.0
         capped = float(scores.get("overall_score", 0.0))
         final = max(0.0, capped - penalty)
@@ -1790,9 +2142,17 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
     @staticmethod
     def _fallback_prompt_gradient(
-        scores: dict[str, Any], cheat
+        scores: dict[str, Any], cheat: Any
     ) -> str:
-        """Deterministic fallback when the abstractor LLM is unavailable."""
+        """Deterministic fallback when the abstractor LLM is unavailable.
+
+        Args:
+            scores: Aggregated score dict from ``_aggregate``.
+            cheat: Cheat-detector report with optional ``behavioral`` findings.
+
+        Returns:
+            Single-sentence human-readable summary of the run's outcome.
+        """
         n_pass = scores.get("n_pass", 0)
         n_fail = scores.get("n_fail", 0)
         n_claims = scores.get("n_claims", 0)
@@ -1815,7 +2175,12 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         return " ".join(bits)
 
     def _persist_prompt_gradient(self, uuid: str, prompt_gradient: str) -> None:
-        """Write the prompt_gradient to ``prompt_gradient.txt`` alongside the report."""
+        """Write the prompt_gradient to ``prompt_gradient.txt`` alongside the report.
+
+        Args:
+            uuid: Workflow identifier; selects the on-disk output folder.
+            prompt_gradient: Text to persist; empty strings are skipped.
+        """
         if not prompt_gradient:
             return
         path = self.workflow_dir / uuid / "prompt_gradient.txt"
@@ -1829,8 +2194,18 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         self,
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
-        cheat
+        cheat: Any,
     ) -> str:
+        """Render a plain-text report from per-claim results and aggregate scores.
+
+        Args:
+            per_claim: List of per-claim scored dicts.
+            scores: Aggregated score dict from ``_aggregate``.
+            cheat: Cheat-detector report, or ``None``.
+
+        Returns:
+            Multi-line report string terminated with a newline.
+        """
         lines: list[str] = []
         w = lines.append
 
@@ -1897,8 +2272,17 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         claims: list[dict[str, Any]],
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
-        cheat
+        cheat: Any,
     ) -> None:
+        """Persist the built report under ``<workflow_dir>/<uuid>/evaluation.txt``.
+
+        Args:
+            uuid: Workflow identifier; selects the on-disk output folder.
+            claims: Raw extracted claim list (kept for signature parity).
+            per_claim: List of per-claim scored dicts to render.
+            scores: Aggregated score dict from ``_aggregate``.
+            cheat: Cheat-detector report, or ``None``.
+        """
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
         report = self._build_report(per_claim, scores, cheat)

@@ -21,17 +21,23 @@ from .grounding import get_perspicacite_grounding
 from .bs_detection import BullshitDetectorNumerical
 
 class GenericEvaluator(BaseEvaluator):
-    """Evaluator for generic workflow evaluation using LLM judgment."""
+    """Evaluator for generic workflow evaluation using LLM judgment.
 
-    def __init__(self, config, use_bs_penalty: bool = True, bs_fraud_threshold: float = 5.0):
+    Runs four independent LLM judges (goal alignment, agent collaboration,
+    output quality, answer plausibility) with fresh contexts and optionally
+    applies a numerical bullshit-detection penalty to the overall score.
+    """
+
+    def __init__(self, config: "Config", use_bs_penalty: bool = True,
+                 bs_fraud_threshold: float = 5.0) -> None:
         """Initialize the GenericEvaluator.
 
         Args:
-            config: Configuration object
-            use_bs_penalty: If True, run BullshitDetectorNumerical on agent memories
-                and subtract a penalty (0-1) from the overall score.
-            bs_fraud_threshold: Per-value fraud-score threshold (0-10) used when
-                building the short fraud report.
+            config: Configuration object forwarded to ``BaseEvaluator``.
+            use_bs_penalty: If True, run BullshitDetectorNumerical on agent
+                memories and subtract a penalty (0-1) from the overall score.
+            bs_fraud_threshold: Per-value fraud-score threshold (0-10) used
+                when building the short fraud report.
         """
         super().__init__(config)
         self.use_bs_penalty = use_bs_penalty
@@ -49,16 +55,16 @@ class GenericEvaluator(BaseEvaluator):
         """Evaluate a single criterion with a fresh LLM context to avoid inter-criteria bias.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            execution_text: The workflow execution text
-            category: The category name (e.g. 'goal_alignment')
-            criterion_prompt: The criterion-specific prompt section
+            uuid: UUID of the workflow to evaluate.
+            execution_text: The workflow execution text.
+            category: The category name (e.g. ``'goal_alignment'``).
+            criterion_prompt: The criterion-specific prompt section.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'``, and ``'evidence'``.
 
         Raises:
-            LLMEvaluationError: If LLM evaluation fails
+            LLMEvaluationError: If LLM evaluation fails.
         """
         prompt = f"""
 You are evaluating AI agent(s) performance on a computational task.
@@ -106,11 +112,13 @@ Respond in this exact JSON format:
         """Evaluate goal alignment criterion with a fresh LLM context.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            execution_text: The workflow execution text
+            uuid: UUID of the workflow to evaluate.
+            execution_text: The workflow execution text.
+            litterature_grounding: Scientific literature grounding text used to
+                contextualize what completing the task looks like.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'``, and ``'evidence'``.
         """
         criterion_prompt = f"""Evaluate whether the multi-agent workflow achieved its stated scientific/research objective.
 
@@ -130,11 +138,11 @@ Consider the following:
         """Evaluate agent collaboration criterion with a fresh LLM context.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            execution_text: The workflow execution text
+            uuid: UUID of the workflow to evaluate.
+            execution_text: The workflow execution text.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'``, and ``'evidence'``.
         """
         criterion_prompt = """Evaluate how effectively agents collaborated within the multi-agent workflow.
 
@@ -152,11 +160,11 @@ Consider the following:
         """Evaluate output quality criterion with a fresh LLM context.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            execution_text: The workflow execution text
+            uuid: UUID of the workflow to evaluate.
+            execution_text: The workflow execution text.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'``, and ``'evidence'``.
         """
         criterion_prompt = """Evaluate the quality and usability of the final output produced by the multi-agent workflow.
 
@@ -172,16 +180,22 @@ Consider the following:
 
     def _evaluate_answer_plausibility(self, uuid: str, execution_text: str,
                                        litterature_grounding: str) -> dict[str, Any]:
-        """Evaluate answer plausibility criterion with a fresh LLM context,
-        using scientific literature grounding from Perspicacite.
+        """Evaluate answer plausibility criterion with a fresh LLM context.
+
+        Uses scientific literature grounding from Perspicacite to judge whether
+        the agents' answer is consistent with external evidence.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            execution_text: The workflow execution text
-            litterature_grounding: Scientific literature grounding from Perspicacite
+            uuid: UUID of the workflow to evaluate.
+            execution_text: The workflow execution text.
+            litterature_grounding: Scientific literature grounding from
+                Perspicacite.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'``, and ``'evidence'``.
+
+        Raises:
+            LLMEvaluationError: If LLM evaluation fails.
         """
         prompt = f"""
 You are evaluating AI agent(s) performance on a computational task.
@@ -236,14 +250,16 @@ Respond in this exact JSON format:
         """Extract a single criterion score from an LLM evaluation response.
 
         Args:
-            evaluation_text: The evaluation text containing the JSON score
-            expected_category: The expected category name
+            evaluation_text: The evaluation text containing the JSON score.
+            expected_category: The expected category name; also used as the
+                returned ``'category'`` value.
 
         Returns:
-            Dictionary with 'category', 'score', and 'evidence'
+            Dictionary with keys ``'category'``, ``'score'`` (float in
+            ``[0.0, 1.0]``), and ``'evidence'`` (str).
 
         Raises:
-            ScoreExtractionError: If the score cannot be extracted or is invalid
+            ScoreExtractionError: If the score cannot be extracted or is invalid.
         """
         if not evaluation_text or not isinstance(evaluation_text, str):
             raise ScoreExtractionError(f"Evaluation text is empty or invalid for {expected_category}")
@@ -308,17 +324,20 @@ Respond in this exact JSON format:
     def evaluate(self, uuid: str, agent_answers: str | None = None) -> None:
         """Perform generic evaluation of a workflow.
 
-        Each evaluation criterion is assessed independently with a fresh LLM context
-        to avoid inter-criteria bias. The answer_plausibility criterion additionally
-        uses scientific literature grounding from Perspicacite.
+        Each evaluation criterion is assessed independently with a fresh LLM
+        context to avoid inter-criteria bias. The answer_plausibility criterion
+        additionally uses scientific literature grounding from Perspicacite.
+        Results are written to ``evaluation.txt`` in the workflow folder and
+        the score dictionary is persisted via ``_save_results``.
 
         Args:
-            uuid: UUID of the workflow to evaluate
-            agent_answers: Optional list of answers from agents for evaluation
+            uuid: UUID of the workflow to evaluate.
+            agent_answers: Optional answers from agents for evaluation
+                (currently accepted for API compatibility).
 
         Raises:
-            LLMEvaluationError: If LLM evaluation fails
-            WorkflowDataError: If workflow data cannot be loaded
+            LLMEvaluationError: If LLM evaluation fails.
+            WorkflowDataError: If workflow data cannot be loaded.
         """
         litterature_grounding = "No grounding available."
         try:
