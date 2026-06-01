@@ -49,14 +49,14 @@ class Config:
         self.planner_llm_model: str = "deepseek/deepseek-chat"
         self.workflow_llm_model: str = "openai/gpt-5.5"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openai/gpt-5.5"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
 
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v10.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
         self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
@@ -69,7 +69,7 @@ class Config:
 
         # learning parameters
         self.learned_score_threshold = 0.97
-        self.max_learning_evolve_iterations = 35
+        self.max_learning_evolve_iterations = 10
 
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode

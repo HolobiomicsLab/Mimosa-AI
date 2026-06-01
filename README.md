@@ -78,6 +78,16 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode):
 - **Automates computational pipelines** across domains: bioinformatics, docking, metabolomics, ML, and more
 - **Self-evolves** through Darwinian-inspired workflow mutation — each failure informs the next attempt
 
+### Interactive documentation
+
+Use the interactive documentation in your browser instead!
+
+Simply run:
+
+```bash
+uvx --with mkdocs-material mkdocs serve
+```
+
 ### Architecture Overview
 
 The framework is organized into five layers:

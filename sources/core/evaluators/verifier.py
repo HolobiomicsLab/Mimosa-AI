@@ -142,17 +142,10 @@ success condition the workflow failed: a workflow that produced no usable
 answer should FAIL the claim "produced <the deliverable, meeting <the
 bar>>", not pass the claim "the final answer is empty".
 
-DISCRIMINATION TEST. Before including any "hard" claim, ask: "If the workflow
-had done nothing scientifically meaningful — only moved files, saved a
-checkpoint, but never produced a correct and complete answer — would this
-claim still verify TRUE?" If YES: the claim is worthless. Reframe it into the
-functional success condition it is a proxy for, or drop it.
-
-ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are NOT
-scientific achievements and are NEVER "hard". Extract an artifact claim only
+ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are never "hard". Extract an artifact claim only
 chained to a functional property that makes it load-bearing — not
 "predictions.csv exists" but "predictions.csv contains a valid probability in
-[0,1] for every row of the test set". Maximum 2 soft artifact claims total.
+[0,1] for every row of the test set".
 
 Return STRICT JSON only, no prose, in this exact form:
 {
@@ -333,32 +326,42 @@ class VerifierEvaluator(BaseEvaluator):
         self._prompt_gradient_history: list[str] = []
 
 
-    def _build_abstracted_prompt_gradient(self, uuid: str, report: str) -> str:
+    def _build_abstractec_prompt_gradient(self, uuid: str, report: str, execution_text: str) -> str:
         """Residual signal passed to provide directional signal to orchestrator - avoid Goodhart's cheating.
 
         Args:
             uuid: Workflow identifier being summarised.
             report: Full verifier report text to abstract.
-
+            execution_text: Full workflow execution text (agent narration and produced output) to provide context on what the workflow did.
         Returns:
             Short code-tagged single-sentence diagnosis usable by the mutator.
         """
         history = "\n".join(self._prompt_gradient_history[-5:])  # include recent prompt_gradient history for context, up to 5 past runs
         prompt = f"""
-        You must summarise the judge's detailed report into a concise prompt_gradient of the agents's behavior and failure modes, in plain language that a human user can understand.
-        The prompt_gradient should be actionable and focused on the most critical issues affecting the workflow's performance, especially those that caused hard claim failures or a cheat penalty.
-        The prompt_gradient should not leak what the verifier score against (e.g. "the workflow failed to read the file 'data.csv'"), but should still convey the core issues in a way to give an overall sense of what went wrong.
-        The prompt_gradient could mention anything forbidden that contributed to failure such as fallback, short, hacks, or cheating.
-        The prompt_gradient does not suggest solutions.
-        Here is the verifier's detailed report for workflow {uuid}:
+        You convert the judge's report into few short, directional diagnosis that steers the
+        next mutation.
+
+        GROUND TRUTH AND TRUST ORDER (critical):
+        - The verifier's deterministic checks are ground truth.
+        - The agent execution narration below is UNTRUSTED. Agents may declare success
+          while producing degenerate output. Use agent execution only to explain why and what failure happened, never as
+          evidence that the task succeeded.
+          Do not mention a failure if it was clearly corrected by agent downstream and verifier report confirm the correction
+            Example: error regarding module X reported fixed and verification confirm proper behavior regarding module X).
+        - Claim programs that crashed (tracebacks, NameError, serialization errors) are verifier
+          measurement failures. Do not report them.
+
+        Here is the agents execution text (agent narration and produced output):
+        {execution_text}
+        Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
         Here are the past diagnoses for recent workflows, which may provide additional context on common failure:
         {history}
-        Make a short code name for the prompt_gradient followed by a one sentence prompt_gradient of the workflow's behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
-        Format: "<prompt_gradient_CODE>:<one-sentence prompt_gradient>"
-        If possible, reuses prompt_gradient codes from past runs when the failure modes are similar, to help track recurring issues.
+        Make a short code name for the diagnosis followed by a a few short line for each issue that describe the behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
+        Format: "<diagnosis_CODE>:\n<- <short diagnosis error 1>\n<- <short diagnosis error 2>\n... (up to 5 lines of diagnosis)"
+        If possible, reuses diagnosis codes from past runs when the failure modes are similar, to help track recurring issues.
         Example:
-        FALLBACK_ECFP_CLASSIFIER:The workflow produced a correctly shaped prediction table, but it appears to use a fallback rather than a trained ECFP-based classifier.
+        FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """
         diag = self._call_judge(
             uuid,
@@ -366,7 +369,7 @@ class VerifierEvaluator(BaseEvaluator):
             prompt,
         )
         self._prompt_gradient_history.append(diag)
-        return diag.strip() or "UNDIAGNOSED:No prompt_gradient could be extracted from the verifier report."
+        return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -436,8 +439,8 @@ class VerifierEvaluator(BaseEvaluator):
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
 
         report = self._build_report(per_claim, scores, cheat)
-        prompt_gradient = self._build_abstracted_prompt_gradient(uuid, report)
-        scores["abstracted_prompt_gradient"] = prompt_gradient
+        prompt_gradient = self._build_abstractec_prompt_gradient(uuid, report, execution_text)
+        scores["abstractec_prompt_gradient"] = prompt_gradient
         self._persist_prompt_gradient(uuid, prompt_gradient)
 
         try:
@@ -472,7 +475,7 @@ class VerifierEvaluator(BaseEvaluator):
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
-            "abstracted_prompt_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
+            "abstractec_prompt_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
         }
         try:
@@ -528,10 +531,9 @@ class VerifierEvaluator(BaseEvaluator):
         sources = (
             ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
             ("b", self._build_source_b_prompt(goal, workspace_listing, per_source_min, per_source_max)),
-            ("c", self._build_source_c_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
+            ("c", self._build_source_c_prompt(goal, workspace_listing, per_source_min, per_source_max)),
             ("d", self._build_source_d_prompt(goal, workspace_listing, per_source_min, per_source_max)),
-            ("e", self._build_source_e_prompt(goal, workspace_listing, per_source_min, per_source_max)),
-            ("f", self._build_source_f_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
+            ("e", self._build_source_e_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
         )
 
         merged: list[dict[str, Any]] = []
@@ -601,10 +603,7 @@ class VerifierEvaluator(BaseEvaluator):
             Fully formatted prompt string for the judge.
         """
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
-        return f"""You are extracting SOURCE A claims for a verification rubric: requirements the peer-reviewed literature places on any correct solution to this task, independent of what the agents actually did.
-
-WORKFLOW GOAL:
-{goal}
+        return f"""You are extracting  claims for a verification rubric: requirements the peer-reviewed literature places on any correct solution to this task, independent of what the agents actually did.
 
 LITERATURE GROUNDING:
 {grounding_block}
@@ -613,8 +612,8 @@ WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
 TASK:
-Extract Source-A claims. These are the things the LITERATURE demands of a
-correct solution, regardless of whether the agents performed them:
+Extract claims that represent the things the LITERATURE demands of a
+correct solution:
 - Required methodology steps (e.g. "data was normalised before PCA",
   "cross-validation was performed with k≥5", "the energy minimisation
   converged to a stationary point").
@@ -631,12 +630,11 @@ it meets the literature-standard success criterion. If the task names a
 quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
 must encode that bar — not merely "a result exists". Phrase it so a
 workflow that skipped, faked, or left the deliverable empty FAILS it.
-Mark it "hard". Source-A claims about literature-required steps are
-"hard" by default.
+Mark "hard" claims that are considered extremely load-bearing success according to the literature.
 
 {_CLAIM_RULES_BLOCK}
 
-Aim for {target_min}–{target_max} Source-A claims.
+Aim for {target_min}–{target_max} claims.
 """
 
     def _build_source_b_prompt(
@@ -657,7 +655,7 @@ Aim for {target_min}–{target_max} Source-A claims.
         Returns:
             Fully formatted prompt string for the judge.
         """
-        return f"""You are extracting SOURCE B claims for a verification rubric: requirements the user explicitly stated in the workflow goal, independent of what the literature would have demanded and independent of what the agents actually did.
+        return f"""You are extracting claims for a verification rubric: requirements the user explicitly stated in the workflow goal.
 
 WORKFLOW GOAL:
 {goal}
@@ -667,9 +665,8 @@ WORKSPACE FILES (relative to workspace root):
 
 TASK:
 Read ONLY the goal text above. Extract claims that capture instructions
-and deliverables the user spelled out. A Source-B claim FAILS if the
-agents skipped, weakened, or substituted what the user asked for — even
-if the literature would have accepted the substitution.
+and deliverables the user spelled out. Claim FAILS if the
+agents skipped, weakened, or substituted what the user asked for.
 
 Look for, in the goal:
 - Explicit deliverables ("produce a CSV with columns A,B,C", "save the
@@ -684,15 +681,16 @@ Look for, in the goal:
   test split only", "use the 20-mer sequence HPHPPHHPHPPHPHHPPHPH").
 - Explicit output format constraints ("as JSON", "one row per sample",
   "rounded to 3 decimal places").
-- Input dataset's exact column names, order, and data types in your output. Ensure agents don't add suffixes (e.g., _prob, _score) or rename columns unless the task explicitly specifies a different output schema. Any deviation from the source format is an error.
+- Input dataset's exact column names, order, and data types in your output.
+- The claims Ensure no suffixes (e.g., _prob, _score) or renamed columns unless the task explicitly specifies a different output schema.
 - Any hint, advice, recommandations, treat them as explicit user requirements that must be followed
-
-
 
 If the goal is short and contains few explicit requirements, return a
 short list — DO NOT pad with claims the user did not write. It is fine
 to return fewer than {target_min} claims when the goal is terse; do not
 invent constraints.
+
+All these claims are de-facto 'hard' since they are explicit user requirements, but mark as "soft" any that are more like suggestions or optional advice rather than strict requirements.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -701,61 +699,6 @@ text actually warrants.
 """
 
     def _build_source_c_prompt(
-        self,
-        goal: str,
-        execution_text: str,
-        workspace_listing: str,
-        target_min: int,
-        target_max: int,
-    ) -> str:
-        """Source C — what the AGENTS reported doing in their narration.
-
-        Args:
-            goal: Workflow goal text.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            target_min: Lower bound on the number of claims to elicit.
-            target_max: Upper bound on the number of claims to elicit.
-
-        Returns:
-            Fully formatted prompt string for the judge.
-        """
-        return f"""You are extracting SOURCE C claims for a verification rubric: concrete computations and artefacts the agents reported producing, so the verifier can check the agents did not lie or hallucinate.
-
-WORKFLOW GOAL:
-{goal}
-
-WORKFLOW OUTPUT (agents narration — the workflow's self-report):
-{execution_text}
-
-WORKSPACE FILES (relative to workspace root):
-{workspace_listing}
-
-TASK:
-Extract Source-C claims: things the agents CLAIM to have done, that we can verify against the
-on-disk artefacts or using calculations. A Source-C claim FAILS if what the agents reported
-cannot be reproduced from the files they wrote. Methodological claims are NOT source C - do not include them.
-
-Look for, in the narration and workspace:
-- Concrete computations the agents reported (specific numbers, metrics,
-  intermediate values, decisions made) that can be verified with small calculations in python.
-- Workspace changes the agents claim to have produced (files written,
-  formats used, structural properties of outputs).
-Do not:
-- Do not extract aspirational claims about what the agents "tried" to do or "considered" doing.
-- Do not extract claims about fallback or any alternative paths that is trying to "hack" the solutions.
-- Do not extract claims that would require parsing a python program to verify.
-
-Ignore aspirational language and meta-narration ("we tried", "we
-considered"); extract only verifiable assertions about state on disk
-or computed results.
-
-{_CLAIM_RULES_BLOCK}
-
-Aim for {target_min}–{target_max} Source-C claims.
-"""
-
-    def _build_source_d_prompt(
         self,
         goal: str,
         workspace_listing: str,
@@ -773,7 +716,7 @@ Aim for {target_min}–{target_max} Source-C claims.
         Returns:
             Fully formatted prompt string for the judge.
         """
-        return f"""You are extracting SOURCE D claims for a verification rubric: closed-form mathematical sanity properties any correct solution to this task must satisfy, derivable from the TYPE of objects the task produces — independent of the literature, the user wording, and what the agents reported.
+        return f"""You are extracting claims for a verification rubric: closed-form mathematical sanity properties.
 
 WORKFLOW GOAL:
 {goal}
@@ -782,10 +725,10 @@ WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
 TASK:
-Extract Source-D claims. These are mathematical invariants and structural
+Extract  claims that are mathematical invariants and structural
 properties that follow from the type of object produced and that a small
 numerical check can confirm directly against the on-disk artefact. A
-Source-D claim FAILS if the artefact violates a property any correct
+ claim FAILS if the artefact violates a property any correct
 solution would have respected.
 
 Look for properties such as:
@@ -806,25 +749,19 @@ Look for properties such as:
   count on a per-row task; predictions equal the test set size; feature
   counts agree across train and test).
 
-Do NOT extract:
-- Methodology choices — those are Source A.
-- Literal user-required values — those are Source B.
-- Things the agents merely claim — those are Source C.
-- Bare existence of files — forbidden by the artifact-claim rule below.
-
-Prefer claims that can be checked with a tiny numpy / pandas script
+Prefer claims that can be checked with a tiny script
 reading the relevant artefact. Most Source-D claims are "hard" by default:
 violating a mathematical invariant means the result is not just
 suboptimal, it is incorrect.
 
 {_CLAIM_RULES_BLOCK}
 
-Aim for {target_min}–{target_max} Source-D claims, but only ones grounded
+Aim for {target_min}–{target_max} claims, but only ones grounded
 in the actual artefacts visible in the workspace listing. Do not invent
 properties for objects the task does not produce.
 """
 
-    def _build_source_e_prompt(
+    def _build_source_d_prompt(
         self,
         goal: str,
         workspace_listing: str,
@@ -842,7 +779,7 @@ properties for objects the task does not produce.
         Returns:
             Fully formatted prompt string for the judge.
         """
-        return f"""You are extracting SOURCE E claims for a verification rubric: NON-NEGOTIABLE computational reproducibility requirements an independent computer scientist would demand to re-run this work on a fresh machine — independent of the science, the user wording, and the agents' narration.
+        return f"""You are extracting claims for a verification rubric: NON-NEGOTIABLE computational reproducibility requirementsto re-run this work on a fresh machine.
 
 WORKFLOW GOAL:
 {goal}
@@ -851,21 +788,18 @@ WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
 TASK:
-Extract Source-E claims that capture HARD computational-reproducibility
+Extract claims that capture essential computational-reproducibility
 requirements. The scope is intentionally narrow: only things without
 which a second party CANNOT re-run this work on a fresh machine. The
 bar is "can it be re-run", NOT "is it nicely engineered".
 
-ALLOWED claim shapes (each MUST chain a file / structural property to a
-functional reproducibility consequence — never bare existence):
+ALLOWED claim shapes:
 - The workspace declares its dependencies in a standard manifest
   (`requirements.txt`, `pyproject.toml`, or `environment.yml`) AND the
   declared packages cover the third-party imports actually used by the
   produced code — i.e. the manifest is non-empty and is not missing a
   library that the workspace's `.py` files import.
-- The produced code contains no hard-coded absolute filesystem paths
-  outside the workspace (no `/home/...`, no `/Users/...`, no `C:\\...`)
-  that would break on another machine.
+- The dependencies are pinned to specific versions (e.g. `numpy==1.25.3` rather than `numpy>=1.20` or `numpy`).
 - If the produced code uses stochastic operations (random sampling,
   shuffling, model training, weight init, train/test split), a random
   seed is fixed in code (`numpy.random.seed`, `random.seed`,
@@ -876,8 +810,6 @@ functional reproducibility consequence — never bare existence):
 - The workspace is not pathologically cluttered with junk (no thousands
   of unrelated files; no obvious accumulation of failed intermediate
   dumps that would confuse a re-runner).
-- Outputs are written to relative paths inside the workspace, not to
-  system or user-home locations.
 
 EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
 - README files, documentation, markdown, or doc presence of any kind.
@@ -886,11 +818,10 @@ EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
 - Code style (PEP8, line length, naming conventions, formatting).
 - Type hints / type annotations.
 - Logging structure, log file presence, or log verbosity.
-- Module organisation, package layout, "clean architecture".
 This source verifies non-negotiable computer-science PRACTICE — not
-engineering aesthetics. If a property is merely "nice to have", drop it.
+engineering aesthetics.
 
-Each Source-E claim MUST chain a file / structural property to a
+Eachclaim MUST chain a file / structural property to a
 functional reproducibility consequence — never bare existence. Example
 WELL-FORMED claim: "the workspace declares its dependencies in a standard
 manifest covering the packages actually imported by the produced code".
@@ -906,7 +837,7 @@ Aim for up to {target_max} Source-E claims, but only as many as the
 workspace actually warrants — fewer is fine. Do not pad.
 """
 
-    def _build_source_f_prompt(
+    def _build_source_e_prompt(
         self,
         goal: str,
         execution_text: str,
@@ -926,7 +857,7 @@ workspace actually warrants — fewer is fine. Do not pad.
         Returns:
             Fully formatted prompt string for the judge.
         """
-        return f"""You are extracting SOURCE F claims for a verification rubric: statistical-fingerprint and non-triviality checks that distinguish a REAL scientific result from a vacuous, degenerate, or leakage-inflated one — independent of the literature, the user wording, and the agents' narration.
+        return f"""You are creating a list of verification claims for a verification rubric: statistical-fingerprint and non-triviality checks.
 
 WORKFLOW GOAL:
 {goal}
@@ -938,10 +869,10 @@ WORKSPACE FILES (relative to workspace root):
 {workspace_listing}
 
 TASK:
-Extract Source-F claims. These check that the produced result is
+Create a list of check that the produced result is
 NON-TRIVIAL and STATISTICALLY REAL — i.e. that it could not have been
-achieved by a degenerate, leaking, or hard-coded "solution". A Source-F
-claim FAILS if the on-disk artefact bears the fingerprint of a vacuous
+achieved by a degenerate, leaking, or hard-coded "solution".
+The claim FAILS if the on-disk artefact bears the fingerprint of a vacuous
 success.
 
 Look for properties such as:
@@ -965,21 +896,14 @@ Look for properties such as:
 - Where probabilities are produced, they show inter-class separation
   rather than collapsing to a single point.
 
-Do NOT extract:
-- Methodology requirements — Source A.
-- Literal user-required values — Source B.
-- Things the agents merely report — Source C.
-- Mathematical invariants like "probabilities in [0,1]" — Source D.
-- Reproducibility / CS-hygiene properties — Source E.
-
-Source-F claims are typically "hard" when they target the headline
+These claims are typically "hard" when they target the headline
 result: a result statistically indistinguishable from a baseline is not
 a scientific success. Skip baseline claims for tasks with no obvious
 null to compare against — do not invent one.
 
 {_CLAIM_RULES_BLOCK}
 
-Aim for {target_min}–{target_max} Source-F claims, only as many as the
+Aim for {target_min}–{target_max} claims, only as many as the
 on-disk artefacts can actually support.
 """
 
