@@ -264,7 +264,7 @@ class WorkflowSelector:
         selection_pressure: SelectionPressure,
         n_parents: int = 2,
         crossover_rate: float = 0.3,
-        threshold_similarity: float = 0.5,
+        threshold_similarity: float = 0.8,
         threshold_score: float = 0.1,
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.

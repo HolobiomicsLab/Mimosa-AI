@@ -256,7 +256,7 @@ class EvolutionEngine:
             selection_pressure=self.selection,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
-            threshold_similarity=0.5,
+            threshold_similarity=0.8,
             threshold_score=0.01,
         )
 
