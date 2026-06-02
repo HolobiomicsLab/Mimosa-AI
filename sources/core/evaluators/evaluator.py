@@ -1,19 +1,29 @@
-import json
 import logging
-import re
-from datetime import datetime
-from pathlib import Path
-from typing import Any
-import sys
 import os
+import sys
+from typing import Any
 
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from .base import BaseEvaluator, EvaluatorError, WorkflowDataError
-from .generic import GenericEvaluator, LLMEvaluationError, ScoreExtractionError
-from .scenario import ScenarioEvaluator, ScenarioError
+from .base import BaseEvaluator, EvaluatorError, WorkflowDataError  # noqa: F401
+from .generic import (  # noqa: F401
+    GenericEvaluator,
+    LLMEvaluationError,
+    ScoreExtractionError,
+)
+from .scenario import ScenarioError, ScenarioEvaluator
 from .verifier import VerifierEvaluator
+
+# Re-exported for `sources.evaluation.__init__`; touch with care.
+__all__ = [
+    "BaseEvaluator", "EvaluatorError", "WorkflowDataError",
+    "GenericEvaluator", "LLMEvaluationError", "ScoreExtractionError",
+    "ScenarioError", "ScenarioEvaluator",
+    "VerifierEvaluator",
+    "WorkflowEvaluator",
+]
+
 
 class WorkflowEvaluator:
     """Combined workflow evaluator: generic judge, scenario rubric, and verifier.
@@ -63,6 +73,7 @@ class WorkflowEvaluator:
         agent_answers: str | None = None,
         evaluator_type: str = "verifier",
         scenario_rubric: str | None = None,
+        rubric_anchor_uuid: str | None = None,
     ) -> dict[str, Any]:
         """Route to the requested evaluator.
 
@@ -74,6 +85,10 @@ class WorkflowEvaluator:
                 - "scenario": rubric-based scoring; requires `scenario_rubric`.
                 - "verifier": atomic-claim verification pipeline.
             scenario_rubric: Scenario ID, required when `evaluator_type="scenario"`.
+            rubric_anchor_uuid: Optional ancestor UUID whose verifier cache
+                (``_verifier_tmp/<id>/claims.json`` + ``verify_*.py``) should
+                be reused for stable cross-generation scoring. Forwarded only
+                to the verifier evaluator; ignored for generic/scenario.
 
         Returns:
             Dictionary containing evaluation results.
@@ -108,7 +123,9 @@ class WorkflowEvaluator:
                     return {"evaluation_type": "generic", "uuid": uuid}
 
             if evaluator_type == "verifier":
-                result = self.verifier_evaluator.evaluate(uuid)
+                result = self.verifier_evaluator.evaluate(
+                    uuid, rubric_anchor_uuid=rubric_anchor_uuid
+                )
                 return {"evaluation_type": "verifier", "uuid": uuid, **result}
 
             # Default: generic
@@ -123,8 +140,9 @@ class WorkflowEvaluator:
 
 if __name__ == "__main__":
     """Manual testing of both evaluation modes."""
-    from config import Config
     import dotenv
+
+    from config import Config
     dotenv.load_dotenv()
     config = Config()
     config.memory_dir = "../../sources/memory"

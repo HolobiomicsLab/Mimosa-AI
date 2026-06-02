@@ -4,7 +4,6 @@ Pipeline: extract atomic claims → generate a verifier script per claim →
 execute in the agents' workspace → score per claim → aggregate.
 """
 
-import ast
 import asyncio
 import json
 import math
@@ -13,9 +12,21 @@ import re
 import subprocess
 import sys
 import threading
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, TypeVar
 
+from sources.cli.pretty_print import (
+    CYAN,
+    DIM,
+    GREEN,
+    RED,
+    YELLOW,
+    print_box,
+    print_info,
+    print_ok,
+    print_warn,
+)
 from sources.core.llm_provider import LLMProvider
 from sources.core.workflow_runner import (
     ExecutionStatus,
@@ -27,15 +38,9 @@ from .base import (
     BaseEvaluator,
     EvaluatorError,
     LLMEvaluationError,
-    ScoreExtractionError,
     WorkflowDataError,
 )
 from .grounding import get_perspicacite_grounding
-
-from sources.cli.pretty_print import (
-    print_box, print_info, print_ok, print_step, print_warn,
-    CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
-)
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
@@ -380,11 +385,24 @@ class VerifierEvaluator(BaseEvaluator):
     # Public entry point
     # ------------------------------------------------------------------
 
-    def evaluate(self, uuid: str) -> dict[str, Any]:
+    def evaluate(
+        self,
+        uuid: str,
+        rubric_anchor_uuid: str | None = None,
+    ) -> dict[str, Any]:
         """Run the verifier pipeline; persists scores under ``evaluation.verifier``.
+
+        When ``rubric_anchor_uuid`` names an ancestor whose verifier cache
+        exists (a ``claims.json`` written by a previous evaluation), the claim
+        list and executable verifier scripts are reused verbatim from that
+        ancestor. This skips the LLM claim-extraction and verifier-generation
+        stages, giving identical rubrics across an evolved lineage so scores
+        are directly comparable. The anchor's scripts are executed against the
+        *current* uuid's workspace, not the anchor's.
 
         Args:
             uuid: Workflow identifier to evaluate.
+            rubric_anchor_uuid: Optional ancestor whose cached rubric to reuse.
 
         Returns:
             Dict with ``uuid``, the per-claim results, and aggregate scores.
@@ -418,9 +436,26 @@ class VerifierEvaluator(BaseEvaluator):
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
-        claims = self._extract_claims(
-            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
+        anchored_records = (
+            self._load_anchored_claims(rubric_anchor_uuid)
+            if rubric_anchor_uuid
+            else None
         )
+        if anchored_records:
+            claims = self._claims_from_anchor(anchored_records)
+            self.logger.info(
+                f"Reusing rubric anchor {rubric_anchor_uuid} for {uuid}: "
+                f"{len(claims)} cached claims"
+            )
+        else:
+            if rubric_anchor_uuid:
+                self.logger.warning(
+                    f"rubric_anchor_uuid={rubric_anchor_uuid} has no readable "
+                    f"cache; falling back to LLM claim extraction"
+                )
+            claims = self._extract_claims(
+                uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
+            )
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
             scores = {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
@@ -429,10 +464,25 @@ class VerifierEvaluator(BaseEvaluator):
 
         self._ensure_verifier_packages()
 
+        anchored_specs = {
+            c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
+            for c in (anchored_records or [])
+        }
         per_claim: list[dict[str, Any]] = []
         for claim in claims[: self.max_claims]:
+            preloaded_spec = None
+            if anchored_records and rubric_anchor_uuid:
+                executable, reason = anchored_specs.get(claim["id"], (False, ""))
+                preloaded_spec = self._spec_from_anchor(
+                    rubric_anchor_uuid, claim["id"], executable, reason
+                )
             result = self._verify_claim(
-                uuid, claim, execution_text, workspace_listing, grounding
+                uuid,
+                claim,
+                execution_text,
+                workspace_listing,
+                grounding,
+                preloaded_spec=preloaded_spec,
             )
             per_claim.append(result)
 
@@ -442,6 +492,7 @@ class VerifierEvaluator(BaseEvaluator):
         cheat = None # NOTE: cheat_detector was crap. Will need to be rethink.
 
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
+        self._persist_claims(uuid, claims, per_claim)
 
         report = self._build_report(per_claim, scores, cheat)
         prompt_gradient = self._build_abstractec_prompt_gradient(uuid, report, execution_text)
@@ -493,6 +544,172 @@ class VerifierEvaluator(BaseEvaluator):
         except Exception as e:
             self.logger.error(f"Failed to persist short-circuit scores for {uuid}: {e}")
         return {"uuid": uuid, "claims": [], **scores}
+
+    # ------------------------------------------------------------------
+    # Lineage rubric reuse — read claims/scripts from an ancestor's cache
+    # ------------------------------------------------------------------
+
+    _CLAIMS_CACHE_FILENAME = "claims.json"
+
+    @property
+    def verifier_temp_root(self) -> Path:
+        """Public alias for the verifier scratch root (``_verifier_tmp/``).
+
+        Exposed so callers (lineage walkers, anchor resolvers) read from the
+        same authoritative path the evaluator itself uses, even when
+        ``config.temp_dir`` is overridden.
+        """
+        return self._runner_temp_root
+
+    def _anchor_dir(self, uuid: str) -> Path:
+        """Return the on-disk verifier cache folder for ``uuid``.
+
+        Args:
+            uuid: Workflow identifier whose cache directory is needed.
+
+        Returns:
+            Path to ``_verifier_tmp/<uuid>/`` (existence not guaranteed).
+        """
+        return self._runner_temp_root / uuid
+
+    def _claims_cache_path(self, uuid: str) -> Path:
+        """Return the rubric-cache JSON path inside ``uuid``'s anchor dir."""
+        return self._anchor_dir(uuid) / self._CLAIMS_CACHE_FILENAME
+
+    @staticmethod
+    def _rubric_record(claim: dict[str, Any], spec: dict[str, Any]) -> dict[str, Any]:
+        """Build one persisted rubric entry from a claim + its verifier spec."""
+        return {
+            "id": claim.get("id"),
+            "description": claim.get("description", ""),
+            "criticality": claim.get("criticality", "soft"),
+            "source": claim.get("source", ""),
+            "likely_relevant_files": list(claim.get("likely_relevant_files") or []),
+            "executable": bool(spec.get("executable")),
+            "reason": str(spec.get("reason") or ""),
+        }
+
+    def _persist_claims(
+        self,
+        uuid: str,
+        claims: list[dict[str, Any]],
+        per_claim: list[dict[str, Any]],
+    ) -> None:
+        """Persist the rubric so descendants can reuse it for stable scoring.
+
+        Writes ``_verifier_tmp/<uuid>/claims.json`` next to the
+        ``verify_<id>.py`` scripts that were already saved as a side effect of
+        execution. Best-effort: write failures are logged and swallowed.
+
+        Args:
+            uuid: Workflow identifier whose anchor folder receives the JSON.
+            claims: Raw claim list as returned by ``_extract_claims``.
+            per_claim: Scored claim list; supplies the per-claim verifier spec.
+        """
+        spec_by_id = {
+            (c.get("claim") or {}).get("id"): (c.get("spec") or {})
+            for c in per_claim
+        }
+        rubric = [
+            self._rubric_record(c, spec_by_id.get(c.get("id")) or {})
+            for c in claims
+        ]
+        payload = {"anchor_uuid": uuid, "claims": rubric}
+        path = self._claims_cache_path(uuid)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            self.logger.info(f"Verifier rubric cache written to {path}")
+        except OSError as e:
+            self.logger.warning(f"Could not write claims cache for {uuid}: {e}")
+
+    def _load_anchored_claims(self, anchor_uuid: str) -> list[dict[str, Any]] | None:
+        """Load a cached rubric from ``anchor_uuid``'s verifier folder.
+
+        Args:
+            anchor_uuid: Ancestor workflow whose rubric should be reused.
+
+        Returns:
+            The cached rubric entries, or ``None`` when the cache file is
+            missing, unreadable, or doesn't contain a non-empty claim list.
+        """
+        path = self._claims_cache_path(anchor_uuid)
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            self.logger.warning(f"Could not read anchored rubric {path}: {e}")
+            return None
+        claims = data.get("claims") if isinstance(data, dict) else None
+        if not isinstance(claims, list) or not claims:
+            return None
+        kept = [
+            c for c in claims
+            if isinstance(c, dict) and isinstance(c.get("id"), str) and c["id"]
+        ]
+        if len(kept) != len(claims):
+            self.logger.warning(
+                f"Dropped {len(claims) - len(kept)} anchored claim(s) "
+                f"from {path} with missing or non-string id"
+            )
+        return kept or None
+
+    def _spec_from_anchor(
+        self,
+        anchor_uuid: str,
+        claim_id: str,
+        executable: bool,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Reconstruct a verifier spec from an ancestor's on-disk cache.
+
+        Args:
+            anchor_uuid: Ancestor whose cached script is read.
+            claim_id: Claim identifier; names the ``verify_<id>.py`` file.
+            executable: Whether the cached claim was marked executable.
+            reason: Cached non-executable rationale (ignored when executable).
+
+        Returns:
+            Spec dict in the same shape as ``_generate_verifier`` returns.
+            Falls back to a non-executable spec when an executable script is
+            missing on disk, so downstream scoring still runs deterministically.
+        """
+        if executable:
+            script = self._anchor_dir(anchor_uuid) / f"verify_{claim_id}.py"
+            try:
+                code = script.read_text(encoding="utf-8")
+            except OSError as e:
+                self.logger.warning(
+                    f"Anchored verifier missing for {claim_id} at {script}: {e}"
+                )
+                return {"executable": False, "reason": f"anchored script unreadable: {e}"}
+            return {"executable": True, "code": code}
+        return {"executable": False, "reason": reason or ""}
+
+    def _claims_from_anchor(self, anchored: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Project cached rubric entries into the shape ``_verify_claim`` expects.
+
+        Drops the persisted ``executable``/``reason`` fields — they're consumed
+        later by ``_spec_from_anchor`` — and keeps everything ``_aggregate``
+        and report-writing read off the claim dict.
+
+        Args:
+            anchored: Records as returned by ``_load_anchored_claims``.
+
+        Returns:
+            Claim dicts mirroring ``_extract_claims`` output.
+        """
+        return [
+            {
+                "id": c.get("id"),
+                "description": c.get("description", ""),
+                "criticality": c.get("criticality", "soft"),
+                "source": c.get("source", "anchor"),
+                "likely_relevant_files": list(c.get("likely_relevant_files") or []),
+            }
+            for c in anchored
+        ]
 
     # ------------------------------------------------------------------
     # Stage 1 — claim extraction
@@ -1006,6 +1223,7 @@ on-disk artefacts can actually support.
         execution_text: str,
         workspace_listing: str,
         grounding: str = "",
+        preloaded_spec: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Generate, execute (if executable) and score a single claim.
 
@@ -1015,14 +1233,20 @@ on-disk artefacts can actually support.
             execution_text: Agent narration / produced output text.
             workspace_listing: Rendered listing of workspace files.
             grounding: Optional peer-reviewed literature grounding block.
+            preloaded_spec: Pre-built verifier spec from a lineage anchor.
+                When provided, both the file-selection LLM call and the
+                verifier-generation LLM call are skipped.
 
         Returns:
             Scored claim dict including verifier spec, status and score.
         """
-        rel_files = self._llm_select_files(
-            uuid, claim, execution_text, workspace_listing
-        )
-        claim = {**claim, "likely_relevant_files": rel_files}
+        if preloaded_spec is None:
+            rel_files = self._llm_select_files(
+                uuid, claim, execution_text, workspace_listing
+            )
+            claim = {**claim, "likely_relevant_files": rel_files}
+        else:
+            rel_files = list(claim.get("likely_relevant_files") or [])
         claim_text = (
             f"id:          {claim.get('id')}\n"
             f"criticality: {claim.get('criticality')}\n"
@@ -1031,7 +1255,11 @@ on-disk artefacts can actually support.
         )
         print_box(claim_text, title=f"Verifying claim {claim.get('id')}", color=CYAN)
 
-        spec = self._generate_verifier(uuid, claim, execution_text, workspace_listing)
+        spec = (
+            preloaded_spec
+            if preloaded_spec is not None
+            else self._generate_verifier(uuid, claim, execution_text, workspace_listing)
+        )
 
         if spec.get("executable") and spec.get("code"):
             code = spec["code"]
@@ -2225,7 +2453,6 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             self.logger.error(f"Could not write verifier report for {uuid}: {e}")
 
 if __name__ == "__main__":
-    import argparse
     import sys
     sys.path.append(str(Path(__file__).parent.parent.parent.parent))  # noqa: E402
     from config import Config

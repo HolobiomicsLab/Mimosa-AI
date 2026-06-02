@@ -81,6 +81,10 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
+        # When True, every child workflow's verifier eval anchors on the
+        # earliest ancestor's cached rubric (claims + verify_*.py) so scores
+        # are comparable across an evolved lineage. Disable for ablation.
+        self.reuse_lineage_rubric: bool = True
 
         # openrouter providers
         self.openrouter_provider: list[str] | None = [
@@ -213,6 +217,7 @@ class Config:
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
+            "reuse_lineage_rubric": self.reuse_lineage_rubric,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -255,6 +260,9 @@ class Config:
         self.runs_capsule_dir = data.get("runs_capsule_dir", self.runs_capsule_dir)
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.memory_dir = data.get("memory_dir", self.memory_dir)
+        self.reuse_lineage_rubric = bool(
+            data.get("reuse_lineage_rubric", self.reuse_lineage_rubric)
+        )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
