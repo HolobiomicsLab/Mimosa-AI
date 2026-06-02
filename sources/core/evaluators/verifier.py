@@ -41,7 +41,7 @@ from sources.cli.pretty_print import (
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 90
 _VERIFIER_MIN_CLAIMS = 30
-_HARD_FAIL_CAP = 0.99 # temporary to disable so signal stay smooth
+_HARD_FAIL_CAP = 0.99 # disabled so signal stay smooth
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
@@ -113,6 +113,11 @@ _VERIFIER_BASE_PACKAGES: tuple[str, ...] = (
     "pandas",
     "scipy",
     "scikit-learn",
+    "pint",
+    "pydantic",
+    "pandera",
+    "jsonschema",
+    "sympy"
 )
 _VERIFIER_PACKAGES_INSTALLED = False
 _VERIFIER_INSTALL_LOCK = threading.Lock()
@@ -1193,6 +1198,7 @@ Return STRICT JSON only:
         relevant_previews = self._render_relevant_previews(
             claim.get("likely_relevant_files", [])
         )
+        packages = ', '.join(_VERIFIER_BASE_PACKAGES)
         prompt = f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
@@ -1203,8 +1209,6 @@ WORKSPACE FILES (relative to workspace root, cwd at runtime):
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 {relevant_previews}
 
-WORKFLOW OUTPUT (for context only — do not re-evaluate the whole thing):
-{execution_text}
 CLAIM TO VERIFY:
 - id: {claim['id']}
 - criticality: {claim['criticality']}
@@ -1216,7 +1220,7 @@ RULES FOR YOUR SCRIPT:
   {{"claim_id": "{claim['id']}", "status": "pass" | "fail" | "error",
     "actual": <observed value or null>, "details": "<short string>"}}
 - Use only the standard library plus the verifier helper packages
-  (numpy, pandas, scipy, scikit-learn). Read files with relative paths
+  ({packages}). Read files with relative paths
   (cwd is the workspace).
 - Recompute or directly check; do not trust the agent's reported numbers.
 - For property checks (symmetry, range, no duplicates, ...), assert the
@@ -1645,6 +1649,9 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             1.0 - math.exp(-n_hard_pass / self.info_bonus_beta)
         )
 
+    def _claim_weight(self, c: dict[str, Any]) -> float:
+        return 3.0 if c["claim"].get("criticality") == "hard" else 1.0
+
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
         """Mean over scored claims + information bonus; hard-fail caps the result.
 
@@ -1697,7 +1704,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "skipped_reason": "all_verifiers_errored",
             }
 
-        base_mean = sum(c["score"] for c in scored) / len(scored)
+        total_w = sum(self._claim_weight(c) for c in scored)
+        base_mean = sum(c["score"] * self._claim_weight(c) for c in scored) / total_w
         bonus = self._information_bonus(n_hard_pass)
         # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
         # bonus can never push past 1.0 nor rescue a broken run.

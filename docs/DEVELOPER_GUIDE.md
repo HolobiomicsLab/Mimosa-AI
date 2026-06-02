@@ -8,7 +8,6 @@
 3. [Directory Structure](#directory-structure)
 4. [Core Components](#core-components)
 5. [Execution Flow](#execution-flow)
-6. [Evaluation & the multi-source per-claim verifier](#evaluation--the-multi-source-per-claim-verifier)
 7. [Testing & Evaluation](#testing-evaluation)
 8. [Contributing Guidelines](#contributing-guidelines)
 

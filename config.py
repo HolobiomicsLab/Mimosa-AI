@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -46,9 +46,9 @@ class Config:
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "deepseek/deepseek-chat"
+        self.planner_llm_model: str = "openai/gpt-5.5"
         self.workflow_llm_model: str = "openai/gpt-5.5"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "deepseek/deepseek-chat"
         self.engine_name: str = "litellm" # for smolagent
