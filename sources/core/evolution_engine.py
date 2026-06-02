@@ -789,11 +789,11 @@ class EvolutionEngine:
         logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
         logger.info(
-            f"[ITERATION END] {iteration_count + 1}/{max_depth} completed in {iteration_time:.3f}s - "
+            f"[ITERATION END] {iteration_count}/{max_depth} completed in {iteration_time:.3f}s - "
             f"Rewards: {wf_rewards:.1f}, Cost: {exec_cost:.3f} USD"
         )
         print_summary(
-            f"ITERATION {iteration_count + 1}/{max_depth} COMPLETE",
+            f"ITERATION {iteration_count}/{max_depth} COMPLETE",
             [
                 ("Rewards", f"{wf_rewards:.1f}"),
                 ("Cost", f"${exec_cost:.6f}"),
