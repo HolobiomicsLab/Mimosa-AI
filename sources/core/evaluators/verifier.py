@@ -49,7 +49,7 @@ _VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99 # disabled so signal stay smooth
 
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
-# bonus(n) = alpha * (1 - exp(-n_hard_pass / beta)); see _aggregate.
+# bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.05
 _INFO_BONUS_BETA = 8.0
 
@@ -128,16 +128,13 @@ _VERIFIER_PACKAGES_INSTALLED = False
 _VERIFIER_INSTALL_LOCK = threading.Lock()
 
 
-# ----- Claim extraction: rules shared across all three source prompts ---------
-_CLAIM_RULES_BLOCK = """For each claim, also estimate `criticality`:
-- "hard": load-bearing for the answer (final metrics, headline files,
-  required computations, claimed satisfaction of the user goal, required
-  methodology steps that are the only path to success according to the literature).
-- "soft": supporting context (intermediate sanity remarks, choices that are
-  defensible but not strictly required, methods decisions the literature cites).
-
-For each claim, also list `likely_relevant_files`: relative paths whose
-contents the verifier would need to read in order to check the claim.
+# ----- Claim extraction: rules shared across all source prompts ---------------
+# Importance is NOT assigned here. Each source emits raw claims; a separate
+# post-merge pass (``_declare_claim_importance``) rates each surviving claim
+# against the goal on a 1–10 scale and drops near-duplicates.
+_CLAIM_RULES_BLOCK = """For each claim, list `likely_relevant_files`: relative
+paths whose contents the verifier would need to read in order to check the
+claim.
 - ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
   Do not invent or guess paths the workflow's answer mentions but that are
   not in the listing.
@@ -152,10 +149,10 @@ success condition the workflow failed: a workflow that produced no usable
 answer should FAIL the claim "produced <the deliverable, meeting <the
 bar>>", not pass the claim "the final answer is empty".
 
-ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are never "hard". Extract an artifact claim only
-chained to a functional property that makes it load-bearing — not
-"predictions.csv exists" but "predictions.csv contains a valid probability in
-[0,1] for every row of the test set".
+ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are weak
+and easy to game. Extract an artifact claim only when chained to a
+functional property — not "predictions.csv exists" but "predictions.csv
+contains a valid probability in [0,1] for every row of the test set".
 
 Return STRICT JSON only, no prose, in this exact form:
 {
@@ -163,7 +160,6 @@ Return STRICT JSON only, no prose, in this exact form:
     {
       "id": "<short_slug>",
       "description": "<concise restatement of the claim>",
-      "criticality": "hard" | "soft",
       "likely_relevant_files": ["<relative/path>", ...]
     },
     ...
@@ -494,8 +490,18 @@ class VerifierEvaluator(BaseEvaluator):
         self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
         self._persist_claims(uuid, claims, per_claim)
 
-        report = self._build_report(per_claim, scores, cheat)
-        prompt_gradient = self._build_abstractec_prompt_gradient(uuid, report, execution_text)
+        # The gradient builder only sees the high-importance slice of the
+        # report so the mutator is not nudged by low-importance noise. The
+        # on-disk report keeps the full view for auditing.
+        gradient_report = self._build_report(
+            per_claim,
+            scores,
+            cheat,
+            min_importance=self._GRADIENT_MIN_IMPORTANCE,
+        )
+        prompt_gradient = self._build_abstractec_prompt_gradient(
+            uuid, gradient_report, execution_text
+        )
         scores["abstractec_prompt_gradient"] = prompt_gradient
         self._persist_prompt_gradient(uuid, prompt_gradient)
 
@@ -578,11 +584,19 @@ class VerifierEvaluator(BaseEvaluator):
 
     @staticmethod
     def _rubric_record(claim: dict[str, Any], spec: dict[str, Any]) -> dict[str, Any]:
-        """Build one persisted rubric entry from a claim + its verifier spec."""
+        """Build one persisted rubric entry from a claim + its verifier spec.
+
+        ``importance`` (int 1-10) replaces the old ``criticality`` tier. The
+        rationale is persisted alongside so anchored descendants render the
+        same gradient view as the anchor.
+        """
         return {
             "id": claim.get("id"),
             "description": claim.get("description", ""),
-            "criticality": claim.get("criticality", "soft"),
+            "importance": int(
+                claim.get("importance", VerifierEvaluator._DEFAULT_CLAIM_IMPORTANCE)
+            ),
+            "importance_rationale": str(claim.get("importance_rationale") or ""),
             "source": claim.get("source", ""),
             "likely_relevant_files": list(claim.get("likely_relevant_files") or []),
             "executable": bool(spec.get("executable")),
@@ -623,8 +637,18 @@ class VerifierEvaluator(BaseEvaluator):
         except OSError as e:
             self.logger.warning(f"Could not write claims cache for {uuid}: {e}")
 
+    # Back-compat mapping for rubric caches written before the
+    # criticality→importance switch. hard ≈ 8 (load-bearing), soft ≈ 3
+    # (advisory). Anchors written with the new schema are passed through
+    # unchanged.
+    _LEGACY_CRITICALITY_TO_IMPORTANCE = {"hard": 8, "soft": 3}
+
     def _load_anchored_claims(self, anchor_uuid: str) -> list[dict[str, Any]] | None:
         """Load a cached rubric from ``anchor_uuid``'s verifier folder.
+
+        Anchors written before the criticality→importance migration are
+        upgraded on read so old lineages keep scoring without re-running
+        extraction: ``criticality=hard`` → ``importance=8``, ``soft`` → ``3``.
 
         Args:
             anchor_uuid: Ancestor workflow whose rubric should be reused.
@@ -645,7 +669,8 @@ class VerifierEvaluator(BaseEvaluator):
         if not isinstance(claims, list) or not claims:
             return None
         kept = [
-            c for c in claims
+            self._upgrade_legacy_anchor(c)
+            for c in claims
             if isinstance(c, dict) and isinstance(c.get("id"), str) and c["id"]
         ]
         if len(kept) != len(claims):
@@ -654,6 +679,26 @@ class VerifierEvaluator(BaseEvaluator):
                 f"from {path} with missing or non-string id"
             )
         return kept or None
+
+    @classmethod
+    def _upgrade_legacy_anchor(cls, rec: dict[str, Any]) -> dict[str, Any]:
+        """Map old ``criticality`` field to ``importance`` when absent.
+
+        New schemas pass through untouched; old schemas get a synthesised
+        importance derived from the prior hard/soft tier so descendants score
+        without re-running extraction.
+        """
+        if "importance" in rec:
+            return rec
+        legacy = rec.get("criticality")
+        if isinstance(legacy, str):
+            rec = {
+                **rec,
+                "importance": cls._LEGACY_CRITICALITY_TO_IMPORTANCE.get(
+                    legacy, cls._DEFAULT_CLAIM_IMPORTANCE
+                ),
+            }
+        return rec
 
     def _spec_from_anchor(
         self,
@@ -692,10 +737,12 @@ class VerifierEvaluator(BaseEvaluator):
 
         Drops the persisted ``executable``/``reason`` fields — they're consumed
         later by ``_spec_from_anchor`` — and keeps everything ``_aggregate``
-        and report-writing read off the claim dict.
+        and report-writing read off the claim dict, including ``importance``
+        and its rationale.
 
         Args:
-            anchored: Records as returned by ``_load_anchored_claims``.
+            anchored: Records as returned by ``_load_anchored_claims`` (already
+                upgraded from any legacy ``criticality`` field).
 
         Returns:
             Claim dicts mirroring ``_extract_claims`` output.
@@ -704,7 +751,10 @@ class VerifierEvaluator(BaseEvaluator):
             {
                 "id": c.get("id"),
                 "description": c.get("description", ""),
-                "criticality": c.get("criticality", "soft"),
+                "importance": int(
+                    c.get("importance", self._DEFAULT_CLAIM_IMPORTANCE)
+                ),
+                "importance_rationale": str(c.get("importance_rationale") or ""),
                 "source": c.get("source", "anchor"),
                 "likely_relevant_files": list(c.get("likely_relevant_files") or []),
             }
@@ -746,7 +796,8 @@ class VerifierEvaluator(BaseEvaluator):
             return [{
                 "id": "c0_execution_succeeded",
                 "description": "The workflow executed to completion and produced a non-empty answer.",
-                "criticality": "hard",
+                "importance": 10,
+                "importance_rationale": "literal deliverable; absent here",
                 "likely_relevant_files": [],
             }]
         per_source_min, per_source_max = self._per_source_targets(n_sources=6)
@@ -786,7 +837,8 @@ class VerifierEvaluator(BaseEvaluator):
                 f"Claim extraction yielded only {len(merged)} claims "
                 f"(min_claims={self.min_claims}); proceeding with what we got"
             )
-        return merged
+        ranked = self._declare_claim_importance(uuid, goal, merged, grounding)
+        return ranked
 
     def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
         """Per-source min/max claim targets derived from the global bounds.
@@ -852,7 +904,6 @@ it meets the literature-standard success criterion. If the task names a
 quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
 must encode that bar — not merely "a result exists". Phrase it so a
 workflow that skipped, faked, or left the deliverable empty FAILS it.
-Mark "hard" claims that are considered extremely load-bearing success according to the literature.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -912,8 +963,6 @@ short list — DO NOT pad with claims the user did not write. It is fine
 to return fewer than {target_min} claims when the goal is terse; do not
 invent constraints.
 
-All these claims are de-facto 'hard' since they are explicit user requirements, but mark as "soft" any that are more like suggestions or optional advice rather than strict requirements.
-
 {_CLAIM_RULES_BLOCK}
 
 Aim for up to {target_max} Source-B claims, but only as many as the goal
@@ -971,10 +1020,9 @@ Look for properties such as:
   count on a per-row task; predictions equal the test set size; feature
   counts agree across train and test).
 
-Prefer claims that can be checked with a tiny script
-reading the relevant artefact. Most Source-D claims are "hard" by default:
-violating a mathematical invariant means the result is not just
-suboptimal, it is incorrect.
+Prefer claims that can be checked with a tiny script reading the relevant
+artefact. Violating a mathematical invariant means the result is not just
+suboptimal — it is incorrect.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -1049,9 +1097,10 @@ WELL-FORMED claim: "the workspace declares its dependencies in a standard
 manifest covering the packages actually imported by the produced code".
 Example MALFORMED claim: "a requirements.txt file exists in the workspace".
 
-Use "hard" criticality ONLY for the deps-manifest, absolute-paths, and
-seed-on-stochastic claims — those genuinely block re-execution. Use
-"soft" for the entrypoint, clutter, and output-location claims.
+The deps-manifest, absolute-paths, and seed-on-stochastic claims genuinely
+block re-execution and matter most; entrypoint, clutter, and output-location
+claims are nice-to-have. The post-extraction importance pass will weight them
+accordingly.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -1118,10 +1167,10 @@ Look for properties such as:
 - Where probabilities are produced, they show inter-class separation
   rather than collapsing to a single point.
 
-These claims are typically "hard" when they target the headline
-result: a result statistically indistinguishable from a baseline is not
-a scientific success. Skip baseline claims for tasks with no obvious
-null to compare against — do not invent one.
+A result statistically indistinguishable from a baseline is not a
+scientific success — claims that target the headline result deserve
+extraction. Skip baseline claims for tasks with no obvious null to
+compare against — do not invent one.
 
 {_CLAIM_RULES_BLOCK}
 
@@ -1136,14 +1185,18 @@ on-disk artefacts can actually support.
     ) -> list[dict[str, Any]]:
         """Validate the LLM JSON, normalise each claim, drop confabulated paths.
 
+        Importance is intentionally NOT assigned here — it is rated by a
+        separate post-merge pass (``_declare_claim_importance``) so the
+        per-source extractors only need to enumerate candidates.
+
         Args:
             uuid: Workflow identifier (used in error context).
             data: Parsed JSON payload from the judge; expected to contain a
                 ``claims`` list or to be a list itself.
 
         Returns:
-            List of normalised claim dicts with stable ids, criticality, and
-            workspace-validated relevant file lists.
+            List of normalised claim dicts with stable ids and workspace-validated
+            relevant file lists.
 
         Raises:
             LLMEvaluationError: When ``data`` does not carry a usable claims list.
@@ -1165,7 +1218,6 @@ on-disk artefacts can actually support.
             cleaned.append({
                 "id": str(c.get("id") or f"c{idx}"),
                 "description": str(c["description"]).strip(),
-                "criticality": "hard" if c.get("criticality") == "hard" else "soft",
                 "likely_relevant_files": relevant,
             })
         return cleaned
@@ -1213,6 +1265,205 @@ on-disk artefacts can actually support.
         return out
 
     # ------------------------------------------------------------------
+    # Stage 1b — rate claim importance (1-10) against the goal, dedupe
+    # ------------------------------------------------------------------
+
+    # Default importance when the rater LLM is unavailable. Sits at the
+    # middle of the 1-10 scale so failures neither inflate nor crush scores.
+    _DEFAULT_CLAIM_IMPORTANCE = 5
+
+    # Minimum importance for a claim to appear in the prompt-gradient view of
+    # the report. The full report (importance ≥ 0) is still persisted on disk;
+    # this only narrows what the mutator's diagnosis prompt sees.
+    _GRADIENT_MIN_IMPORTANCE = 6
+
+    # Importance anchors shown to the rater LLM so it doesn't collapse to
+    # the middle of the scale. Kept short on purpose — long anchors waste
+    # tokens and tend to confuse small judges.
+    _IMPORTANCE_ANCHOR_BLOCK = """Importance scale (1–10), anchored:
+- 10: literal deliverable named in the goal (the exact file, the headline metric).
+-  8: required methodology step without which the result is invalid.
+-  6: non-negotiable sanity property (probabilities in [0,1], no NaN, train/test disjoint).
+-  4: literature-recommended best practice (seeded RNG, pinned dependencies).
+-  2: minor / advisory (entrypoint name, workspace clutter).
+Use the FULL scale; do not collapse to 5–7 by default. Goal-alignment dominates."""
+
+    def _declare_claim_importance(
+        self,
+        uuid: str,
+        goal: str,
+        claims: list[dict[str, Any]],
+        grounding: str = "",
+    ) -> list[dict[str, Any]]:
+        """Rate each merged claim on a 1-10 importance scale and drop duplicates.
+
+        Replaces the previous hard/soft step-function tier. A single judge call
+        sees the goal and the full merged claim list; it returns (a) ids to drop
+        as near-duplicates and (b) an importance + one-sentence rationale for
+        each surviving claim. Goal-alignment is the dominant axis — the prompt
+        anchors the scale on what the user explicitly asked for.
+
+        On parse failure or judge error every input claim is returned with
+        ``importance = _DEFAULT_CLAIM_IMPORTANCE``: the run still scores rather
+        than crashing, but the gradient is intentionally muted so the next
+        iteration is not steered by a noisy rating.
+
+        Args:
+            uuid: Workflow identifier (used for the judge call).
+            goal: Workflow goal text — primary anchor for importance.
+            claims: Merged, source-tagged claims from the per-source extractors.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Filtered claim list with ``importance`` (int 1-10) and
+            ``importance_rationale`` (one-sentence str) populated on every entry.
+        """
+        if not claims:
+            return claims
+
+        prompt = self._build_importance_prompt(goal, claims, grounding)
+        data, err = self._call_judge_for_json(
+            uuid, "verifier_declare_importance", prompt
+        )
+        if err is not None or not isinstance(data, dict):
+            self.logger.warning(
+                f"importance rater failed for {uuid} ({err or 'non-dict JSON'}); "
+                f"falling back to uniform importance={self._DEFAULT_CLAIM_IMPORTANCE}"
+            )
+            return [self._with_default_importance(c) for c in claims]
+
+        drop_ids = self._extract_drop_ids(data)
+        importance_by_id = self._extract_importance_map(data)
+
+        kept: list[dict[str, Any]] = []
+        for c in claims:
+            cid = c.get("id")
+            if cid in drop_ids:
+                self.logger.debug(f"importance rater dropped duplicate claim {cid}")
+                continue
+            imp, rationale = importance_by_id.get(
+                cid, (self._DEFAULT_CLAIM_IMPORTANCE, "")
+            )
+            kept.append({
+                **c,
+                "importance": imp,
+                "importance_rationale": rationale,
+            })
+
+        print_ok(
+            f"Rated {len(kept)} claims for {uuid} "
+            f"(dropped {len(drop_ids)} duplicate(s))"
+        )
+        return kept
+
+    def _build_importance_prompt(
+        self,
+        goal: str,
+        claims: list[dict[str, Any]],
+        grounding: str,
+    ) -> str:
+        """Render the rater prompt: scale anchors + goal + claim list.
+
+        Args:
+            goal: Workflow goal text.
+            claims: Merged claims to rate.
+            grounding: Optional grounding block; may be empty.
+
+        Returns:
+            Fully formatted prompt string for the rater judge.
+        """
+        grounding_block = (
+            grounding.strip() if grounding else "(no literature grounding available)"
+        )
+        claim_lines = "\n".join(
+            f"- id={c.get('id')!r}  source={c.get('source', 'unknown')}  "
+            f"desc={str(c.get('description', '')).strip()[:300]}"
+            for c in claims
+        )
+        return f"""You are rating verification claims by how much they matter for the user's goal.
+
+WORKFLOW GOAL:
+{goal}
+
+LITERATURE GROUNDING:
+{grounding_block}
+
+{self._IMPORTANCE_ANCHOR_BLOCK}
+
+CLAIMS TO RATE:
+{claim_lines}
+
+TASKS:
+1. Identify near-duplicate claims (same checked property, different wording or
+   source) and list the redundant ids to drop. Keep the clearest version of
+   each cluster. Do NOT drop claims that check different facets — only true
+   duplicates.
+2. For every surviving claim, return an integer importance 1–10 anchored on
+   the scale above (goal-alignment dominates), plus a one-sentence rationale
+   stating what makes the claim that important.
+
+Return STRICT JSON only, in this exact shape:
+{{
+  "drop_ids": ["<id>", ...],
+  "importance": [
+    {{"id": "<id>", "importance": <int 1-10>, "rationale": "<one sentence>"}},
+    ...
+  ]
+}}
+"""
+
+    @staticmethod
+    def _extract_drop_ids(data: dict[str, Any]) -> set[str]:
+        """Best-effort parse of the ``drop_ids`` list from the rater JSON."""
+        raw = data.get("drop_ids") if isinstance(data, dict) else None
+        if not isinstance(raw, list):
+            return set()
+        return {str(x) for x in raw if isinstance(x, str) and x}
+
+    def _extract_importance_map(
+        self,
+        data: dict[str, Any],
+    ) -> dict[str, tuple[int, str]]:
+        """Project the ``importance`` array into ``{id: (importance, rationale)}``.
+
+        Importance values are clamped to ``[1, 10]`` and rationales coerced to
+        strings; malformed entries are skipped silently — the caller falls back
+        to the default importance for any claim missing from the map.
+
+        Args:
+            data: Parsed rater JSON.
+
+        Returns:
+            Map from claim id to ``(importance, rationale)``.
+        """
+        out: dict[str, tuple[int, str]] = {}
+        raw = data.get("importance") if isinstance(data, dict) else None
+        if not isinstance(raw, list):
+            return out
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            cid = entry.get("id")
+            if not isinstance(cid, str) or not cid:
+                continue
+            try:
+                imp = int(entry.get("importance", self._DEFAULT_CLAIM_IMPORTANCE))
+            except (TypeError, ValueError):
+                imp = self._DEFAULT_CLAIM_IMPORTANCE
+            imp = max(1, min(10, imp))
+            rationale = str(entry.get("rationale") or "").strip()
+            out[cid] = (imp, rationale)
+        return out
+
+    def _with_default_importance(self, claim: dict[str, Any]) -> dict[str, Any]:
+        """Stamp a claim with the default importance + an empty rationale."""
+        return {
+            **claim,
+            "importance": self._DEFAULT_CLAIM_IMPORTANCE,
+            "importance_rationale": "",
+        }
+
+    # ------------------------------------------------------------------
     # Stage 2 + 3 + 4 — generate, run and score one verifier
     # ------------------------------------------------------------------
 
@@ -1229,7 +1480,7 @@ on-disk artefacts can actually support.
 
         Args:
             uuid: Workflow identifier (used for judge calls and logs).
-            claim: Normalised claim dict with id, criticality, description.
+            claim: Normalised claim dict with id, importance, description.
             execution_text: Agent narration / produced output text.
             workspace_listing: Rendered listing of workspace files.
             grounding: Optional peer-reviewed literature grounding block.
@@ -1249,7 +1500,7 @@ on-disk artefacts can actually support.
             rel_files = list(claim.get("likely_relevant_files") or [])
         claim_text = (
             f"id:          {claim.get('id')}\n"
-            f"criticality: {claim.get('criticality')}\n"
+            f"importance:  {claim.get('importance')}\n"
             f"description: {claim.get('description')}\n"
             f"files:       {rel_files if rel_files else '(none)'}"
         )
@@ -1439,7 +1690,7 @@ RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 
 CLAIM TO VERIFY:
 - id: {claim['id']}
-- criticality: {claim['criticality']}
+- importance: {claim.get('importance', self._DEFAULT_CLAIM_IMPORTANCE)} (1-10; 10 = literal deliverable)
 - description: {claim['description']}
 - likely_relevant_files: {claim.get('likely_relevant_files', [])}
 
@@ -1809,7 +2060,7 @@ WORKFLOW OUTPUT (context only):
 
 CLAIM:
 - id: {claim['id']}
-- criticality: {claim['criticality']}
+- importance: {claim.get('importance', self._DEFAULT_CLAIM_IMPORTANCE)} (1-10; 10 = literal deliverable)
 - description: {claim['description']}
 - likely_relevant_files: {claim.get('likely_relevant_files', [])}
 
@@ -1858,30 +2109,69 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
     # Stage 5 — aggregation
     # ------------------------------------------------------------------
 
-    def _information_bonus(self, n_hard_pass: int) -> float:
+    def _information_bonus(self, importance_pass_mass: float) -> float:
         """Saturating reward for thoroughness; gameable spam yields no extra credit.
 
-        bonus(n) = α · (1 − exp(−n / β)). Bounded above by α, monotonic in n,
-        and conditional on the *passing hard* claim count so trivial or failed
-        claims contribute nothing.
+        bonus(m) = α · (1 − exp(−m / β)). Bounded above by α, monotonic in m,
+        and conditional on the *passing high-importance mass* so trivial or
+        failed claims contribute nothing. ``m`` is the sum of importance
+        (capped at 10 per claim) for passes with importance ≥ 6, divided by 10
+        — units are roughly "equivalent number of importance-10 passes".
 
         Args:
-            n_hard_pass: Number of hard claims that the verifier passed.
+            importance_pass_mass: Importance-weighted pass mass (see above).
 
         Returns:
             Non-negative bonus value, asymptotically bounded by ``info_bonus_alpha``.
         """
-        if n_hard_pass <= 0 or self.info_bonus_alpha <= 0.0:
+        if importance_pass_mass <= 0.0 or self.info_bonus_alpha <= 0.0:
             return 0.0
         return self.info_bonus_alpha * (
-            1.0 - math.exp(-n_hard_pass / self.info_bonus_beta)
+            1.0 - math.exp(-importance_pass_mass / self.info_bonus_beta)
         )
 
+    # Minimum importance at which a pass contributes to the information bonus.
+    # Below this, claims are noise from the rater's lower tail; counting them
+    # would let workflows farm easy claims for thoroughness credit.
+    _INFO_BONUS_MIN_IMPORTANCE = 6
+
+    # Importance at which a refuted claim caps the overall score. The cap
+    # itself (``_HARD_FAIL_CAP``) is currently permissive (0.99) so the
+    # gradient stays smooth across QD selection; this threshold defines what
+    # counts as "load-bearing" under the new importance scale.
+    _HARD_FAIL_IMPORTANCE = 8
+
     def _claim_weight(self, c: dict[str, Any]) -> float:
-        return 3.0 if c["claim"].get("criticality") == "hard" else 1.0
+        """Aggregator weight = self-reported importance (1–10).
+
+        Clamps to ``[1, 10]`` so a stray rater overshoot can't dominate, and
+        falls back to ``_DEFAULT_CLAIM_IMPORTANCE`` when the field is missing
+        (e.g. an old anchored rubric before back-compat mapping ran).
+
+        Args:
+            c: Scored claim dict carrying ``claim["importance"]``.
+
+        Returns:
+            Float weight in ``[1.0, 10.0]``.
+        """
+        raw = c["claim"].get("importance", self._DEFAULT_CLAIM_IMPORTANCE)
+        try:
+            return max(1.0, min(10.0, float(raw)))
+        except (TypeError, ValueError):
+            return float(self._DEFAULT_CLAIM_IMPORTANCE)
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Mean over scored claims + information bonus; hard-fail caps the result.
+        """Importance-weighted mean + thoroughness bonus; capped on top-tier fail.
+
+        Each claim is weighted by its rater-assigned importance (1-10) rather
+        than the old hard=3/soft=1 step function. This gives the optimizer a
+        smooth gradient: flipping an importance-10 deliverable claim moves the
+        score ~5× more than flipping a low-importance hygiene claim.
+
+        The thoroughness bonus saturates on importance-weighted mass of
+        high-importance passes (importance ≥ ``_INFO_BONUS_MIN_IMPORTANCE``).
+        The hard-fail cap fires when any claim with importance
+        ≥ ``_HARD_FAIL_IMPORTANCE`` is refuted (not errored, not unsure).
 
         Args:
             per_claim: List of per-claim scored dicts from ``_verify_claim``.
@@ -1895,7 +2185,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "overall_score_uncapped": 0.0,
                 "base_mean": 0.0,
                 "information_bonus": 0.0,
-                "n_hard_pass": 0,
+                "n_high_importance_pass": 0,
+                "high_importance_pass_mass": 0.0,
                 "hard_fail_capped": False,
                 "n_claims": 0,
                 "n_pass": 0,
@@ -1910,9 +2201,15 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
-        n_hard_pass = sum(
-            1 for c in scored
-            if c["claim"].get("criticality") == "hard" and c["status"] == "pass"
+        # High-importance passes drive the thoroughness bonus.
+        high_imp_passes = [
+            c for c in scored
+            if c["status"] == "pass"
+            and self._claim_weight(c) >= self._INFO_BONUS_MIN_IMPORTANCE
+        ]
+        n_high_importance_pass = len(high_imp_passes)
+        high_importance_pass_mass = (
+            sum(self._claim_weight(c) for c in high_imp_passes) / 10.0
         )
 
         if not scored:
@@ -1921,7 +2218,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
                 "overall_score_uncapped": 0.0,
                 "base_mean": 0.0,
                 "information_bonus": 0.0,
-                "n_hard_pass": 0,
+                "n_high_importance_pass": 0,
+                "high_importance_pass_mass": 0.0,
                 "hard_fail_capped": False,
                 "n_claims": len(per_claim),
                 "n_pass": n_pass,
@@ -1934,13 +2232,14 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
 
         total_w = sum(self._claim_weight(c) for c in scored)
         base_mean = sum(c["score"] * self._claim_weight(c) for c in scored) / total_w
-        bonus = self._information_bonus(n_hard_pass)
+        bonus = self._information_bonus(high_importance_pass_mass)
         # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
         # bonus can never push past 1.0 nor rescue a broken run.
         pre_cap = max(0.0, min(1.0, base_mean + bonus))
-        # Hard-fail cap fires only on a real refutation, not on errors or unsure.
+        # Hard-fail cap fires only on a real refutation of a top-importance
+        # claim — not on errors or unsure verdicts.
         hard_fail = any(
-            c["claim"].get("criticality") == "hard"
+            self._claim_weight(c) >= self._HARD_FAIL_IMPORTANCE
             and c["status"] == "fail"
             for c in scored
         )
@@ -1951,7 +2250,8 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             "overall_score_uncapped": round(pre_cap, 4),
             "base_mean": round(base_mean, 4),
             "information_bonus": round(bonus, 4),
-            "n_hard_pass": n_hard_pass,
+            "n_high_importance_pass": n_high_importance_pass,
+            "high_importance_pass_mass": round(high_importance_pass_mass, 4),
             "hard_fail_capped": hard_fail,
             "n_claims": len(per_claim),
             "n_pass": n_pass,
@@ -2355,6 +2655,7 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
         cheat: Any,
+        min_importance: int = 0,
     ) -> str:
         """Render a plain-text report from per-claim results and aggregate scores.
 
@@ -2362,6 +2663,11 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
             per_claim: List of per-claim scored dicts.
             scores: Aggregated score dict from ``_aggregate``.
             cheat: Cheat-detector report, or ``None``.
+            min_importance: When > 0, only claims with importance ≥ this value
+                are rendered. The aggregate header still reflects the full run.
+                Used to build a noise-suppressed view for the prompt-gradient
+                builder, while the on-disk ``evaluation.txt`` keeps the full
+                report (``min_importance=0``).
 
         Returns:
             Multi-line report string terminated with a newline.
@@ -2386,13 +2692,25 @@ Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one 
         w(
             f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
             f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
-            f"n_hard_pass={scores.get('n_hard_pass', 0)}  "
+            f"n_high_importance_pass={scores.get('n_high_importance_pass', 0)}  "
+            f"high_importance_pass_mass={scores.get('high_importance_pass_mass', 0.0):.3f}  "
             f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}"
         )
+        if min_importance > 0:
+            w(f"(filtered view: importance ≥ {min_importance})")
 
         for c in per_claim:
             cl = c["claim"]
-            w(f"[{cl['id']}] ({cl['criticality']}) {cl['description']}")
+            imp = int(cl.get("importance", self._DEFAULT_CLAIM_IMPORTANCE))
+            if imp < min_importance:
+                continue
+            rationale = str(cl.get("importance_rationale") or "").strip()
+            header = (
+                f"[{cl['id']}] (importance={imp}; {rationale}) {cl['description']}"
+                if rationale
+                else f"[{cl['id']}] (importance={imp}) {cl['description']}"
+            )
+            w(header)
             rel = cl.get("likely_relevant_files", [])
             if rel:
                 w(f"  relevant_files: {rel}")

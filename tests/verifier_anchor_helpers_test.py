@@ -57,14 +57,16 @@ def _sample_claims() -> list[dict]:
         {
             "id": "ecfp_featurization",
             "description": "Workflow featurises with ECFP.",
-            "criticality": "hard",
+            "importance": 9,
+            "importance_rationale": "domain-required featurization",
             "source": "source_a",
             "likely_relevant_files": ["clintox_nn.py"],
         },
         {
             "id": "deps_manifest",
             "description": "Workspace ships a requirements manifest.",
-            "criticality": "soft",
+            "importance": 3,
+            "importance_rationale": "nice-to-have for reproducibility",
             "source": "source_b",
             "likely_relevant_files": [],
         },
@@ -85,7 +87,7 @@ def _sample_per_claim() -> list[dict]:
 
 
 def test_persist_and_load_round_trip(tmp_path: Path) -> None:
-    """Persisted rubric loads back with criticality, source, and exec flag intact."""
+    """Persisted rubric loads back with importance, source, and exec flag intact."""
     v = _StubVerifier(tmp_path)
     v._persist_claims("u1", _sample_claims(), _sample_per_claim())
 
@@ -96,10 +98,39 @@ def test_persist_and_load_round_trip(tmp_path: Path) -> None:
     assert loaded is not None and len(loaded) == 2
 
     by_id = {c["id"]: c for c in loaded}
-    assert by_id["ecfp_featurization"]["criticality"] == "hard"
+    assert by_id["ecfp_featurization"]["importance"] == 9
+    assert by_id["ecfp_featurization"]["importance_rationale"] == "domain-required featurization"
     assert by_id["ecfp_featurization"]["executable"] is True
+    assert by_id["deps_manifest"]["importance"] == 3
     assert by_id["deps_manifest"]["executable"] is False
     assert by_id["deps_manifest"]["reason"] == "needs human judgement"
+
+
+def test_load_upgrades_legacy_criticality_to_importance(tmp_path: Path) -> None:
+    """Pre-migration caches (``criticality`` only) are upgraded on read.
+
+    Without the legacy mapping, existing rubric anchors written before the
+    criticality → importance switch would score under uniform default
+    importance — destroying QD comparability across the lineage. The on-read
+    upgrade keeps old anchors scoreable: hard → 8, soft → 3.
+    """
+    v = _StubVerifier(tmp_path)
+    folder = tmp_path / "u_legacy"
+    folder.mkdir(parents=True)
+    payload = {
+        "anchor_uuid": "u_legacy",
+        "claims": [
+            {"id": "k_hard", "description": "x", "criticality": "hard"},
+            {"id": "k_soft", "description": "y", "criticality": "soft"},
+        ],
+    }
+    (folder / "claims.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    loaded = v._load_anchored_claims("u_legacy")
+    assert loaded is not None
+    by_id = {c["id"]: c for c in loaded}
+    assert by_id["k_hard"]["importance"] == 8
+    assert by_id["k_soft"]["importance"] == 3
 
 
 def test_load_returns_none_when_cache_missing(tmp_path: Path) -> None:
@@ -131,7 +162,7 @@ def test_load_drops_claims_with_missing_or_empty_id(tmp_path: Path) -> None:
     payload = {
         "anchor_uuid": "u_dirty",
         "claims": [
-            {"id": "real", "description": "x", "criticality": "hard"},
+            {"id": "real", "description": "x", "importance": 8},
             {"id": "", "description": "empty"},  # dropped
             {"description": "no id at all"},  # dropped
             {"id": 42, "description": "non-string id"},  # dropped
@@ -190,12 +221,15 @@ def test_claims_from_anchor_drops_persistence_fields(tmp_path: Path) -> None:
 
     Specifically, the persisted ``executable`` and ``reason`` keys must NOT
     leak into the per-claim dict — they live on the spec, not the claim.
+    Importance + rationale ARE copied through so the per-claim view drives
+    weighting just like a freshly-extracted claim.
     """
     v = _StubVerifier(tmp_path)
     anchored = [{
         "id": "c1",
         "description": "x",
-        "criticality": "hard",
+        "importance": 9,
+        "importance_rationale": "load-bearing",
         "source": "source_a",
         "likely_relevant_files": ["a.py"],
         "executable": True,
@@ -205,7 +239,8 @@ def test_claims_from_anchor_drops_persistence_fields(tmp_path: Path) -> None:
     assert projected == [{
         "id": "c1",
         "description": "x",
-        "criticality": "hard",
+        "importance": 9,
+        "importance_rationale": "load-bearing",
         "source": "source_a",
         "likely_relevant_files": ["a.py"],
     }]
