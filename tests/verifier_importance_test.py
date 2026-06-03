@@ -21,25 +21,10 @@ from __future__ import annotations
 
 import logging
 import sys
-import types
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
-
-# Same stubs as the anchor test file — pulled in transitively by
-# sources.core's __init__.py.
-_st = sys.modules.setdefault("sentence_transformers", types.ModuleType("sentence_transformers"))
-if not hasattr(_st, "SentenceTransformer"):
-    _st.SentenceTransformer = type("SentenceTransformer", (), {})
-
-_ev = sys.modules.setdefault("sources.evaluation", types.ModuleType("sources.evaluation"))
-_loader = sys.modules.setdefault(
-    "sources.evaluation.scenario_loader",
-    types.ModuleType("sources.evaluation.scenario_loader"),
-)
-if not hasattr(_loader, "ScenarioLoader"):
-    _loader.ScenarioLoader = type("ScenarioLoader", (), {})
 
 from sources.core.evaluators import verifier as verifier_mod  # noqa: E402
 from sources.core.evaluators.verifier import VerifierEvaluator  # noqa: E402

@@ -2,6 +2,12 @@
 """
 Simple test script for the WorkflowEvaluator class.
 Tests both generic evaluation (with and without answer) and scenario-based evaluation.
+
+This file is an argparse-driven integration test script (run via the
+``__main__`` block with a real workflow UUID), not a pytest unit test.
+The functions take parameters (``workflow_id``, ``scenario_rubric``) that
+have no fixtures, so pytest collection errors out. Skipping at module
+level keeps the suite clean while preserving the script for manual use.
 """
 
 import argparse
@@ -10,12 +16,19 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
 from dotenv import load_dotenv
 
 # Add the parent directory to the path so we can import from sources
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from sources.core.evaluators.evaluator import WorkflowEvaluator
+
+# Module-level skip: this file's ``test_*`` functions are CLI entrypoints,
+# not pytest tests. Run via ``python tests/workflow_evaluator_test.py``.
+pytestmark = pytest.mark.skip(
+    reason="CLI integration script — invoke via __main__, not pytest"
+)
 
 # Load environment variables
 load_dotenv()

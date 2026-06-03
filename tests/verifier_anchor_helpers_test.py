@@ -1,9 +1,10 @@
 """Tests for the lineage-rubric helpers on ``VerifierEvaluator``.
 
-These cover ``_persist_claims`` → ``_load_anchored_claims`` round-trip,
-``_spec_from_anchor`` (executable / soft / missing-script fallback) and the
-``_claims_from_anchor`` projection. We avoid ``BaseEvaluator.__init__`` so
-tests run without an OpenRouter pricing call.
+These cover ``_persist_claims`` → ``_load_anchored_claims`` round-trip
+(incl. legacy ``criticality`` → ``importance`` migration), ``_spec_from_anchor``
+(executable / soft / missing-script fallback) and the ``_claims_from_anchor``
+projection. We avoid ``BaseEvaluator.__init__`` so tests run without an
+OpenRouter pricing call.
 """
 
 from __future__ import annotations
@@ -11,30 +12,10 @@ from __future__ import annotations
 import json
 import logging
 import sys
-import types
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
-
-# Stub sentence_transformers — pulled in transitively by sources.core's
-# __init__.py and broken in this environment (transformers version mismatch).
-# These helpers don't touch embeddings, so a dummy class is enough.
-_st = sys.modules.setdefault("sentence_transformers", types.ModuleType("sentence_transformers"))
-if not hasattr(_st, "SentenceTransformer"):
-    _st.SentenceTransformer = type("SentenceTransformer", (), {})
-
-# Pre-empt the sources.evaluation ↔ sources.core.evaluators.evaluator cycle.
-# evaluation/__init__.py re-exports symbols from evaluator.py; when triggered
-# mid-import via scenario.py, the names aren't bound yet → ImportError.
-# We never use evaluation here, so a stub fully resolves the cycle.
-_ev = sys.modules.setdefault("sources.evaluation", types.ModuleType("sources.evaluation"))
-_loader = sys.modules.setdefault(
-    "sources.evaluation.scenario_loader",
-    types.ModuleType("sources.evaluation.scenario_loader"),
-)
-if not hasattr(_loader, "ScenarioLoader"):
-    _loader.ScenarioLoader = type("ScenarioLoader", (), {})
 
 from sources.core.evaluators.verifier import VerifierEvaluator  # noqa: E402
 
