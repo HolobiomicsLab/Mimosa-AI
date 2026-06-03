@@ -13,6 +13,54 @@ if __name__ == "__main__":
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.workflow_info import WorkflowInfo
 
+
+def extract_json_payload(text: str) -> str:
+    """First balanced JSON object/array in *text*, tolerant of fences and prose.
+
+    Lives at module level (not on ``BaseEvaluator``) so non-evaluator callers
+    can use it too. Used by ``BaseEvaluator._call_judge_for_json`` and by any
+    code path that parses an LLM JSON response wrapped in commentary.
+
+    Args:
+        text: Arbitrary string possibly containing a JSON document, with or
+            without ``` fences and with prose around it.
+
+    Returns:
+        The substring spanning the first balanced ``{...}`` or ``[...]``
+        block, or an empty string when none is found.
+    """
+    if not text:
+        return ""
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if fence:
+        text = fence.group(1)
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = text.find(opener)
+        if start == -1:
+            continue
+        depth = 0
+        in_str = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == opener:
+                    depth += 1
+                elif ch == closer:
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : i + 1]
+    return ""
+
 class EvaluatorError(Exception):
     """Base exception for evaluator errors."""
     pass
@@ -267,3 +315,83 @@ class BaseEvaluator:
     - Tool Usage: Were tools (agents, algorithms, data) applied correctly and in sequence?
     - Error Handling: Did the system detect and manage errors appropriately?
     - Clarity & Professionalism: Are results presented clearly and in a usable format?"""
+
+    # ------------------------------------------------------------------
+    # Judge call helpers (shared across evaluators)
+    # ------------------------------------------------------------------
+
+    _JSON_RETRY_FEEDBACK = (
+        "Your previous response could not be parsed as JSON. Reply with ONLY "
+        "the JSON object, no prose, no markdown fences, no commentary."
+    )
+
+    def _call_judge(self, uuid: str, agent_name: str, prompt: str) -> str:
+        """One judge round-trip; raises whatever the LLM provider raises.
+
+        Args:
+            uuid: Workflow identifier (used to scope per-uuid memory).
+            agent_name: Logical name for this judge call (used for memory file).
+            prompt: User-side prompt to send to the judge.
+
+        Returns:
+            Raw text response from the LLM provider.
+        """
+        memory_path = Path(self.memory_dir) / uuid
+        memory_path.mkdir(parents=True, exist_ok=True)
+        provider = LLMProvider(
+            agent_name=agent_name,
+            memory_path=memory_path,
+            system_msg=self._get_judge_system_prompt(),
+            config=self.llm_config,
+        )
+        return provider(prompt)
+
+    def _call_judge_for_json(
+        self,
+        uuid: str,
+        agent_name: str,
+        prompt: str,
+    ) -> tuple[Any, str | None]:
+        """Call the judge expecting JSON; one retry on parse failure.
+
+        Both call exceptions and JSON-parse errors are absorbed so callers
+        never have to wrap in try/except.
+
+        Args:
+            uuid: Workflow identifier.
+            agent_name: Logical name for the call (a ``_retry`` suffix is added on retry).
+            prompt: User-side prompt to send to the judge.
+
+        Returns:
+            ``(parsed, None)`` on success or ``(None, error_str)`` on terminal failure.
+        """
+        last_err: str | None = None
+        cur_prompt = prompt
+        for attempt in (1, 2):
+            agent = agent_name if attempt == 1 else f"{agent_name}_retry"
+            try:
+                raw = self._call_judge(uuid, agent, cur_prompt)
+            except Exception as e:
+                last_err = f"judge call failed: {type(e).__name__}: {e}"
+                self.logger.warning(f"[{agent}] {last_err}")
+                # Retrying when the call itself raised is unlikely to help; bail.
+                return None, last_err
+
+            payload = extract_json_payload(raw or "")
+            if payload:
+                try:
+                    return json.loads(payload), None
+                except json.JSONDecodeError as e:
+                    last_err = f"invalid JSON: {e}"
+            else:
+                last_err = "no JSON object found in response"
+
+            if attempt == 1:
+                self.logger.warning(
+                    f"[{agent}] JSON parse failed ({last_err}); retrying once"
+                )
+                cur_prompt = (
+                    f"{prompt}\n\nPREVIOUS ATTEMPT FAILED: {last_err}\n"
+                    f"{self._JSON_RETRY_FEEDBACK}\n"
+                )
+        return None, last_err
