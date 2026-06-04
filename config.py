@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -46,11 +46,11 @@ class Config:
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-opus-4-8"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-8"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
+        self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
+        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
         self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
-        self.capsule_namer_model = "deepseek/deepseek-chat"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
 
@@ -68,11 +68,11 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.96
-        self.max_learning_evolve_iterations = 25
+        self.learned_score_threshold = 0.94
+        self.max_learning_evolve_iterations = 45
 
         # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 2  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
