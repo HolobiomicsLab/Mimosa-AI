@@ -124,7 +124,7 @@ class VariationEngine:
         """
         raw_stagnation = self._compute_stagnation()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
-        stagnation = raw_stagnation * (1.0 - parent_score)
+        stagnation = raw_stagnation * (1.0 - (parent_score / 2))
 
         curr = self.agent_count_history[-1] if self.agent_count_history else 1
         budget = curr + round(stagnation * (self.max_possible_agents - curr))
