@@ -231,11 +231,15 @@ def _load_memory_steps(mem_dir: Path) -> List[StepInfo]:
     nested = load_memory_files(mem_dir)
     for stage_steps in nested.values():
         for s in stage_steps:
+            if str(s.get("agent", "")).startswith("verifier_"):
+                continue
             raw_pool.append((s, parse_step(s)))
 
     import json
     for jf in sorted(mem_dir.glob("*.json")):
         agent = jf.stem
+        if agent.startswith("verifier_"):
+            continue
         try:
             data = json.loads(jf.read_text())
         except Exception:
