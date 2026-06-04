@@ -54,12 +54,12 @@ uv sync && uv run main.py        # interactive onboarding
 ## Demo
 
 <p align="center">
-    <em>Mimosa-AI autonomously regenerated the molecular network from the <code>.mzML</code> files of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection, alignment, and molecular networking — from a single command, with no fixed pipeline.</em>
+    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files, alignment, and classical molecular networking (GNPS-style cosine clustering) — from a single command, with no fixed pipeline.</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-The reproduced network matches the topology reported in the paper (cluster separation, edge weights). Note: this reproduces the **molecular networking pipeline** of that study; the bioactivity-guided fractionation experiments are out of scope for the autonomous run.
+The reproduced network matches the topology reported in the paper at the cluster level. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
 
 <p align="center">
   <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
@@ -78,6 +78,8 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 | **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
 > Iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
+
+> **Cost & runtime.** The `$1.70/task` figure is amortised over the default `--learn` budget (up to 35 generations, early-stop at `overall_score > 0.97`). A typical evolving run takes 30–90 min of wall-clock per task with DeepSeek-V3.2 and scales roughly with model price. Single-shot runs (no `--learn`) are ~5–15 min and an order of magnitude cheaper.
 
 ---
 
@@ -280,6 +282,37 @@ Setup details for each benchmark: [`docs/science_agent_bench_evaluation.md`](./d
 
 ---
 
+## Related work
+
+Mimosa-AI sits in a small but active lineage of LLM-driven program-search and autonomous-research systems. We don't claim to subsume any of them — they answer different questions:
+
+| Project | What it does | How Mimosa differs |
+|---------|--------------|--------------------|
+| [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | End-to-end paper generation in ML | Mimosa optimises **per-task workflow synthesis** with QD+verifier, not full-paper generation |
+| [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM-driven discovery of preference-optimisation algorithms | Same "LLM as variation operator over code" paradigm; Mimosa applies it to multi-agent workflow code rather than loss functions |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | Evolutionary search over Python functions guided by an LLM | Mimosa evolves whole multi-agent programs and adds a multi-source per-claim verifier instead of a single fitness function |
+| [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | LLM-mediated quality-diversity over code | Closest QD ancestor; Mimosa's behaviour descriptor is workflow-structural rather than domain-specific |
+| AIDE | Automated ML pipelines on Kaggle-like tasks | Mimosa targets broader scientific reproduction (ScienceAgentBench, PaperBench, lab data) and ships an auditable per-claim verifier |
+
+If you're publishing comparative work, the [manuscript](https://arxiv.org/abs/2603.28986) has the detailed positioning.
+
+---
+
+## Limitations & known failure modes
+
+We'd rather you find these in the README than in production. Honest list:
+
+- **LLM-judge residual risk.** The verifier's executable claims are deterministic Python, but the *generation* of those programs and all soft-claim verdicts come from `judge_model`. A weak or quantised judge model can produce weak claims. Use a strong model for `judge_model` even if you cheap out elsewhere.
+- **OpenRouter quantised providers.** Some fp8/int4 providers pass basic capability checks but corrupt escape sequences (the `\\n` bug) — generated workflows crash or silently miscompute. If you see odd parse errors, route around quantised endpoints. See [Troubleshooting](./docs/reference/troubleshooting.md).
+- **Cheat detector is disabled.** The standalone cheat-detector pass over generated source is currently `cheat = None` pending a rewrite. Behavioural anti-cheat pressure comes from Source C recompute-from-disk verifiers, the inverted "Used fallback" claim, and anti-tautology tripwires — but a determined output-shaped workflow could still slip past.
+- **Behaviour descriptor is structural, not semantic.** `[n_agents, n_edges, n_branches, prompt_chars]` summarises the genotype; two workflows with identical structure but different tool routing land on the same point. Workspace-fingerprint or trace-embedding descriptors are on the roadmap.
+- **Goal mode is human-written goals.** "Autonomous" applies to workflow synthesis, not problem framing. The planner decomposes *your* objective; it does not pick scientific questions.
+- **Hard-fail cap is permissive.** `_HARD_FAIL_CAP = 0.99` keeps the evolutionary signal smooth, which means a refuted hard claim still scores high. The `hard_fail_capped` flag in `state_result.json` tells you when this happened — check it before reporting numbers.
+- **`--learn` cost can scale.** Worst-case budget is `max_learning_evolve_iterations × per-generation cost`. Plan for $30–$60/task on premium models if you cap at 35 generations and never hit the early-stop threshold.
+- **Toolomics on default ports.** The discovery default `0.0.0.0:5000–5100` collides with common dev servers (Flask, etc.). Either configure `discovery_addresses` or run Toolomics on a non-conflicting range.
+
+---
+
 ## Full documentation
 
 ```bash
@@ -288,6 +321,12 @@ uvx --with mkdocs-material mkdocs build   # static HTML to ./site
 ```
 
 Site config: [`mkdocs.yml`](./mkdocs.yml). Index: [`docs/index.md`](./docs/index.md).
+
+---
+
+## Contributing
+
+Patches, MCP tools, evaluators, and new claim sources welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), the [Developer guide](./docs/DEVELOPER_GUIDE.md), and the contribution terms in [`CLA/`](./CLA/).
 
 ---
 
