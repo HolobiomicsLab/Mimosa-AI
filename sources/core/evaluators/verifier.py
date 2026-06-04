@@ -21,6 +21,7 @@ descendants score against an ancestor's claim set for stable QD ranking.
 
 import json
 import math
+import time
 from pathlib import Path
 from typing import Any
 
@@ -43,52 +44,14 @@ _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 90
 _VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
+_VERIFIER_GEN_PARALLELISM = 16
 
-# Upper bound on concurrent verifier-generation LLM calls. The two judge
-# round-trips per claim (file selection + spec generation) overlap their
-# network latency; this caps fan-out so we don't trip provider rate limits.
-_VERIFIER_GEN_PARALLELISM = 10
-
-# ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.05
 _INFO_BONUS_BETA = 8.0
 
 # ----- Empty-run marker -------------------------------------------------------
-# Emitted by base.workflow_execution_text when no state_result and no code exist.
-# We use this as the precise empty-run signal, NOT the brittle ``success`` flag
-# (which trips False on any successful run whose answers JSON contains "[]").
 _EMPTY_RUN_MARKER = "workflow execution fully failed"
-
-# ----- Anti-cheat thresholds (reserved; cheat detector currently disabled) ----
-# Kept for the eventual cheat-detector rewrite. Unused at runtime today.
-_CHEAT_MIN_LITERAL_LEN = 80
-_CHEAT_OVERLAP_WINDOW = 60
-_IO_MARKERS = (
-    "open(",
-    "Path(",
-    ".read_text(",
-    ".read_bytes(",
-    "json.load",
-    "csv.reader",
-    "csv.DictReader",
-    "pd.read_",
-    "pandas.read_",
-    "np.load",
-    "np.loadtxt",
-    "np.genfromtxt",
-    "numpy.load",
-    "numpy.loadtxt",
-    "numpy.genfromtxt",
-    "subprocess.",
-    "os.path.exists",
-    "os.path.isfile",
-    "os.stat",
-    "Path.exists",
-    "Path.is_file",
-    "glob.glob",
-)
-
 
 class VerifierEvaluator(
     BaseEvaluator,
@@ -104,36 +67,10 @@ class VerifierEvaluator(
     ``_get_judge_system_prompt``) that every stage uses.
     """
 
-    # ------------------------------------------------------------------
-    # Class-level tunables shared across mixins (importance is the gradient
-    # axis — these resolve on the subclass so any of the mixins can read
-    # them via ``self.``).
-    # ------------------------------------------------------------------
-
-    # Default importance when the rater LLM is unavailable. Sits at the
-    # middle of the 1-10 scale so failures neither inflate nor crush scores.
     _DEFAULT_CLAIM_IMPORTANCE = 5
-
-    # Minimum importance for a claim to appear in the prompt-gradient view of
-    # the report. The full report (importance ≥ 0) is still persisted on disk;
-    # this only narrows what the mutator's diagnosis prompt sees.
     _GRADIENT_MIN_IMPORTANCE = 6
-
-    # Minimum importance at which a pass contributes to the information bonus.
-    # Below this, claims are noise from the rater's lower tail; counting them
-    # would let workflows farm easy claims for thoroughness credit.
     _INFO_BONUS_MIN_IMPORTANCE = 6
-
-    # Importance at which a refuted claim caps the overall score. The cap
-    # itself (``_HARD_FAIL_CAP``) is currently permissive (0.99) so the
-    # gradient stays smooth across QD selection; this threshold defines what
-    # counts as "load-bearing" under the new importance scale.
     _HARD_FAIL_IMPORTANCE = 8
-
-    # Back-compat mapping for rubric caches written before the
-    # criticality→importance switch. hard ≈ 8 (load-bearing), soft ≈ 3
-    # (advisory). Anchors written with the new schema are passed through
-    # unchanged.
     _LEGACY_CRITICALITY_TO_IMPORTANCE = {"hard": 8, "soft": 3}
 
     def __init__(
@@ -359,12 +296,19 @@ class VerifierEvaluator(
             else:
                 needs_generation.append(claim)
 
+        st = time.time()
         generated = self._generate_specs_parallel(
             uuid,
             needs_generation,
             execution_text,
             workspace_listing,
             self.gen_parallelism,
+        )
+        et = time.time()
+        print_box(
+            f"Verifier spec generation for {len(needs_generation)} claims took "
+            f"{et - st:.1f}s (parallelism={self.gen_parallelism})",
+            title="Verifier generation timing",
         )
 
         per_claim: list[dict[str, Any]] = []
