@@ -1,24 +1,5 @@
-"""Workspace-listing, file-preview and literature-grounding helpers.
-
-Mixed into :class:`VerifierEvaluator` via multiple inheritance. The split is
-purely organisational: every method here reaches for state owned by the
-concrete subclass (``self.workspace_dir``, ``self.logger``, the preview byte
-budgets, ``self._workspace_files`` set, ``self._preview_cache`` dict, the
-``use_grounding`` flag and ``self._grounding_cache``). Mixing keeps the
-``self.`` call-graph intact without forcing callers through an extra object.
-
-Three concerns live here:
-
-* **Listing** — :meth:`_list_workspace` walks the workspace once and produces
-  the ``<rel>\\t<size>B`` listing the LLM prompts consume, while populating
-  the in-process ``_workspace_files`` set used to validate paths the LLM
-  returns later (path hallucination guard).
-* **Previews** — :meth:`_preview_file` and :meth:`_render_relevant_previews`
-  feed the per-claim verifier-generation prompt safe head+tail file snippets
-  (binary files fall back to a magic-byte hex dump). The previews are cached
-  per-uuid run to keep token cost bounded.
-* **Grounding** — :meth:`_get_grounding` performs a single Perspicacite
-  round-trip per UUID and is cached so repeated claims share one lookup.
+"""
+Workspace-listing, file-preview and literature-grounding helpers.
 """
 
 from __future__ import annotations

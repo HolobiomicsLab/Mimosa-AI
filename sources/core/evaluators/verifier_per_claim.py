@@ -1,35 +1,5 @@
-"""Per-claim verifier generation, sandboxed execution and scoring.
-
-Mixed into :class:`VerifierEvaluator` via multiple inheritance. Three stages
-live here, one per claim:
-
-* **Generation.** :meth:`_generate_verifier` asks the judge for either a tiny
-  Python program that recomputes the asserted value from disk
-  (``executable=True``) or a one-sentence rationale for why it can't be
-  executable (``executable=False``). :meth:`_llm_select_files` pre-picks the
-  workspace files the verifier should open so the prompt sees relevant
-  previews only.
-* **Execution.** :meth:`_run_verifier` runs the script in the agents'
-  workspace under a per-script timeout, using the same Python interpreter
-  that hosts Mimosa so the pre-installed helper packages
-  (``numpy``/``pandas``/``scipy``/``scikit-learn`` …) are importable.
-  :meth:`_parse_verifier_stdout` extracts the single JSON line the script
-  must emit, with ``claim_id`` matching.
-* **Scoring.** :meth:`_score_executable` converts ``pass/fail/error`` →
-  ``1.0/0.0/excluded``. :meth:`_score_soft` falls back to a narrow LLM
-  verdict (``pass/unsure/fail`` → ``1.0/0.5/0.0``) when the claim cannot be
-  recomputed deterministically.
-
-The mixin expects the subclass to provide:
-    - ``self.verifier_timeout`` (int) — per-script wall-clock budget.
-    - ``self.workspace_dir`` (Path) — sandbox cwd for the verifier script.
-    - ``self.logger``.
-    - ``self._runner_temp_root`` (Path) — scratch root for per-claim caches.
-    - From the workspace mixin: ``self._eligible_workspace_files``,
-      ``self._render_relevant_previews``, ``self._validate_workspace_paths``.
-    - From :class:`BaseEvaluator`: ``self._call_judge_for_json``.
-    - The class attribute ``_DEFAULT_CLAIM_IMPORTANCE`` resolved through MRO
-      (defined on :class:`VerifierEvaluator`).
+"""
+Per-claim verifier generation, sandboxed execution and scoring.
 """
 
 from __future__ import annotations
@@ -382,8 +352,7 @@ RULES FOR YOUR SCRIPT:
 - Print EXACTLY ONE JSON line to stdout, structured as:
   {{"claim_id": "{claim['id']}", "status": "pass" | "fail" | "error",
     "actual": <observed value or null>, "details": "<short string>"}}
-- Use only the standard library plus the verifier helper packages
-  ({packages}). Read files with relative paths
+- Read files with relative paths
   (cwd is the workspace).
 - Recompute or directly check; do not trust the agent's reported numbers.
 - For property checks (symmetry, range, no duplicates, ...), assert the
@@ -421,6 +390,10 @@ What a legitimate verifier does:
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
 defensibility of a conclusion), set "executable": false and explain briefly.
+
+Don't forget to include the library you need such as json, numpy, etc..
+You can use library from the standard library and the available imports.
+AVAILABLE IMPORTS: {packages}
 
 Return STRICT JSON only, in one of these two shapes:
   {{"executable": true,  "code": "<full python script as one string>"}}

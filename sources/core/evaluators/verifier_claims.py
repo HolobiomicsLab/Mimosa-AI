@@ -1,25 +1,5 @@
-"""Claim extraction (six independent sources) and importance rating.
-
-Mixed into :class:`VerifierEvaluator` via multiple inheritance. Two stages
-live here:
-
-* **Stage 1 — extraction.** Six per-source prompt builders enumerate
-  positive-success claims from independent vantage points (literature, user
-  goal, agent narration, math invariants, computational reproducibility,
-  statistical fingerprint). Each LLM round-trip returns raw claims; results
-  are merged across sources and de-duplicated by id.
-* **Stage 1b — importance rating.** A single follow-up judge call sees the
-  goal and the merged claim list and emits (a) ids to drop as near-duplicates
-  and (b) an integer importance ``1–10`` plus one-sentence rationale for each
-  surviving claim. Importance replaces the previous hard/soft tier.
-
-The mixin expects the concrete subclass to provide:
-    - ``self.logger``, ``self.min_claims`` / ``self.max_claims``.
-    - ``self._workspace_files`` (populated by the workspace mixin).
-    - ``self._validate_workspace_paths`` (workspace mixin).
-    - ``self._call_judge_for_json`` (inherited from :class:`BaseEvaluator`).
-    - The class attribute ``_DEFAULT_CLAIM_IMPORTANCE`` (defined on
-      :class:`VerifierEvaluator`; resolves through MRO).
+"""
+Claim extraction (six independent sources) and importance rating.
 """
 
 from __future__ import annotations
