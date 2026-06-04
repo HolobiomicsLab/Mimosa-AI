@@ -26,6 +26,74 @@ You'll see, for each agent step:
 This is the single best tool for understanding *why* a workflow did what
 it did.
 
+## `--memory_cli` — ask questions about a run
+
+Sometimes you don't want to scroll through every step — you just want to ask
+"*what classifier did the task_builder end up using?*" or "*did any agent hit
+an error involving rdkit?*". The memory chat CLI gives you a small RAG-backed
+Q&A interface over a single run's memory.
+
+```bash
+# Latest run by modification time
+uv run main.py --memory_cli
+
+# A specific run UUID
+uv run main.py --memory_cli --memory_uuid 20260604_133122_06d6d38f
+```
+
+### How it works
+
+1. **Chunking.** Every JSON file under `sources/memory/<uuid>/` is split into
+   searchable chunks. A step-trace file (`task_builder.json`,
+   `task_data_curator.json`, …) yields one chunk per smolagent step
+   (`step_number`, `model_output`, `code_action`, `observations`,
+   `action_output`, `error`). A single-call file (`workflow_creator.json`,
+   …) yields one chunk for the whole LLM completion.
+2. **Embedding.** All chunk summaries are embedded once at startup with
+   `sentence-transformers/all-MiniLM-L6-v2` (downloaded automatically on
+   first use, ~90 MB).
+3. **Retrieval.** Each question goes through two LLM calls on `judge_model`
+   (see [Configuration reference](../reference/configuration.md)):
+   - **Query rewrite** — the question is compressed into a short
+     keyword-focused search query.
+   - **Answer** — top-K chunks (default `K=5`) are scored by cosine
+     similarity, formatted as context, and fed back to the judge model
+     which is instructed to answer **only from the retrieved chunks** and
+     cite them by header (e.g. `task_builder.json · step 4`).
+
+### UI
+
+A curses interface in the same family as `memory_explorer.py`:
+
+| Key | Action |
+| --- | ------ |
+| `a` | Ask a new question (curses pauses, you type at the shell prompt). |
+| `↑` / `↓` | Scroll the answer pane. |
+| `←` / `→` | Move between previously asked Q&As. |
+| `c` / `C` | Scroll the code pane down / up. |
+| `r` | Re-load the memory directory and re-embed (useful if a run finishes while the CLI is open). |
+| `q` | Quit. |
+
+The screen is split into:
+
+- **Top:** the question, the judge model's answer, and a list of the
+  retrieved chunks with their similarity scores.
+- **Bottom:** the *executed code* of the top-ranked chunk (the
+  `code_action` of that step, or the `python_interpreter` tool-call
+  arguments). This is what you usually want to see when the answer
+  mentions "the model_builder did X".
+
+### When to reach for it
+
+- You remember a detail from the run but not which agent or step produced
+  it.
+- A learning loop produced dozens of step-trace files and `memory_explorer.py`
+  would be tedious to scroll through.
+- You want to confirm whether the agents *actually* used a specific tool,
+  library, or model name before drawing a conclusion from the score.
+
+The CLI is read-only — it does not modify any memory file.
+
 ## `memory_timelapse.py` — memory growth visualisation
 
 For longer `--learn` runs, you may want a coarser view: how the agent's

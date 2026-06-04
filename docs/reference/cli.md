@@ -22,6 +22,8 @@ If no mode is given, Mimosa drops into the interactive onboarding wizard.
 | `--workflow_eval_mode` | Workflow-generation-quality evaluation. |
 | `--scenario <path>` | Use a scenario rubric instead of LLM-judge scoring. |
 | `--evaluation_cli` | Interactive evaluation launcher for ScienceAgentBench. |
+| `--memory_cli` | Interactive RAG chat over the memory of a workflow run. See [Transparency & replay](../usage/transparency.md#-memory_cli-ask-questions-about-a-run). |
+| `--memory_uuid <uuid>` | Run UUID to load with `--memory_cli` (defaults to the most recent run under `sources/memory/`). |
 
 ## Behaviour modifiers
 
@@ -116,6 +118,17 @@ These override values from `--config`'s JSON or the defaults in
     uv run main.py --task "…" \
       --runner_default_timeout 7200 \
       --runner_default_max_memory_mb 4096
+    ```
+
+=== "Interrogate the latest run"
+
+    ```bash
+    # RAG chat over the most recent run's memory
+    uv run main.py --memory_cli
+
+    # Or against a specific UUID
+    uv run main.py --memory_cli \
+      --memory_uuid 20260604_133122_06d6d38f
     ```
 
 ## See also
