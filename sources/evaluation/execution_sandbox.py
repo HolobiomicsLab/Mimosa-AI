@@ -10,12 +10,13 @@ import subprocess
 import shutil
 import sys
 import tempfile
-import venv
 from pathlib import Path
 from typing import Tuple
 
 
 logger = logging.getLogger(__name__)
+
+SANDBOX_PYTHON_VERSION = "3.12"
 
 
 class ExecutionSandbox:
@@ -43,14 +44,19 @@ class ExecutionSandbox:
         "openai"
     ]
 
-    def __init__(self, capsule_path: Path):
+    def __init__(self, capsule_path: Path, cpu_only: bool = True):
         """
         Initialize execution sandbox and set up virtual environment with dependencies.
 
         Args:
             capsule_path: Path to capsule directory containing generated code
+            cpu_only: If True (default), force CPU execution by hiding any GPU
+                from the spawned scripts. Sidesteps CUDA/XLA plumbing issues
+                (e.g. missing libdevice) that would otherwise fail VER on
+                machines with a partial CUDA install.
         """
         self.capsule_path = Path(capsule_path)
+        self.cpu_only = cpu_only
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
         # Create a single temporary directory for this sandbox instance
@@ -66,30 +72,88 @@ class ExecutionSandbox:
         # Install basic packages and analyze/setup dependencies
         self._setup_environment()
 
+    def _resolve_sandbox_python(self) -> str:
+        """Resolve a Python SANDBOX_PYTHON_VERSION interpreter for the venv.
+
+        Resolution order: the ``$MIMOSA_SANDBOX_PYTHON`` override, then
+        ``python<version>`` on PATH. The interpreter's ``--version`` is verified
+        so we never silently build the venv with the wrong Python (which is how
+        the eval previously drifted onto the harness interpreter).
+        """
+        candidates = []
+        override = os.environ.get("MIMOSA_SANDBOX_PYTHON")
+        if override:
+            candidates.append(override)
+        which = shutil.which(f"python{SANDBOX_PYTHON_VERSION}")
+        if which:
+            candidates.append(which)
+
+        for cand in candidates:
+            try:
+                out = subprocess.run(
+                    [cand, "--version"], capture_output=True, text=True, timeout=10
+                )
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if (out.stdout or out.stderr).strip().startswith(
+                f"Python {SANDBOX_PYTHON_VERSION}."
+            ):
+                return cand
+
+        raise RuntimeError(
+            f"Eval sandbox requires Python {SANDBOX_PYTHON_VERSION}; none found "
+            f"(looked at $MIMOSA_SANDBOX_PYTHON and python{SANDBOX_PYTHON_VERSION} on "
+            f"PATH). Install it (apt install python{SANDBOX_PYTHON_VERSION} "
+            f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
+        )
+
     def _create_virtual_environment(self) -> Path:
-        """Create a virtual environment for isolated execution."""
+        """Create a Python SANDBOX_PYTHON_VERSION venv for isolated execution."""
         venv_path = self.temp_dir / "venv"
 
-        self.logger.info(f"[SANDBOX] Creating virtual environment at {venv_path}")
+        py = self._resolve_sandbox_python()
+        self.logger.info(
+            f"[SANDBOX] Creating Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py}"
+        )
 
-        try:
-            venv.create(venv_path, with_pip=True)
-        except Exception as e:
-            raise RuntimeError(f"Failed to create virtual environment at {venv_path}: {e}")
-        
+        result = subprocess.run(
+            [py, "-m", "venv", str(venv_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"venv creation failed via {py}: {result.stderr[:500]} "
+                f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
+            )
+
         # Verify the venv was created successfully
         if sys.platform == "win32":
             python_exe = venv_path / "Scripts" / "python.exe"
         else:
             python_exe = venv_path / "bin" / "python"
-        
+
         if not python_exe.exists():
             raise RuntimeError(
                 f"Virtual environment created but Python executable not found at {python_exe}. "
                 f"This may indicate a problem with the Python installation or venv module."
             )
-        
-        self.logger.info(f"[SANDBOX] Virtual environment created successfully at {venv_path}")
+
+        # Assert the venv really is the pinned version, so a mismatch fails loudly
+        # instead of silently evaluating on the wrong interpreter.
+        ver = subprocess.run(
+            [str(python_exe), "--version"], capture_output=True, text=True, timeout=10
+        )
+        got = (ver.stdout or ver.stderr).strip()
+        if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
+            raise RuntimeError(
+                f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
+            )
+
+        self.logger.info(
+            f"[SANDBOX] Virtual environment created successfully at {venv_path} ({got})"
+        )
         return venv_path
 
     def _setup_environment(self) -> None:
@@ -175,12 +239,12 @@ class ExecutionSandbox:
                 shutil.copy2(file_path, temp_path / file_path.name)
             # Run pipreqs (installed as console script in venv)
             pipreqs_exe = self.venv_path / "bin" / "pipreqs"
-            
+
             # Check if pipreqs is available (may not be if basic package installation failed)
             if not pipreqs_exe.exists():
                 self.logger.warning("[SANDBOX] pipreqs not found in venv, skipping dependency analysis")
                 return
-            
+
             cmd_pipreqs = [
                 str(pipreqs_exe),
                 "--savepath", str(temp_path / "requirements.in"),
@@ -196,7 +260,7 @@ class ExecutionSandbox:
             )
 
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:200]}")
+                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:512]}")
                 return
 
             requirements_in = temp_path / "requirements.in"
@@ -219,7 +283,7 @@ class ExecutionSandbox:
             )
 
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:200]}")
+                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:512]}")
                 # Fall back to direct installation from .in file
                 requirements_txt = requirements_in
 
@@ -242,6 +306,14 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Dependency analysis/installation failed: {e}")
             # Continue execution even if dependency installation fails
+
+    def _subprocess_env(self) -> dict:
+        """Build the env dict for spawned scripts, applying cpu_only if set."""
+        env = os.environ.copy()
+        if self.cpu_only:
+            env["CUDA_VISIBLE_DEVICES"] = ""
+            env["TF_CPP_MIN_LOG_LEVEL"] = env.get("TF_CPP_MIN_LOG_LEVEL", "2")
+        return env
 
     def run_generated_code(
         self,
@@ -291,13 +363,13 @@ class ExecutionSandbox:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=os.environ.copy()
+                env=self._subprocess_env()
             )
 
             if result.returncode != 0:
                 error_msg = f"Generated code failed with code {result.returncode}"
                 if result.stderr:
-                    error_msg += f": {result.stderr[:2048]}"
+                    error_msg += f": {result.stderr[:100000]}"
                 self.logger.error(f"[SANDBOX] {error_msg}")
                 return False, error_msg
 
@@ -510,13 +582,13 @@ class ExecutionSandbox:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=os.environ.copy()
+                env=self._subprocess_env()
             )
 
             if result.returncode != 0:
                 error_msg = f"Eval script failed with code {result.returncode}"
                 if result.stderr:
-                    error_msg += f": {result.stderr[:4096]}"
+                    error_msg += f": {result.stderr[:100000]}"
                 self.logger.error(f"[SANDBOX] {error_msg}")
                 return False, error_msg
             output = result.stdout.strip()

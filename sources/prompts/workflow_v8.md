@@ -294,4 +294,5 @@ Above is an example, create tailored workflow for the task.
 - [ ] Final agent validates/cleans output
 - [ ] Error agents receive diagnostic context, not just "failed"
 - [ ] Knowledge-seeking agents exist for computational workflows
-- [ ] All agents have SHELL_MCP + domain tools
+- [ ] All agents have shell + domain tools
+- [ ] You are forbidden from using any annotation or typehint.

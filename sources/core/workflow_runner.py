@@ -17,6 +17,8 @@ from typing import Any
 
 
 class ExecutionStatus(Enum):
+    """Lifecycle status of a workflow execution."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -27,6 +29,17 @@ class ExecutionStatus(Enum):
 
 @dataclass
 class ExecutionResult:
+    """Outcome of a subprocess execution managed by ``WorkflowRunner``.
+
+    Attributes:
+        status: Final :class:`ExecutionStatus` of the execution.
+        return_code: Process exit code (``-1`` for runner-level failures).
+        stdout: Captured standard output as a single string.
+        stderr: Captured standard error as a single string.
+        execution_time: Wall-clock duration in seconds.
+        resource_usage: Optional dictionary of resource-usage metrics.
+    """
+
     status: ExecutionStatus
     return_code: int
     stdout: str
@@ -37,14 +50,37 @@ class ExecutionResult:
 
 @dataclass
 class RuntimeConfig:
-    python_version: str = "3.10"
+    """Configuration controlling how the workflow runner spawns Python.
+
+    Attributes:
+        python_version: Target Python version string (e.g. ``"3.12"``).
+        timeout: Maximum execution time per command, in seconds.
+        max_memory_mb: Soft memory cap, in megabytes (advisory).
+        max_cpu_percent: Soft CPU cap, as a percentage (advisory).
+        temp_dir: Directory used to materialise generated scripts. Defaults to
+            ``"./tmp"`` when not provided.
+        requirements_file: Optional path to a pip requirements file used as a
+            fallback when no explicit dependencies are passed.
+        use_pty: When False, the runner skips the PTY/color path and uses
+            plain pipes. Useful for short, non-interactive scripts (e.g.
+            verifier checks) where ANSI colour propagation and TTY emulation
+            are pure overhead.
+    """
+
+    python_version: str = "3.12"
     timeout: int = 1800
     max_memory_mb: int = 1024
     max_cpu_percent: int = 100
     temp_dir: Path | None = None
+    # optional replacement for config requirements list
     requirements_file: Path | None = "requirements.txt"
+    # When False, the runner skips the PTY/color path and uses plain pipes.
+    # Useful for short, non-interactive scripts (e.g. verifier checks) where
+    # ANSI colour propagation and TTY emulation are pure overhead.
+    use_pty: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Default ``temp_dir`` to ``./tmp`` when left unset."""
         if self.temp_dir is None:
             self.temp_dir = "./tmp"
 
@@ -52,7 +88,18 @@ class RuntimeConfig:
 class WorkflowRunner:
     """Async workflow execution engine for python code."""
 
-    def __init__(self, config: RuntimeConfig = None, execution_dir = '.'):
+    def __init__(self, config: RuntimeConfig | None = None, execution_dir: str = '.') -> None:
+        """Initialize the runner and resolve its Python executable.
+
+        Args:
+            config: Runtime configuration to use. When ``None``, a default
+                :class:`RuntimeConfig` is constructed.
+            execution_dir: Working directory used when spawning subprocesses.
+
+        Raises:
+            RuntimeError: If the configured Python version cannot be found on
+                the host.
+        """
         self.config = config or RuntimeConfig()
         self.execution_dir = execution_dir
         self.logger = logging.getLogger(__name__)
@@ -61,7 +108,15 @@ class WorkflowRunner:
         self._setup_environment()
 
     def _setup_environment(self) -> None:
-        """Initialize the execution environment."""
+        """Initialize the execution environment.
+
+        Resolves ``temp_dir`` to an absolute path, creates it if needed, and
+        validates that the configured Python version is available.
+
+        Raises:
+            RuntimeError: If no working Python executable matches
+                ``config.python_version``.
+        """
         # Convert temp_dir to absolute path to ensure it's created in the right location
         self.config.temp_dir = os.path.abspath(self.config.temp_dir)
         os.makedirs(self.config.temp_dir, exist_ok=True)
@@ -127,6 +182,10 @@ class WorkflowRunner:
         """
         Check if the configured Python version is available and cache the
         resolved executable in ``self._python_cmd``.
+
+        Returns:
+            True when a matching Python executable was found and cached;
+            False otherwise.
         """
         resolved = self._resolve_python_executable()
         if resolved is not None:
@@ -164,7 +223,21 @@ class WorkflowRunner:
     async def install_dependencies(
         self, requirements: list[str] | None = None
     ) -> ExecutionResult:
-        """Install dependencies asynchronously."""
+        """Install dependencies asynchronously.
+
+        Args:
+            requirements: Explicit list of pip requirement specifiers. When
+                omitted, the runner falls back to ``config.requirements_file``.
+
+        Returns:
+            The :class:`ExecutionResult` of the underlying ``pip install``
+            command, or a COMPLETED result with zero output when there is
+            nothing to install.
+
+        Raises:
+            FileNotFoundError: If a requirements file fallback is configured
+                but does not exist on disk.
+        """
 
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
@@ -189,7 +262,18 @@ class WorkflowRunner:
         execution_id: str | None = None,
         progress_callback: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
-        """Execute workflow code with full async support and monitoring."""
+        """Execute workflow code with full async support and monitoring.
+
+        Args:
+            code: Python source code to write to a temporary script and run.
+            execution_id: Optional identifier used to track and cancel the
+                process. A human-readable id is generated when omitted.
+            progress_callback: Optional callable invoked once per stdout line
+                as the script runs.
+
+        Returns:
+            The :class:`ExecutionResult` of the subprocess invocation.
+        """
 
         # Generate human-readable execution ID: exec_MMDD_HHMMSS_shortid
         execution_id = (
@@ -210,6 +294,9 @@ class WorkflowRunner:
         Copies the host environment and adds variables commonly checked by
         CLI tools and Python libraries (rich, click, tqdm, pytest, …) to
         force colored output even when stdout is not a real TTY.
+
+        Returns:
+            A copy of ``os.environ`` augmented with color-forcing variables.
         """
         env = dict(os.environ)
         env.setdefault("TERM", "xterm-256color")
@@ -221,7 +308,7 @@ class WorkflowRunner:
 
     def _pty_available(self) -> bool:
         """Return True when pseudo-terminal support can be used."""
-        return sys.platform != "win32"
+        return sys.platform != "win32" and getattr(self.config, "use_pty", True)
 
     async def _run_command(
         self,
@@ -235,6 +322,17 @@ class WorkflowRunner:
         is connected to a pseudo-terminal so that child processes see
         ``isatty(1) == True`` and emit ANSI colour codes.  Stderr is still
         captured via a regular pipe.
+
+        Args:
+            cmd: Argv list for :func:`asyncio.create_subprocess_exec`.
+            execution_id: Optional id used to register the process so it can
+                be cancelled mid-flight.
+            progress_callback: Optional callable invoked with each stdout
+                line as it is produced.
+
+        Returns:
+            An :class:`ExecutionResult` describing the outcome (including
+            COMPLETED, FAILED, TIMEOUT, or runner-level failure).
         """
 
         start_time = asyncio.get_event_loop().time()
@@ -334,6 +432,15 @@ class WorkflowRunner:
 
         The PTY preserves ANSI escape sequences (colours, bold, …) because
         the child process sees a real terminal on its stdout.
+
+        Args:
+            process: The running subprocess whose stderr pipe will be drained.
+            master_fd: Master end of the pseudo-terminal used as stdout.
+            progress_callback: Optional callable invoked with each stdout
+                line decoded from the PTY.
+
+        Returns:
+            A tuple ``(stdout, stderr)`` with the full captured output.
         """
         loop = asyncio.get_event_loop()
         stdout_chunks: list[str] = []
@@ -378,7 +485,17 @@ class WorkflowRunner:
         process: asyncio.subprocess.Process,
         progress_callback: Callable[[str], None] | None = None,
     ) -> tuple[str, str]:
-        """Fallback: stream stdout/stderr when both are plain pipes."""
+        """Fallback: stream stdout/stderr when both are plain pipes.
+
+        Args:
+            process: The running subprocess whose stdout and stderr pipes
+                will be drained concurrently.
+            progress_callback: Optional callable invoked once per stdout
+                line (with the trailing newline stripped).
+
+        Returns:
+            A tuple ``(stdout, stderr)`` with the full captured output.
+        """
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
 
@@ -398,14 +515,34 @@ class WorkflowRunner:
         return "".join(stdout_lines), "".join(stderr_lines)
 
     async def cancel_execution(self, execution_id: str) -> bool:
-        """Cancel a running execution."""
+        """Cancel a running execution.
+
+        Args:
+            execution_id: Identifier returned by (or supplied to)
+                :meth:`execute`.
+
+        Returns:
+            True when the process was found and termination was attempted;
+            False when no such execution is registered.
+        """
         if execution_id not in self._active_processes:
             return False
 
         return await self._kill_process(execution_id)
 
     async def _kill_process(self, execution_id: str) -> bool:
-        """Forcefully terminate a process."""
+        """Forcefully terminate a process.
+
+        Sends ``SIGTERM`` first and waits up to five seconds; if the process
+        is still alive it is escalated to ``SIGKILL``.
+
+        Args:
+            execution_id: Identifier of the registered process.
+
+        Returns:
+            True when termination was attempted; False when no such process
+            is registered.
+        """
         process = self._active_processes.get(execution_id)
         if not process:
             return False
@@ -420,16 +557,23 @@ class WorkflowRunner:
         return True
 
     async def get_active_executions(self) -> list[str]:
-        """Get list of currently running executions."""
+        """Get list of currently running executions.
+
+        Returns:
+            List of execution ids currently registered with the runner.
+        """
         return list(self._active_processes.keys())
 
     async def cleanup(self) -> None:
-        """Clean up all resources and running processes."""
+        """Clean up all resources and running processes.
+
+        Iterates over every registered execution and forcefully terminates it.
+        """
         for execution_id in list(self._active_processes.keys()):
             await self._kill_process(execution_id)
 
 
-async def main():
+async def main() -> None:
     """Example usage of the WorkflowRunner."""
     config = RuntimeConfig(python_version="3.10", timeout=60, max_memory_mb=256)
     runner = WorkflowRunner(config)
@@ -443,7 +587,7 @@ print("\\033[1;34mBold blue text\\033[0m")
 print(f"stdout is a TTY: {sys.stdout.isatty()}")
 """
 
-    def progress_handler(line: str):
+    def progress_handler(line: str) -> None:
         print(f"[PROGRESS] {line}")
 
     result = await runner.execute(code, progress_callback=progress_handler)

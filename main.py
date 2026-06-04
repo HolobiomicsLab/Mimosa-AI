@@ -16,13 +16,16 @@ import dotenv
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+# Ensure the default memory directory exists before local imports that may read it.
+os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
+
 from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
 
 from config import Config
-from sources.core.dgm import DarwinMachine
+from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.cli import OnboardCLI
+from sources.cli import OnboardCLI, EvaluationCLI, MemoryChatCLI
 from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.evaluation.eval_workflow_generation import WorkflowEval
@@ -113,7 +116,7 @@ async def papers_mode(args, config):
 
 async def science_bench_papers_mode(args, config):
     # Use concurrent evaluation by default for science_agent_bench
-    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 4)
+    max_concurrent = getattr(config, 'max_concurrent_eval_tasks', 1)
     task_start_delay = getattr(config, 'task_start_delay', 30.0)
     papers = CsvEvaluationMode(
         config,
@@ -161,7 +164,7 @@ def load_goal_from_file_or_string(goal_input: str) -> str:
     return goal_input
 
 async def normal_execution_mode(args, config):
-    dgm = DarwinMachine(config)
+    evolve = EvolutionEngine(config)
     planner = Planner(config)
     if args.scenario:
         scenario_file = ScenarioLoader().load_scenario(args.scenario)
@@ -171,11 +174,10 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.task)
         if args.single_agent:
             print_info("Starting in single agent mode")
-        await dgm.start_dgm(goal=goal_content,
+        await evolve.start_workflow_evolution(goal=goal_content,
                             judge=not args.disable_judge,
                             scenario_rubric=args.scenario,
-                            max_iteration=args.max_evolve_iterations,
-                            learning_mode=args.learn,
+                            enable_evolution=args.learn,
                             single_agent_mode=args.single_agent
                            )
     elif args.goal:
@@ -183,7 +185,6 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
-                                    max_evolve_iteration=args.max_evolve_iterations
                                    )
         trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
@@ -234,7 +235,7 @@ async def main():
         "--disable_judge", action="store_true", default=False, help="Disable judge for workflow evaluation"
     )
     parser.add_argument(
-        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and auto-improvement"
+        "--scenario", type=str, help="Use scenario benchmark (eg: datasets/scenarios/X.json) with criterions for workflow evaluation and evolution"
     )
     parser.add_argument(
         "--debug", action="store_true", help="Enable advanced debug logging to console"
@@ -244,6 +245,15 @@ async def main():
     )
     parser.add_argument(
         "--max_evolve_iterations", type=int, help="Maximum number of learning iterations. Used for retrying/learning a task."
+    )
+    parser.add_argument(
+        "--evaluation_cli", action="store_true", help="Interactive evaluation CLI for ScienceAgentBench (guided model, workspace, and mode selection)"
+    )
+    parser.add_argument(
+        "--memory_cli", action="store_true", help="Interactive RAG chat over the memory of a workflow run (latest by default, or --memory_uuid)"
+    )
+    parser.add_argument(
+        "--memory_uuid", type=str, help="Specific run UUID to load (defaults to latest run under sources/memory/)"
     )
 
     add_config_arguments(parser, config)
@@ -255,7 +265,6 @@ async def main():
         print(f"Configuration loaded from: {args.config}")
 
     # security check
-    PackageCheck().run()
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
 
@@ -268,7 +277,29 @@ async def main():
         args.goal,
         args.scenario,
         args.workflow_eval_mode,
+        args.evaluation_cli,
+        args.memory_cli,
     ])
+
+    if args.evaluation_cli:
+        # Interactive evaluation CLI — handles its own config/validation flow.
+        try:
+            cli = EvaluationCLI(config)
+            await cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        return
+
+    if args.memory_cli:
+        # Interactive RAG chat over a run's memory directory.
+        try:
+            cli = MemoryChatCLI(config, run_uuid=args.memory_uuid)
+            cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        except FileNotFoundError as exc:
+            print_err(str(exc))
+        return
 
     if no_mode_selected:
         # Interactive onboarding CLI for full setup flow.
@@ -288,16 +319,18 @@ async def main():
     config.create_paths()
     config.validate_paths()
 
-    PreCheck(config).run()
 
     try:
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
+            PreCheck(config).run()
             await papers_mode(args, config)
         elif (args.science_agent_bench):
+            PreCheck(config).run()
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
+            PreCheck(config).run()
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)

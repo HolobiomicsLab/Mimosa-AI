@@ -63,6 +63,7 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
+                 temperature=0.7,
                  max_steps=64,
                 ) -> None:
         self.name = name
@@ -77,7 +78,10 @@ class SmolAgentFactory:
         self.engine = None
         self.provider = "auto"
         self.max_tokens = 8192
+        self.temperature = temperature
         self.token = os.getenv("HF_TOKEN")
+        # Optional pin for OpenRouter routing. May be injected by the workflow
+        self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         self.timeout = 3600
@@ -147,11 +151,27 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "litellm":
+            extra_kwargs = {}
+            if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
+                order = (
+                    [self.openrouter_provider]
+                    if isinstance(self.openrouter_provider, str)
+                    else list(self.openrouter_provider)
+                )
+                extra_kwargs["extra_body"] = {
+                    "provider": {
+                        "order": order,
+                        "allow_fallbacks": False,
+                        "require_parameters": True,
+                    }
+                }
             return LiteLLMModel(
                 model_id=self.model_id,
-                temperature=1.0,
+                temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                timeout=self.timeout
+                timeout=self.timeout,
+                request_timeout=180,
+                **extra_kwargs,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
@@ -178,7 +198,7 @@ class SmolAgentFactory:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
-        return f"""You are an autonomous agent executing tasks in a constrained environment.
+        return f"""
 OPERATIONAL CONTEXT:
 {prev_infos}
 

@@ -116,11 +116,11 @@ def print_rule(width: int = _W, color: str = CYAN) -> None:
 def print_iteration_header(
     current: int,
     total: int,
-    subtitle: str = "Self-Improvement Loop",
+    subtitle: str = "Evolution Loop",
     width: int = _W,
 ) -> None:
     """
-    Prominent iteration counter banner shown at the start of each DGM loop.
+    Prominent iteration counter banner shown at the start of each evolution engine loop.
     """
     bar = "═" * width
     print(f"\n{CYAN}{bar}{RESET}")
@@ -155,6 +155,8 @@ def print_box(
         │  functionality by outputting the text 'Hello World'.          │
         ╰──────────────────────────────────────────────────────────────╯
     """
+    if not content:
+        return
     inner_w = width - 4  # 2 border chars + 2 spaces padding on each side
 
     # Top border

@@ -16,7 +16,12 @@ class LocalTransfer:
         self.workspace_path = workspace_path
         self.runs_capsule_dir = runs_capsule_dir
         provider, model = extract_model_pattern(config.capsule_namer_model)
-        self.config_llm = LLMConfig.from_dict({"model": model, "provider": provider})
+        # max_tokens kept small (256) — we only need a short folder name.
+        self.config_llm = LLMConfig.from_dict({
+            "model": model,
+            "provider": provider,
+            "max_tokens": 256,
+        })
 
     def create_capsule_name(self, goal: str) -> str:
         """

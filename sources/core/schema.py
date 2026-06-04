@@ -20,30 +20,37 @@ class TaskComplexity(Enum):
     MEDIUM = "medium"
     HIGH = "high"
 
-# ImprovementLog class for tracking validated improvements in Darwin Gödel Machine
+# class for tracking validated improvements
 @dataclass
-class ImprovementLog:
-    """Tracks validated improvements in the Darwin Gödel Machine."""
+class SelectionLog:
+    """Tracks validated improvements during evolution."""
     from_iteration: int
     to_iteration: int
     improvement_type: str
     delta_reward: float
     is_validated: bool
     confidence: float = 0.0
+    admit_rejected: bool = False
     timestamp: datetime = field(default_factory=datetime.now)
 
     def __str__(self) -> str:
+        """Return a human-readable summary of the selection log entry."""
         status = "✅ VALIDATED" if self.is_validated else "⚠️ NOT VALIDATED"
-        return (f"ImprovementLog({status}, type={self.improvement_type}, "
+        return (f"SelectionLog({status}, type={self.improvement_type}, "
                 f"delta={self.delta_reward:+.3f}, confidence={self.confidence:.0%})")
 
 @dataclass
 class IndividualRun:
-    """Tracks information for a single evolved workflow run."""
+    """Tracks information for a single evolved workflow run.
+
+    Aggregates per-iteration evaluation data, lineage, and metadata used by
+    the evolution engine to weigh, log, and persist runs.
+    """
     goal: str
     prompt: str
     cost: float = 0.0
     reward: float = 0.0
+    reward_uncapped: float = 0.0
     max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False
@@ -56,8 +63,16 @@ class IndividualRun:
     state_result: dict | None = None
     plot: str | None = ""
     original_task: str | None = None  # Original unwrapped task for similarity matching
+    code: str | None = None
+    selection_log: "SelectionLog | None" = None
+    # Lineage: parents that produced this individual and the variation operator
+    # used. Set by EvolutionEngine before orchestrate_workflow runs and
+    # persisted via sources.core.lineage.record_lineage afterwards.
+    parent_uuids: list[str] = field(default_factory=list)
+    evolution_kind: str = "seed"  # "seed" | "mutation" | "crossover"
 
     def __str__(self) -> str:
+        """Return a verbose, debug-style summary of the run."""
         return (f"IndividualRun(goal='{self.goal}', prompt='{self.prompt}', "
                 f"cost={self.cost}, reward={self.reward}, max_depth={self.max_depth}, "
                 f"iteration_count={self.iteration_count}, answers={self.answers}, "
@@ -79,8 +94,13 @@ class PlanStep:
     complexity: str = "medium"
     status: TaskStatus = TaskStatus.PENDING
 
-    def __post_init__(self):
-        """Validate the plan step after initialization."""
+    def __post_init__(self) -> None:
+        """Validate the plan step after initialization.
+
+        Raises:
+            ValueError: When ``name`` or ``task`` is empty, or ``complexity``
+                is not one of :class:`TaskComplexity` values.
+        """
         if not self.name:
             raise ValueError("Plan step name cannot be empty")
         if not self.task:
@@ -94,8 +114,14 @@ class Plan:
     goal: str
     steps: list[PlanStep] = field(default_factory=list)
 
-    def __post_init__(self):
-        """Validate the plan after initialization."""
+    def __post_init__(self) -> None:
+        """Validate the plan after initialization.
+
+        Raises:
+            ValueError: When ``goal`` or ``steps`` are empty, step names are
+                not unique, or any step depends on a step not present in the
+                plan.
+        """
         if not self.goal:
             raise ValueError("Plan goal cannot be empty")
         if not self.steps:
@@ -115,6 +141,12 @@ class Plan:
 # Task class used in the planner module for keeping track of tasks and their states.
 @dataclass
 class Task:
+    """Tracks a planner task and the evolution runs produced for it.
+
+    Used by :mod:`sources.core.planner` to manage task lifecycle: dependencies,
+    inputs/outputs, status, cumulative cost, and the evolved runs that
+    eventually produce its final answer.
+    """
     name: str
     description: str
     run_id: int = 0

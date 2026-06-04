@@ -19,13 +19,13 @@ class WorkflowEval:
     """
     Class for evaluating success of LLMs on generating workflow for a given dataset tasks
     """
-    def __init__(self, config, csv_runs_limit: int = 102):
+    def __init__(self, config, csv_runs_limit: int = 3):
         self.config = config
         self.csv_runs_limit = csv_runs_limit
         self.orchestrator = WorkflowOrchestrator(config)
         self.model_lists = [
-            "openrouter/z-ai/glm-5",
-            "anthropic/claude-sonnet-4-5",
+            "openrouter/mistralai/mistral-large-2512",
+            "anthropic/claude-opus-4-5",
             #"openrouter/deepseek/deepseek-v3.2",
             #"openrouter/openrouter/inception/mercury-2",
             #"openrouter/minimax/minimax-m2.5",
@@ -40,7 +40,6 @@ class WorkflowEval:
     async def run_workflow_eval_loop(self, dataset_type: str, dataset_path: str) -> None:
         """Run evaluation loop for all models and display comparative report."""
         for model in self.model_lists:
-            self.config.prompts_llm_model = model
             self.config.workflow_llm_model = model
 
             print(f"\n{'='*80}")

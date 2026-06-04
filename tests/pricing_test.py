@@ -106,12 +106,16 @@ def test_config_pricing_integration():
         print("✅ Pricing cache works correctly")
 
         # Test 4: Refresh functionality
+        # ``refresh_pricing()`` is lazy by design — it nulls the cache; the
+        # next read of ``model_pricing`` is what triggers the fresh API call.
+        # Reading proactively here verifies the documented contract.
         print("\n4️⃣ Testing pricing refresh...")
         config.refresh_pricing()
         assert config._model_pricing_cache is None, "Cache not cleared after refresh"
 
+        _ = config.model_pricing  # next read should re-hit the API
         assert mock_instance.get_model_pricing_dict.call_count == 2, (
-            "Refresh didn't trigger new API call"
+            "Read after refresh should have triggered a new API call"
         )
         print("✅ Pricing refresh works correctly")
 

@@ -38,29 +38,29 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5100)
         ]
 
         # LLMs choices
-        self.planner_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.prompts_llm_model: str = "anthropic/claude-sonnet-4-5"
-        self.workflow_llm_model: str = "anthropic/claude-opus-4-5"
-        self.smolagent_model_id: str = "anthropic/claude-sonnet-4-5"
-        self.judge_model = "anthropic/claude-sonnet-4-5"
-        self.capsule_namer_model = "deepseek/deepseek-chat"
+        self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
+        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
+        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
+
 
         # prompts for planner / workflow generator
         self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v8.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
         self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
-        self.reasoning_effort: str = "high"
+        self.reasoning_effort: str = "medium"
 
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 8192
@@ -68,8 +68,8 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 10
+        self.learned_score_threshold = 0.94
+        self.max_learning_evolve_iterations = 45
 
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
@@ -81,7 +81,21 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
+        # When True, every child workflow's verifier eval anchors on the
+        # earliest ancestor's cached rubric (claims + verify_*.py) so scores
+        # are comparable across an evolved lineage. Disable for ablation.
+        self.reuse_lineage_rubric: bool = True
 
+        # openrouter providers
+        self.openrouter_provider: list[str] | None = [
+            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
+            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
+             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
+             "groq", "cerebras", "sambanova", "nvidia"
+        ]
+        self.openrouter_provider_by_model: dict[str, list[str]] = {}
+        self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
+        self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
         # runner settings
         self.runner_default_python_version: str = "3.10"
         self.runner_default_timeout: int = 3600
@@ -110,6 +124,30 @@ class Config:
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
 
+
+    def openrouter_provider_for(self, model_id: str | None) -> list[str] | None:
+        """Return the precheck-selected provider list for `model_id`, or the
+        default `openrouter_provider` when no per-model selection exists.
+
+        Callers that build an LLMConfig for an OpenRouter model should use
+        this — passing the shared `openrouter_provider` directly can leave
+        the runtime with no routable provider for that specific model.
+        """
+        if model_id and model_id in self.openrouter_provider_by_model:
+            return self.openrouter_provider_by_model[model_id]
+        return self.openrouter_provider
+
+    def openrouter_quantizations_for(self, model_id: str | None) -> list[str] | None:
+        """Return the OpenRouter `quantizations` filter to apply for `model_id`.
+
+        `None` means omit the filter — this is the case when precheck
+        selected at least one untagged first-party provider (google-vertex,
+        google-ai-studio, etc.). Without precheck data, returns the default
+        safety filter which blocks unsafe (int4/fp4) routing.
+        """
+        if model_id and model_id in self.openrouter_quantizations_by_model:
+            return self.openrouter_quantizations_by_model[model_id]
+        return self.default_openrouter_quantizations
 
     @property
     def model_pricing(self) -> dict[str, dict[str, float]]:
@@ -163,11 +201,11 @@ class Config:
                 for addr in self.discovery_addresses
             ],
             "planner_llm_model": self.planner_llm_model,
-            "prompts_llm_model": self.prompts_llm_model,
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
             "engine_name": self.engine_name,
+            "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "reasoning_effort": self.reasoning_effort,
@@ -179,6 +217,7 @@ class Config:
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
+            "reuse_lineage_rubric": self.reuse_lineage_rubric,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
@@ -195,15 +234,13 @@ class Config:
             for addr in data.get("discovery_addresses", [])
         ]
         self.planner_llm_model = data.get("planner_llm_model", self.planner_llm_model)
-        self.prompts_llm_model = data.get(
-            "prompts_llm_model", self.prompts_llm_model
-        )
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
         self.engine_name = data.get("engine_name", self.engine_name)
+        self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
@@ -223,6 +260,9 @@ class Config:
         self.runs_capsule_dir = data.get("runs_capsule_dir", self.runs_capsule_dir)
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.memory_dir = data.get("memory_dir", self.memory_dir)
+        self.reuse_lineage_rubric = bool(
+            data.get("reuse_lineage_rubric", self.reuse_lineage_rubric)
+        )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )

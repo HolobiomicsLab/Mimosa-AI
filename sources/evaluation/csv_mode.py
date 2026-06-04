@@ -9,13 +9,14 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sources.core.dgm import DarwinMachine
+from sources.core.evolution_engine import EvolutionEngine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
 from sources.core.schema import Task, IndividualRun
@@ -23,10 +24,42 @@ from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.list_files import list_files
+from sources.utils.email_reporter import send_evaluation_report
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_summary,
 )
+
+
+_INPUT_TIMEOUT = 10  # seconds before auto-accepting the default
+
+
+async def _input_with_timeout(prompt: str, default: str = "0", timeout: float = _INPUT_TIMEOUT) -> str:
+    """
+    Non-blocking input prompt with a countdown timeout.
+
+    Displays a prompt and waits up to *timeout* seconds for user input.
+    If no input is provided within the timeout, *default* is returned.
+
+    Args:
+        prompt: The text shown to the user.
+        default: Value returned on timeout or empty input.
+        timeout: Seconds to wait before auto-accepting *default*.
+
+    Returns:
+        The user's input string, or *default* on timeout / empty input.
+    """
+    loop = asyncio.get_running_loop()
+    print(f"{prompt} (auto-accept '{default}' in {timeout:.0f}s): ", end="", flush=True)
+    try:
+        raw = await asyncio.wait_for(
+            loop.run_in_executor(None, input),
+            timeout=timeout,
+        )
+        return raw.strip() if raw.strip() else default
+    except asyncio.TimeoutError:
+        print(f"\n  ⏱  Timeout – using default: {default}")
+        return default
 
 
 @dataclass
@@ -57,7 +90,7 @@ class CsvEvaluationMode:
         self.config = config
         self.csv_runs_limit = csv_runs_limit
         self.max_concurrent_tasks = max_concurrent_tasks
-        self.dgm = DarwinMachine(config)
+        self.evolve = EvolutionEngine(config)
         self.planner = Planner(config)
         self.run_notes_dir = Path("run_notes")
         self.run_notes_dir.mkdir(exist_ok=True)
@@ -66,16 +99,15 @@ class CsvEvaluationMode:
         # Concurrency control
         self.task_start_delay = task_start_delay
         self._semaphore: asyncio.Semaphore | None = None
-        self._results_lock = asyncio.Lock()
         self._base_workspace_dir = config.workspace_dir
 
-        model_name = "anthropic/claude-haiku-4-5-20251001"  # judge
+        model_name = config.judge_model
         provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
 
         self.llm_config = LLMConfig(
             model=model,
             provider=provider,
-            temperature=0.8,
+            temperature=1.0,
             max_tokens=8192
         )
         self.result_analyzer = LLMProvider(
@@ -87,6 +119,14 @@ class CsvEvaluationMode:
         # Track execution history
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
+
+        # Run-level context captured by start_evaluation for the email report.
+        self._dataset_type: str | None = None
+        self._dataset_path: str | None = None
+        self._learning: bool = False
+        self._single_agent_mode: bool = False
+        self._concurrent: bool = False
+        self._start_row: int = 0
 
     def _get_result_analyzer_system_prompt(self) -> str:
         """System prompt for the result analysis LLM."""
@@ -241,7 +281,8 @@ Provide a structured analysis with:
             "goal": goal,
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
-            "total_eval": len(sab_runs)
+            "total_eval": len(sab_runs),
+            "git": self._get_git_info()
         }
 
         if sab_runs:
@@ -273,6 +314,36 @@ Provide a structured analysis with:
         with open(notes_file, 'w', encoding='utf-8') as f:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
+
+    @staticmethod
+    def _get_git_info() -> dict:
+        """
+        Capture the current git commit, branch and working-tree state of the repo.
+
+        Recorded in run notes so each run can be tied back to the exact code that
+        produced it. Returns None values when git metadata is unavailable.
+        """
+        repo_dir = Path(__file__).resolve().parent
+
+        def _git(*args: str) -> str | None:
+            try:
+                return subprocess.run(
+                    ["git", *args],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5,
+                ).stdout.strip()
+            except (subprocess.SubprocessError, OSError):
+                return None
+
+        status = _git("status", "--porcelain")
+        return {
+            "commit": _git("rev-parse", "HEAD"),
+            "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+            "dirty": bool(status) if status is not None else None,
+        }
 
     @staticmethod
     def _compute_per_iteration_costs(runs_data: list) -> list[float]:
@@ -362,6 +433,7 @@ Your ENTIRE working environment is confined to the subfolder: {workspace_subfold
 • ALL file reads, writes and creations MUST happen inside {workspace_subfolder}/ — never outside.
 • Treat {workspace_subfolder}/ as your root directory and use paths relative to it.
 • Do NOT access, create or modify anything outside {workspace_subfolder}/.
+. Any scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
 """
 
         # Build explicit output paths
@@ -385,14 +457,6 @@ EXPECTED OUTPUT:
 1. Results file — save to the EXACT path: {output_path}
    (i.e. at the root of your workspace subfolder, not in any sub-directory)
 2. Python script — keep exactly ONE final script at: {script_path}
-   (i.e. directly inside {workspace_subfolder}/, not nested deeper)
-3. Others scripts, files, notes or folders you create during your work MUST also be inside {workspace_subfolder}/
-
-⚠️ OUTPUT FORMAT RULES — non-compliance will cause evaluation failure:
-• Column names in the output file must match the source data exactly.
-  Example: if the input CSV column is named FDA_APPROVED, the output column MUST also be FDA_APPROVED.
-  Variants such as FDA_APPROVED_prob are NOT acceptable.
-• Do not rename, reorder, or otherwise alter column identifiers from the source.
 """
         return task_prompt, scenario_id, scoring_rubric_file
 
@@ -640,8 +704,8 @@ Provide your analysis following the specified output format."""
                 print(f"\033[96m[Worker {workspace_name}] 📋 GOAL: {goal[:100]}...\033[0m")
                 print(f"\033[96m[Worker {workspace_name}] 📄 Scenario Rubric: {scenario_rubric_filename}\033[0m")
 
-                # Create isolated DGM/Planner instances
-                isolated_dgm = DarwinMachine(isolated_config)
+                # Create isolated evolution engine/Planner instances
+                isolated_dgm = EvolutionEngine(isolated_config)
                 isolated_planner = Planner(isolated_config)
 
                 # Create file transfer with isolated workspace
@@ -651,20 +715,16 @@ Provide your analysis following the specified output format."""
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
-                # When learning is disabled, run only 1 iteration (no self-improvement loop)
-                max_iter = self.config.max_learning_evolve_iterations if learning else 1
-
                 runs = None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
                     self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
 
-                    runs = await isolated_dgm.start_dgm(
+                    runs = await isolated_dgm.start_workflow_evolution(
                         goal=goal,
                         judge=True,
-                        learning_mode=learning,
+                        enable_evolution=learning,
                         scenario_rubric=None,
-                        max_iteration=max_iter,
                         single_agent_mode=single_agent_mode
                     )
                     results_str = self._format_task_mode_results(runs[-1])
@@ -672,7 +732,6 @@ Provide your analysis following the specified output format."""
                     tasks_data = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
-                        max_evolve_iteration=max_iter,
                         max_task_retry=3
                     )
                     results_str = self._format_goal_mode_results(tasks_data)
@@ -797,23 +856,23 @@ Provide your analysis following the specified output format."""
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
+        # Get starting row from user (with timeout)
         while True:
-            user_input = input("Enter starting row ([Enter] 0 by default): ")
-            if not user_input.strip():
-                start_row = 0
-                break
+            user_input = await _input_with_timeout("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1
+                start_row = int(user_input) - 1 if user_input != "0" else 0
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        self._start_row = start_row
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
-            if restore_input.strip().lower() != 'n':
+            restore_input = await _input_with_timeout(
+                "Restore previous run statistics from cache? (y/n)", default="y"
+            )
+            if restore_input.lower() != 'n':
                 self._restore_execution_history_from_cache(cached_notes)
 
         # Initialize semaphore for concurrency control
@@ -896,6 +955,7 @@ Provide your analysis following the specified output format."""
         self.execution_history.sort(key=lambda x: x.get("iteration", 0))
 
         self._print_final_summary()
+        self._send_email_report(status="completed")
 
     async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
         """
@@ -903,22 +963,24 @@ Provide your analysis following the specified output format."""
         Generates goals from CSV entries, executes them, analyzes results, and learns.
         """
         papers_csv_path = Path(dataset_path)
+
+        # Get starting row from user (with timeout)
         while True:
-            user_input = input("Enter starting row ([Enter] 0 by default): ")
-            if not user_input.strip():
-                start_row = 0
-                break
+            user_input = await _input_with_timeout("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1
+                start_row = int(user_input) - 1 if user_input != "0" else 0
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        self._start_row = start_row
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = input("Restore previous run statistics from cache? (y/n) [Enter for yes]: ")
-            if restore_input.strip().lower() != 'n':
+            restore_input = await _input_with_timeout(
+                "Restore previous run statistics from cache? (y/n)", default="y"
+            )
+            if restore_input.lower() != 'n':
                 self._restore_execution_history_from_cache(cached_notes)
 
         sab_loader = None
@@ -951,23 +1013,18 @@ Provide your analysis following the specified output format."""
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
-                    # When learning is disabled, run only 1 iteration (no self-improvement loop)
-                    max_iter = self.config.max_learning_evolve_iterations if learning else 1
-
                     if dataset_type == "science_agent_bench" and sab_loader:
                         self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.dgm.start_dgm(goal=goal,
+                        runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
-                                                        learning_mode=learning,
+                                                        enable_evolution=learning,
                                                         scenario_rubric=None,
-                                                        max_iteration=max_iter,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])
                     else:
                         tasks_data = await self.planner.start_planner(goal=goal,
                                     judge=True,
-                                    max_evolve_iteration=self.config.max_learning_evolve_iterations,
                                     max_task_retry=3
                                    )
                         results_str = self._format_goal_mode_results(tasks_data)
@@ -982,7 +1039,8 @@ Provide your analysis following the specified output format."""
                         "goal": goal,
                         "execution_time": execution_time,
                         "success_level": analysis.get("success_level", "Unknown"),
-                        "key_insight": analysis.get("full_analysis", "Unknown")
+                        "key_insight": analysis.get("full_analysis", "Unknown"),
+                        "task_id": self._extract_workspace_name_from_row(row),
                     }
                     if dataset_type == "science_agent_bench" and sab_loader:
                         execution_data = self._evaluate_with_science_agent_bench(
@@ -1009,9 +1067,10 @@ Provide your analysis following the specified output format."""
                     raise e
 
         self._print_final_summary()
+        self._send_email_report(status="completed")
 
-    def _print_final_summary(self) -> None:
-        """Print a summary of all autonomous executions."""
+    def _build_summary_rows(self) -> tuple[list[tuple[str, str]], list[dict], list[dict]]:
+        """Build the rows used for both the printed summary and the email report."""
         # Filter out cached entries to count only actual runs from this session
         current_runs = [exec_data for exec_data in self.execution_history
                        if exec_data.get("success_level") != "Cached"]
@@ -1023,13 +1082,12 @@ Provide your analysis following the specified output format."""
             f"{len(successful_runs)/len(current_runs)*100:.1f}%"
             if current_runs else "N/A"
         )
-        rows = [
+        rows: list[tuple[str, str]] = [
             ("Steps evaluated", str(len(current_runs))),
             ("Successful runs", str(len(successful_runs))),
             ("Success rate", success_rate),
         ]
 
-        # For SAB metrics, also exclude cached entries
         sab_runs = [exec_data for exec_data in current_runs if 'VER' in exec_data]
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
@@ -1044,8 +1102,128 @@ Provide your analysis following the specified output format."""
                 ("Total API Cost", f"${total_cost:.4f}"),
                 ("Avg cost/task", f"${total_cost/len(sab_runs):.4f}"),
             ]
+        return rows, current_runs, sab_runs
+
+    def _print_final_summary(self) -> None:
+        """Print a summary of all autonomous executions."""
+        rows, current_runs, sab_runs = self._build_summary_rows()
+
+        # Recompute the values needed for the cli-notes side-effect below.
+        successful_runs = [exec_data for exec_data in current_runs
+                          if exec_data.get("success_level") in ["High", "Medium"]]
+        success_rate = (
+            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
+            if current_runs else "N/A"
+        )
+        if sab_runs:
+            ver_success = sum(1 for run in sab_runs if run.get('VER', False))
+            sr_success = sum(1 for run in sab_runs if run.get('SR', False))
+            avg_cbs = sum(run.get('CBS', 0.0) for run in sab_runs) / len(sab_runs)
+            total_cost = sum(run.get('eval_cost', 0.0) for run in sab_runs)
 
         print_summary("📊 EVALUATION SUMMARY", rows)
+
+        # If launched via EvaluationCLI, append final metrics to the run notes file.
+        notes_path = getattr(self, "_evaluation_cli_notes_path", None)
+        if notes_path and Path(notes_path).exists():
+            try:
+                with open(notes_path, "r", encoding="utf-8") as fh:
+                    notes_data = json.load(fh)
+                final = {
+                    "steps_evaluated": len(current_runs),
+                    "successful_runs": len(successful_runs),
+                    "success_rate": success_rate,
+                }
+                if sab_runs:
+                    final.update({
+                        "ver_success": ver_success,
+                        "ver_total": len(sab_runs),
+                        "sr_success": sr_success,
+                        "sr_total": len(sab_runs),
+                        "avg_cbs": avg_cbs,
+                        "total_cost": total_cost,
+                    })
+                notes_data["final_results"] = final
+                notes_data["finished_at"] = datetime.now().isoformat()
+                with open(notes_path, "w", encoding="utf-8") as fh:
+                    json.dump(notes_data, fh, indent=2, ensure_ascii=False)
+                    fh.write("\n")
+            except Exception:
+                pass  # best-effort
+
+    def _build_config_rows(self) -> list[tuple[str, str]]:
+        """Build the run-configuration rows shown at the top of the email."""
+        mode = "single-agent" if self._single_agent_mode else "multi-agent"
+        concurrency = (
+            f"{self.max_concurrent_tasks} workers (stagger {self.task_start_delay:.1f}s)"
+            if self._concurrent else "sequential"
+        )
+        return [
+            ("Execution mode", mode),
+            ("Learning", "enabled" if self._learning else "disabled"),
+            ("Concurrency", concurrency),
+            ("Dataset type", self._dataset_type or "unknown"),
+            ("Dataset path", self._dataset_path or "unknown"),
+            ("CSV runs limit", str(self.csv_runs_limit)),
+            ("Start row", str(self._start_row + 1)),
+            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown")),
+            ("Judge model", f"{self.llm_config.provider}/{self.llm_config.model}"),
+        ]
+
+    def _build_task_table(self) -> dict | None:
+        """Build the per-task results table for the email. Returns None if empty."""
+        current_runs = [
+            exec_data for exec_data in self.execution_history
+            if exec_data.get("success_level") != "Cached"
+        ]
+        if not current_runs:
+            return None
+
+        has_sab = any("VER" in d for d in current_runs)
+        headers = ["#", "Task", "Time (s)", "Success"]
+        if has_sab:
+            headers += ["VER", "SR", "CBS", "Cost ($)"]
+
+        rows: list[list[str]] = []
+        for d in current_runs:
+            task_label = d.get("task_id") or (d.get("goal", "") or "")[:40]
+            row = [
+                str(d.get("iteration", "?")),
+                task_label,
+                f"{d.get('execution_time', 0):.1f}",
+                str(d.get("success_level", "?")),
+            ]
+            if has_sab:
+                row += [
+                    "✓" if d.get("VER") else "✗",
+                    "✓" if d.get("SR") else "✗",
+                    f"{d.get('CBS', 0.0):.3f}",
+                    f"{d.get('eval_cost', 0.0):.4f}",
+                ]
+            rows.append(row)
+        return {"headers": headers, "rows": rows}
+
+    def _send_email_report(self, status: str = "completed") -> None:
+        """Send the final summary by email (no-op if email env vars are unset)."""
+        try:
+            rows, current_runs, _ = self._build_summary_rows()
+            config_rows = self._build_config_rows()
+            task_table = self._build_task_table()
+            model = getattr(self.config, "smolagent_model_id", "unknown")
+            subject = f"[Mimosa] Evaluation {status} — {len(current_runs)} runs ({model})"
+            body_prefix = (
+                f"Mimosa-AI evaluation {status} at "
+                f"{datetime.now().isoformat(timespec='seconds')}."
+            )
+            send_evaluation_report(
+                subject=subject,
+                rows=rows,
+                body_prefix=body_prefix,
+                config_rows=config_rows,
+                task_table=task_table,
+            )
+        except Exception as e:
+            self.logger.warning(f"[EMAIL] Skipped email report due to error: {e}")
 
     async def start_evaluation(
         self,
@@ -1065,6 +1243,13 @@ Provide your analysis following the specified output format."""
             single_agent_mode: Whether to use single agent mode
             concurrent: Whether to run tasks concurrently (uses max_concurrent_tasks from init)
         """
+        # Snapshot the run-level args so the email report can describe what ran.
+        self._dataset_type = dataset_type
+        self._dataset_path = dataset_path
+        self._learning = learning
+        self._single_agent_mode = single_agent_mode
+        self._concurrent = concurrent and self.max_concurrent_tasks > 1
+
         try:
             if concurrent and self.max_concurrent_tasks > 1:
                 print(f"\033[95mStarting CONCURRENT evaluation with {self.max_concurrent_tasks} workers\033[0m")
@@ -1076,9 +1261,11 @@ Provide your analysis following the specified output format."""
         except KeyboardInterrupt:
             print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
+            self._send_email_report(status="interrupted")
         except Exception as e:
             self.logger.error(f"[PAPERS DATASET MODE] Fatal error: {str(e)}")
             print_err(f"Fatal error in autonomous mode: {str(e)}")
+            self._send_email_report(status="failed")
             raise
 
     async def start_concurrent_evaluation(

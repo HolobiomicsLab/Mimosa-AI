@@ -1,4 +1,17 @@
-g Running PaperBench Locally (Quick Note)
+# Running PaperBench Locally
+
+!!! info "Two different things called 'evaluation'"
+    PaperBench is an **external benchmark grader** released by OpenAI's
+    frontier-evals team — not the Mimosa judge. PaperBench takes a
+    candidate submission and grades it against a paper's expected
+    reproduction outputs using its own scaffolded judge and runtime.
+
+    The Mimosa-internal verifier ([Evaluation pipeline](concepts/evaluation-pipeline.md))
+    runs *during* workflow evolution, produces the prompt gradient that
+    drives the mutator, and is separate from PaperBench. When you run
+    PaperBench on a Mimosa capsule, you are sending an artefact that
+    Mimosa's evolution loop produced into a grading system Mimosa has
+    no control over.
 
 This note captures the minimum you need to run PaperBench with pre-existing submissions (via `PBDirectSubmissionSolver`). For a full walkthrough see `paperbench/README.md`.
 
@@ -132,3 +145,12 @@ uv run python -m paperbench.nano.entrypoint \
 - `group.log` summarizes the entire launch.
 
 If a run reports "No checkpoint exists", confirm the submissions directory contains a folder named exactly after the paper(s) in your split. If reproduction fails because Python/Jupyter are missing in the base container, rerun after pulling the latest code (the runtime now auto-installs Python when necessary).
+
+## See also
+
+- [Evaluation pipeline](concepts/evaluation-pipeline.md) — Mimosa's
+  in-loop verifier, which is **not** PaperBench.
+- [ScienceAgentBench evaluation](science_agent_bench_evaluation.md) —
+  the other external benchmark grader Mimosa is wired into.
+- [PaperBench (frontier-evals)](https://github.com/openai/frontier-evals) —
+  upstream source, the canonical reference for the grader itself.

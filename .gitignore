@@ -1,4 +1,8 @@
 *.wav
+.claude/*
+credentials.json
+token.json
+*credentials*
 *.DS_Store
 *.log
 *.tmp

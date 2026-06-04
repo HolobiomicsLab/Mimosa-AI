@@ -1,8 +1,37 @@
-# ScienceAgentBench Evaluation System
+# ScienceAgentBench Evaluation
+
+!!! info "Two different things called 'evaluation'"
+    Mimosa has two distinct evaluation systems and this page covers one
+    of them.
+
+    - **The judge / verifier** ([Evaluation pipeline](concepts/evaluation-pipeline.md))
+      runs after every workflow execution and produces the **pressure
+      signal** that drives workflow evolution. It writes deterministic
+      Python programs that recompute claims from the workspace.
+    - **ScienceAgentBench evaluation** (this page) is an **external
+      benchmark grader** that compares a workflow's output file against
+      a **ground-truth file shipped by the ScienceAgentBench authors**.
+      It is not part of the evolutionary loop and is not written by us
+      — VER / SR / CBS are the benchmark's metrics, not Mimosa's
+      internal scoring.
 
 ## Overview
 
-The ScienceAgentBench evaluation system provides comprehensive evaluation of Mimosa-AI's performance on scientific computing tasks using standardized metrics. This system implements the complete evaluation pipeline from the ScienceAgentBench benchmark.
+ScienceAgentBench is a 102-task benchmark of scientific computing tasks
+released by the ScienceAgentBench authors
+([paper](https://arxiv.org/abs/2410.05080)). Each task ships with:
+
+- A task description and dataset preview.
+- A **gold reference Python program** written by the benchmark authors.
+- A **gold output file** computed by running that gold program.
+- A **task-specific evaluation script** that decides whether a candidate
+  output meets the task's acceptance criterion.
+
+The Mimosa-side ScienceAgentBench code in
+[`sources/evaluation/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/)
+runs the candidate workflow, hands the produced file to the benchmark's
+own evaluation machinery, and aggregates the resulting metrics. It does
+not re-implement the benchmark; it bridges Mimosa to it.
 
 ## Architecture
 
@@ -122,7 +151,7 @@ These figures are manuscript results, not a guaranteed console output for every 
 **Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 iterations**
 
 ```sh
-uv run main.py --science_agent_bench --csv_runs_limit 102 --max_evolve_iterations 10
+uv run main.py --science_agent_bench --csv_runs_limit 102
 ```
 
 ### Output Structure
@@ -189,11 +218,27 @@ ScienceAgentBench CSV requires these columns:
 - `eval_script_name`: Evaluation script filename
 - `gold_program_name`: Reference implementation filename
 
+## What this is *not*
+
+This page does **not** describe the multi-source per-claim verifier that
+drives workflow evolution. The verifier runs on every workflow execution
+(benchmark or not), writes deterministic Python programs to check the
+agents' claims against the workspace, and emits a coarse prompt gradient
+that the mutator can act on. For that, see
+[Evaluation pipeline](concepts/evaluation-pipeline.md).
+
+When running ScienceAgentBench in `--learn` mode, both systems run: the
+verifier provides the per-generation pressure signal, and the
+ScienceAgentBench grader scores the final per-task output for the
+benchmark report.
+
 ## References
 
 - [ScienceAgentBench Paper](https://arxiv.org/abs/2410.05080)
 - [CodeBERT Model](https://huggingface.co/microsoft/codebert-base)
-- [Mimosa-AI Documentation](../README.md)
+- [Evaluation pipeline](concepts/evaluation-pipeline.md) — the *other*
+  evaluation system in Mimosa.
+- [Mimosa-AI Documentation](index.md)
 
 ## License
 

@@ -1,0 +1,106 @@
+# Iterative learning
+
+Run any task with `--learn` and Mimosa retries it across generations,
+keeping only improvements. This page covers the practical side; for the
+mechanics, see [Evolution engine](../concepts/evolution-engine.md).
+
+## Why learn first
+
+Single-shot multi-agent workflows are noisy: even strong LLMs produce
+workflows that need refinement. Iterative learning lets Mimosa explore the
+workflow space, archive what worked, and recombine.
+
+In practice:
+
+- **Cold tasks** (no related runs on disk) benefit most — the first
+  generation is often weak; iteration finds the strong region.
+- **Warm tasks** (similar runs already on disk) start from a stronger
+  baseline thanks to the disk-similarity scan.
+- **Familiar tasks** (a previous run hit the threshold) can reuse a saved
+  workflow without iteration — see [Workspace & audit trail](workspace.md).
+
+## How to enable it
+
+Add `--learn` to a task or goal mode invocation:
+
+```bash
+uv run main.py --task "Train a multitask model on the Clintox dataset…" \
+              --learn \
+              --config my_config.json
+```
+
+Or, for batch evaluations:
+
+```bash
+uv run main.py --science_agent_bench --csv_runs_limit 20 --learn
+```
+
+Without `--learn`, the engine still runs the verifier but never iterates
+— you get a one-shot result.
+
+## Termination
+
+Mimosa stops the moment either condition is met:
+
+- `overall_score > learned_score_threshold` (config field, default `0.97`).
+- `iteration ≥ max_learning_evolve_iterations` (default `35`).
+
+The "best" workflow at termination — the one with the highest
+`reward_uncapped` in the archive — has its workspace snapshot restored as
+the run's final state.
+
+!!! tip "Tuning the threshold"
+    - Setting the threshold too high (e.g. `1.0`) means the loop never
+      stops early; you'll always hit `max_learning_evolve_iterations`.
+    - Setting it too low (e.g. `0.7`) means the loop stops after one lucky
+      generation that *happens* to fool the judge.
+    - The default `0.97` is a reasonable balance — adjust based on observed
+      score distributions for your task family.
+
+## What evolves between generations
+
+| Stagnation effective | Mutation scope                                          |
+| -------------------- | ------------------------------------------------------- |
+| < 0.20               | prompt-only little tweak                                |
+| < 0.40               | prompt, handoff, tools — improve information flow       |
+| < 0.60               | significant redesign while keeping topology             |
+| < 0.80               | bold rewire — restructure or grow the agent set         |
+| ≥ 0.80               | complete rethink — discard inherited topology / prompts |
+
+Stagnation is the MiniLM cosine similarity between the last 4
+non-failure prompt gradients (rescaled so unrelated diagnoses ≈ 0,
+near-identical ≈ 1). Effective stagnation is damped by parent score
+(`stagnation · (1 − parent_score)`) so near-winners stay protected
+from disruption. The agent budget grows with stagnation up to a hard
+ceiling of 7.
+
+Roughly ~30 % of generations do **crossover** instead of mutation — two
+parents combined, best-parent-first.
+
+## What you'll see on disk
+
+After a `--learn` run, each generation has its own folder under
+`sources/workflows/<uuid>/`. The "best" UUID is logged to the console at
+the end. Across the run you'll also get:
+
+- `sources/workflows/<best_uuid>/reward_progress.png` — score-over-iteration curve.
+- `sources/workflows/<best_uuid>/evolution_tree.png` — lineage tree (each
+  node a workflow, edges showing mutation/crossover).
+- `runs_capsule/<capsule_name>/` — archived snapshot of the best run.
+
+![Reward progress example](../images/evolve_example.png){ width="70%" }
+
+## Mid-run interruption
+
+`SIGINT` (Ctrl-C) and `SIGTERM` are caught by `setup_signal_handlers()` in
+`main.py`. Mimosa cancels in-flight async tasks and exits cleanly. The
+session archive lives only in memory, so an interrupted `--learn` run
+discards uncommitted progress — but every completed generation is already
+on disk under `sources/workflows/<uuid>/` and can be inspected.
+
+## See also
+
+- [Evolution engine](../concepts/evolution-engine.md) — mechanics of QD selection.
+- [Evaluation pipeline](../concepts/evaluation-pipeline.md) — what the scores mean.
+- [Workspace & audit trail](workspace.md) — where each generation's artefacts go.
+- [Transparency & replay](transparency.md) — step through any generation interactively.

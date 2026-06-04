@@ -12,12 +12,18 @@ from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .factory import Factory
 
 class SingleAgentFactory(Factory):
-    """Handles the creation and management of Langraph-SmolAgent workflow generation"""
+    """Build executable Python code for a single SmolAgent run.
 
-    def __init__(self, config) -> None:
+    Mirrors :class:`WorkflowFactory` but emits a one-agent script instead of
+    a LangGraph workflow. Supports cost tracking by reusing the same folder
+    structure (workflow + memory) as the multi-agent path.
+    """
+
+    def __init__(self, config: "Config") -> None:
         """Initialize the workflow crafting system.
+
         Args:
-            config: Configuration object containing paths and settings
+            config: Configuration object containing paths and settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -25,16 +31,20 @@ class SingleAgentFactory(Factory):
         self.logger = logging.getLogger(__name__)
 
 
-    async def craft_single_agent(self, goal: str, original_task: str = None):
-        """
-        For crafting single agent with cost tracking support.
+    async def craft_single_agent(self, goal: str, original_task: str | None = None) -> tuple[str, str, str]:
+        """Craft a single-agent script with cost tracking support.
 
         Args:
-            goal: The goal description (may be knowledge-wrapped)
-            original_task: The original unwrapped task for similarity matching
+            goal: The goal description (may be knowledge-wrapped).
+            original_task: The original unwrapped task for similarity matching.
 
         Returns:
-            tuple[str, str, str]: (complete_code, workflow_code, uuid)
+            Tuple ``(complete_code, workflow_genotype_code, uuid_str)``. For the
+            single-agent case ``complete_code`` and ``workflow_genotype_code``
+            are identical.
+
+        Raises:
+            RuntimeError: If MCP tools or the system prompt cannot be loaded.
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
@@ -107,6 +117,7 @@ max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
+openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
 engine = None
 
 if engine_name == "mlx":
@@ -126,10 +137,21 @@ elif engine_name == "inference_client":
         max_tokens=max_tokens,
     )
 elif engine_name == "litellm":
+    _litellm_extra = {{}}
+    if openrouter_provider and str(model_id).startswith("openrouter/"):
+        _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
+        _litellm_extra["extra_body"] = {{
+            "provider": {{
+                "order": _order,
+                "allow_fallbacks": False,
+                "require_parameters": True,
+            }}
+        }}
     engine = LiteLLMModel(
         model_id=model_id,
         temperature=1.0,
         max_tokens=max_tokens,
+        **_litellm_extra,
     )
 elif engine_name == "openai":
     engine = InferenceClientModel(

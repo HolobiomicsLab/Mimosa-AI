@@ -8,13 +8,23 @@ import json
 import os
 import sys
 
+import pytest
 from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from config import Config
-from sources.core.dgm import DarwinMachine
-from sources.evaluation.evaluator import WorkflowEvaluator
+
+# ``sources.core.dgm`` / ``DarwinMachine`` were removed during the evolution
+# engine refactor. This file was left behind; skip collection cleanly until
+# the user decides whether to rewrite it against the current EvolutionEngine
+# API or delete it.
+pytest.importorskip(
+    "sources.core.dgm",
+    reason="sources.core.dgm no longer exists; legacy test file kept for review",
+)
+from sources.core.dgm import DarwinMachine  # noqa: E402  pragma: no cover
+from sources.core.evaluators.evaluator import WorkflowEvaluator  # noqa: E402
 
 load_dotenv()
 

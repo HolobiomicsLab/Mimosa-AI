@@ -53,7 +53,7 @@ def setup_logging(debug=False, disable=False):
 
     # Add workflow handler to specific loggers
     workflow_loggers = [
-        'sources.core.dgm',
+        'sources.core.evolution_engine',
         'sources.core.orchestrator',
         'sources.core.workflow_factory',
         'sources.core.workflow_runner',

@@ -16,420 +16,324 @@
 </p>
 
 <p align="center">
-    <em>자율 과학 연구를 위한 자기진화 AI 프레임워크</em>
+    <em>자율 과학 연구를 위한 자기 진화형 멀티에이전트 프레임워크.</em>
 </p>
+
 <p align="center">
-  🧬 자기진화 멀티에이전트 워크플로우 &nbsp;·&nbsp;
+  🧬 Quality-Diversity 워크플로우 진화 &nbsp;·&nbsp;
   🔍 MCP 기반 도구 자동 탐색 &nbsp;·&nbsp;
-  🔁 다윈식 워크플로우 최적화 &nbsp;·&nbsp;
-  📦 완전한 감사 추적 및 재현성 &nbsp;·&nbsp;
+  🧪 다중 소스 클레임별 검증 &nbsp;·&nbsp;
+  📦 완전한 감사 추적 및 재현성
 </p>
 
 <p align="center">
-    <em>Mimosa-AI는 Nothias et al. (2018)을 엔드투엔드로 자율적으로 재현했습니다——원시 .mzML 파일부터 분자 네트워크까지——단 하나의 명령으로.</em>
-</p>
-
-<p align="center">
-    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv 프리프린트"></a>
+    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv Preprint"></a>
     <a href="https://doi.org/10.48550/arXiv.2603.28986"><img src="https://img.shields.io/badge/DOI-10.48550%2FarXiv.2603.28986-blue?style=flat-square" alt="DOI"></a>
-    <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/웹사이트-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="웹사이트"></a>
+    <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/website-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="website"></a>
 </p>
 
 <p align="center">
-    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers">
-        <img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars">
-    </a>
-    <a href="https://opensource.org/licenses/Apache-2.0">
-        <img src="https://img.shields.io/badge/라이선스-Apache%202.0-blue.svg?style=flat-square" alt="라이선스: Apache 2.0">
-    </a>
+    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers"><img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars"></a>&nbsp;
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
 </p>
 
 ---
 
-## 라이브 데모: 자율적 논문 재현
+## TL;DR
+
+Mimosa-AI는 **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 여섯 개의 독립적인 관점(문헌, 사용자의 목표, 에이전트 내레이션, 수학적 불변량, 계산 재현성, 통계적 핑거프린트)에 비추어 검증합니다. 그리고 학습을 요청하면 **Quality-Diversity** 탐색을 통해 성능과 구조적 다양성을 모두 보존하며 세대를 거쳐 워크플로우를 진화시킵니다.
+
+워크플로우는 순수 Python으로 출력됩니다. 검증기는 에이전트가 주장하는 내용을 재계산하는 결정론적 Python 검사를 실행합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
+
+```bash
+uv sync && uv run main.py        # interactive onboarding
+```
+
+---
+
+## 데모
+
+<p align="center">
+    <em>Mimosa-AI는 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a>의 LC-MS/MS 분자 네트워킹 파이프라인 — <code>.mzML</code> 파일에 대한 피처 검출, 정렬, 그리고 고전적 분자 네트워킹(GNPS 스타일 코사인 클러스터링) — 을 단일 명령으로, 사전에 고정된 파이프라인 없이 자율적으로 재생성했습니다.</em>
+</p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-**결과:** 아래 분자 네트워크는 원시 `.mzML` 파일에서 자율적으로 재현되었으며, [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation)에서 보고된 토폴로지——클러스터 분리 및 엣지 가중치 포함——와 완벽히 일치합니다.
+재현된 네트워크는 논문에서 보고된 토폴로지와 클러스터 수준에서 일치합니다. 범위 참고: 이 재현은 **분자 네트워킹** 단계만을 대상으로 하며, 원 연구에서 다룬 생리활성 기반 분획, 수동 어노테이션 검토, 라이브러리 매칭(GNPS / SIRIUS / CSI:FingerID)은 자율 실행 범위 밖입니다.
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="재현된 분자 네트워크" width="80%">
+  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
 </p>
 
 ---
 
-## 벤치마크 결과
+## 벤치마크
 
-**ScienceAgentBench** 평가 결과（102개 작업, `task` 모드）：
+**ScienceAgentBench**(102개 태스크, `task` 모드 — 플래닝 레이어를 건너뛰어 워크플로우 합성 및 정제만을 독립적으로 평가)에서 평가했습니다:
 
-| 모드 | 성공률 | Code-BLEU 점수 | 작업당 비용 |
-|------|--------|----------------|------------|
-| DeepSeek-V3.2 단일 에이전트 | 38.2% | 0.898 | $0.05 |
-| DeepSeek-V3.2 원샷 멀티에이전트 | 32.4% | 0.794 | $0.38 |
-| **DeepSeek-V3.2 반복 학습** | **43.1%** | **0.921** | **$1.7** |
+| 모드                                    | 성공률 | Code-BLEU | 태스크당 비용 |
+| --------------------------------------- | ------------ | --------- | ----------- |
+| DeepSeek-V3.2 단일 에이전트              | 38.2 %       | 0.898     | $0.05       |
+| DeepSeek-V3.2 원샷 멀티에이전트      | 32.4 %       | 0.794     | $0.38       |
+| **DeepSeek-V3.2 반복 학습**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 반복 학습은 GPT-4o를 개선하지만 Claude Haiku 4.5에는 미미한 성능 저하를 가져옵니다——모델 의존 행동 분석은 [논문](https://arxiv.org/abs/2603.28986)을 참조하세요.
+> 반복 학습은 GPT-4o에서는 성능을 향상시키지만 Claude Haiku 4.5에서는 미세한 성능 저하를 보입니다 — 모델 의존적 동작은 [논문](https://arxiv.org/abs/2603.28986)에서 분석합니다. PaperBench 결과는 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)를 참조하세요.
+
+> **비용과 실행 시간.** `$1.70/task` 수치는 기본 `--learn` 예산(최대 35세대, `overall_score > 0.97`에서 조기 종료) 기준으로 분할 상환된 값입니다. 일반적인 진화 실행은 DeepSeek-V3.2 기준 태스크당 실시간 30–90분이 소요되며, 모델 가격에 대체로 비례합니다. 단일 실행(`--learn` 미사용)은 약 5–15분이며 비용은 한 자릿수 배 더 저렴합니다.
 
 ---
 
-## Mimosa-AI란 무엇인가요?
+## 작동 원리
 
-> ***Mimosa-AI 🌼*** — 감지하고, 학습하고, 적응하는 미모사 식물처럼, Mimosa는 작업별 맞춤 멀티에이전트 워크플로우를 자동으로 합성하고 실행 피드백을 통해 지속적으로 개선하는 오픈소스 자율 과학 연구 프레임워크입니다. MCP 기반 도구 발견, 코드 생성 에이전트, LLM 기반 평가를 중심으로 구축되어, 학술 연구자들에게 폐쇄형 블랙박스 시스템의 모듈화되고 감사 가능한 대안을 제공합니다.
-
-**핵심 기능:**
-- **과학적 연구 재현**——추적 가능성과 엄밀성으로——원시 데이터에서 출판 가능한 그림까지
-- **계산 파이프라인 자동화**——바이오인포매틱스, 분자 도킹, 대사체학, ML 등
-- **자기 진화**——다윈적 워크플로우 변이를 통해——각 실패가 다음 시도를 개선
-
-### 아키텍처 개요
-
-프레임워크는 5개 계층으로 구성됩니다:
-
-1. **계획 계층** (선택사항) — 고수준 과학 목표를 개별 작업으로 분해
-2. **도구 발견 계층** — Toolomics를 통해 로컬 네트워크의 MCP 도구 자동 발견
-3. **메타 오케스트레이션 계층** — 작업별 멀티에이전트 워크플로우 합성; 전문 에이전트에 도구 할당
-4. **에이전트 실행 계층** — 코드 생성 에이전트가 발견된 도구와 과학 라이브러리를 사용해 서브태스크 실행
-5. **판단/평가 계층** — LLM 기반 판사가 출력 채점; 학습 모드에서 반복적 워크플로우 개선 추진
+다섯 개의 레이어가 작은 dataclass 스키마로 연결됩니다 — 전체 세부 사항은 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)를 참조하세요.
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa 아키텍처 개요" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
 </p>
 
-벤치마크 `task` 모드에서는 계획 계층(1)을 우회하여 워크플로우 합성과 개선을 독립적으로 평가합니다.
+| 레이어 | 컴포넌트 | 역할 |
+|-------|-----------|--------------|
+| 0 | **Planner** *(선택, `--goal` 전용)* | 고수준 목표를 개별 태스크로 분해합니다. |
+| 1 | **ToolManager + Perspicacité** | 설정된 주소/포트 범위에서 MCP 도구를 탐색하고, 선택적으로 문헌 스니펫을 가져옵니다. |
+| 2 | **EvolutionEngine** | 워크플로우를 합성하고 세대를 거쳐 진화시킵니다(아래 참조). |
+| 3 | **WorkflowRunner** | 합성된 Python 워크플로우를 [SmolAgents](https://github.com/huggingface/smolagents)와 공유 LangGraph 상태를 사용해 샌드박스에서 실행합니다. |
+| 4 | **VerifierEvaluator** | 다중 소스 클레임별 검증기. 다음 변이를 추동합니다. |
+
+### 진화 루프 — 실제로 무엇이 진화하는가
+
+워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. 유전자형(genotype)은 워크플로우 파일이고, 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
+
+- **선택: Quality-Diversity 아카이브** — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). 참신성(novelty)은 행동 기술자 `[n_agents, n_edges, n_branches, prompt_chars]` 상의 k-NN 거리(`k=25`)입니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다.
+- **변이: 정체 기반 범위 조절** — 변이의 대담함은 마지막 4개의 프롬프트 그래디언트가 얼마나 반복되는지에 대한 연속 함수입니다. 거의 승리한 개체는 보호됩니다. 범위 대역은 "프롬프트만 미세 조정"부터 "완전한 토폴로지 재고"까지 이어집니다.
+- **교차** — 약 30%의 세대에서 두 부모를 결합하며, 강한 쪽이 먼저 적용됩니다.
+- **콜드 스타트** — 아카이브가 비어 있으면, 디스크의 과거 실행을 유사도 필터링(MiniLM 코사인 ≥ 0.5)으로 스캔하여 탐색을 시드합니다. 유용한 워크플로우는 태스크 간에 전이됩니다.
+
+전체 메커니즘: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md).
+
+### 검증기 — 점수가 실제로 의미하는 것
+
+각 실행 후, 여섯 개의 독립적인 클레임 소스가 워크스페이스를 살펴보고 성공-극성(success-polarity) 클레임을 산출합니다:
+
+| 소스 | 관점 |
+|--------|---------|
+| **A** | 동료 평가된 관행(Perspicacité 문헌 그라운딩 경유) |
+| **B** | 목표 텍스트 그 자체 — 에이전트가 요청받은 것을 전달했는가? |
+| **C** | 에이전트 내레이션 — 주장된 수치/산출물을 디스크에서 재현할 수 있는가? |
+| **D** | 수학적 불변량 — 확률은 [0,1] 범위, 형상 일관성, NaN 없음, 보존 |
+| **E** | 계산 재현성 — 선언된 의존성이 사용된 import를 포함, 절대 경로 없음, 확률적 연산에 시드 설정 |
+| **F** | 통계적 핑거프린트 — 베이스라인 초과, 퇴화된 예측 없음, 누출 시그니처 없음 |
+
+각 클레임은 심판(judge)이 워크스페이스에 대해 작성하는 **결정론적 Python 프로그램**으로 검증됩니다 — 에이전트를 믿느냐고 LLM에 다시 묻는 방식이 아닙니다. 반(反)동어반복 트립와이어는 에이전트의 출력을 자신과 비교하는 프로그램을 거부합니다.
+
+**변이기는 평가 기준(rubric)을 결코 보지 않습니다.** 되돌아 흐르는 유일한 신호는 `abstracted_prompt_gradient` — 클레임, 점수, 소스를 명명하지 않는 실패 모드의 암호화된 진단입니다. 구조적으로, 탐색은 결코 보지 않는 평가 기준의 어휘에 과적합할 수 없습니다.
+
+전체 파이프라인: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
 ---
 
-## 목차
+## 빠른 시작
 
-- [Toolomics란 무엇이며, 필요한가요?](#toolomics란-무엇이며-필요한가요)
-- [사전 요구사항](#사전-요구사항)
-- [설치](#설치)
-- [설정](#설정)
-- [Mimosa 실행](#mimosa-실행)
-- [워크스페이스와 감사 추적](#워크스페이스와-감사-추적)
-- [멀티에이전트 워크플로우 진화를 통한 학습](#멀티에이전트-워크플로우-진화를-통한-학습)
-- [투명성](#투명성)
-- [명령줄 인수](#명령줄-인수)
-- [평가](#평가)
-- [스마트폰 알림](#스마트폰-알림)
-- [텔레메트리 설정](#텔레메트리-설정)
-- [라이선스](#라이선스)
-
----
-
-## Toolomics란 무엇이며, 필요한가요?
-
-**[Toolomics](https://github.com/HolobiomicsLab/toolomics)**는 Mimosa의 동반 플랫폼으로, MCP 서버 관리에 사용됩니다. 과학 도구(데이터 분석 유틸리티, 웹 서비스, 실험실 기기)를 발견 가능한 MCP 서비스로 제공하고, Mimosa가 작업 아티팩트를 읽고 쓰는 공유 워크스페이스를 제공하며, Mimosa 핵심 코드를 수정하지 않고 사용자 정의 도구를 등록할 수 있습니다.
-
-**필요한가요?** 예——Mimosa의 어떤 모드를 실행하기 전에도 Toolomics가 실행 중이어야 합니다. 좋은 소식은: 설정에 몇 분밖에 걸리지 않습니다.
-
-- Mimosa와 Toolomics 모두 Apache 2.0 라이선스로, 무료로 사용할 수 있습니다.
-- Toolomics는 설정 가능한 포트 범위(기본값 `5000–5100`)에서 로컬로 실행됩니다.
-- [Toolomics 문서](https://github.com/HolobiomicsLab/toolomics)를 통해 사용자 정의 MCP 도구를 추가할 수 있습니다.
-
-> **빠른 시작 경로:** Toolomics 클론 → 기본 포트 범위에서 시작 → Mimosa 실행. LLM API 키 외에 클라우드 계정이나 유료 서비스가 필요 없습니다.
-
----
-
-## 사전 요구사항
-
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) (권장) 또는 pip
-- 실행 중인 [Toolomics MCP 서버](https://github.com/HolobiomicsLab/toolomics)
-
----
-
-## 설치
-
-### 1. 의존성 설치
+### 1. 설치
 
 ```bash
-# uv 사용 (권장 — 가상 환경 생성과 의존성 설치를 한 번에 수행)
 pip install uv
+git clone https://github.com/HolobiomicsLab/Mimosa-AI.git
+cd Mimosa-AI
 uv sync
-
-# 또는 pip 사용
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install .
 ```
 
-### 2. API 키 설정
+### 2. 최소 하나의 LLM 키 추가
 
-프로젝트 루트에 `.env` 파일을 생성합니다. 사용할 LLM 프로바이더의 키만 포함하세요:
+프로젝트 루트에 `.env`를 생성하세요. 실제로 사용하는 제공자만 필요합니다.
 
 ```env
-ANTHROPIC_API_KEY=...       # Claude — 워크플로우 오케스트레이션에 권장
-OPENAI_API_KEY=...          # OpenAI 모델 - 선택사항
-MISTRAL_API_KEY=...         # Mistral 모델 - 선택사항
-DEEPSEEK_API_KEY=...        # Deepseek - 선택사항
-HF_TOKEN=...                # HuggingFace 프로바이더, 선택사항
-OPENROUTER_API_KEY=...      # OpenRouter를 통해 모든 모델에 접근
+ANTHROPIC_API_KEY=...       # Claude — recommended for workflow synthesis
+OPENAI_API_KEY=...
+MISTRAL_API_KEY=...
+DEEPSEEK_API_KEY=...
+HF_TOKEN=...
+OPENROUTER_API_KEY=...      # Any model via OpenRouter
 
-# 선택사항 — Langfuse를 통한 관찰 가능성
+# Optional: Langfuse observability
 LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 3. MCP 서버 시작
+### 3. MCP 도구 노출
 
-[HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics)의 설정 지침을 따르세요. 포트 범위(예: `5000–5100`)에서 실행되도록 설정합니다.
+Mimosa는 설정의 주소/포트 범위(기본값 `0.0.0.0:5000–5100`)에서 도달 가능한 모든 MCP 서버를 탐색합니다.
 
-사용자 정의 MCP 도구는 [Toolomics 문서](https://github.com/HolobiomicsLab/toolomics/README.md)를 통해 추가할 수 있습니다.
+- **가장 쉬운 경로:** 동반 플랫폼 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** 설치 — 패키징된 과학 도구, 공유 워크스페이스 관리, 정형화된 등록 흐름을 제공합니다.
+- **자체 도구 사용:** `discovery_addresses`를 도달 가능한 임의의 MCP 서버 — `fastmcp` 스크립트, ToolHive, 서드파티 MCP 컨테이너 — 로 지정하세요. Toolomics는 필수가 아닙니다. [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)를 참조하세요.
+
+### 4. 실행
+
+```bash
+uv run main.py                   # interactive onboarding (recommended first time)
+```
+
+또는 마법사를 건너뛰기:
+
+```bash
+uv run main.py --task "Train a multitask model on Clintox to predict toxicity and FDA approval"
+uv run main.py --goal "Reproduce experiments from https://arxiv.org/pdf/2306.00306 and compare results"
+```
+
+원샷 대신 세대를 거쳐 진화시키려면 `--learn`을 추가하세요:
+
+```bash
+uv run main.py --task "..." --learn --config my_config.json
+```
+
+전체 빠른 시작: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md).
+
+### 5. (선택) Perspicacité를 통한 과학적 그라운딩
+
+[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)는 워크플로우 합성과 Source A 클레임을 문헌에 그라운딩합니다. 실행 중이면 Mimosa가 자동으로 인식합니다.
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git && cd Perspicacite-AI
+uv sync && uv run web_app_full.py
+```
+
+---
+
+## 실행 모드
+
+| 모드 | 사용 시점 | 명령 |
+|------|----------|---------|
+| `--task` | 단일 집중 작업 | `uv run main.py --task "..."` |
+| `--goal` | 계획이 필요한 다단계 목표 | `uv run main.py --goal "..."` |
+| `--learn` | 위 두 모드에 추가 — 세대를 거쳐 진화 | `... --learn` |
+| `--single_agent` | 멀티에이전트 합성 생략(빠름, 학습 없음) | `... --single_agent` |
+| `--manual` | 개별 MCP 도구를 테스트하기 위한 대화형 CLI | `uv run main.py --manual` |
+| 배치 | 태스크 CSV 평가 | `... --papers <csv>` |
+| 벤치마크 | ScienceAgentBench | `... --science_agent_bench` |
+
+세부 사항: [`docs/usage/modes.md`](./docs/usage/modes.md), [`docs/usage/learning.md`](./docs/usage/learning.md), [`docs/reference/cli.md`](./docs/reference/cli.md).
+
+---
+
+## 감사 추적 및 재생
+
+Mimosa는 과학적 용도로 설계되었습니다 — 모든 결정은 사후에 검사 가능합니다.
+
+| 도구 | 역할 |
+|------|--------------|
+| `uv run memory_explorer.py <uuid>` | 한 세대의 전체 추적 — 사고, 도구 호출, 출력, 상태 변화 — 을 단계별로 살펴봅니다. |
+| `uv run main.py --memory_cli` | 완료된 실행의 메모리에 대한 RAG 기반 Q&A. 스크롤 대신 "*task_builder가 어떤 분류기를 사용했는가?*"라고 질문하세요. |
+| `uv run memory_timelapse.py <uuid>` | 반복에 걸친 메모리 성장의 프레임별 애니메이션 뷰. |
+| `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | 에이전트가 실행한 정확한 Python. DSL 없음. |
+| `sources/workflows/<uuid>/lineage_<uuid>.json` | 이 세대의 부모와 연산자(`seed | mutation | crossover`). |
+| `sources/workflows/<uuid>/evolution_prompt_<uuid>.md` | 이 코드를 생성한 정확한 LLM 프롬프트. 동일한 프롬프트 + 시드 = 동일한 코드. |
+| `sources/workflows/<uuid>/evolution_tree.png` | 전체 `--learn` 실행의 렌더링된 계보 트리. |
+| `sources/workflows/<uuid>/reward_progress.png` | 반복에 따른 점수 곡선. |
+| `runs_capsule/<capsule_name>/` | 공유 또는 재실행을 위한 최종 워크스페이스의 아카이브 스냅샷. |
+
+전체 레이아웃: [`docs/usage/transparency.md`](./docs/usage/transparency.md), [`docs/usage/workspace.md`](./docs/usage/workspace.md).
 
 ---
 
 ## 설정
 
-```bash
-cp config_default.json my_config.json
-```
+`config_default.json`을 `my_config.json`으로 복사하여 편집하세요. 가장 자주 만지게 되는 필드는 다음과 같습니다:
 
-`my_config.json`을 편집합니다. 주요 파라미터:
+| 필드 | 제어 대상 |
+|-------|------------------|
+| `workspace_dir` | 공유 워크스페이스 — 생성된 모든 파일이 여기에 나타납니다 |
+| `discovery_addresses` | MCP 탐색을 위한 IP + 포트 범위 |
+| `workflow_llm_model` | 멀티에이전트 워크플로우를 합성합니다 (예: `anthropic/claude-opus-4-5`) |
+| `smolagent_model_id` | 실행 에이전트가 사용하는 모델 |
+| `judge_model` | 검증기 프로그램을 작성하고 소프트 판정을 내리는 LLM |
+| `learned_score_threshold` | `--learn` 모드에서의 조기 종료 임계값 (기본값 `0.97`) |
+| `max_learning_evolve_iterations` | 세대 수 상한 (기본값 `35`) |
+| `population_size` / `novelty_weight` / `min_improvement_threshold` | QD 아카이브 튜닝 |
 
-| 파라미터 | 설명 |
-|---------|------|
-| `workspace_dir` | Toolomics 워크스페이스 경로 — 생성된 모든 파일이 여기에 저장됩니다 |
-| `discovery_addresses` | MCP 서버 탐색을 위한 IP + 포트 범위 |
-| `planner_llm_model` | 작업 분해 및 계획을 위한 LLM |
-| `prompts_llm_model` | 워크플로우 프롬프트 생성을 위한 LLM |
-| `workflow_llm_model` | 멀티에이전트 오케스트레이션을 위한 LLM (권장: `anthropic/claude-opus-4-5` 또는 `z-ai/glm-5`) |
-| `smolagent_model_id` | SmolAgents 실행 서브태스크를 위한 모델 |
-| `judge_model` | 출력 자기평가 및 채점을 위한 LLM |
-| `learned_score_threshold` | 결과를 수용하고 반복을 중단하는 최소 점수 |
-| `max_learning_evolve_iterations` | 결과를 수용하기 전 최대 자기개선 반복 횟수 |
-
----
-
-## Mimosa 실행
-
-Mimosa는 **목표(Goal)**와 **작업(Task)** 두 가지 실행 모드를 지원합니다.
-
-### 목표 모드 — 다단계 과학적 목표
-
-여러 개별 작업에 걸친 계획이 필요한 경우 사용합니다(예: 논문 재현, ML 파이프라인 구축).
-
-```bash
-uv run main.py --goal "귀하의 과학적 목표" --config my_config.json
-```
-
-**예시:**
-```bash
-uv run main.py \
-  --goal "「Dual Aggregation Transformer for Image Super-Resolution」(https://arxiv.org/pdf/2306.00306)의 실험을 재현하고 결과를 비교한다." \
-  --config my_config.json
-
-uv run main.py \
-  --goal "단백질-리간드 결합 친화도를 예측하는 머신러닝 모델을 개발한다." \
-  --config my_config.json
-```
-
-### 작업 모드 — 단일 세밀 작업
-
-장기 계획 없이 집중적이고 자기완결적인 작업에 사용합니다.
-
-```bash
-uv run main.py --task "귀하의 작업 설명" --config my_config.json
-```
-
-**예시:**
-```bash
-uv run main.py \
-  --task "Clintox 데이터셋에서 멀티태스크 모델을 훈련하여 약물 독성과 FDA 승인 상태를 예측한다." \
-  --config my_config.json
-
-uv run main.py --task "신약 발견을 위한 그래프 신경망에 관한 문헌 검토를 수행한다." --config my_config.json
-```
-
-> **벤치마크 참고:** 논문에서 보고된 결과는 `task` 모드에서 측정되며, 워크플로우 합성과 반복 개선을 독립적으로 평가하기 위해 계획 계층이 비활성화됩니다.
->
-> **참고:** 어떤 모드를 실행하기 전에 Toolomics를 설치하고 MCP 서버가 실행 중인지 확인해야 합니다.
-
----
-
-## 워크스페이스와 감사 추적
-
-실행 중에 Mimosa는 `workspace_dir`로 설정된 Toolomics 워크스페이스 내 파일을 읽고 씁니다. 실행 완료 시 워크스페이스 내용이 타임스탬프가 있는 폴더로 `runs_capsule/`에 복사되어 아카이브로 보존됩니다.
-
-- **Toolomics `workspace/`** — 실시간 작업 디렉토리: 중간 파일, 스크립트, 다운로드, 생성된 출력
-- **`sources/workflows/<uuid>/`** — 생성된 워크플로우와 실행 메타데이터: `state_result.json`, `evaluation.txt`, `reward_progress.png`, `memory/` 추적
-- **`runs_capsule/<capsule_name>/`** — 실행의 아카이브 스냅샷, 나중에 검사·비교·공유를 위한
-- **`memory_explorer.py <uuid>`** — 워크플로우 실행을 단계별로 재생하여 에이전트 추적·도구 호출·출력 검사
-
-이러한 위치들이 합쳐져 Mimosa의 완전한 감사 추적을 형성합니다: 계획·실행·평가·산출의 전 과정.
-
----
-
-## 멀티에이전트 워크플로우 진화를 통한 학습
-
-***Mimosa-AI***는 과학적 작업을 위한 특화된 워크플로우를 동적으로 합성하는 **자기 진화 멀티에이전트 시스템**입니다. **다윈적 단일 후보 지역 탐색**을 통해 워크플로우를 진화시킵니다: 각 반복에서 성능이 가장 우수한 워크플로우만이 후계자를 생성하며 개선된 것만 유지됩니다. 시간이 지남에 따라 검증된 워크플로우 라이브러리가 구축되어 유사한 미래 작업이 처음부터가 아닌 강력한 기준점에서 시작할 수 있습니다.
-
-새로운 작업의 경우, 완전한 자율성 전에 시스템이 역량을 쌓을 수 있도록 **먼저 학습 모드로 시작하는 것**을 권장합니다.
-
-**학습 모드로 시작**
-
-```bash
-uv run main.py --task "Clintox 데이터셋에서 멀티태스크 모델을 훈련하여 약물 독성과 FDA 승인 상태를 예측한다" --learn --config my_config.json
-```
-
-<p align="center">
-  <img src="./docs/images/workflow_mutation.png" alt="워크플로우 변이 다이어그램" width="80%">
-</p>
-
-**진행 상황 시각화:**
-
-***Mimosa-AI***가 학습 단계를 완료하면, 보상 진행 그래프(시도별 성능 향상)가 `sources/workflows/<uuid>/reward_progress.png`에 자동으로 저장됩니다.
-
-<p align="center">
-  <img src="./docs/images/evolve_example.png" alt="보상 진행 예시" width="80%">
-</p>
-
----
-
-## 투명성
-
-에이전트 실행을 세밀한 단위로 단계별로 살펴볼 수 있는 대화형 디버거 `memory_explorer.py`가 제공됩니다.
-
-```bash
-python memory_explorer.py 20260115_113303_9bb63437
-```
-
-이를 통해 전체 실행 추적(생각, 도구 호출, 출력)이 재생되어 각 의사결정이 어떻게 전개되었는지 정확히 검사할 수 있습니다.
-
----
-
-## 명령줄 인수
-
-### 실행 모드
-
-| 인수 | 설명 |
-|-----|------|
-| `--goal GOAL` | 고수준 연구 목표, 논문 재현 또는 과학적 질문 지정 (플래너 모드) |
-| `--task TASK` | 단일 작업 실행: 문헌 검토, 데이터셋 다운로드, ML 모델 구현 등 |
-| `--manual` | MCP를 디버깅하고 ***Mimosa*** 도구를 직접 테스트하는 대화형 CLI 모드 |
-| `--papers <CSV 경로>` | 연구 논문과 프롬프트가 포함된 CSV 데이터셋으로 평가 |
-| `--science_agent_bench` | ScienceAgentBench로 평가 |
-
-### 기타 파라미터
-
-| 인수 | 설명 |
-|-----|------|
-| `--learn` | 작업 성능 최적화를 위한 반복 학습 활성화 |
-| `--max_evolve_iterations N` | 최대 학습 반복 횟수 |
-| `--csv_runs_limit N` | 평가할 CSV 항목 수 제한 |
-| `--scenario <시나리오 파일명>` | 채점에 LLM 판정자 대신 특정 시나리오 기반 어설션 사용 |
-| `--single_agent` | 단일 에이전트 모드——빠르지만 학습을 통한 개선 불가 |
-| `--debug` | 더 자세한 로깅을 위한 디버그 모드 활성화 |
+전체 레퍼런스: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 
 ---
 
 ## 평가
 
-***Mimosa-AI***는 [ScienceAgentBench](https://arxiv.org/abs/2410.05080) 또는 [PaperBench](https://arxiv.org/pdf/2504.01848)에서 평가할 수 있습니다.
-
-⚠️ 편향 없는 평가를 위해 먼저 `./cleanup.sh`를 실행하여 캐시된 워크플로우 사용을 방지하세요.
-
-### ScienceAgentBench
-
-1. ScienceAgentBench 전체 데이터셋 다운로드:
-   [데이터셋 링크](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
-2. 비밀번호 `scienceagentbench`로 압축 해제
-3. `benchmark/benchmark/datasets/` → `Mimosa-AI/datasets/scienceagentbench/datasets/`로 복사
-
-**학습 모드로 전체 평가:**
-```sh
+```bash
+# ScienceAgentBench (download dataset first — see docs)
 uv run main.py --science_agent_bench --learn
-```
 
-**빠른 평가 (10개 작업, 4회 학습 반복):**
-```sh
-uv run main.py --science_agent_bench --csv_runs_limit 10 --max_evolve_iterations 4
-```
+# Quick smoke (10 tasks)
+uv run main.py --science_agent_bench --csv_runs_limit 10
 
-### PaperBench
-
-OpenAI PaperBench는 AI 연구 복제에서 AI 에이전트의 능력을 평가합니다 (*PaperBench: Evaluating AI's Ability to Replicate AI Research*).
-
-```sh
+# PaperBench
 uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
+
+# Custom CSV
+uv run main.py --papers datasets/<your_benchmark>.csv --learn
 ```
 
-⚠️ 결과는 `runs_capsule/`에 저장됩니다. 완전한 평가는 [PaperBench 문서](https://github.com/openai/frontier-evals/tree/main/project/paperbench)를 참조하세요.
+> ⚠️ 편향 없는 평가를 위해, Mimosa가 캐시된 워크플로우를 재사용하지 못하도록 먼저 `./cleanup.sh`를 실행하세요.
 
-**사용자 정의 벤치마크:**
-
-```sh
-uv run main.py --papers datasets/<귀하의 벤치마크 이름>.csv --csv_runs_limit 20 --learn
-```
+각 벤치마크에 대한 설정 세부 사항: [`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md), [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ---
 
-## 스마트폰 알림
+## 알림 및 텔레메트리
 
-Pushover 알림을 통해 ***Mimosa*** 상태에 대한 실시간 업데이트를 받습니다.
-
-### 설정
-
-1. [Pushover](https://pushover.net/) 계정 생성 및 **사용자 키** 메모
-2. "Mimosa"라는 이름의 애플리케이션 생성——**API 토큰** 복사
-3. 환경 변수 내보내기:
-   ```bash
-   export PUSHOVER_USER="귀하의 사용자 키"
-   export PUSHOVER_TOKEN="귀하의 API 토큰"
-   ```
-4. Pushover 모바일 앱 설치 및 로그인
+- **Pushover** — 휴대폰으로의 실시간 진행 상황 알림. `PUSHOVER_USER`와 `PUSHOVER_TOKEN`을 설정하세요. 세부 사항: [`docs/usage/notifications.md`](./docs/usage/notifications.md).
+- **Langfuse** — 모든 LLM 호출의 스팬 수준 추적. Langfuse 저장소에서 `docker compose up -d`를 실행한 후, `.env`에 `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_PRIVATE_KEY`를 추가하세요. 대시보드는 `http://localhost:3000`에서 확인 가능합니다. 세부 사항: [`docs/usage/telemetry.md`](./docs/usage/telemetry.md).
 
 ---
 
-## 텔레메트리 설정
+## 관련 연구
 
-Langfuse를 사용하여 실시간 관찰 가능성 대시보드로 AI 에이전트를 모니터링하고 디버그합니다.
+Mimosa-AI는 LLM 기반 프로그램 탐색 및 자율 연구 시스템의 작지만 활발한 계보에 위치합니다. 우리는 이들 중 어느 것도 포섭한다고 주장하지 않습니다 — 각 시스템은 서로 다른 질문에 답합니다:
 
-### 빠른 시작
+| 프로젝트 | 역할 | Mimosa와의 차이 |
+|---------|--------------|--------------------|
+| [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | ML 분야의 종단 간 논문 생성 | Mimosa는 전체 논문 생성이 아니라 QD+검증기를 사용한 **태스크별 워크플로우 합성**을 최적화합니다 |
+| [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM 기반 선호 최적화 알고리즘의 발견 | 동일한 "코드에 대한 변이 연산자로서의 LLM" 패러다임. Mimosa는 이를 손실 함수가 아니라 멀티에이전트 워크플로우 코드에 적용합니다 |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | LLM이 안내하는 Python 함수에 대한 진화적 탐색 | Mimosa는 멀티에이전트 프로그램 전체를 진화시키며, 단일 적합도 함수 대신 다중 소스 클레임별 검증기를 추가합니다 |
+| [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | LLM 매개 코드에 대한 quality-diversity | 가장 가까운 QD 조상. Mimosa의 행동 기술자는 도메인 특화가 아니라 워크플로우 구조 기반입니다 |
+| AIDE | Kaggle 유사 태스크에 대한 자동화된 ML 파이프라인 | Mimosa는 더 광범위한 과학적 재현(ScienceAgentBench, PaperBench, 실험실 데이터)을 대상으로 하며, 감사 가능한 클레임별 검증기를 함께 제공합니다 |
 
-1. **Langfuse를 로컬에 배포:**
-   ```bash
-   git clone https://github.com/langfuse/langfuse.git
-   cd langfuse
-   docker compose up -d
-   ```
+비교 연구를 출판하는 경우, [논문](https://arxiv.org/abs/2603.28986)에 상세한 포지셔닝이 있습니다.
 
-2. **`.env`에 추가:**
-   ```env
-   LANGFUSE_PUBLIC_KEY=귀하의 공개 키
-   LANGFUSE_PRIVATE_KEY=귀하의 비밀 키
-   ```
+---
 
-3. **대시보드 접속**: ***Mimosa-AI*** 실행 중에 `http://localhost:3000` 방문
+## 전체 문서
 
-대시보드는 에이전트 실행 추적, 성능 메트릭, 오류 디버깅, 토큰/API 사용량을 제공합니다.
+```bash
+uvx --with mkdocs-material mkdocs serve   # live preview at http://localhost:8000
+uvx --with mkdocs-material mkdocs build   # static HTML to ./site
+```
 
-> **참고:** 텔레메트리는 선택사항이지만 디버깅 및 성능 최적화에 권장됩니다.
+사이트 설정: [`mkdocs.yml`](./mkdocs.yml). 인덱스: [`docs/index.md`](./docs/index.md).
+
+---
+
+## 기여
+
+패치, MCP 도구, 평가기, 새로운 클레임 소스 기여를 환영합니다. [`CONTRIBUTING.md`](./CONTRIBUTING.md), [Developer guide](./docs/DEVELOPER_GUIDE.md), 그리고 [`CLA/`](./CLA/)의 기여 조항부터 시작하세요.
 
 ---
 
 ## 라이선스
 
-이 저장소는 Apache License 2.0 하에 공개 배포됩니다. 기여 및 라이선스 세부사항은 다음을 참조하세요:
-- `NOTICE`
-- `docs/licensing-notes.md`
-- `CLA/INDIVIDUAL_CLA.md`
-- `CLA/EMPLOYER_AUTHORIZATION.md`
+Apache 2.0. 기여 조항에 대해서는 [`NOTICE`](./NOTICE), [`docs/licensing-notes.md`](./docs/licensing-notes.md), [`CLA/`](./CLA/) 폴더를 참조하세요.
 
 ---
 
 ## 인용
 
 <p align="center">
-<b>인용:</b> <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
+<em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
 M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a>
 </p>
 
 ```bibtex
 @article{legrand2026mimosa,
-  title={Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author={Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal={arXiv preprint arXiv:2603.28986},
-  year={2026}
+  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal = {arXiv preprint arXiv:2603.28986},
+  year    = {2026}
 }
 ```
