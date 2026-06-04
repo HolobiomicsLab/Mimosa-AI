@@ -44,6 +44,11 @@ _VERIFIER_MAX_CLAIMS = 90
 _VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 
+# Upper bound on concurrent verifier-generation LLM calls. The two judge
+# round-trips per claim (file selection + spec generation) overlap their
+# network latency; this caps fan-out so we don't trip provider rate limits.
+_VERIFIER_GEN_PARALLELISM = 10
+
 # ----- Information bonus (rewards thoroughness; saturates) --------------------
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.05
@@ -146,6 +151,7 @@ class VerifierEvaluator(
         info_bonus_alpha: float = _INFO_BONUS_ALPHA,
         info_bonus_beta: float = _INFO_BONUS_BETA,
         use_cheat_detector: bool = True,
+        gen_parallelism: int = _VERIFIER_GEN_PARALLELISM,
     ) -> None:
         """Initialise the evaluator; ``workspace_dir`` defaults to ``config.workspace_dir``.
 
@@ -163,6 +169,7 @@ class VerifierEvaluator(
             info_bonus_alpha: Asymptotic ceiling of the information bonus.
             info_bonus_beta: Saturation rate of the information bonus.
             use_cheat_detector: Reserved; cheat detector currently disabled.
+            gen_parallelism: Max concurrent LLM calls for verifier generation.
         """
         super().__init__(config)
         self.workspace_dir = Path(
@@ -181,6 +188,7 @@ class VerifierEvaluator(
         self.info_bonus_alpha = max(0.0, info_bonus_alpha)
         self.info_bonus_beta = max(1e-6, info_bonus_beta)
         self.use_cheat_detector = use_cheat_detector
+        self.gen_parallelism = max(1, int(gen_parallelism))
         self._preview_cache: dict[str, str] = {}
         self._workspace_files: set[str] = set()
         self._grounding_cache: dict[str, str] = {}
@@ -334,17 +342,42 @@ class VerifierEvaluator(
             c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
             for c in (anchored_records or [])
         }
-        per_claim: list[dict[str, Any]] = []
-        for claim in claims[: self.max_claims]:
-            preloaded_spec = None
-            if anchored_records and rubric_anchor_uuid:
-                executable, reason = anchored_specs.get(claim["id"], (False, ""))
-                preloaded_spec = self._spec_from_anchor(
+        claims_to_verify = claims[: self.max_claims]
+
+        # Pre-resolve specs: anchor-cache hits are O(disk read) each, but every
+        # other claim costs two judge round-trips (file selection + spec gen).
+        # Fan those out via threads so the per-claim loop only pays for the
+        # sandbox execution, not for serial LLM latency.
+        anchor_preloaded: dict[str, dict[str, Any]] = {}
+        needs_generation: list[dict[str, Any]] = []
+        for claim in claims_to_verify:
+            if anchored_records and rubric_anchor_uuid and claim["id"] in anchored_specs:
+                executable, reason = anchored_specs[claim["id"]]
+                anchor_preloaded[claim["id"]] = self._spec_from_anchor(
                     rubric_anchor_uuid, claim["id"], executable, reason
                 )
+            else:
+                needs_generation.append(claim)
+
+        generated = self._generate_specs_parallel(
+            uuid,
+            needs_generation,
+            execution_text,
+            workspace_listing,
+            self.gen_parallelism,
+        )
+
+        per_claim: list[dict[str, Any]] = []
+        for claim in claims_to_verify:
+            cid = claim["id"]
+            if cid in anchor_preloaded:
+                target_claim = claim
+                preloaded_spec = anchor_preloaded[cid]
+            else:
+                target_claim, preloaded_spec = generated[cid]
             result = self._verify_claim(
                 uuid,
-                claim,
+                target_claim,
                 execution_text,
                 workspace_listing,
                 grounding,

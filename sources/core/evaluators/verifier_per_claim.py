@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import Callable, Coroutine
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypeVar
 
 if __name__ == "__main__":
@@ -432,6 +433,97 @@ Return STRICT JSON only, in one of these two shapes:
         return spec
 
     # ------------------------------------------------------------------
+    # Parallel pre-generation across claims (file selection + verifier spec)
+    # ------------------------------------------------------------------
+
+    def _select_files_and_generate_spec(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """One claim's pre-flight: pick relevant files, then generate the spec.
+
+        These two judge calls are sequential within a single claim (the spec
+        prompt needs the file previews chosen here), so they're bundled
+        together as one worker unit for parallel fan-out across claims.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claim: Normalised claim dict.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+
+        Returns:
+            ``(updated_claim, spec)`` — the claim with ``likely_relevant_files``
+            populated, and the verifier spec from ``_generate_verifier``.
+        """
+        rel_files = self._llm_select_files(
+            uuid, claim, execution_text, workspace_listing
+        )
+        updated = {**claim, "likely_relevant_files": rel_files}
+        spec = self._generate_verifier(
+            uuid, updated, execution_text, workspace_listing
+        )
+        return updated, spec
+
+    def _generate_specs_parallel(
+        self,
+        uuid: str,
+        claims: list[dict[str, Any]],
+        execution_text: str,
+        workspace_listing: str,
+        max_workers: int,
+    ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
+        """Fan out file selection + verifier generation across claims via threads.
+
+        The LLM calls under the hood are sync HTTP; threading is enough to
+        overlap their network latency. Each claim writes to its own memory
+        file (agent name is keyed by ``claim['id']``), so no cache collisions.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls).
+            claims: Claims that need a freshly generated spec (anchored ones
+                should already be filtered out by the caller).
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            max_workers: Upper bound on concurrent LLM calls.
+
+        Returns:
+            Dict keyed by claim id mapping to ``(updated_claim, spec)``.
+        """
+        if not claims:
+            return {}
+        results: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+        workers = max(1, min(len(claims), max_workers))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {
+                ex.submit(
+                    self._select_files_and_generate_spec,
+                    uuid, c, execution_text, workspace_listing,
+                ): c["id"]
+                for c in claims
+            }
+            for f in as_completed(futures):
+                cid = futures[f]
+                try:
+                    results[cid] = f.result()
+                except Exception as e:
+                    # Mirror the soft-fail contract of _call_and_parse_verifier:
+                    # never let one bad claim crash the whole batch.
+                    self.logger.warning(
+                        f"parallel spec generation failed for {cid}: "
+                        f"{type(e).__name__}: {e}"
+                    )
+                    results[cid] = (
+                        {**next(c for c in claims if c["id"] == cid),
+                         "likely_relevant_files": []},
+                        {"executable": False, "reason": f"spec generation raised: {e}"},
+                    )
+        return results
+
+    # ------------------------------------------------------------------
     # Verifier helper-package install (idempotent, lock-guarded)
     # ------------------------------------------------------------------
 
@@ -775,6 +867,8 @@ if __name__ == "__main__":
         "_build_select_files_prompt",
         "_generate_verifier",
         "_call_and_parse_verifier",
+        "_select_files_and_generate_spec",
+        "_generate_specs_parallel",
         "_ensure_verifier_packages",
         "_smoke_check",
         "_run_verifier",
