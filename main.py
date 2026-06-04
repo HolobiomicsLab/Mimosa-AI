@@ -25,7 +25,7 @@ from config import Config
 from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.cli import OnboardCLI, EvaluationCLI
+from sources.cli import OnboardCLI, EvaluationCLI, MemoryChatCLI
 from sources.evaluation.csv_mode import CsvEvaluationMode
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.evaluation.eval_workflow_generation import WorkflowEval
@@ -249,6 +249,12 @@ async def main():
     parser.add_argument(
         "--evaluation_cli", action="store_true", help="Interactive evaluation CLI for ScienceAgentBench (guided model, workspace, and mode selection)"
     )
+    parser.add_argument(
+        "--memory_cli", action="store_true", help="Interactive RAG chat over the memory of a workflow run (latest by default, or --memory_uuid)"
+    )
+    parser.add_argument(
+        "--memory_uuid", type=str, help="Specific run UUID to load (defaults to latest run under sources/memory/)"
+    )
 
     add_config_arguments(parser, config)
     args = parser.parse_args()
@@ -272,6 +278,7 @@ async def main():
         args.scenario,
         args.workflow_eval_mode,
         args.evaluation_cli,
+        args.memory_cli,
     ])
 
     if args.evaluation_cli:
@@ -281,6 +288,17 @@ async def main():
             await cli.run()
         except KeyboardInterrupt:
             print("\n\n  Interrupted. Goodbye!\n")
+        return
+
+    if args.memory_cli:
+        # Interactive RAG chat over a run's memory directory.
+        try:
+            cli = MemoryChatCLI(config, run_uuid=args.memory_uuid)
+            cli.run()
+        except KeyboardInterrupt:
+            print("\n\n  Interrupted. Goodbye!\n")
+        except FileNotFoundError as exc:
+            print_err(str(exc))
         return
 
     if no_mode_selected:
