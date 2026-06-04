@@ -298,21 +298,6 @@ If you're publishing comparative work, the [manuscript](https://arxiv.org/abs/26
 
 ---
 
-## Limitations & known failure modes
-
-We'd rather you find these in the README than in production. Honest list:
-
-- **LLM-judge residual risk.** The verifier's executable claims are deterministic Python, but the *generation* of those programs and all soft-claim verdicts come from `judge_model`. A weak or quantised judge model can produce weak claims. Use a strong model for `judge_model` even if you cheap out elsewhere.
-- **OpenRouter quantised providers.** Some fp8/int4 providers pass basic capability checks but corrupt escape sequences (the `\\n` bug) — generated workflows crash or silently miscompute. If you see odd parse errors, route around quantised endpoints. See [Troubleshooting](./docs/reference/troubleshooting.md).
-- **Cheat detector is disabled.** The standalone cheat-detector pass over generated source is currently `cheat = None` pending a rewrite. Behavioural anti-cheat pressure comes from Source C recompute-from-disk verifiers, the inverted "Used fallback" claim, and anti-tautology tripwires — but a determined output-shaped workflow could still slip past.
-- **Behaviour descriptor is structural, not semantic.** `[n_agents, n_edges, n_branches, prompt_chars]` summarises the genotype; two workflows with identical structure but different tool routing land on the same point. Workspace-fingerprint or trace-embedding descriptors are on the roadmap.
-- **Goal mode is human-written goals.** "Autonomous" applies to workflow synthesis, not problem framing. The planner decomposes *your* objective; it does not pick scientific questions.
-- **Hard-fail cap is permissive.** `_HARD_FAIL_CAP = 0.99` keeps the evolutionary signal smooth, which means a refuted hard claim still scores high. The `hard_fail_capped` flag in `state_result.json` tells you when this happened — check it before reporting numbers.
-- **`--learn` cost can scale.** Worst-case budget is `max_learning_evolve_iterations × per-generation cost`. Plan for $30–$60/task on premium models if you cap at 35 generations and never hit the early-stop threshold.
-- **Toolomics on default ports.** The discovery default `0.0.0.0:5000–5100` collides with common dev servers (Flask, etc.). Either configure `discovery_addresses` or run Toolomics on a non-conflicting range.
-
----
-
 ## Full documentation
 
 ```bash
