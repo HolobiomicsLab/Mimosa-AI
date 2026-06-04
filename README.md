@@ -16,14 +16,14 @@
 </p>
 
 <p align="center">
-    <em>Self-evolving AI-Framework for Autonomous Scientific Research</em>
+    <em>Self-evolving multi-agent framework for autonomous scientific research.</em>
 </p>
 
 <p align="center">
-  🧬 Self-evolving multi-agent workflows &nbsp;·&nbsp;
+  🧬 Quality-Diversity workflow evolution &nbsp;·&nbsp;
   🔍 MCP-based tool auto-discovery &nbsp;·&nbsp;
-  🔁 Darwinian workflow optimization &nbsp;·&nbsp;
-  📦 Full audit trail & reproducibility &nbsp;·&nbsp;
+  🧪 Multi-source per-claim verification &nbsp;·&nbsp;
+  📦 Full audit trail & reproducibility
 </p>
 
 <p align="center">
@@ -39,15 +39,27 @@
 
 ---
 
-## Demo: Autonomous Paper Reproduction
+## TL;DR
+
+Mimosa-AI writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against six independent vantage points (literature, your goal, agent narration, math invariants, computational reproducibility, statistical fingerprint), and — when you ask it to learn — evolves the workflow across generations with a **Quality-Diversity** search that preserves both performance and structural diversity.
+
+The workflow is emitted as plain Python. The verifier runs deterministic Python checks that recompute what the agents claim. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+
+```bash
+uv sync && uv run main.py        # interactive onboarding
+```
+
+---
+
+## Demo
 
 <p align="center">
-    <em>Mimosa-AI reproduced Nothias et al. (2018) end-to-end — from raw .mzML files to molecular network — autonomously, in a single command.</em>
+    <em>Mimosa-AI autonomously regenerated the molecular network from the <code>.mzML</code> files of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection, alignment, and molecular networking — from a single command, with no fixed pipeline.</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-**Result:** The molecular network below was reproduced autonomously from raw `.mzML` files, matching the topology reported in [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation) — including cluster separation and edge weights.
+The reproduced network matches the topology reported in the paper (cluster separation, edge weights). Note: this reproduces the **molecular networking pipeline** of that study; the bioactivity-guided fractionation experiments are out of scope for the autonomous run.
 
 <p align="center">
   <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
@@ -55,427 +67,249 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ---
 
-## Benchmark Results
+## Benchmark
 
-Evaluated on **ScienceAgentBench** (102 tasks, `task` mode):
+Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer bypassed so workflow synthesis and refinement are evaluated in isolation):
 
-| Mode | Success Rate | Code-BLEU Score | Cost/task |
-|------|-------------|-----------------|-----------|
-| DeepSeek-V3.2 single-agent | 38.2% | 0.898 | $0.05 |
-| DeepSeek-V3.2 one-shot multi-agent | 32.4% | 0.794 | $0.38 |
-| **DeepSeek-V3.2 iterative-learning** | **43.1%** | **0.921** | **$1.7** |
+| Mode                                    | Success Rate | Code-BLEU | Cost / task |
+| --------------------------------------- | ------------ | --------- | ----------- |
+| DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
+| DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
+| **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> Iterative learning improves GPT-4o but yields marginal degradation for Claude Haiku 4.5 — see the [manuscript](https://arxiv.org/abs/2603.28986) for model-dependent behavior analysis.
+> Iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ---
 
-## What is Mimosa-AI?
+## How it works
 
-> ***Mimosa-AI 🌼*** — like the mimosa plant that senses, learns, and adapts — is an open-source framework for autonomous scientific research that automatically synthesizes task-specific multi-agent workflows and refines them through execution feedback. Built around MCP-based tool discovery, code-generating agents, and LLM-based evaluation, it offers academics a modular and auditable alternative to closed black-box systems.
-
-**What it does:**
-- **Reproduces scientific studies** with traceability and rigor — from raw data to publication-ready figures
-- **Automates computational pipelines** across domains: bioinformatics, docking, metabolomics, ML, and more
-- **Self-evolves** through Darwinian-inspired workflow mutation — each failure informs the next attempt
-
-### Interactive documentation
-
-Use the interactive documentation in your browser instead!
-
-Simply run:
-
-```bash
-uvx --with mkdocs-material mkdocs serve
-```
-
-### Architecture Overview
-
-The framework is organized into five layers:
-
-1. **Planning** (optional) — decomposes a high-level scientific goal into discrete tasks
-2. **Tool Discovery** — auto-discovers MCP-based tools on the local network via Toolomics
-3. **Meta-Orchestration** — synthesizes a task-specific multi-agent workflow; assigns tools to specialized agents
-4. **Agent Execution** — code-generating agents run subtasks using discovered tools and scientific libraries
-5. **Judge / Evaluation** — LLM-based judge scores outputs; in learning mode, drives iterative workflow refinement
+Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
 
 <p align="center">
   <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
 </p>
 
-In benchmark `task` mode, the planning layer (1) is bypassed so workflow synthesis and refinement can be evaluated in isolation.
+| Layer | Component | What it does |
+|-------|-----------|--------------|
+| 0 | **Planner** *(optional, `--goal` only)* | Decomposes a high-level objective into discrete tasks. |
+| 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
+| 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
+| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using [SmolAgents](https://github.com/huggingface/smolagents) with shared LangGraph state. |
+| 4 | **VerifierEvaluator** | Multi-source per-claim verifier. Drives the next mutation. |
+
+### The evolution loop — what's actually evolving
+
+Workflows are **full Python programs**, mutated as source code. The genotype is the workflow file; the phenotype is whatever it produces in the workspace.
+
+- **Selection: Quality-Diversity archive** — population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). Novelty is k-NN distance (`k=25`) over a behaviour descriptor `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
+- **Variation: stagnation-driven scope** — mutation boldness is a continuous function of how much the last 4 prompt gradients repeat themselves. Near-winners stay protected. Scope bands run from "prompt-only tweak" to "complete topology rethink."
+- **Crossover** — ~30 % of generations combine two parents, strongest-first.
+- **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.5) seeds the search. Useful workflows transfer across tasks.
+
+Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md).
+
+### The verifier — what scores actually mean
+
+After each run, six independent claim sources look at the workspace and emit success-polarity claims:
+
+| Source | Vantage |
+|--------|---------|
+| **A** | Peer-reviewed practice (via Perspicacité literature grounding) |
+| **B** | The literal goal text — did the agents deliver what was asked? |
+| **C** | Agent narration — can claimed numbers / artefacts be reproduced from disk? |
+| **D** | Math invariants — probabilities in [0,1], shape consistency, no NaN, conservation |
+| **E** | Computational reproducibility — declared deps cover used imports, no absolute paths, seeds on stochastic ops |
+| **F** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
+
+Each claim is verified by a **deterministic Python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent. Anti-tautology tripwires reject programs that compare the agent's output to itself.
+
+**The mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
+
+Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
 ---
 
-> :books: **Full documentation**: see [`docs/`](./docs/index.md) — render locally with `uvx --with mkdocs-material mkdocs serve` (live preview at `http://localhost:8000`) or `uvx --with mkdocs-material mkdocs build` (static HTML to `./site`). The full site config is in [`mkdocs.yml`](./mkdocs.yml).
+## Quickstart
 
-## Table of Contents
-
-- [What is Toolomics and do I need it?](#what-is-toolomics-and-do-i-need-it)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Optional: Perspicacité for Scientific Grounding](#optional-perspicacité-for-scientific-grounding)
-- [Configuration](#configuration)
-- [Running Mimosa](#running-mimosa)
-  - [Interactive Onboarding (recommended for first-time setup)](#interactive-onboarding-recommended-for-first-time-setup)
-  - [Goal mode — multi-step scientific objective](#goal-mode--multi-step-scientific-objective)
-  - [Task mode — single granular operation](#task-mode--single-granular-operation)
-- [Workspace and Audit Trail](#workspace-and-audit-trail)
-- [Learning through Evolution of Multi-Agent Workflows](#learning-through-evolution-of-multi-agent-workflows)
-- [Transparency](#transparency)
-- [Command Line Arguments](#command-line-arguments)
-- [Evaluation](#evaluation)
-- [Phone Notifications](#phone-notifications)
-- [Telemetry Setup](#telemetry-setup)
-- [License](#license)
-- [Citation](#citation)
-
----
-
-## What is Toolomics and do I need it?
-
-**[Toolomics](https://github.com/HolobiomicsLab/toolomics)** is Mimosa's companion platform for MCP server management. It exposes scientific tools (data-analysis utilities, web services, laboratory instruments) as discoverable MCP services, provides the shared workspace where Mimosa reads and writes task artifacts, and lets you register custom tools without touching Mimosa's core.
-
-**Do you need it?** Yes — Toolomics must be running before you execute any Mimosa mode. The good news: setup takes only a few minutes.
-
-- Both Mimosa and Toolomics are Apache 2.0 licensed and free to use.
-- Toolomics runs locally on a configurable port range (default `5000–5100`).
-- You can add your own MCP tools via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics).
-
-> **Quick-start path:** Clone Toolomics → start it on the default port range → then run Mimosa. No cloud accounts or paid services required beyond an LLM API key.
-
----
-
-## Prerequisites
-
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- A running [Toolomics MCP server](https://github.com/HolobiomicsLab/toolomics)
-
----
-
-## Installation
-
-### 1. Install dependencies
+### 1. Install
 
 ```bash
-# Using uv (recommended — creates venv and installs dependencies in one step)
 pip install uv
+git clone https://github.com/HolobiomicsLab/Mimosa-AI.git
+cd Mimosa-AI
 uv sync
-
-# Or with pip
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install .
 ```
 
-### 2. Set API keys
+### 2. Add at least one LLM key
 
-Create a `.env` file at the project root. Include only the keys for the LLM providers you plan to use:
+Create `.env` at the project root. Only the providers you actually use are required.
 
 ```env
-ANTHROPIC_API_KEY=...       # Claude — recommended for workflow orchestration
-OPENAI_API_KEY=...          # OpenAI models - Optional
-MISTRAL_API_KEY=...         # Mistral models - Optional
-DEEPSEEK_API_KEY=...        # Deepseek - Optional
-HF_TOKEN=...                # HuggingFace provider, Optional
+ANTHROPIC_API_KEY=...       # Claude — recommended for workflow synthesis
+OPENAI_API_KEY=...
+MISTRAL_API_KEY=...
+DEEPSEEK_API_KEY=...
+HF_TOKEN=...
 OPENROUTER_API_KEY=...      # Any model via OpenRouter
 
-# Optional — observability via Langfuse
+# Optional: Langfuse observability
 LANGFUSE_PUBLIC_KEY=...
 LANGFUSE_PRIVATE_KEY=...
 ```
 
-### 3. Start the MCP server
+### 3. Expose MCP tools
 
-Follow the setup instructions at [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics). Configure it to run on a port range (e.g., `5000–5100`).
+Mimosa discovers any MCP server reachable on the address/port range in your config (default `0.0.0.0:5000–5100`).
 
-Custom MCP tools can be added via the [Toolomics docs](https://github.com/HolobiomicsLab/toolomics/README.md).
+- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — packaged scientific tools, shared workspace management, an opinionated registration flow.
+- **Bring-your-own:** point `discovery_addresses` at any reachable MCP server — `fastmcp` scripts, ToolHive, third-party MCP containers. Toolomics is not required; see [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
 
-### 4. (Optional) Start Perspicacité for Scientific Grounding
-
-**[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI)** is an optional companion AI that provides scientific grounding for Mimosa's workflow creation and evaluation. When running, Mimosa will automatically interact with it to improve the scientific rigor of its outputs.
-
-**Setup:**
+### 4. Run
 
 ```bash
-git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git
-cd Perspicacite-AI
-uv sync
-uv run web_app_full.py
+uv run main.py                   # interactive onboarding (recommended first time)
 ```
 
-That's it — Perspicacité will start and be ready to interact. Then launch Mimosa in another terminal the normal way and it will be able to interact automatically.
+Or skip the wizard:
+
+```bash
+uv run main.py --task "Train a multitask model on Clintox to predict toxicity and FDA approval"
+uv run main.py --goal "Reproduce experiments from https://arxiv.org/pdf/2306.00306 and compare results"
+```
+
+Add `--learn` to evolve across generations instead of one-shotting:
+
+```bash
+uv run main.py --task "..." --learn --config my_config.json
+```
+
+Full quickstart: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md).
+
+### 5. (Optional) Scientific grounding via Perspicacité
+
+[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI) grounds workflow synthesis and Source A claims in the literature. When it's running, Mimosa picks it up automatically.
+
+```bash
+git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git && cd Perspicacite-AI
+uv sync && uv run web_app_full.py
+```
 
 ---
 
+## Execution modes
 
-## Running Mimosa
+| Mode | Use when | Command |
+|------|----------|---------|
+| `--task` | Single focused operation | `uv run main.py --task "..."` |
+| `--goal` | Multi-step objective requiring planning | `uv run main.py --goal "..."` |
+| `--learn` | Add to either mode — evolve across generations | `... --learn` |
+| `--single_agent` | Skip multi-agent synthesis (fast, no learning) | `... --single_agent` |
+| `--manual` | Interactive CLI to test individual MCP tools | `uv run main.py --manual` |
+| Batch | Evaluate a CSV of tasks | `... --papers <csv>` |
+| Benchmark | ScienceAgentBench | `... --science_agent_bench` |
 
-### Interactive Onboarding (recommended for first-time setup)
-
-> **If you are new to Mimosa, start here.**
-
-Running Mimosa with **no arguments** launches an interactive, step-by-step onboarding wizard that guides you through everything before the first execution:
-
-```bash
-uv run main.py
-```
-Once you complete setup once, subsequent runs remember your workspace path via `config_default.json` — no re-configuration needed.
-
----
-
-### Manual onboarding:
-
-**1. Start by editing the config:**
-
-```bash
-cp config_default.json my_config.json
-```
-
-Edit `my_config.json`. Key parameters:
-
-| Parameter | Description |
-|-----------|-------------|
-| `workspace_dir` | Path to the Toolomics workspace — all generated files appear here |
-| `discovery_addresses` | IP + port ranges for MCP server discovery |
-| `planner_llm_model` | LLM for task decomposition and planning |
-| `prompts_llm_model` | LLM for workflow prompt generation |
-| `workflow_llm_model` | LLM for multi-agent orchestration (recommended: `anthropic/claude-opus-4-5` or `z-ai/glm-5`) |
-| `smolagent_model_id` | Model for SmolAgents execution subtasks |
-| `judge_model` | LLM for output self-evaluation and scoring |
-| `learned_score_threshold` | Minimum score to accept a result and stop iterating |
-| `max_learning_evolve_iterations` | Maximum evolution iterations before accepting the result |
-
-**2. Choose a mode `task` or `goal` depending on the complexity of your objective.**
-
-**2.1 Goal mode — multi-step scientific objective**
-
-Use this when your objective requires planning across multiple distinct operations (e.g., reproducing a paper, building an ML pipeline).
-
-```bash
-uv run main.py --goal "Your scientific objective" --config my_config.json
-```
-
-**Examples:**
-```bash
-uv run main.py \
-  --goal "Reproduce experiments from 'Dual Aggregation Transformer for Image Super-Resolution' (https://arxiv.org/pdf/2306.00306) and compare results." \
-  --config my_config.json
-
-uv run main.py \
-  --goal "Develop a machine learning model to predict protein-ligand binding affinity." \
-  --config my_config.json
-```
-
-**2.2 Task mode — single granular operation**
-
-Use this for a focused, self-contained operation without long-term planning.
-
-```bash
-uv run main.py --task "Your task description" --config my_config.json
-```
-
-**Examples:**
-```bash
-uv run main.py \
-  --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status." \
-  --config my_config.json
-
-uv run main.py --task "Conduct a literature review on graph neural networks for drug discovery." --config my_config.json
-```
-
-> **Benchmark note:** The results reported in the manuscript are measured in `task` mode, with the planning layer disabled, to isolate workflow synthesis and iterative refinement.
->
-> **Note:** Toolomics must be installed and the MCP server must be running before executing any mode.
+Details: [`docs/usage/modes.md`](./docs/usage/modes.md), [`docs/usage/learning.md`](./docs/usage/learning.md), [`docs/reference/cli.md`](./docs/reference/cli.md).
 
 ---
 
-## Workspace and Audit Trail
+## Audit trail and replay
 
-During execution, Mimosa reads and writes files inside the Toolomics workspace configured by `workspace_dir`. When a run finishes, the workspace contents are copied into a timestamped folder under `runs_capsule/` so the final state is preserved as an archive.
+Mimosa is built for scientific use — every decision is inspectable after the fact.
 
-- **Toolomics `workspace/`** — live working directory: intermediate files, scripts, downloads, generated outputs
-- **`sources/workflows/<uuid>/`** — generated workflow and execution metadata: `state_result.json`, `evaluation.txt`, `reward_progress.png`
-- **`runs_capsule/<capsule_name>/`** — archived snapshot of the run for later inspection, comparison, or sharing
-- **`memory_explorer.py <uuid>`** — replay a workflow execution step-by-step to inspect agent traces, tool calls, and outputs
+| Tool | What it does |
+|------|--------------|
+| `uv run memory_explorer.py <uuid>` | Step through one generation's full trace — thoughts, tool calls, outputs, state deltas. |
+| `uv run main.py --memory_cli` | RAG-backed Q&A over a finished run's memory. Ask "*what classifier did task_builder use?*" instead of scrolling. |
+| `uv run memory_timelapse.py <uuid>` | Animated frame-by-frame view of memory growth across iterations. |
+| `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | The exact Python the agents executed. No DSL. |
+| `sources/workflows/<uuid>/lineage_<uuid>.json` | Parents and operator (`seed | mutation | crossover`) for this generation. |
+| `sources/workflows/<uuid>/evolution_prompt_<uuid>.md` | The exact LLM prompt that produced this code. Same prompt + seed = same code. |
+| `sources/workflows/<uuid>/evolution_tree.png` | Rendered lineage tree of the whole `--learn` run. |
+| `sources/workflows/<uuid>/reward_progress.png` | Score-over-iteration curve. |
+| `runs_capsule/<capsule_name>/` | Archived snapshot of the final workspace for sharing or re-running. |
 
-Together, these locations form Mimosa's full audit trail: what was planned, executed, evaluated, and produced.
-
----
-
-## Learning through Evolution of Multi-Agent Workflows
-
-***Mimosa-AI*** is a **self-evolving multi-agent system** that dynamically synthesizes specialized workflows for scientific tasks. Rather than forcing tasks through fixed pipelines, the system composes custom multi-agent architectures on-demand and learns from execution patterns to optimize future performance.
-
-Mimosa evolves workflows through **Darwinian-inspired single-incumbent local search**: at each iteration, only the best-performing workflow generates a successor, and only improvements are kept. Over time, the system builds a library of proven workflows, so similar future tasks start from a strong baseline rather than from scratch.
-
-For any new task, **start with learn mode** to let Mimosa build competence before full autonomy.
-
-**Start in Learning mode**
-
-```bash
-uv run main.py --task "Train a multitask model on the Clintox dataset to predict drug toxicity and FDA approval status" --learn --config my_config.json
-```
-
-<p align="center">
-  <img src="./docs/images/workflow_mutation.png" alt="Workflow mutation diagram" width="80%">
-</p>
-
-**Progress visualization:**
-
-Once ***Mimosa-AI*** completes its learning phase, the reward progress plot (performance gains across attempts) is automatically saved to `sources/workflows/<uuid>/reward_progress.png`.
-
-<p align="center">
-  <img src="./docs/images/evolve_example.png" alt="Reward progress example" width="80%">
-</p>
+Full layout: [`docs/usage/transparency.md`](./docs/usage/transparency.md), [`docs/usage/workspace.md`](./docs/usage/workspace.md).
 
 ---
 
-## Transparency
+## Configuration
 
-We ship an interactive debugger, `memory_explorer.py`, that lets you step through any agent execution in granular detail.
+Copy `config_default.json` to `my_config.json` and edit. The fields you'll touch most often:
 
-```bash
-python memory_explorer.py 20260115_113303_9bb63437
-```
+| Field | What it controls |
+|-------|------------------|
+| `workspace_dir` | Shared workspace — all generated files appear here |
+| `discovery_addresses` | IP + port ranges for MCP discovery |
+| `workflow_llm_model` | Synthesizes the multi-agent workflow (e.g. `anthropic/claude-opus-4-5`) |
+| `smolagent_model_id` | Model used by execution agents |
+| `judge_model` | LLM that writes verifier programs and renders soft verdicts |
+| `learned_score_threshold` | Early-stop threshold in `--learn` mode (default `0.97`) |
+| `max_learning_evolve_iterations` | Cap on generations (default `35`) |
+| `population_size` / `novelty_weight` / `min_improvement_threshold` | QD archive tuning |
 
-This replays the full execution trace — thoughts, tool calls, and outputs — so you can inspect exactly how every decision unfolded.
-
----
-
-## Command Line Arguments
-
-### Execution Modes
-
-| Argument | Description |
-|----------|-------------|
-| `--goal GOAL` | Specify a high-level research objective, paper reproduction, or scientific question (planner mode) |
-| `--task TASK` | Execute a single task: literature review, dataset download, ML model implementation, … |
-| `--manual` | Interactive CLI mode to debug MCPs and test ***Mimosa*** tools directly |
-| `--papers <CSV path>` | Evaluation on a CSV dataset containing research papers and prompts |
-| `--science_agent_bench` | Evaluation on ScienceAgentBench |
-
-### Other Parameters
-
-| Argument | Description |
-|----------|-------------|
-| `--learn` | Enable iterative learning to optimize task performance |
-| `--csv_runs_limit N` | Limit number of CSV entries to evaluate |
-| `--scenario <scenario file name>` | Use specific scenario-based assertions instead of LLM-as-a-judge for scoring |
-| `--single_agent` | Single-agent mode — fast, but cannot improve through learning |
-| `--debug` | Enable debug mode for more verbose logging |
+Full reference: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 
 ---
 
 ## Evaluation
 
-***Mimosa-AI*** can be evaluated on [ScienceAgentBench](https://arxiv.org/abs/2410.05080) or [PaperBench](https://arxiv.org/pdf/2504.01848).
-
-⚠️ For unbiased evaluation, run `./cleanup.sh` first to prevent Mimosa from using cached workflows.
-
-### ScienceAgentBench
-
-**Note:** For manuscript aligned results checkout: `latest_benchmark_run`
-
-1. Download the full ScienceAgentBench dataset:
-   [dataset link](https://buckeyemailosu-my.sharepoint.com/personal/chen_8336_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch%2Fbenchmark%2Ezip&parent=%2Fpersonal%2Fchen%5F8336%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FResearch&ga=1)
-2. Unzip with password: `scienceagentbench`
-3. Copy `benchmark/benchmark/datasets/` → `Mimosa-AI/datasets/scienceagentbench/datasets/`
-
-**Full evaluation with learning:**
-```sh
+```bash
+# ScienceAgentBench (download dataset first — see docs)
 uv run main.py --science_agent_bench --learn
-```
 
-**Quick evaluation (10 tasks, 4 learning iterations):**
-```sh
+# Quick smoke (10 tasks)
 uv run main.py --science_agent_bench --csv_runs_limit 10
-```
 
-### PaperBench
-
-OpenAI PaperBench evaluates AI agents on AI research replication (*PaperBench: Evaluating AI's Ability to Replicate AI Research*).
-
-```sh
+# PaperBench
 uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
+
+# Custom CSV
+uv run main.py --papers datasets/<your_benchmark>.csv --learn
 ```
 
-⚠️ Results are saved to `runs_capsule/`. Refer to the [PaperBench documentation](https://github.com/openai/frontier-evals/tree/main/project/paperbench) for complete evaluation instructions.
+> ⚠️ For unbiased evaluation, run `./cleanup.sh` first to prevent Mimosa from reusing cached workflows.
 
-**Custom benchmark:**
-
-```sh
-uv run main.py --papers datasets/<your_benchmark_name>.csv --csv_runs_limit 20 --learn
-```
+Setup details for each benchmark: [`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md), [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ---
 
-## Phone Notifications
+## Notifications and telemetry
 
-Receive real-time status updates via Pushover notifications.
-
-### Setup
-
-1. Create a [Pushover](https://pushover.net/) account and note your **User Key**
-2. Create an application named "Mimosa" — copy the **API Token**
-3. Export environment variables:
-   ```bash
-   export PUSHOVER_USER="your_user_key"
-   export PUSHOVER_TOKEN="your_api_token"
-   ```
-4. Install the Pushover mobile app and log in
+- **Pushover** — real-time progress on your phone. Set `PUSHOVER_USER` and `PUSHOVER_TOKEN`. Details: [`docs/usage/notifications.md`](./docs/usage/notifications.md).
+- **Langfuse** — span-level traces of every LLM call. `docker compose up -d` from the Langfuse repo, then add `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_PRIVATE_KEY` to `.env`. Dashboard at `http://localhost:3000`. Details: [`docs/usage/telemetry.md`](./docs/usage/telemetry.md).
 
 ---
 
-## Telemetry Setup
+## Full documentation
 
-Monitor and debug AI agents with real-time observability dashboards using Langfuse.
+```bash
+uvx --with mkdocs-material mkdocs serve   # live preview at http://localhost:8000
+uvx --with mkdocs-material mkdocs build   # static HTML to ./site
+```
 
-### Quick Start
-
-1. **Deploy Langfuse locally:**
-   ```bash
-   git clone https://github.com/langfuse/langfuse.git
-   cd langfuse
-   docker compose up -d
-   ```
-
-2. **Add to `.env`:**
-   ```env
-   LANGFUSE_PUBLIC_KEY=your_public_key
-   LANGFUSE_PRIVATE_KEY=your_private_key
-   ```
-
-3. **Access the dashboard** at `http://localhost:3000` while Mimosa is running.
-
-The dashboard provides agent execution traces, performance metrics, error debugging, and token/API usage.
-
-> **Note:** Telemetry is optional but recommended for debugging and performance optimization.
+Site config: [`mkdocs.yml`](./mkdocs.yml). Index: [`docs/index.md`](./docs/index.md).
 
 ---
 
 ## License
 
-This repository is publicly distributed under the Apache License 2.0. For contribution and licensing details, see:
-- `NOTICE`
-- `docs/licensing-notes.md`
-- `CLA/INDIVIDUAL_CLA.md`
-- `CLA/EMPLOYER_AUTHORIZATION.md`
+Apache 2.0. See [`NOTICE`](./NOTICE), [`docs/licensing-notes.md`](./docs/licensing-notes.md), and the [`CLA/`](./CLA/) folder for contribution terms.
 
 ---
 
 ## Citation
 
 <p align="center">
-<b>Citation:</b> <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
+<em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
 M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a>
 </p>
 
 ```bibtex
 @article{legrand2026mimosa,
-  title={Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author={Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal={arXiv preprint arXiv:2603.28986},
-  year={2026}
+  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal = {arXiv preprint arXiv:2603.28986},
+  year    = {2026}
 }
 ```
