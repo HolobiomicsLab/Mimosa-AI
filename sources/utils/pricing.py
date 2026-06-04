@@ -30,35 +30,14 @@ class PricingCalculator:
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
 
-    # Verifier memory files are saved as `verifier_<stem>.json` by LLMProvider.
-    # Each prefix maps to a human-readable phase label for the cost breakdown.
-    # Order matters: more specific prefixes must come before shorter ones.
-    VERIFIER_PHASES = (
-        ("verifier_extract_claims", "claim extraction"),
-        ("verifier_declare_importance", "importance rating"),
-        ("verifier_abstract_", "abstract diagnosis"),
-        ("verifier_select_files_", "file selection"),
-        ("verifier_gen_", "script generation"),
-        ("verifier_soft_", "soft evaluation"),
-    )
-
-    @classmethod
-    def _verifier_phase(cls, stem: str) -> str:
-        """Map a `verifier_*` filename stem to a phase label."""
-        for prefix, label in cls.VERIFIER_PHASES:
-            if stem.startswith(prefix):
-                return label
-        return "other"
-
     def _collect_verifier_calls(self, memory_path: Path) -> list[TokenUsage]:
-        """Aggregate `verifier_*.json` LLM calls by (phase, model).
+        """One `TokenUsage` per `verifier_*.json` file in `memory_path`.
 
-        Each verifier memory file has the same shape as `workflow_creator.json`
-        (single LLMProvider call: top-level `model` + `usage.{prompt,completion,total}_tokens`).
-        Returns one `TokenUsage` per (phase, model) bucket, summing tokens.
+        Same shape as `workflow_creator.json` / `judge.json`: single LLMProvider
+        call with top-level `model` and `usage.{prompt,completion,total}_tokens`.
         """
-        buckets: dict[tuple[str, str], dict[str, int]] = {}
-        for file in os.listdir(memory_path):
+        calls: list[TokenUsage] = []
+        for file in sorted(os.listdir(memory_path)):
             if not (file.startswith("verifier_") and file.endswith(".json")):
                 continue
             try:
@@ -67,27 +46,17 @@ class PricingCalculator:
             except (OSError, json.JSONDecodeError) as e:
                 print(f"⚠️  Could not read verifier memory {file}: {e}")
                 continue
-
             usage = data.get("usage") or {}
             model = data.get("model")
             if not model or "prompt_tokens" not in usage:
                 continue
-
-            phase = self._verifier_phase(file[:-len(".json")])
-            bucket = buckets.setdefault(
-                (phase, model),
-                {"input": 0, "output": 0, "total": 0, "n": 0},
-            )
-            bucket["input"] += usage.get("prompt_tokens", 0) or 0
-            bucket["output"] += usage.get("completion_tokens", 0) or 0
-            bucket["total"] += usage.get("total_tokens", 0) or 0
-            bucket["n"] += 1
-
-        calls: list[TokenUsage] = []
-        for (phase, model), agg in sorted(buckets.items()):
-            suffix = "call" if agg["n"] == 1 else "calls"
-            label = f"verifier — {phase} ({agg['n']} {suffix})"
-            calls.append(TokenUsage(label, model, agg["input"], agg["output"], agg["total"]))
+            calls.append(TokenUsage(
+                file[:-len(".json")],
+                model,
+                usage.get("prompt_tokens", 0) or 0,
+                usage.get("completion_tokens", 0) or 0,
+                usage.get("total_tokens", 0) or 0,
+            ))
         return calls
 
     def _strip_routing_prefix(self, model_name: str) -> str:
