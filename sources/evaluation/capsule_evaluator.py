@@ -146,7 +146,8 @@ class CapsuleEvaluator:
 
         except Exception as e:
             self.logger.error(f"[EVAL] Error in evaluation: {str(e)}")
-            return False, f"Evaluation error: {str(e)}", False
+            msg = f"Evaluation error: {str(e)}"
+            return False, msg, False, msg
 
     def calculate_codebert_score(self) -> float:
         """
