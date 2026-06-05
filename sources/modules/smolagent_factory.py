@@ -84,7 +84,10 @@ class SmolAgentFactory:
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
-        self.timeout = 3600
+        # Per-agent execution timeout (seconds). Injected from the main config
+        # (config.agent_execution_timeout) as a module global by the workflow
+        # factory; falls back to 1 hour if run standalone.
+        self.timeout = globals().get("AGENT_EXECUTION_TIMEOUT", 3600)
         os.makedirs(self.memory_folder, exist_ok=True)
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 

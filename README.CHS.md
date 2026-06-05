@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>面向自主科学研究的自进化多智能体框架。</em>
+    <em>面向自主科学研究的自进化多智能体框架 —— LLM 驱动的工作流合成、质量-多样性进化搜索、MCP 工具自动发现。</em>
 </p>
 
 <p align="center">
@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI 为**每个任务编写定制的多智能体工作流**,在沙箱中运行它,并对照六个独立视角(文献、你的目标、智能体叙述、数学不变量、计算可复现性、统计指纹)核查智能体的实际行为;并且当你要求它学习时,它会以**质量-多样性 (Quality-Diversity)** 搜索跨代进化工作流,同时保持性能与结构多样性。
+Mimosa-AI 是一个**面向自主科学研究的开源 Python 框架**:它为**每个任务编写定制的多智能体工作流**,在沙箱中运行它,并对照六个独立视角(文献、你的目标、智能体叙述、数学不变量、计算可复现性、统计指纹)核查智能体的实际行为;并且当你要求它学习时,它会以**质量-多样性 (Quality-Diversity)** 搜索(MAP-Elites 谱系)跨代进化工作流,同时保持性能与结构多样性。
 
-工作流以纯 Python 形式输出。验证器运行确定性 Python 检查,重新计算智能体所声称的内容。每一代都连同其谱系和生成它的精确 LLM 提示一并落盘。
+工作流以纯 Python 形式输出 —— 无 DSL、无 YAML —— 因此任何一代都可以被检视、对比或独立重新执行。验证器运行确定性 Python 检查,重新计算智能体所声称的内容。每一代都连同其谱系和生成它的精确 LLM 提示一并落盘。
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## 演示
 
 <p align="center">
-    <em>Mimosa-AI 自主重建了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> 的 LC-MS/MS 分子网络流水线 —— 对 <code>.mzML</code> 文件进行特征检测、对齐与经典分子网络构建(GNPS 风格的余弦聚类) —— 仅需一条命令,无需任何固定流水线。</em>
+    <em>Mimosa-AI 自主重建了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> 的 LC-MS/MS 分子网络流水线 —— 对 <code>.mzML</code> 文件进行特征检测(MZmine / OpenMS / matchms 类工具栈 —— 由智能体自行选择)、对齐与经典分子网络构建(GNPS 风格的余弦聚类) —— 仅需一条命令,无需任何固定流水线。</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-复现得到的网络在聚类层面与论文所报告的拓扑相吻合。范围说明:此处仅复现**分子网络**阶段 —— 原研究中的生物活性导向分离、人工注释审核以及库匹配(GNPS / SIRIUS / CSI:FingerID)不在本次自主运行的范围内。
+复现得到的网络在聚类层面与论文所报告的拓扑相吻合,输出为可在 Cytoscape 中加载的 `.graphml` 文件,以及对应的特征定量表。范围说明:此处仅复现**分子网络**阶段 —— 原研究中的生物活性导向分离、人工注释审核以及库匹配(GNPS / SIRIUS / CSI:FingerID)不在本次自主运行的范围内。
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -77,7 +77,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 迭代学习提升了 GPT-4o 的表现,但在 Claude Haiku 4.5 上出现了边际退化 —— 与模型相关的行为在[手稿](https://arxiv.org/abs/2603.28986)中有详细分析。PaperBench 结果见 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
+> **在 ScienceAgentBench 上,DeepSeek-V3.2 迭代学习取得 43.1% 成功率 —— 相较单智能体基线提升 +4.9 个百分点,单任务成本 $1.70。**
+
+> 在 ScienceAgentBench 上使用 DeepSeek-V3.2 时,迭代学习提升了 GPT-4o 的表现,但在 Claude Haiku 4.5 上出现了边际退化 —— 与模型相关的行为在[手稿](https://arxiv.org/abs/2603.28986)中有详细分析。PaperBench 结果见 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
 
 > **成本与运行时间。** `$1.70/task` 的数字是按默认 `--learn` 预算(最多 35 代,在 `overall_score > 0.97` 时早停)摊销得到的。在 DeepSeek-V3.2 下,一次典型的进化运行每个任务的挂钟时间为 30–90 分钟,并大致随模型价格线性扩展。单次运行(无 `--learn`)约为 5–15 分钟,成本要低一个数量级。
 
@@ -88,7 +90,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 五层架构,通过小型 dataclass 模式串联 —— 完整细节见 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | 层级 | 组件 | 作用 |
@@ -96,14 +98,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(可选,仅 `--goal` 使用)* | 将高层目标分解为离散任务。 |
 | 1 | **ToolManager + Perspicacité** | 在配置的地址/端口范围内发现 MCP 工具;可选地拉取文献片段。 |
 | 2 | **EvolutionEngine** | 合成工作流并跨代进化它(见下文)。 |
-| 3 | **WorkflowRunner** | 使用 [SmolAgents](https://github.com/huggingface/smolagents) 在沙箱中运行所合成的 Python 工作流,并共享 LangGraph 状态。 |
+| 3 | **WorkflowRunner** | 在沙箱中运行所合成的 Python 工作流,使用 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)(`LocalPythonExecutor` 配合 AST 白名单),并共享 LangGraph 状态。 |
 | 4 | **VerifierEvaluator** | 多源逐声明验证器。驱动下一次变异。 |
 
 ### 进化循环 —— 真正在进化的是什么
 
-工作流是**完整的 Python 程序**,作为源代码被变异。基因型是工作流文件;表现型是它在工作空间中产生的任何东西。
+工作流是**完整的 Python 程序**,作为源代码被变异。**代码即基因型 (code-as-genotype)** 是工作流文件;表现型是它在工作空间中产生的任何东西。
 
-- **选择:质量-多样性归档** —— 种群规模为 50,`qd_score = (1−w)·quality + w·novelty`(`w=0.4`)。新颖度是在行为描述符 `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距离(`k=25`)。父代通过子代数量倒数轮盘抽取,使归档分布开来。
+- **选择:质量-多样性归档**(**MAP-Elites** 风格) —— 种群规模为 50,`qd_score = (1−w)·quality + w·novelty`(`w=0.4`)。**新颖性搜索 (novelty search)** 使用**行为描述符 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距离(`k=25`)。父代通过子代数量倒数轮盘抽取,使归档分布开来。
 - **变异:由停滞驱动的尺度** —— 变异的大胆程度是过去 4 个提示梯度自身重复程度的连续函数。接近优胜者的个体会被保护。变异尺度的范围从"仅提示微调"一直到"完整拓扑重思"。
 - **交叉** —— 约 30% 的代次会以强者优先的方式组合两个父代。
 - **冷启动** —— 当归档为空时,会基于相似度过滤,从磁盘上过往运行进行扫描(MiniLM 余弦相似度 ≥ 0.5)以种子化搜索。有用的工作流可在任务之间迁移。
@@ -123,9 +125,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | **E** | 计算可复现性 —— 声明的依赖覆盖了实际使用的导入、无绝对路径、随机操作上有种子 |
 | **F** | 统计指纹 —— 超过基线、无退化预测、无泄漏特征 |
 
-每个声明都由裁判针对工作空间编写的**确定性 Python 程序**进行验证 —— 而不是再去问 LLM 它是否相信智能体。反同义反复的绊线会拒绝那些把智能体输出与自身比较的程序。
+每个声明都由裁判针对工作空间编写的**确定性 Python 程序**进行验证 —— 而不是再去问 LLM 它是否相信智能体。**自我验证 (self-verification)** 使用反同义反复的绊线,拒绝那些把智能体输出与自身比较的程序。
 
-**变异器从不接触评分细则。**唯一反馈回流的信号是 `abstracted_prompt_gradient` —— 一种用代号表述的失效模式诊断,不会指明声明、分数或源。从结构上讲,搜索无法对从未见过的评分词汇过拟合。
+**评分细则盲变异 (rubric-blind mutation) —— 变异器从不接触评分细则。**唯一反馈回流的信号是 `abstracted_prompt_gradient` —— 一种用代号表述的失效模式诊断,不会指明声明、分数或源。从结构上讲,搜索无法对从未见过的评分词汇过拟合。
 
 完整流水线:[`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -163,7 +165,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa 会发现配置中地址/端口范围内可达的任意 MCP 服务器(默认 `0.0.0.0:5000–5100`)。
 
-- **最简路径:**安装我们的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 打包好的科研工具、共享工作空间管理、规范化的注册流程。
+- **最简路径:**安装我们的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 每个工作空间一个 MCP shell 沙箱,智能体按需安装科研依赖(同一工作空间的后续运行可复用已安装的工具);此外提供预构建的 MCP 服务以暴露常见科研工具栈,并附带共享工作空间管理与规范化的注册流程。
 - **自带方案:**将 `discovery_addresses` 指向任意可达的 MCP 服务器 —— `fastmcp` 脚本、ToolHive、第三方 MCP 容器。Toolomics 并非必需;参见 [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)。
 
 ### 4. 运行
@@ -321,7 +323,7 @@ Apache 2.0。请参见 [`NOTICE`](./NOTICE)、[`docs/licensing-notes.md`](./docs
 
 ---
 
-## 引用
+## 引用本工作
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +332,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

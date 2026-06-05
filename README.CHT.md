@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>面向自主科學研究的自我演化多智能體框架。</em>
+    <em>面向自主科學研究的自我演化多智能體框架 —— LLM 驅動的工作流程合成、品質-多樣性演化搜尋、MCP 工具自動探索。</em>
 </p>
 
 <p align="center">
@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI 會**為每一項任務撰寫一套客製化的多智能體工作流程**,於沙箱中執行,並以六個獨立觀察視角(文獻、您的目標、智能體敘述、數學不變量、計算可重現性、統計指紋)檢核智能體實際完成的內容;當您要求其學習時,則透過**品質-多樣性 (Quality-Diversity)** 搜尋於世代之間演化該工作流程,同時保留效能與結構多樣性。
+Mimosa-AI 是一個**面向自主科學研究的開源 Python 框架**:它會**為每一項任務撰寫一套客製化的多智能體工作流程**,於沙箱中執行,並以六個獨立觀察視角(文獻、您的目標、智能體敘述、數學不變量、計算可重現性、統計指紋)檢核智能體實際完成的內容;當您要求其學習時,則透過**品質-多樣性 (Quality-Diversity)** 搜尋(MAP-Elites 譜系)於世代之間演化該工作流程,同時保留效能與結構多樣性。
 
-工作流程以純 Python 程式碼產出。驗證器執行確定性的 Python 檢核程式,重新計算智能體所宣稱的結果。每一個世代都連同其譜系與產生該世代的確切 LLM 提示一併保存於磁碟。
+工作流程以純 Python 程式碼產出 —— 無 DSL、無 YAML —— 因此每一個世代皆可被檢視、比對或獨立重新執行。驗證器執行確定性的 Python 檢核程式,重新計算智能體所宣稱的結果。每一個世代都連同其譜系與產生該世代的確切 LLM 提示一併保存於磁碟。
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## 示範
 
 <p align="center">
-    <em>Mimosa-AI 僅透過單一指令、且無預設管線的情況下,自主重現了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias 等人 (2018)</a> 的 LC-MS/MS 分子網路分析管線——對 <code>.mzML</code> 檔案進行特徵偵測、對齊,以及經典分子網路分析 (GNPS 風格的餘弦聚類)。</em>
+    <em>Mimosa-AI 僅透過單一指令、且無預設管線的情況下,自主重現了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias 等人 (2018)</a> 的 LC-MS/MS 分子網路分析管線——對 <code>.mzML</code> 檔案進行特徵偵測(MZmine / OpenMS / matchms 類型工具——由智能體自行挑選)、對齊,以及經典分子網路分析 (GNPS 風格的餘弦聚類)。</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-所重現的網路在叢集層級上與該論文所報告的拓樸相符。範圍說明:此處僅重現**分子網路分析**階段——原始研究中的生物活性導向分餾、人工註解審閱及資料庫比對 (GNPS / SIRIUS / CSI:FingerID) 皆不在自主執行的範圍內。
+所重現的網路在叢集層級上與該論文所報告的拓樸相符,輸出為可於 Cytoscape 中載入的 `.graphml` 檔案,以及對應的特徵定量表。範圍說明:此處僅重現**分子網路分析**階段——原始研究中的生物活性導向分餾、人工註解審閱及資料庫比對 (GNPS / SIRIUS / CSI:FingerID) 皆不在自主執行的範圍內。
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -77,7 +77,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | DeepSeek-V3.2 單發多智能體              | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 迭代學習**              | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 迭代學習能改善 GPT-4o 的表現,但對 Claude Haiku 4.5 卻造成輕微的退化——與模型相關的行為差異已於[論文](https://arxiv.org/abs/2603.28986)中分析。PaperBench 結果請見 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
+> **於 ScienceAgentBench 上,DeepSeek-V3.2 迭代學習取得 43.1% 成功率 —— 較單一智能體基線提升 +4.9 個百分點,單任務成本 $1.70。**
+
+> 於 ScienceAgentBench 上使用 DeepSeek-V3.2 時,迭代學習能改善 GPT-4o 的表現,但對 Claude Haiku 4.5 卻造成輕微的退化——與模型相關的行為差異已於[論文](https://arxiv.org/abs/2603.28986)中分析。PaperBench 結果請見 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
 
 > **成本與執行時間。** `$1.70/task` 的數字是依預設 `--learn` 預算(最多 35 個世代,於 `overall_score > 0.97` 時提前終止)所攤提的結果。在 DeepSeek-V3.2 上,典型的演化執行需 30–90 分鐘實際時間,並大致隨模型價格等比例縮放。單發執行(未使用 `--learn`)約需 5–15 分鐘,成本則低一個量級。
 
@@ -88,7 +90,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 五個層級透過小型的 dataclass 結構互相串接——完整細節請見 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | 層級 | 元件 | 功能 |
@@ -96,14 +98,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(選用,僅 `--goal`)* | 將高階目標拆解為離散任務。 |
 | 1 | **ToolManager + Perspicacité** | 於設定的位址/連接埠範圍上探索 MCP 工具;選擇性地擷取文獻片段。 |
 | 2 | **EvolutionEngine** | 合成工作流程並於世代之間進行演化(詳見下文)。 |
-| 3 | **WorkflowRunner** | 使用 [SmolAgents](https://github.com/huggingface/smolagents) 並透過共享的 LangGraph 狀態,於沙箱中執行所合成的 Python 工作流程。 |
+| 3 | **WorkflowRunner** | 於沙箱中執行所合成的 Python 工作流程,使用 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)(`LocalPythonExecutor` 搭配 AST 白名單),並透過共享的 LangGraph 狀態運作。 |
 | 4 | **VerifierEvaluator** | 多來源逐項聲明驗證器,並驅動下一次的突變。 |
 
 ### 演化迴圈——實際在演化的是什麼
 
-工作流程是**完整的 Python 程式**,以原始碼形式進行突變。基因型即為工作流程檔案;表現型則為其在工作區內所產生的一切。
+工作流程是**完整的 Python 程式**,以原始碼形式進行突變。**程式碼即基因型 (code-as-genotype)** 即為工作流程檔案;表現型則為其在工作區內所產生的一切。
 
-- **選擇:品質-多樣性 (QD) 檔案庫** —— 族群大小為 50,`qd_score = (1−w)·quality + w·novelty` (`w=0.4`)。新穎性以行為描述子 `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距離 (`k=25`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散。
+- **選擇:品質-多樣性 (QD) 檔案庫**(**MAP-Elites** 風格)—— 族群大小為 50,`qd_score = (1−w)·quality + w·novelty` (`w=0.4`)。**新穎性搜尋 (novelty search)** 以**行為描述子 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距離 (`k=25`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散。
 - **變異:由停滯驅動的範圍** —— 突變的大膽程度是過去 4 次提示梯度自我重複程度的連續函數。接近獲勝者者受到保護。範圍從「僅微調提示」至「完整重新思考拓樸」分為多個級距。
 - **交配** —— 約 30 % 的世代會組合兩個親代,依強者優先。
 - **冷啟動** —— 當檔案庫為空時,以磁碟上過往執行的相似度過濾掃描 (MiniLM 餘弦 ≥ 0.5) 為搜尋播種。可用的工作流程能跨任務遷移。
@@ -123,9 +125,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | **E** | 計算可重現性——已宣告的相依套件涵蓋實際使用的 import、無絕對路徑、隨機操作皆有種子 |
 | **F** | 統計指紋——優於基線、無退化預測、無洩漏特徵 |
 
-每一項聲明皆由評審撰寫、針對工作區執行的**確定性 Python 程式**來驗證——而非再次詢問 LLM 是否相信該智能體。反同語反複的觸發機制會拒絕將智能體輸出與自身比對的程式。
+每一項聲明皆由評審撰寫、針對工作區執行的**確定性 Python 程式**來驗證——而非再次詢問 LLM 是否相信該智能體。**自我驗證 (self-verification)** 透過反同語反複的觸發機制,拒絕將智能體輸出與自身比對的程式。
 
-**突變器永遠看不到評分準則。** 唯一回流的訊號是 `abstracted_prompt_gradient`——一份以代號描述失效模式的診斷,當中不會點名任何聲明、分數或來源。就架構而言,搜尋無法對其從未看到的評分詞彙過度擬合。
+**評分準則盲變異 (rubric-blind mutation) —— 突變器永遠看不到評分準則。** 唯一回流的訊號是 `abstracted_prompt_gradient`——一份以代號描述失效模式的診斷,當中不會點名任何聲明、分數或來源。就架構而言,搜尋無法對其從未看到的評分詞彙過度擬合。
 
 完整管線:[`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -163,7 +165,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa 會在您組態中的位址/連接埠範圍內探索任何可連線的 MCP 伺服器(預設為 `0.0.0.0:5000–5100`)。
 
-- **最簡途徑:** 安裝我們的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 已封裝的科學工具、共享工作區管理,以及一套既定的註冊流程。
+- **最簡途徑:** 安裝我們的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 每個工作區一個 MCP shell 沙箱,智能體可依需求安裝科學套件(同一工作區的後續執行可重複使用已安裝的工具);另提供預先建置的 MCP 服務以暴露常見科學工具堆疊,並搭配共享工作區管理與一套既定的註冊流程。
 - **自備工具:** 將 `discovery_addresses` 指向任何可連線的 MCP 伺服器 —— `fastmcp` 指令稿、ToolHive、第三方 MCP 容器皆可。Toolomics 並非必要;請見 [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)。
 
 ### 4. 執行
@@ -321,7 +323,7 @@ Apache 2.0。請見 [`NOTICE`](./NOTICE)、[`docs/licensing-notes.md`](./docs/li
 
 ---
 
-## 引用
+## 引用本作品
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +332,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

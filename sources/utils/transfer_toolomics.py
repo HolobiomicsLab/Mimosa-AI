@@ -35,19 +35,15 @@ class LocalTransfer:
                 system_msg=system_prompt,
                 config=self.config_llm
             )(f"generate a unique folder name for sentence: {goal}")
+            if not raw_output:
+                return "capsule_" + str(abs(hash(goal)))
             name = raw_output.strip().lower()
             name = re.sub(r'^["\']|["\']$', '', name)  # Remove quotes
             name = re.sub(r'[^a-z0-9_]', '_', name)    # Sanitize
             name = re.sub(r'_+', '_', name)             # Collapse multiple underscores
-            name = name.strip('_')                      # Remove leading/trailing
-            if not name or len(name) < 5:
-                raise ValueError("LLM output too short")
-            if len(name) > 50:
-                parts = name.split('_')[:7]
-                name = '_'.join(parts)
-            return name
+            return name.strip('_')                      # Remove leading/trailing
         except Exception as e:
-            raise e
+            return "capsule_" + str(abs(hash(goal)))
 
     def create_capsule_folder(self, capsule_name) -> str:
         path = f"{self.runs_capsule_dir}/{capsule_name}"
@@ -180,6 +176,8 @@ class LocalTransfer:
                     item.unlink(missing_ok=True)
 
 if __name__ == "__main__":
-    trans = LocalTransfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")
+    from config import Config
+    conf = Config()
+    trans = LocalTransfer(conf, workspace_path=conf.workspace_dir, runs_capsule_dir="./runs_capsule")
     goal = "you are assigned Low-Light Image Enhancement with Wavelet-based Diffusion Models to replicate. You need to ACTUALLY EXECUTE the experiment only for the LOLv1 dataset. Paper is availableat this link https://arxiv.org/pdf/2306.00306. Reproduction without model training (inference only using available evaluation script is allowed). Looking for existing model weight if necessary is allowed. make sure plan is within json"
     trans.transfer_workspace_files_to_capsule(goal)

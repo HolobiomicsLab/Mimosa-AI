@@ -1,11 +1,12 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
-<h1 align="center">Mimosa-AI 🌼🔬</h1>
+<h1 align="center">Mimosa-AI — Evolving Multi-Agent Framework for Autonomous Scientific Research</h1>
+
 
 <p align="center">
   <a href="./README.md">English</a> &nbsp;|&nbsp;
@@ -16,7 +17,7 @@
 </p>
 
 <p align="center">
-    <em>Self-evolving multi-agent framework for autonomous scientific research.</em>
+    <em>Self-evolving multi-agent framework for autonomous scientific research — LLM-driven workflow synthesis, Quality-Diversity evolutionary search, MCP tool discovery.</em>
 </p>
 
 <p align="center">
@@ -41,9 +42,9 @@
 
 ## TL;DR
 
-Mimosa-AI writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against six independent vantage points (literature, your goal, agent narration, math invariants, computational reproducibility, statistical fingerprint), and — when you ask it to learn — evolves the workflow across generations with a **Quality-Diversity** search that preserves both performance and structural diversity.
+Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
 
-The workflow is emitted as plain Python. The verifier runs deterministic Python checks that recompute what the agents claim. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier score workflows by running deterministic Python checks that verify litterature grounding, non-triviality, and quality metrics against artifacts that the agents produced. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -54,20 +55,20 @@ uv sync && uv run main.py        # interactive onboarding
 ## Demo
 
 <p align="center">
-    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files, alignment, and classical molecular networking (GNPS-style cosine clustering) — from a single command, with no fixed pipeline.</em>
+    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering).</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-The reproduced network matches the topology reported in the paper at the cluster level. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
+The reproduced network matches the topology reported in the paper at the cluster level, output as a Cytoscape-loadable `.graphml` plus the underlying feature quantification table. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
 
-## Benchmark
+## Benchmark (V1)
 
 Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer bypassed so workflow synthesis and refinement are evaluated in isolation):
 
@@ -77,9 +78,9 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> Iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
+> **43.1 % success rate on ScienceAgentBench with DeepSeek-V3.2 iterative-learning — +4.9 pp over the single-agent baseline at $1.70 per task.**
 
-> **Cost & runtime.** The `$1.70/task` figure is amortised over the default `--learn` budget (up to 35 generations, early-stop at `overall_score > 0.97`). A typical evolving run takes 30–90 min of wall-clock per task with DeepSeek-V3.2 and scales roughly with model price. Single-shot runs (no `--learn`) are ~5–15 min and an order of magnitude cheaper.
+> On ScienceAgentBench with DeepSeek-V3.2, iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ---
 
@@ -88,7 +89,7 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | Layer | Component | What it does |
@@ -96,14 +97,14 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 | 0 | **Planner** *(optional, `--goal` only)* | Decomposes a high-level objective into discrete tasks. |
 | 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
 | 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
-| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using [SmolAgents](https://github.com/huggingface/smolagents) with shared LangGraph state. |
+| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) (`LocalPythonExecutor` with AST allow-list) and shared LangGraph state. |
 | 4 | **VerifierEvaluator** | Multi-source per-claim verifier. Drives the next mutation. |
 
 ### The evolution loop — what's actually evolving
 
-Workflows are **full Python programs**, mutated as source code. The genotype is the workflow file; the phenotype is whatever it produces in the workspace.
+Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
 
-- **Selection: Quality-Diversity archive** — population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). Novelty is k-NN distance (`k=25`) over a behaviour descriptor `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
+- **Selection: Quality-Diversity archive** (**MAP-Elites**-style) — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). **Novelty search** uses k-NN distance (`k=25`) over a **behaviour descriptor** `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
 - **Variation: stagnation-driven scope** — mutation boldness is a continuous function of how much the last 4 prompt gradients repeat themselves. Near-winners stay protected. Scope bands run from "prompt-only tweak" to "complete topology rethink."
 - **Crossover** — ~30 % of generations combine two parents, strongest-first.
 - **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.5) seeds the search. Useful workflows transfer across tasks.
@@ -123,9 +124,9 @@ After each run, six independent claim sources look at the workspace and emit suc
 | **E** | Computational reproducibility — declared deps cover used imports, no absolute paths, seeds on stochastic ops |
 | **F** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
 
-Each claim is verified by a **deterministic Python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent. Anti-tautology tripwires reject programs that compare the agent's output to itself.
+Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent.
 
-**The mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
+**Rubric-blind mutation — the mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
 
 Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
@@ -163,7 +164,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa discovers any MCP server reachable on the address/port range in your config (default `0.0.0.0:5000–5100`).
 
-- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — packaged scientific tools, shared workspace management, an opinionated registration flow.
+- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — a per-workspace MCP shell sandbox where agents install scientific packages on demand, plus pre-built MCP servers exposing common scientific stacks, shared workspace management, and an easy registration flow for new MCPs.
 - **Bring-your-own:** point `discovery_addresses` at any reachable MCP server — `fastmcp` scripts, ToolHive, third-party MCP containers. Toolomics is not required; see [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
 
 ### 4. Run
@@ -321,7 +322,7 @@ Apache 2.0. See [`NOTICE`](./NOTICE), [`docs/licensing-notes.md`](./docs/licensi
 
 ---
 
-## Citation
+## Cite this work
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +331,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

@@ -30,6 +30,35 @@ class PricingCalculator:
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
 
+    def _collect_verifier_calls(self, memory_path: Path) -> list[TokenUsage]:
+        """One `TokenUsage` per `verifier_*.json` file in `memory_path`.
+
+        Same shape as `workflow_creator.json` / `judge.json`: single LLMProvider
+        call with top-level `model` and `usage.{prompt,completion,total}_tokens`.
+        """
+        calls: list[TokenUsage] = []
+        for file in sorted(os.listdir(memory_path)):
+            if not (file.startswith("verifier_") and file.endswith(".json")):
+                continue
+            try:
+                with open(memory_path / file) as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                print(f"⚠️  Could not read verifier memory {file}: {e}")
+                continue
+            usage = data.get("usage") or {}
+            model = data.get("model")
+            if not model or "prompt_tokens" not in usage:
+                continue
+            calls.append(TokenUsage(
+                file[:-len(".json")],
+                model,
+                usage.get("prompt_tokens", 0) or 0,
+                usage.get("completion_tokens", 0) or 0,
+                usage.get("total_tokens", 0) or 0,
+            ))
+        return calls
+
     def _strip_routing_prefix(self, model_name: str) -> str:
         """Strip common routing prefixes from model name.
 
@@ -221,6 +250,10 @@ class PricingCalculator:
         # Check for single agent mode (no orchestrator calls but has task files)
         if not orchestrator_calls_found:
             print("📊 Single agent mode detected - calculating agent execution costs only")
+
+        # Verifier LLM calls (claim extraction, importance, file selection, script gen, soft eval).
+        # Saved by LLMProvider as `verifier_<stem>.json`, same shape as workflow_creator.json.
+        llm_calls.extend(self._collect_verifier_calls(memory_path))
 
         workflow_path = Path(self.workflow_dir) / uuid
 

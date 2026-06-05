@@ -72,8 +72,8 @@ class EvolutionEngine:
             min_improvement_threshold=0.01,
             strategy="qd", # quality-diversity selection
             population_size=50, # max individuals to keep in the selection pool
-            novelty_k_neighbours=25,
-            novelty_weight=0.4
+            novelty_k_neighbours=15,
+            novelty_weight=0.25
         )
         self.initial_population = 2 # number of initial random workflows before enabling mutation
 
@@ -479,9 +479,19 @@ class EvolutionEngine:
                 on_error
                 or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
             )
+            # Best-so-far *before* this offspring contributes; used by the
+            # Rechenberg 1/5 rule in VariationEngine to decide whether
+            # mutation boldness should grow.
+            best_before = max(rewards_history) if rewards_history else None
+            child_score = (
+                None if is_failure or wf_info.overall_score is None
+                else float(wf_info.overall_score)
+            )
             self.variation.record_offspring_gradient(
                 wf_info.abstracted_prompt_gradient,
                 is_failure=is_failure,
+                child_score=child_score,
+                best_before=best_before,
             )
 
         runs[-1].current_uuid = uuid
