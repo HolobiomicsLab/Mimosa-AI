@@ -180,8 +180,8 @@ Provide a structured analysis with:
                 with open(notes_file, 'r', encoding='utf-8') as f:
                     notes = json.load(f)
                     model = notes.get('model', '')
-                    assert model
-                    assert self.config.smolagent_model_id
+                    if not model or not self.config.smolagent_model_id:
+                        continue
                     if model != self.config.smolagent_model_id:
                         continue
 
@@ -1064,7 +1064,14 @@ Provide your analysis following the specified output format."""
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    raise e
+                    self.execution_history.append({
+                        "iteration": i + 1,
+                        "goal": "Unknown",
+                        "execution_time": 0,
+                        "success_level": "Error",
+                        "key_insight": str(e),
+                    })
+                    continue
 
         self._print_final_summary()
         self._send_email_report(status="completed")
