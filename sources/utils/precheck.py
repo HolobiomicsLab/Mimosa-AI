@@ -31,7 +31,11 @@ import time
 import litellm
 
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
-from sources.utils.openrouter_endpoints import providers_for_model, quant_rank
+from sources.utils.openrouter_endpoints import (
+    is_first_party,
+    providers_for_model,
+    quant_rank,
+)
 
 N_REPEAT = 3
 ALL_ACCEPTED_QUANTS = ["bf16", "fp16", "fp8"]
@@ -252,10 +256,14 @@ class PreCheck:
             results = [fut.result() for fut in concurrent.futures.as_completed(futures)]
 
         # Final sort: pass-strict first, then drift, then fail.
-        # Within each tier, higher quant rank first, then lower latency.
+        # Within each tier: first-party model creators before community
+        # resellers, then higher quant rank, then lower latency. First-party
+        # wins over quant because the creator serves reference weights at
+        # intended precision (even when OpenRouter reports it as `unknown`).
         results.sort(
             key=lambda r: (
                 r["tier"] if r["tier"] != 0 else 99,
+                0 if is_first_party(r["provider"]) else 1,
                 -quant_rank(r["discovered_quant"]),
                 r["mean_latency"],
             )
@@ -303,6 +311,7 @@ class PreCheck:
                 (
                     r["provider"],
                     r["tier"],
+                    0 if is_first_party(r["provider"]) else 1,
                     quant_rank(r["discovered_quant"]),
                     r["mean_latency"],
                     r["discovered_quant"],
@@ -310,11 +319,11 @@ class PreCheck:
                 for r in results
                 if r["tier"] != 0
             ]
-            # Stable sort: strict before drift; within each, higher precision
-            # first, then faster.
-            kept.sort(key=lambda x: (x[1], -x[2], x[3]))
+            # Stable sort: strict before drift; within each, first-party
+            # creator before community, then higher precision, then faster.
+            kept.sort(key=lambda x: (x[1], x[2], -x[3], x[4]))
             new_list = [t[0] for t in kept]
-            selected_quants = {t[4] for t in kept}
+            selected_quants = {t[5] for t in kept}
 
             if new_list:
                 self.config.openrouter_provider_by_model[model_id] = new_list

@@ -26,11 +26,26 @@ _QUANT_RANK: dict[str, int] = {
     "unknown": -1,
 }
 
+# Routing slugs known to be the model creator's own serving endpoint, not a
+# community reseller. Sorted ahead of community providers within a tier:
+# even when they expose `quantization: "unknown"` (which ranks -1), they
+# should win over an fp8 community endpoint because they serve the reference
+# weights at intended precision.
+FIRST_PARTY_SLUGS: frozenset[str] = frozenset({
+    "anthropic", "openai", "google-vertex", "google-ai-studio",
+    "xai", "deepseek", "mistral", "cohere", "moonshotai",
+    "z-ai", "alibaba", "minimax", "perplexity",
+})
+
 logger = logging.getLogger(__name__)
 
 
 def quant_rank(q: str) -> int:
     return _QUANT_RANK.get((q or "unknown").lower(), -1)
+
+
+def is_first_party(slug: str) -> bool:
+    return (slug or "").lower() in FIRST_PARTY_SLUGS
 
 
 def fetch_endpoints(model_id: str, timeout: int = 30) -> list[dict]:
@@ -67,6 +82,12 @@ def providers_for_model(model_id: str) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     for ep in fetch_endpoints(model_id):
+        # Skip endpoints OpenRouter has flagged as not currently serving.
+        # Observed values: 0 = active, -2 = deprecated/down. Probing a
+        # negative-status endpoint reliably returns 404 or rate-limits, so
+        # it just burns a probe slot.
+        if (ep.get("status") or 0) < 0:
+            continue
         # `tag` looks like "baidu/fp8" or just "friendli"; the prefix before
         # the slash is the lowercase routing slug used by extra_body.provider.
         # `provider_name` is display-cased ("Baidu") and NOT usable for routing.
