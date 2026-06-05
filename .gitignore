@@ -1,5 +1,6 @@
 *.wav
 .claude/*
+docs/support/*
 credentials.json
 token.json
 *credentials*
