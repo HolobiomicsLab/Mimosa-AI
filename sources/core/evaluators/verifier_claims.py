@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Any
 
 if __name__ == "__main__":
@@ -137,7 +138,10 @@ class _VerifierClaimExtractionMixin:
 
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
+        per_source_elapsed: list[tuple[str, float, int]] = []
+        t_sources = time.time()
         for label, prompt in sources:
+            t_src = time.time()
             data, err = self._call_judge_for_json(
                 uuid, f"verifier_extract_claims_{label}", prompt
             )
@@ -145,8 +149,10 @@ class _VerifierClaimExtractionMixin:
                 self.logger.warning(
                     f"Claim extraction source {label} failed for {uuid}: {err}"
                 )
+                per_source_elapsed.append((label, time.time() - t_src, 0))
                 continue
-            for claim in self._parse_and_filter_claims(uuid, data):
+            new_claims = self._parse_and_filter_claims(uuid, data)
+            for claim in new_claims:
                 print_info(f"Extracted claim {claim['id']} from source {label} for {uuid}")
                 claim_id = claim["id"]
                 if claim_id in seen_ids:
@@ -155,15 +161,29 @@ class _VerifierClaimExtractionMixin:
                 claim["source"] = f"source_{label}"
                 seen_ids.add(claim_id)
                 merged.append(claim)
+            per_source_elapsed.append((label, time.time() - t_src, len(new_claims)))
 
-        print_ok(f"Extracted claims for workflow {uuid} from {len(sources)} sources...")
+        sources_dt = time.time() - t_sources
+        breakdown = "\n".join(
+            f"  source {lbl}: {dt:>6.1f}s  ({n} claims)"
+            for lbl, dt, n in per_source_elapsed
+        )
+        print_ok(
+            f"Extracted claims for workflow {uuid} from {len(sources)} sources "
+            f"in {sources_dt:.1f}s ({len(merged)} merged):\n{breakdown}"
+        )
         if len(merged) < self.min_claims:
             print_warn("Claim extraction yielded fewer than the minimum required claims ")
             self.logger.warning(
                 f"Claim extraction yielded only {len(merged)} claims "
                 f"(min_claims={self.min_claims}); proceeding with what we got"
             )
+        t_rate = time.time()
         ranked = self._declare_claim_importance(uuid, goal, merged, grounding)
+        print_ok(
+            f"Importance rating for {uuid}: {len(ranked)} claims kept "
+            f"in {time.time() - t_rate:.1f}s"
+        )
         return ranked
 
     def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:

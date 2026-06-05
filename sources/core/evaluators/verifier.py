@@ -26,8 +26,10 @@ from pathlib import Path
 from typing import Any
 
 from sources.cli.pretty_print import (
+    CYAN,
     RED,
     print_box,
+    print_ok,
 )
 
 from .base import (
@@ -223,6 +225,10 @@ class VerifierEvaluator(
         if not uuid or not isinstance(uuid, str):
             raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
+        t_total = time.time()
+        phase_timings: list[tuple[str, float]] = []
+
+        t = time.time()
         execution_text, success = self.workflow_execution_text(uuid)
         if not execution_text:
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
@@ -234,17 +240,25 @@ class VerifierEvaluator(
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
+        phase_timings.append(("setup (exec text + workspace listing)", time.time() - t))
+        print_ok(f"[verifier {uuid}] setup done in {phase_timings[-1][1]:.1f}s")
+
         # Use explicit empty-run marker rather than the brittle ``success`` flag
         # — ``success`` is ``not "[]" in json.dumps(answers)``, which mis-fires
         # whenever an answer payload contains a (possibly nested) empty list.
         is_truly_empty = (
             not execution_text or _EMPTY_RUN_MARKER in execution_text
         )
+        t = time.time()
         grounding = (
             self._get_grounding(uuid, execution_text, wf_info.goal)
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
+        phase_timings.append(("grounding fetch", time.time() - t))
+        print_ok(f"[verifier {uuid}] grounding fetch done in {phase_timings[-1][1]:.1f}s")
+
+        t = time.time()
         anchored_records = (
             self._load_anchored_claims(rubric_anchor_uuid)
             if rubric_anchor_uuid
@@ -265,13 +279,24 @@ class VerifierEvaluator(
             claims = self._extract_claims(
                 uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
             )
+        phase_timings.append(("claim extraction + importance", time.time() - t))
+        print_ok(
+            f"[verifier {uuid}] claim extraction + importance done in "
+            f"{phase_timings[-1][1]:.1f}s ({len(claims)} claims)"
+        )
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
             scores = {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
+        t = time.time()
         self._ensure_verifier_packages()
+        phase_timings.append(("ensure verifier packages", time.time() - t))
+        print_ok(
+            f"[verifier {uuid}] ensure_verifier_packages done in "
+            f"{phase_timings[-1][1]:.1f}s"
+        )
 
         anchored_specs = {
             c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
@@ -302,13 +327,15 @@ class VerifierEvaluator(
             workspace_listing,
             self.gen_parallelism,
         )
-        et = time.time()
+        gen_dt = time.time() - st
+        phase_timings.append(("spec generation (parallel)", gen_dt))
         print_box(
             f"Verifier spec generation for {len(needs_generation)} claims took "
-            f"{et - st:.1f}s (parallelism={self.gen_parallelism})",
+            f"{gen_dt:.1f}s (parallelism={self.gen_parallelism})",
             title="Verifier generation timing",
         )
 
+        t_loop = time.time()
         per_claim: list[dict[str, Any]] = []
         for claim in claims_to_verify:
             cid = claim["id"]
@@ -326,6 +353,13 @@ class VerifierEvaluator(
                 preloaded_spec=preloaded_spec,
             )
             per_claim.append(result)
+        loop_dt = time.time() - t_loop
+        phase_timings.append(("per-claim verification loop (sequential)", loop_dt))
+        print_ok(
+            f"[verifier {uuid}] per-claim verification done in {loop_dt:.1f}s "
+            f"({len(per_claim)} claims)"
+        )
+        self._print_per_claim_timings(per_claim)
 
         scores = self._aggregate(per_claim)
 
@@ -344,8 +378,14 @@ class VerifierEvaluator(
             cheat,
             min_importance=self._GRADIENT_MIN_IMPORTANCE,
         )
+        t = time.time()
         prompt_gradient = self._build_abstractec_prompt_gradient(
             uuid, gradient_report, execution_text
+        )
+        phase_timings.append(("prompt gradient builder", time.time() - t))
+        print_ok(
+            f"[verifier {uuid}] prompt gradient done in "
+            f"{phase_timings[-1][1]:.1f}s"
         )
         scores["abstractec_prompt_gradient"] = prompt_gradient
         self._persist_prompt_gradient(uuid, prompt_gradient)
@@ -355,7 +395,53 @@ class VerifierEvaluator(
         except Exception as e:
             self.logger.error(f"Failed to persist verifier scores for {uuid}: {e}")
 
+        phase_timings.append(("TOTAL evaluate()", time.time() - t_total))
+        self._print_phase_summary(uuid, phase_timings)
+
         return {"uuid": uuid, "claims": per_claim, **scores}
+
+    @staticmethod
+    def _print_per_claim_timings(per_claim: list[dict[str, Any]]) -> None:
+        """Render a sorted table of per-claim elapsed times.
+
+        Slow claims rise to the top so the cost concentration is obvious at a
+        glance — typically a handful of executable scripts dominate the loop.
+        """
+        if not per_claim:
+            return
+        rows = sorted(
+            per_claim,
+            key=lambda c: float(c.get("elapsed_s") or 0.0),
+            reverse=True,
+        )
+        total = sum(float(c.get("elapsed_s") or 0.0) for c in rows)
+        header = f"{'claim_id':<38} {'kind':<11} {'status':<7} {'elapsed_s':>10}"
+        body = "\n".join(
+            f"{str((c.get('claim') or {}).get('id') or '?')[:38]:<38} "
+            f"{str(c.get('verifier_kind') or '?'):<11} "
+            f"{str(c.get('status') or '?'):<7} "
+            f"{float(c.get('elapsed_s') or 0.0):>10.2f}"
+            for c in rows
+        )
+        print_box(
+            f"{header}\n{body}\n"
+            f"{'-' * 68}\n"
+            f"sum of per-claim elapsed: {total:.1f}s over {len(rows)} claims",
+            title="Per-claim verification timings (slowest first)",
+            color=CYAN,
+        )
+
+    @staticmethod
+    def _print_phase_summary(uuid: str, phases: list[tuple[str, float]]) -> None:
+        """Render the end-of-evaluate phase breakdown."""
+        if not phases:
+            return
+        body = "\n".join(f"{name:<46} {dt:>8.2f}s" for name, dt in phases)
+        print_box(
+            body,
+            title=f"Verifier phase summary · {uuid}",
+            color=CYAN,
+        )
 
     def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
         """Return 0.0 without running scripts when the workflow produced nothing.

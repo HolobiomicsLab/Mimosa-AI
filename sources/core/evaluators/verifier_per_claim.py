@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypeVar
@@ -137,8 +138,11 @@ class _VerifierPerClaimMixin:
                 verifier-generation LLM call are skipped.
 
         Returns:
-            Scored claim dict including verifier spec, status and score.
+            Scored claim dict including verifier spec, status, score, and the
+            ``elapsed_s`` wall-clock spent in this call (used by the
+            orchestrator to render a per-claim timing table).
         """
+        t_start = time.time()
         if preloaded_spec is None:
             rel_files = self._llm_select_files(
                 uuid, claim, execution_text, workspace_listing
@@ -200,12 +204,14 @@ class _VerifierPerClaimMixin:
 
         scored["claim"] = claim
         scored["spec"] = spec
+        scored["elapsed_s"] = round(time.time() - t_start, 3)
 
         final = (
             f"id:     {claim.get('id')}\n"
             f"kind:   {scored.get('verifier_kind')}\n"
             f"status: {scored.get('status')}\n"
-            f"score:  {scored.get('score')}"
+            f"score:  {scored.get('score')}\n"
+            f"elapsed:{scored['elapsed_s']}s"
         )
         print_box(
             final,
