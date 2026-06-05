@@ -205,17 +205,6 @@ START --> [Solver] --> [Grounded Checker] --> END
                               |
                         fail --> [Diagnostician] --> [Knowledge Agent] --> [Solver retry]
 
-
-4. When the real computation fails, repair with real signals: the diagnostician reads the actual traceback, the knowledge agent consults real external sources, then the executor retries.
-
-final_answer('{"status": "FALLBACK", "message": "object has no attribute \'as_numpy_dtype\'; suspected: ... version mismatch", "attempted": ["..."], "error_trace": "..."}')
-
-[Executor] --fails--> [Diagnostician: root-cause from trace]
-     ^                          |
-     |        local logic bug? -+- needs library/version/env knowledge?
-     |                          |
-   [retry] <--- precise edit ---+--- [Knowledge Agent: web/docs] --sourced fix--> [retry]
-
 ## Tips
 
 - Agents execute in the same workspace and have access to all previous agents artifacts.
