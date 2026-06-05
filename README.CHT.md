@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(選用,僅 `--goal`)* | 將高階目標拆解為離散任務。 |
 | 1 | **ToolManager + Perspicacité** | 於設定的位址/連接埠範圍上探索 MCP 工具;選擇性地擷取文獻片段。 |
 | 2 | **EvolutionEngine** | 合成工作流程並於世代之間進行演化(詳見下文)。 |
-| 3 | **WorkflowRunner** | 於沙箱中執行所合成的 Python 工作流程(Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) `LocalPythonExecutor` 搭配 AST 白名單;亦支援 Docker / E2B 後端),並透過共享的 LangGraph 狀態運作。 |
+| 3 | **WorkflowRunner** | 於沙箱中執行所合成的 Python 工作流程,使用 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)(`LocalPythonExecutor` 搭配 AST 白名單),並透過共享的 LangGraph 狀態運作。 |
 | 4 | **VerifierEvaluator** | 多來源逐項聲明驗證器,並驅動下一次的突變。 |
 
 ### 演化迴圈——實際在演化的是什麼
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa 會在您組態中的位址/連接埠範圍內探索任何可連線的 MCP 伺服器(預設為 `0.0.0.0:5000–5100`)。
 
-- **最簡途徑:** 安裝我們的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 已封裝的科學工具(RDKit、matchms、OpenMS 綁定、BioPython、scikit-bio、scanpy 等)、共享工作區管理,以及一套既定的註冊流程。
+- **最簡途徑:** 安裝我們的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 每個工作區一個 MCP shell 沙箱,智能體可依需求安裝科學套件(同一工作區的後續執行可重複使用已安裝的工具);另提供預先建置的 MCP 服務以暴露常見科學工具堆疊,並搭配共享工作區管理與一套既定的註冊流程。
 - **自備工具:** 將 `discovery_addresses` 指向任何可連線的 MCP 伺服器 —— `fastmcp` 指令稿、ToolHive、第三方 MCP 容器皆可。Toolomics 並非必要;請見 [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)。
 
 ### 4. 執行

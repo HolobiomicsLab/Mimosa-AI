@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(任意、`--goal` のみ)* | 高レベルの目標を離散的なタスクに分解します。 |
 | 1 | **ToolManager + Perspicacité** | 設定されたアドレス/ポート範囲で MCP ツールを検出し、必要に応じて文献スニペットを取得します。 |
 | 2 | **EvolutionEngine** | ワークフローを合成し、世代を超えて進化させます（後述）。 |
-| 3 | **WorkflowRunner** | 合成された Python ワークフローをサンドボックスで実行します（Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) の `LocalPythonExecutor` と AST 許可リスト方式、Docker / E2B バックエンドもサポート）。LangGraph の状態を共有します。 |
+| 3 | **WorkflowRunner** | 合成された Python ワークフローを Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)（`LocalPythonExecutor` と AST 許可リスト方式）のサンドボックスで実行し、LangGraph の状態を共有します。 |
 | 4 | **VerifierEvaluator** | マルチソース・クレーム単位の verifier。次の変異を駆動します。 |
 
 ### 進化ループ — 実際に進化しているもの
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa は設定のアドレス/ポート範囲（デフォルト `0.0.0.0:5000–5100`）で到達可能な任意の MCP サーバを検出します。
 
-- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — パッケージ化された科学ツール（RDKit、matchms、OpenMS バインディング、BioPython、scikit-bio、scanpy ほか）、共有ワークスペース管理、定型的な登録フローを提供します。
+- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — ワークスペースごとに 1 つの MCP shell サンドボックスを提供し、エージェントが必要に応じて科学パッケージをインストール（同一ワークスペース内の後続実行ではインストール済みのツールを再利用）できます。さらに、一般的な科学ツールスタックを公開するビルド済み MCP サーバ、共有ワークスペース管理、定型的な登録フローも提供します。
 - **持ち込み方式:** `discovery_addresses` を任意の到達可能な MCP サーバに向けてください — `fastmcp` スクリプト、ToolHive、サードパーティ MCP コンテナなど。Toolomics は必須ではありません。詳細は [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics) を参照してください。
 
 ### 4. 実行
