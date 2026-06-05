@@ -5,7 +5,8 @@
 
 </div>
 
-<h1 align="center">Mimosa-AI 🌼🔬</h1>
+<h1 align="center">Mimosa-AI — Evolving Multi-Agent Framework for Autonomous Scientific Research</h1>
+
 
 <p align="center">
   <a href="./README.md">English</a> &nbsp;|&nbsp;
