@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
+        self.workspace_dir = "/home/mlegrand/Desktop/Deniz/tools/Toolomics-main/workspace_dert"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -48,7 +48,7 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "deepseek/deepseek-chat"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-pro"
         self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
@@ -98,8 +98,11 @@ class Config:
         self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
         # runner settings
         self.runner_default_python_version: str = "3.10"
-        self.runner_default_timeout: int = 3600
-        self.runner_default_max_memory_mb: int = 1024
+        self.runner_default_timeout: int = 10800
+        # Per-agent (SmolAgentFactory) execution timeout in seconds. Injected into
+        # the generated workflow as AGENT_EXECUTION_TIMEOUT. 3600 = 1 hour.
+        self.agent_execution_timeout: int = 3600
+        self.runner_default_max_memory_mb: int = 10000
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
         self.runner_requirements: list[str] = [
@@ -220,6 +223,7 @@ class Config:
             "reuse_lineage_rubric": self.reuse_lineage_rubric,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
+            "agent_execution_timeout": self.agent_execution_timeout,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
             "runner_default_max_cpu_percent": self.runner_default_max_cpu_percent,
             "runner_temp_dir": self.runner_temp_dir,
@@ -269,6 +273,9 @@ class Config:
         self.runner_default_timeout = data.get(
             "runner_default_timeout", self.runner_default_timeout
         )
+        self.agent_execution_timeout = data.get(
+            "agent_execution_timeout", self.agent_execution_timeout
+        )
         self.runner_default_max_memory_mb = data.get(
             "runner_default_max_memory_mb", self.runner_default_max_memory_mb
         )
@@ -305,6 +312,7 @@ class Config:
             f"reasoning_effort={self.reasoning_effort},\n"
             f"runner_default_python_version={self.runner_default_python_version},\n"
             f"runner_default_timeout={self.runner_default_timeout},\n"
+            f"agent_execution_timeout={self.agent_execution_timeout},\n"
             f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
             f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
             f"runner_temp_dir={self.runner_temp_dir})\n"
