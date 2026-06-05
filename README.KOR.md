@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>자율 과학 연구를 위한 자기 진화형 멀티에이전트 프레임워크.</em>
+    <em>자율 과학 연구를 위한 자기 진화형 멀티에이전트 프레임워크 — LLM 기반 워크플로우 합성, Quality-Diversity 진화 탐색, MCP 도구 자동 탐색.</em>
 </p>
 
 <p align="center">
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## 데모
 
 <p align="center">
-    <em>Mimosa-AI는 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a>의 LC-MS/MS 분자 네트워킹 파이프라인 — <code>.mzML</code> 파일에 대한 피처 검출, 정렬, 그리고 고전적 분자 네트워킹(GNPS 스타일 코사인 클러스터링) — 을 단일 명령으로, 사전에 고정된 파이프라인 없이 자율적으로 재생성했습니다.</em>
+    <em>Mimosa-AI는 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a>의 LC-MS/MS 분자 네트워킹 파이프라인 — <code>.mzML</code> 파일에 대한 피처 검출(MZmine / OpenMS / matchms 계열 도구 스택 — 에이전트가 직접 선택), 정렬, 그리고 고전적 분자 네트워킹(GNPS 스타일 코사인 클러스터링) — 을 단일 명령으로, 사전에 고정된 파이프라인 없이 자율적으로 재생성했습니다.</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-재현된 네트워크는 논문에서 보고된 토폴로지와 클러스터 수준에서 일치합니다. 범위 참고: 이 재현은 **분자 네트워킹** 단계만을 대상으로 하며, 원 연구에서 다룬 생리활성 기반 분획, 수동 어노테이션 검토, 라이브러리 매칭(GNPS / SIRIUS / CSI:FingerID)은 자율 실행 범위 밖입니다.
+재현된 네트워크는 논문에서 보고된 토폴로지와 클러스터 수준에서 일치하며, Cytoscape에서 바로 불러올 수 있는 `.graphml` 파일과 그에 대응하는 피처 정량 테이블로 출력됩니다. 범위 참고: 이 재현은 **분자 네트워킹** 단계만을 대상으로 하며, 원 연구에서 다룬 생리활성 기반 분획, 수동 어노테이션 검토, 라이브러리 매칭(GNPS / SIRIUS / CSI:FingerID)은 자율 실행 범위 밖입니다.
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -88,7 +88,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 다섯 개의 레이어가 작은 dataclass 스키마로 연결됩니다 — 전체 세부 사항은 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)를 참조하세요.
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | 레이어 | 컴포넌트 | 역할 |
@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(선택, `--goal` 전용)* | 고수준 목표를 개별 태스크로 분해합니다. |
 | 1 | **ToolManager + Perspicacité** | 설정된 주소/포트 범위에서 MCP 도구를 탐색하고, 선택적으로 문헌 스니펫을 가져옵니다. |
 | 2 | **EvolutionEngine** | 워크플로우를 합성하고 세대를 거쳐 진화시킵니다(아래 참조). |
-| 3 | **WorkflowRunner** | 합성된 Python 워크플로우를 [SmolAgents](https://github.com/huggingface/smolagents)와 공유 LangGraph 상태를 사용해 샌드박스에서 실행합니다. |
+| 3 | **WorkflowRunner** | 합성된 Python 워크플로우를 샌드박스에서 실행합니다(Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)의 `LocalPythonExecutor` + AST 허용 리스트 방식; Docker / E2B 백엔드도 지원). LangGraph 상태를 공유합니다. |
 | 4 | **VerifierEvaluator** | 다중 소스 클레임별 검증기. 다음 변이를 추동합니다. |
 
 ### 진화 루프 — 실제로 무엇이 진화하는가
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa는 설정의 주소/포트 범위(기본값 `0.0.0.0:5000–5100`)에서 도달 가능한 모든 MCP 서버를 탐색합니다.
 
-- **가장 쉬운 경로:** 동반 플랫폼 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** 설치 — 패키징된 과학 도구, 공유 워크스페이스 관리, 정형화된 등록 흐름을 제공합니다.
+- **가장 쉬운 경로:** 동반 플랫폼 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** 설치 — 패키징된 과학 도구(RDKit, matchms, OpenMS 바인딩, BioPython, scikit-bio, scanpy 등), 공유 워크스페이스 관리, 정형화된 등록 흐름을 제공합니다.
 - **자체 도구 사용:** `discovery_addresses`를 도달 가능한 임의의 MCP 서버 — `fastmcp` 스크립트, ToolHive, 서드파티 MCP 컨테이너 — 로 지정하세요. Toolomics는 필수가 아닙니다. [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)를 참조하세요.
 
 ### 4. 실행

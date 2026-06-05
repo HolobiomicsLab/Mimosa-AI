@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>面向自主科学研究的自进化多智能体框架。</em>
+    <em>面向自主科学研究的自进化多智能体框架 —— LLM 驱动的工作流合成、质量-多样性进化搜索、MCP 工具自动发现。</em>
 </p>
 
 <p align="center">
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## 演示
 
 <p align="center">
-    <em>Mimosa-AI 自主重建了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> 的 LC-MS/MS 分子网络流水线 —— 对 <code>.mzML</code> 文件进行特征检测、对齐与经典分子网络构建(GNPS 风格的余弦聚类) —— 仅需一条命令,无需任何固定流水线。</em>
+    <em>Mimosa-AI 自主重建了 <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> 的 LC-MS/MS 分子网络流水线 —— 对 <code>.mzML</code> 文件进行特征检测(MZmine / OpenMS / matchms 类工具栈 —— 由智能体自行选择)、对齐与经典分子网络构建(GNPS 风格的余弦聚类) —— 仅需一条命令,无需任何固定流水线。</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-复现得到的网络在聚类层面与论文所报告的拓扑相吻合。范围说明:此处仅复现**分子网络**阶段 —— 原研究中的生物活性导向分离、人工注释审核以及库匹配(GNPS / SIRIUS / CSI:FingerID)不在本次自主运行的范围内。
+复现得到的网络在聚类层面与论文所报告的拓扑相吻合,输出为可在 Cytoscape 中加载的 `.graphml` 文件,以及对应的特征定量表。范围说明:此处仅复现**分子网络**阶段 —— 原研究中的生物活性导向分离、人工注释审核以及库匹配(GNPS / SIRIUS / CSI:FingerID)不在本次自主运行的范围内。
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -88,7 +88,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 五层架构,通过小型 dataclass 模式串联 —— 完整细节见 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | 层级 | 组件 | 作用 |
@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(可选,仅 `--goal` 使用)* | 将高层目标分解为离散任务。 |
 | 1 | **ToolManager + Perspicacité** | 在配置的地址/端口范围内发现 MCP 工具;可选地拉取文献片段。 |
 | 2 | **EvolutionEngine** | 合成工作流并跨代进化它(见下文)。 |
-| 3 | **WorkflowRunner** | 使用 [SmolAgents](https://github.com/huggingface/smolagents) 在沙箱中运行所合成的 Python 工作流,并共享 LangGraph 状态。 |
+| 3 | **WorkflowRunner** | 在沙箱中运行所合成的 Python 工作流(Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) `LocalPythonExecutor` 配合 AST 白名单;亦支持 Docker / E2B 后端),并共享 LangGraph 状态。 |
 | 4 | **VerifierEvaluator** | 多源逐声明验证器。驱动下一次变异。 |
 
 ### 进化循环 —— 真正在进化的是什么
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa 会发现配置中地址/端口范围内可达的任意 MCP 服务器(默认 `0.0.0.0:5000–5100`)。
 
-- **最简路径:**安装我们的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 打包好的科研工具、共享工作空间管理、规范化的注册流程。
+- **最简路径:**安装我们的配套平台 **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** —— 打包好的科研工具(RDKit、matchms、OpenMS 绑定、BioPython、scikit-bio、scanpy 等)、共享工作空间管理、规范化的注册流程。
 - **自带方案:**将 `discovery_addresses` 指向任意可达的 MCP 服务器 —— `fastmcp` 脚本、ToolHive、第三方 MCP 容器。Toolomics 并非必需;参见 [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics)。
 
 ### 4. 运行

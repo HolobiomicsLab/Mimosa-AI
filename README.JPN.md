@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>自律的科学研究のための自己進化型マルチエージェントフレームワーク。</em>
+    <em>自律的科学研究のための自己進化型マルチエージェントフレームワーク —— LLM 駆動のワークフロー合成、Quality-Diversity 進化探索、MCP ツール自動検出。</em>
 </p>
 
 <p align="center">
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## デモ
 
 <p align="center">
-    <em>Mimosa-AI は <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> の LC-MS/MS 分子ネットワーキングパイプライン（<code>.mzML</code> ファイルでの特徴検出、アラインメント、古典的な分子ネットワーキング（GNPS 形式のコサインクラスタリング））を、固定パイプラインなしの単一コマンドから自律的に再生成しました。</em>
+    <em>Mimosa-AI は <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> の LC-MS/MS 分子ネットワーキングパイプライン（<code>.mzML</code> ファイルでの特徴検出（MZmine / OpenMS / matchms 系のツールスタック — エージェントが自ら選択）、アラインメント、古典的な分子ネットワーキング（GNPS 形式のコサインクラスタリング））を、固定パイプラインなしの単一コマンドから自律的に再生成しました。</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-再現されたネットワークは、論文で報告されたクラスタレベルのトポロジーと一致します。スコープに関する注記: ここで再現されるのは **分子ネットワーキング** のステージのみです。元の研究における生物活性ガイド分画、手動アノテーションレビュー、ライブラリマッチング（GNPS / SIRIUS / CSI:FingerID）は自律実行の対象外です。
+再現されたネットワークは、論文で報告されたクラスタレベルのトポロジーと一致し、Cytoscape で読み込み可能な `.graphml` ファイルと、それに対応する特徴量定量テーブルとして出力されます。スコープに関する注記: ここで再現されるのは **分子ネットワーキング** のステージのみです。元の研究における生物活性ガイド分画、手動アノテーションレビュー、ライブラリマッチング（GNPS / SIRIUS / CSI:FingerID）は自律実行の対象外です。
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -88,7 +88,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 5 つのレイヤーが小さな dataclass スキーマで配線されています。詳細は [`docs/concepts/architecture.md`](./docs/concepts/architecture.md) を参照してください。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | レイヤー | コンポーネント | 役割 |
@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 0 | **Planner** *(任意、`--goal` のみ)* | 高レベルの目標を離散的なタスクに分解します。 |
 | 1 | **ToolManager + Perspicacité** | 設定されたアドレス/ポート範囲で MCP ツールを検出し、必要に応じて文献スニペットを取得します。 |
 | 2 | **EvolutionEngine** | ワークフローを合成し、世代を超えて進化させます（後述）。 |
-| 3 | **WorkflowRunner** | 合成された Python ワークフローを、共有 LangGraph 状態を持つ [SmolAgents](https://github.com/huggingface/smolagents) を用いてサンドボックスで実行します。 |
+| 3 | **WorkflowRunner** | 合成された Python ワークフローをサンドボックスで実行します（Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) の `LocalPythonExecutor` と AST 許可リスト方式、Docker / E2B バックエンドもサポート）。LangGraph の状態を共有します。 |
 | 4 | **VerifierEvaluator** | マルチソース・クレーム単位の verifier。次の変異を駆動します。 |
 
 ### 進化ループ — 実際に進化しているもの
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa は設定のアドレス/ポート範囲（デフォルト `0.0.0.0:5000–5100`）で到達可能な任意の MCP サーバを検出します。
 
-- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — パッケージ化された科学ツール、共有ワークスペース管理、定型的な登録フローを提供します。
+- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — パッケージ化された科学ツール（RDKit、matchms、OpenMS バインディング、BioPython、scikit-bio、scanpy ほか）、共有ワークスペース管理、定型的な登録フローを提供します。
 - **持ち込み方式:** `discovery_addresses` を任意の到達可能な MCP サーバに向けてください — `fastmcp` スクリプト、ToolHive、サードパーティ MCP コンテナなど。Toolomics は必須ではありません。詳細は [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics) を参照してください。
 
 ### 4. 実行

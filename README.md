@@ -1,7 +1,7 @@
 <div align="center">
 <br>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI Logo">
+<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
 
 </div>
 
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-    <em>Self-evolving multi-agent framework for autonomous scientific research.</em>
+    <em>Self-evolving multi-agent framework for autonomous scientific research — LLM-driven workflow synthesis, Quality-Diversity evolutionary search, MCP tool discovery.</em>
 </p>
 
 <p align="center">
@@ -54,15 +54,15 @@ uv sync && uv run main.py        # interactive onboarding
 ## Demo
 
 <p align="center">
-    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files, alignment, and classical molecular networking (GNPS-style cosine clustering) — from a single command, with no fixed pipeline.</em>
+    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering) — from a single command, with no fixed pipeline.</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
-The reproduced network matches the topology reported in the paper at the cluster level. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
+The reproduced network matches the topology reported in the paper at the cluster level, output as a Cytoscape-loadable `.graphml` plus the underlying feature quantification table. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
 
 <p align="center">
-  <img src="./docs/images/network.png" alt="Reproduced molecular network" width="80%">
+  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
 </p>
 
 ---
@@ -86,7 +86,7 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa architecture overview" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
 </p>
 
 | Layer | Component | What it does |
@@ -94,7 +94,7 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 | 0 | **Planner** *(optional, `--goal` only)* | Decomposes a high-level objective into discrete tasks. |
 | 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
 | 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
-| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using [SmolAgents](https://github.com/huggingface/smolagents) with shared LangGraph state. |
+| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox (Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) `LocalPythonExecutor` with AST allow-list; Docker / E2B backends also supported) with shared LangGraph state. |
 | 4 | **VerifierEvaluator** | Multi-source per-claim verifier. Drives the next mutation. |
 
 ### The evolution loop — what's actually evolving
@@ -161,7 +161,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa discovers any MCP server reachable on the address/port range in your config (default `0.0.0.0:5000–5100`).
 
-- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — packaged scientific tools, shared workspace management, an opinionated registration flow.
+- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — packaged scientific tools (RDKit, matchms, OpenMS bindings, BioPython, scikit-bio, scanpy, and more), shared workspace management, an opinionated registration flow.
 - **Bring-your-own:** point `discovery_addresses` at any reachable MCP server — `fastmcp` scripts, ToolHive, third-party MCP containers. Toolomics is not required; see [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
 
 ### 4. Run
