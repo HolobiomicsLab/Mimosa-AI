@@ -22,6 +22,7 @@ descendants score against an ancestor's claim set for stable QD ranking.
 import json
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,11 @@ _VERIFIER_MAX_CLAIMS = 90
 _VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 _VERIFIER_GEN_PARALLELISM = 16
+# Per-claim verifier execution fan-out. Capped low because executable verifier
+# scripts can be CPU-bound (numpy/pandas on full artefacts); higher concurrency
+# starves rather than helps. Threading is enough because the slow path is
+# subprocess I/O via WorkflowRunner.
+_VERIFIER_EXEC_PARALLELISM = 4
 
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.05
@@ -91,6 +97,7 @@ class VerifierEvaluator(
         info_bonus_beta: float = _INFO_BONUS_BETA,
         use_cheat_detector: bool = True,
         gen_parallelism: int = _VERIFIER_GEN_PARALLELISM,
+        exec_parallelism: int = _VERIFIER_EXEC_PARALLELISM,
     ) -> None:
         """Initialise the evaluator; ``workspace_dir`` defaults to ``config.workspace_dir``.
 
@@ -109,6 +116,8 @@ class VerifierEvaluator(
             info_bonus_beta: Saturation rate of the information bonus.
             use_cheat_detector: Reserved; cheat detector currently disabled.
             gen_parallelism: Max concurrent LLM calls for verifier generation.
+            exec_parallelism: Max concurrent claim verifications (executable
+                sandbox runs and soft-LLM checks share this pool).
         """
         super().__init__(config)
         self.workspace_dir = Path(
@@ -128,6 +137,7 @@ class VerifierEvaluator(
         self.info_bonus_beta = max(1e-6, info_bonus_beta)
         self.use_cheat_detector = use_cheat_detector
         self.gen_parallelism = max(1, int(gen_parallelism))
+        self.exec_parallelism = max(1, int(exec_parallelism))
         self._preview_cache: dict[str, str] = {}
         self._workspace_files: set[str] = set()
         self._grounding_cache: dict[str, str] = {}
@@ -336,28 +346,22 @@ class VerifierEvaluator(
         )
 
         t_loop = time.time()
-        per_claim: list[dict[str, Any]] = []
-        for claim in claims_to_verify:
-            cid = claim["id"]
-            if cid in anchor_preloaded:
-                target_claim = claim
-                preloaded_spec = anchor_preloaded[cid]
-            else:
-                target_claim, preloaded_spec = generated[cid]
-            result = self._verify_claim(
-                uuid,
-                target_claim,
-                execution_text,
-                workspace_listing,
-                grounding,
-                preloaded_spec=preloaded_spec,
-            )
-            per_claim.append(result)
+        per_claim = self._verify_claims_parallel(
+            uuid,
+            claims_to_verify,
+            anchor_preloaded,
+            generated,
+            execution_text,
+            workspace_listing,
+            grounding,
+        )
         loop_dt = time.time() - t_loop
-        phase_timings.append(("per-claim verification loop (sequential)", loop_dt))
+        phase_timings.append(
+            (f"per-claim verification (parallel x{self.exec_parallelism})", loop_dt)
+        )
         print_ok(
             f"[verifier {uuid}] per-claim verification done in {loop_dt:.1f}s "
-            f"({len(per_claim)} claims)"
+            f"({len(per_claim)} claims, parallelism={self.exec_parallelism})"
         )
         self._print_per_claim_timings(per_claim)
 
@@ -399,6 +403,99 @@ class VerifierEvaluator(
         self._print_phase_summary(uuid, phase_timings)
 
         return {"uuid": uuid, "claims": per_claim, **scores}
+
+    def _verify_claims_parallel(
+        self,
+        uuid: str,
+        claims_to_verify: list[dict[str, Any]],
+        anchor_preloaded: dict[str, dict[str, Any]],
+        generated: dict[str, tuple[dict[str, Any], dict[str, Any]]],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> list[dict[str, Any]]:
+        """Fan claim verification out across ``self.exec_parallelism`` threads.
+
+        Claim ordering is preserved so the downstream report, aggregator, and
+        rubric cache see the same order they would in the old sequential loop.
+        A per-claim exception is converted into an ``error`` result rather than
+        crashing the whole batch — mirrors the soft-fail contract of
+        ``_generate_specs_parallel``.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls + sandbox dirs).
+            claims_to_verify: Claims in the desired output order.
+            anchor_preloaded: Specs reconstructed from a lineage anchor.
+            generated: Specs produced by ``_generate_specs_parallel``.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Scored per-claim list in the same order as ``claims_to_verify``.
+        """
+        if not claims_to_verify:
+            return []
+        results: list[dict[str, Any] | None] = [None] * len(claims_to_verify)
+        workers = max(1, min(len(claims_to_verify), self.exec_parallelism))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {
+                ex.submit(
+                    self._verify_one_claim_safe,
+                    uuid, claim, anchor_preloaded, generated,
+                    execution_text, workspace_listing, grounding,
+                ): idx
+                for idx, claim in enumerate(claims_to_verify)
+            }
+            for f in as_completed(futures):
+                idx = futures[f]
+                results[idx] = f.result()
+        return [r for r in results if r is not None]
+
+    def _verify_one_claim_safe(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        anchor_preloaded: dict[str, dict[str, Any]],
+        generated: dict[str, tuple[dict[str, Any], dict[str, Any]]],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> dict[str, Any]:
+        """Resolve the right spec for one claim and run ``_verify_claim``.
+
+        Soft-fails to an ``error`` result so one bad claim cannot crash the
+        thread-pool batch.
+        """
+        cid = claim["id"]
+        if cid in anchor_preloaded:
+            target_claim = claim
+            preloaded_spec = anchor_preloaded[cid]
+        else:
+            target_claim, preloaded_spec = generated[cid]
+        try:
+            return self._verify_claim(
+                uuid,
+                target_claim,
+                execution_text,
+                workspace_listing,
+                grounding,
+                preloaded_spec=preloaded_spec,
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"parallel claim verification failed for {cid}: "
+                f"{type(e).__name__}: {e}"
+            )
+            return {
+                "claim": target_claim,
+                "spec": preloaded_spec,
+                "score": 0.0,
+                "verifier_kind": "executable" if preloaded_spec.get("executable") else "soft",
+                "status": "error",
+                "details": f"verify_claim raised: {type(e).__name__}: {e}",
+                "elapsed_s": 0.0,
+            }
 
     @staticmethod
     def _print_per_claim_timings(per_claim: list[dict[str, Any]]) -> None:
