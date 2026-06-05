@@ -177,6 +177,28 @@ When the loop finishes, Mimosa emits two artifacts in
 
 ![Reward progress example](../images/evolve_example.png){ width="80%" }
 
+## Run metrics artifacts
+
+Each iteration also writes structured metrics for post-hoc analysis:
+
+- `sources/workflows/<uuid>/run_metrics.json` — one file per workflow.
+  Captures `iteration`, `evolution_kind`, `parent_uuids`,
+  `iteration_wall_time_s`, `iteration_cost_usd`, `cumulative_cost_usd`,
+  `overall_score{,_uncapped}`, `qd_descriptor`, `qd_score`,
+  `novelty_score`, the `selection_log`, and the
+  `variation_state` (`stagnation`, `success_rate`, `effective_boldness`,
+  `scope_band`, `agent_budget`) that produced this offspring.
+- `sources/workflows/qd_archive.jsonl` — append-only, one line per
+  `validate_survivor` call. Records the candidate's descriptor,
+  `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`
+  (if the archive was at capacity).
+- `sources/workflows/variation_log.jsonl` — append-only, one line per
+  mutation/crossover/seed prompt assembled. Lets you retrace the
+  Rechenberg 1/5 step-size schedule without rerunning the engine.
+
+All three are best-effort and fail-soft: an I/O error logs a warning
+but never aborts a run.
+
 ## See also
 
 - [Evaluation pipeline](evaluation-pipeline.md) — what the verifier actually returns.

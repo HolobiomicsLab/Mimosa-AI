@@ -35,6 +35,10 @@ class VariationEngine:
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self._embedder: SentenceTransformer | None = None
+        # Last `_get_prompt_step_size` snapshot — consumed by
+        # evolution_engine to write variation_log.jsonl. Empty until the
+        # first mutation/crossover prompt has been assembled.
+        self.last_variation_state: dict = {}
 
     def record_offspring_gradient(
         self,
@@ -244,6 +248,14 @@ class VariationEngine:
             (1.01, "complete rethink — discard inherited topology/prompts and innovate freely"),
         ]
         scope = next(label for threshold, label in bands if effective < threshold)
+        self.last_variation_state = {
+            "stagnation": float(raw_stagnation),
+            "success_rate": None if success_rate is None else float(success_rate),
+            "effective_boldness": float(effective),
+            "parent_score": float(parent_score),
+            "scope_band": scope,
+            "agent_budget": int(n_agents),
+        }
         return f"Mutation scope: {scope}. Boldness: {effective*100:.2f}%. Use at most {n_agents} agent(s).\n"
 
     # ── Utility ───────────────────────────────────────────────────────────────
