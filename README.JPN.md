@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI は **タスクごとにカスタムのマルチエージェントワークフローを記述**し、サンドボックスで実行し、エージェントが実際に行った内容を 6 つの独立した視点（文献、ユーザーの目標、エージェントのナラレーション、数学的不変量、計算再現性、統計的フィンガープリント）に照らして検証します。学習を指示された場合は、性能と構造的多様性の両方を維持する **Quality-Diversity**（品質多様性）探索によって、世代を超えてワークフローを進化させます。
+Mimosa-AI は **自律的科学研究のためのオープンソース Python フレームワーク** です。**タスクごとにカスタムのマルチエージェントワークフローを記述**し、サンドボックスで実行し、エージェントが実際に行った内容を 6 つの独立した視点（文献、ユーザーの目標、エージェントのナラレーション、数学的不変量、計算再現性、統計的フィンガープリント）に照らして検証します。学習を指示された場合は、性能と構造的多様性の両方を維持する **Quality-Diversity**（品質多様性、MAP-Elites 系譜）探索によって、世代を超えてワークフローを進化させます。
 
-ワークフローはプレーンな Python として出力されます。verifier はエージェントが主張する内容を再計算する決定論的な Python チェックを実行します。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
+ワークフローはプレーンな Python として出力されます — DSL なし、YAML なし — そのため、どの世代も検査・差分比較・単独での再実行が可能です。verifier はエージェントが主張する内容を再計算する決定論的な Python チェックを実行します。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -77,7 +77,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 反復学習は GPT-4o を改善しますが、Claude Haiku 4.5 では僅かな劣化をもたらします。モデル依存の挙動については[論文](https://arxiv.org/abs/2603.28986)で分析しています。PaperBench の結果は [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md) を参照してください。
+> **ScienceAgentBench における DeepSeek-V3.2 反復学習で 43.1% の成功率 — シングルエージェントベースラインに対して +4.9 ポイント、タスクあたりコスト $1.70。**
+
+> ScienceAgentBench 上で DeepSeek-V3.2 を用いた場合、反復学習は GPT-4o を改善しますが、Claude Haiku 4.5 では僅かな劣化をもたらします。モデル依存の挙動については[論文](https://arxiv.org/abs/2603.28986)で分析しています。PaperBench の結果は [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md) を参照してください。
 
 > **コストと実行時間.** `$1.70/task` の数値は、デフォルトの `--learn` 予算（最大 35 世代、`overall_score > 0.97` で早期停止）に対して償却された値です。DeepSeek-V3.2 を用いた典型的な進化実行はタスクあたり 30 〜 90 分の実時間で、概ねモデル価格に比例してスケールします。ワンショット実行（`--learn` なし）は約 5 〜 15 分で、コストは一桁安価です。
 
@@ -101,9 +103,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 進化ループ — 実際に進化しているもの
 
-ワークフローは **完全な Python プログラム** であり、ソースコードとして変異されます。遺伝子型はワークフローファイル、表現型はそれがワークスペース上に生成するものです。
+ワークフローは **完全な Python プログラム** であり、ソースコードとして変異されます。**コードを遺伝子型として扱う方式 (code-as-genotype)** で、遺伝子型はワークフローファイル、表現型はそれがワークスペース上に生成するものです。
 
-- **選択: Quality-Diversity アーカイブ** — 集団サイズ 50、`qd_score = (1−w)·quality + w·novelty`（`w=0.4`）。新規性は行動記述子 `[n_agents, n_edges, n_branches, prompt_chars]` 上の k-NN 距離（`k=25`）です。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます。
+- **選択: Quality-Diversity アーカイブ**（**MAP-Elites** 方式）— 集団サイズ 50、`qd_score = (1−w)·quality + w·novelty`（`w=0.4`）。**新規性探索 (novelty search)** は **行動記述子 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上の k-NN 距離（`k=25`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます。
 - **変異: 停滞駆動のスコープ** — 変異の大胆さは、直近 4 回のプロンプト勾配がどの程度反復しているかの連続関数です。勝者に近い個体は保護されます。スコープ帯域は「プロンプトのみの微調整」から「トポロジー全面再考」まで及びます。
 - **交叉** — 約 30 % の世代で 2 つの親（強いもの優先）を組み合わせます。
 - **コールドスタート** — アーカイブが空の場合、ディスク上の過去実行を類似度フィルタ（MiniLM コサイン ≥ 0.5）でスキャンして探索を播種します。有用なワークフローはタスク間で転移します。
@@ -123,9 +125,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | **E** | 計算再現性 — 宣言された依存関係が使用された import を網羅、絶対パスなし、確率的操作のシード |
 | **F** | 統計的フィンガープリント — ベースラインを上回り、退化した予測がなく、漏洩シグネチャがない |
 
-各クレームは、judge がワークスペースに対して記述する **決定論的 Python プログラム** によって検証されます。LLM にエージェントを信じるかどうかを再質問することはしません。反トートロジーのトリップワイヤは、エージェントの出力をそれ自身と比較するプログラムを拒絶します。
+各クレームは、judge がワークスペースに対して記述する **決定論的 Python プログラム** によって検証されます — LLM にエージェントを信じるかどうかを再質問することはしません。**自己検証 (self-verification)** では、反トートロジーのトリップワイヤがエージェントの出力をそれ自身と比較するプログラムを拒絶します。
 
-**mutator はルーブリックを決して見ません。** フィードバックされる唯一のシグナルは `abstracted_prompt_gradient` です。これはクレーム、スコア、ソースの名前を含まない、コードネーム化された失敗モードの診断です。構造上、探索は決して見ないルーブリック語彙に過適合できません。
+**ルーブリック盲変異 (rubric-blind mutation) — mutator はルーブリックを決して見ません。** フィードバックされる唯一のシグナルは `abstracted_prompt_gradient` です。これはクレーム、スコア、ソースの名前を含まない、コードネーム化された失敗モードの診断です。構造上、探索は決して見ないルーブリック語彙に過適合できません。
 
 完全なパイプライン: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -321,7 +323,7 @@ Apache 2.0。コントリビューション規約については [`NOTICE`](./NO
 
 ---
 
-## 引用
+## 本研究を引用する
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +332,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

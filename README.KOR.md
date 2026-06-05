@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI는 **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 여섯 개의 독립적인 관점(문헌, 사용자의 목표, 에이전트 내레이션, 수학적 불변량, 계산 재현성, 통계적 핑거프린트)에 비추어 검증합니다. 그리고 학습을 요청하면 **Quality-Diversity** 탐색을 통해 성능과 구조적 다양성을 모두 보존하며 세대를 거쳐 워크플로우를 진화시킵니다.
+Mimosa-AI는 **자율 과학 연구를 위한 오픈소스 Python 프레임워크**입니다. **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 여섯 개의 독립적인 관점(문헌, 사용자의 목표, 에이전트 내레이션, 수학적 불변량, 계산 재현성, 통계적 핑거프린트)에 비추어 검증합니다. 그리고 학습을 요청하면 **Quality-Diversity** 탐색(MAP-Elites 계보)을 통해 성능과 구조적 다양성을 모두 보존하며 세대를 거쳐 워크플로우를 진화시킵니다.
 
-워크플로우는 순수 Python으로 출력됩니다. 검증기는 에이전트가 주장하는 내용을 재계산하는 결정론적 Python 검사를 실행합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
+워크플로우는 순수 Python으로 출력됩니다 — DSL 없이, YAML 없이 — 그래서 어떤 세대든 검사하거나 비교하거나 단독으로 다시 실행할 수 있습니다. 검증기는 에이전트가 주장하는 내용을 재계산하는 결정론적 Python 검사를 실행합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -77,7 +77,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | DeepSeek-V3.2 원샷 멀티에이전트      | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 반복 학습**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 반복 학습은 GPT-4o에서는 성능을 향상시키지만 Claude Haiku 4.5에서는 미세한 성능 저하를 보입니다 — 모델 의존적 동작은 [논문](https://arxiv.org/abs/2603.28986)에서 분석합니다. PaperBench 결과는 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)를 참조하세요.
+> **ScienceAgentBench에서 DeepSeek-V3.2 반복 학습으로 43.1% 성공률 — 단일 에이전트 베이스라인 대비 +4.9 포인트, 태스크당 비용 $1.70.**
+
+> ScienceAgentBench에서 DeepSeek-V3.2를 사용했을 때, 반복 학습은 GPT-4o에서는 성능을 향상시키지만 Claude Haiku 4.5에서는 미세한 성능 저하를 보입니다 — 모델 의존적 동작은 [논문](https://arxiv.org/abs/2603.28986)에서 분석합니다. PaperBench 결과는 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)를 참조하세요.
 
 > **비용과 실행 시간.** `$1.70/task` 수치는 기본 `--learn` 예산(최대 35세대, `overall_score > 0.97`에서 조기 종료) 기준으로 분할 상환된 값입니다. 일반적인 진화 실행은 DeepSeek-V3.2 기준 태스크당 실시간 30–90분이 소요되며, 모델 가격에 대체로 비례합니다. 단일 실행(`--learn` 미사용)은 약 5–15분이며 비용은 한 자릿수 배 더 저렴합니다.
 
@@ -101,9 +103,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 진화 루프 — 실제로 무엇이 진화하는가
 
-워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. 유전자형(genotype)은 워크플로우 파일이고, 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
+워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. **코드를 유전자형으로 다루는 방식 (code-as-genotype)** 으로, 유전자형(genotype)은 워크플로우 파일이고 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
 
-- **선택: Quality-Diversity 아카이브** — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). 참신성(novelty)은 행동 기술자 `[n_agents, n_edges, n_branches, prompt_chars]` 상의 k-NN 거리(`k=25`)입니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다.
+- **선택: Quality-Diversity 아카이브**(**MAP-Elites** 방식) — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). **참신성 탐색 (novelty search)** 은 **행동 기술자 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 상의 k-NN 거리(`k=25`)를 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다.
 - **변이: 정체 기반 범위 조절** — 변이의 대담함은 마지막 4개의 프롬프트 그래디언트가 얼마나 반복되는지에 대한 연속 함수입니다. 거의 승리한 개체는 보호됩니다. 범위 대역은 "프롬프트만 미세 조정"부터 "완전한 토폴로지 재고"까지 이어집니다.
 - **교차** — 약 30%의 세대에서 두 부모를 결합하며, 강한 쪽이 먼저 적용됩니다.
 - **콜드 스타트** — 아카이브가 비어 있으면, 디스크의 과거 실행을 유사도 필터링(MiniLM 코사인 ≥ 0.5)으로 스캔하여 탐색을 시드합니다. 유용한 워크플로우는 태스크 간에 전이됩니다.
@@ -123,9 +125,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | **E** | 계산 재현성 — 선언된 의존성이 사용된 import를 포함, 절대 경로 없음, 확률적 연산에 시드 설정 |
 | **F** | 통계적 핑거프린트 — 베이스라인 초과, 퇴화된 예측 없음, 누출 시그니처 없음 |
 
-각 클레임은 심판(judge)이 워크스페이스에 대해 작성하는 **결정론적 Python 프로그램**으로 검증됩니다 — 에이전트를 믿느냐고 LLM에 다시 묻는 방식이 아닙니다. 반(反)동어반복 트립와이어는 에이전트의 출력을 자신과 비교하는 프로그램을 거부합니다.
+각 클레임은 심판(judge)이 워크스페이스에 대해 작성하는 **결정론적 Python 프로그램**으로 검증됩니다 — 에이전트를 믿느냐고 LLM에 다시 묻는 방식이 아닙니다. **자가 검증 (self-verification)** 은 반(反)동어반복 트립와이어를 통해 에이전트의 출력을 자신과 비교하는 프로그램을 거부합니다.
 
-**변이기는 평가 기준(rubric)을 결코 보지 않습니다.** 되돌아 흐르는 유일한 신호는 `abstracted_prompt_gradient` — 클레임, 점수, 소스를 명명하지 않는 실패 모드의 암호화된 진단입니다. 구조적으로, 탐색은 결코 보지 않는 평가 기준의 어휘에 과적합할 수 없습니다.
+**평가 기준 비공개 변이 (rubric-blind mutation) — 변이기는 평가 기준(rubric)을 결코 보지 않습니다.** 되돌아 흐르는 유일한 신호는 `abstracted_prompt_gradient` — 클레임, 점수, 소스를 명명하지 않는 실패 모드의 암호화된 진단입니다. 구조적으로, 탐색은 결코 보지 않는 평가 기준의 어휘에 과적합할 수 없습니다.
 
 전체 파이프라인: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
@@ -321,7 +323,7 @@ Apache 2.0. 기여 조항에 대해서는 [`NOTICE`](./NOTICE), [`docs/licensing
 
 ---
 
-## 인용
+## 본 연구 인용하기
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +332,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI 會**為每一項任務撰寫一套客製化的多智能體工作流程**,於沙箱中執行,並以六個獨立觀察視角(文獻、您的目標、智能體敘述、數學不變量、計算可重現性、統計指紋)檢核智能體實際完成的內容;當您要求其學習時,則透過**品質-多樣性 (Quality-Diversity)** 搜尋於世代之間演化該工作流程,同時保留效能與結構多樣性。
+Mimosa-AI 是一個**面向自主科學研究的開源 Python 框架**:它會**為每一項任務撰寫一套客製化的多智能體工作流程**,於沙箱中執行,並以六個獨立觀察視角(文獻、您的目標、智能體敘述、數學不變量、計算可重現性、統計指紋)檢核智能體實際完成的內容;當您要求其學習時,則透過**品質-多樣性 (Quality-Diversity)** 搜尋(MAP-Elites 譜系)於世代之間演化該工作流程,同時保留效能與結構多樣性。
 
-工作流程以純 Python 程式碼產出。驗證器執行確定性的 Python 檢核程式,重新計算智能體所宣稱的結果。每一個世代都連同其譜系與產生該世代的確切 LLM 提示一併保存於磁碟。
+工作流程以純 Python 程式碼產出 —— 無 DSL、無 YAML —— 因此每一個世代皆可被檢視、比對或獨立重新執行。驗證器執行確定性的 Python 檢核程式,重新計算智能體所宣稱的結果。每一個世代都連同其譜系與產生該世代的確切 LLM 提示一併保存於磁碟。
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -77,7 +77,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | DeepSeek-V3.2 單發多智能體              | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 迭代學習**              | **43.1 %**   | **0.921** | **$1.70**   |
 
-> 迭代學習能改善 GPT-4o 的表現,但對 Claude Haiku 4.5 卻造成輕微的退化——與模型相關的行為差異已於[論文](https://arxiv.org/abs/2603.28986)中分析。PaperBench 結果請見 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
+> **於 ScienceAgentBench 上,DeepSeek-V3.2 迭代學習取得 43.1% 成功率 —— 較單一智能體基線提升 +4.9 個百分點,單任務成本 $1.70。**
+
+> 於 ScienceAgentBench 上使用 DeepSeek-V3.2 時,迭代學習能改善 GPT-4o 的表現,但對 Claude Haiku 4.5 卻造成輕微的退化——與模型相關的行為差異已於[論文](https://arxiv.org/abs/2603.28986)中分析。PaperBench 結果請見 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
 
 > **成本與執行時間。** `$1.70/task` 的數字是依預設 `--learn` 預算(最多 35 個世代,於 `overall_score > 0.97` 時提前終止)所攤提的結果。在 DeepSeek-V3.2 上,典型的演化執行需 30–90 分鐘實際時間,並大致隨模型價格等比例縮放。單發執行(未使用 `--learn`)約需 5–15 分鐘,成本則低一個量級。
 
@@ -101,9 +103,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 演化迴圈——實際在演化的是什麼
 
-工作流程是**完整的 Python 程式**,以原始碼形式進行突變。基因型即為工作流程檔案;表現型則為其在工作區內所產生的一切。
+工作流程是**完整的 Python 程式**,以原始碼形式進行突變。**程式碼即基因型 (code-as-genotype)** 即為工作流程檔案;表現型則為其在工作區內所產生的一切。
 
-- **選擇:品質-多樣性 (QD) 檔案庫** —— 族群大小為 50,`qd_score = (1−w)·quality + w·novelty` (`w=0.4`)。新穎性以行為描述子 `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距離 (`k=25`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散。
+- **選擇:品質-多樣性 (QD) 檔案庫**(**MAP-Elites** 風格)—— 族群大小為 50,`qd_score = (1−w)·quality + w·novelty` (`w=0.4`)。**新穎性搜尋 (novelty search)** 以**行為描述子 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距離 (`k=25`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散。
 - **變異:由停滯驅動的範圍** —— 突變的大膽程度是過去 4 次提示梯度自我重複程度的連續函數。接近獲勝者者受到保護。範圍從「僅微調提示」至「完整重新思考拓樸」分為多個級距。
 - **交配** —— 約 30 % 的世代會組合兩個親代,依強者優先。
 - **冷啟動** —— 當檔案庫為空時,以磁碟上過往執行的相似度過濾掃描 (MiniLM 餘弦 ≥ 0.5) 為搜尋播種。可用的工作流程能跨任務遷移。
@@ -123,9 +125,9 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | **E** | 計算可重現性——已宣告的相依套件涵蓋實際使用的 import、無絕對路徑、隨機操作皆有種子 |
 | **F** | 統計指紋——優於基線、無退化預測、無洩漏特徵 |
 
-每一項聲明皆由評審撰寫、針對工作區執行的**確定性 Python 程式**來驗證——而非再次詢問 LLM 是否相信該智能體。反同語反複的觸發機制會拒絕將智能體輸出與自身比對的程式。
+每一項聲明皆由評審撰寫、針對工作區執行的**確定性 Python 程式**來驗證——而非再次詢問 LLM 是否相信該智能體。**自我驗證 (self-verification)** 透過反同語反複的觸發機制,拒絕將智能體輸出與自身比對的程式。
 
-**突變器永遠看不到評分準則。** 唯一回流的訊號是 `abstracted_prompt_gradient`——一份以代號描述失效模式的診斷,當中不會點名任何聲明、分數或來源。就架構而言,搜尋無法對其從未看到的評分詞彙過度擬合。
+**評分準則盲變異 (rubric-blind mutation) —— 突變器永遠看不到評分準則。** 唯一回流的訊號是 `abstracted_prompt_gradient`——一份以代號描述失效模式的診斷,當中不會點名任何聲明、分數或來源。就架構而言,搜尋無法對其從未看到的評分詞彙過度擬合。
 
 完整管線:[`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -321,7 +323,7 @@ Apache 2.0。請見 [`NOTICE`](./NOTICE)、[`docs/licensing-notes.md`](./docs/li
 
 ---
 
-## 引用
+## 引用本作品
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -330,10 +332,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```

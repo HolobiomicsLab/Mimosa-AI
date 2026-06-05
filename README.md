@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI writes **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** search to find the optimal workflow for the task.
+Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** search (MAP-Elites lineage) to find the optimal workflow for the task.
 
-The workflow is emitted as plain Python. The verifier runs deterministic Python checks that recompute what the agents claim. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier runs deterministic Python checks that recompute what the agents claim. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -77,7 +77,9 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
 | **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
 
-> Iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
+> **43.1 % success rate on ScienceAgentBench with DeepSeek-V3.2 iterative-learning — +4.9 pp over the single-agent baseline at $1.70 per task.**
+
+> On ScienceAgentBench with DeepSeek-V3.2, iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ---
 
@@ -99,9 +101,9 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 
 ### The evolution loop — what's actually evolving
 
-Workflows are **full Python programs**, mutated as source code. The genotype is the workflow file; the phenotype is whatever it produces in the workspace.
+Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
 
-- **Selection: Quality-Diversity archive** — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). Novelty is k-NN distance (`k=25`) over a behaviour descriptor `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
+- **Selection: Quality-Diversity archive** (**MAP-Elites**-style) — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). **Novelty search** uses k-NN distance (`k=25`) over a **behaviour descriptor** `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
 - **Variation: stagnation-driven scope** — mutation boldness is a continuous function of how much the last 4 prompt gradients repeat themselves. Near-winners stay protected. Scope bands run from "prompt-only tweak" to "complete topology rethink."
 - **Crossover** — ~30 % of generations combine two parents, strongest-first.
 - **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.5) seeds the search. Useful workflows transfer across tasks.
@@ -121,9 +123,9 @@ After each run, six independent claim sources look at the workspace and emit suc
 | **E** | Computational reproducibility — declared deps cover used imports, no absolute paths, seeds on stochastic ops |
 | **F** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
 
-Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent. Anti-tautology tripwires reject programs that compare the agent's output to itself.
+Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent. **Self-verification** uses anti-tautology tripwires that reject programs comparing the agent's output to itself.
 
-**The mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
+**Rubric-blind mutation — the mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
 
 Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
@@ -319,7 +321,7 @@ Apache 2.0. See [`NOTICE`](./NOTICE), [`docs/licensing-notes.md`](./docs/licensi
 
 ---
 
-## Citation
+## Cite this work
 
 <p align="center">
 <em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
@@ -328,10 +330,13 @@ M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L
 
 ```bibtex
 @article{legrand2026mimosa,
-  title   = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
-  author  = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
-             and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
-  journal = {arXiv preprint arXiv:2603.28986},
-  year    = {2026}
+  title         = {Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research},
+  author        = {Legrand, Martin and Jiang, Tao and Feraud, Matthieu and Navet, Benjamin
+                   and Taghzouti, Yousouf and Gandon, Fabien and Dumont, Elise and Nothias, Louis-F{\'e}lix},
+  journal       = {arXiv preprint arXiv:2603.28986},
+  year          = {2026},
+  eprint        = {2603.28986},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
 }
 ```
