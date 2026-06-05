@@ -41,9 +41,9 @@
 
 ## TL;DR
 
-Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** search (MAP-Elites lineage) to find the optimal workflow for the task.
+Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
 
-The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier runs deterministic Python checks that recompute what the agents claim. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier score workflows by running deterministic Python checks that verify litterature grounding, non-triviality, and quality metrics against artifacts that the agents produced. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
 ```bash
 uv sync && uv run main.py        # interactive onboarding
@@ -54,7 +54,7 @@ uv sync && uv run main.py        # interactive onboarding
 ## Demo
 
 <p align="center">
-    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering) — from a single command, with no fixed pipeline.</em>
+    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering).</em>
 </p>
 
 https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
@@ -123,7 +123,7 @@ After each run, six independent claim sources look at the workspace and emit suc
 | **E** | Computational reproducibility — declared deps cover used imports, no absolute paths, seeds on stochastic ops |
 | **F** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
 
-Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent. **Self-verification** uses anti-tautology tripwires that reject programs comparing the agent's output to itself.
+Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent.
 
 **Rubric-blind mutation — the mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
 
@@ -163,7 +163,7 @@ LANGFUSE_PRIVATE_KEY=...
 
 Mimosa discovers any MCP server reachable on the address/port range in your config (default `0.0.0.0:5000–5100`).
 
-- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — a per-workspace MCP shell sandbox where agents install scientific packages on demand (cached for follow-up runs in the same workspace), plus pre-built MCP servers exposing common scientific stacks, shared workspace management, and an opinionated registration flow.
+- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — a per-workspace MCP shell sandbox where agents install scientific packages on demand, plus pre-built MCP servers exposing common scientific stacks, shared workspace management, and an easy registration flow for new MCPs.
 - **Bring-your-own:** point `discovery_addresses` at any reachable MCP server — `fastmcp` scripts, ToolHive, third-party MCP containers. Toolomics is not required; see [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
 
 ### 4. Run
