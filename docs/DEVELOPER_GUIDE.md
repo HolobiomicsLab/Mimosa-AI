@@ -149,8 +149,9 @@ mimosa-ai/
 │   │   └── smolagent_factory.py           # SmolAgent factory template
 │   │
 │   ├── prompts/
-│   │   ├── workflow_v10.md                # Current workflow generator prompt
-│   │   ├── workflow_v9.md                 # (kept for diffing)
+│   │   ├── workflow_v11.md                # Current workflow generator prompt
+│   │   ├── workflow_v10.md                # (kept for diffing)
+│   │   ├── workflow_v9.md                 # (legacy reference)
 │   │   ├── workflow_v8.md                 # (legacy reference)
 │   │   ├── planner_reproduction.md        # Planner prompt — reproduction goal
 │   │   ├── planner_paperbench_codedev.md  # Planner prompt — code-dev paperbench
@@ -241,8 +242,8 @@ Key collaborators (instantiated in `__init__`):
 - `WorkflowOrchestrator` — grounding → factory → sandbox.
 - `VariationEngine` — mutation / crossover prompt assembly.
 - `WorkflowEvaluator` — multi-source per-claim verifier (default).
-- `SelectionPressure` — QD archive (population_size=50, k=25,
-  novelty_weight=0.4).
+- `SelectionPressure` — QD archive (population_size=50, k=15,
+  novelty_weight=0.25).
 
 Each recursive step:
 1. resets the workspace to the initial state,
@@ -254,9 +255,9 @@ Each recursive step:
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
-Termination: `overall_score > learned_score_threshold` (default 0.97) in
+Termination: `overall_score > learned_score_threshold` (default 0.94) in
 `--learn` mode, or `max_depth` reached
-(`max_learning_evolve_iterations`, default 35; single-shot uses
+(`max_learning_evolve_iterations`, default 45; single-shot uses
 `max_depth=1`).
 
 ### 2. `SelectionPressure` — [`sources/core/selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
@@ -264,37 +265,51 @@ Termination: `overall_score > learned_score_threshold` (default 0.97) in
 Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
-(`w = novelty_weight = 0.4`). Quality is sourced from `reward_uncapped`
+(`w = novelty_weight = 0.25`). Quality is sourced from `reward_uncapped`
 so the hard-fail cap (`_HARD_FAIL_CAP`, currently `0.99`) doesn't
 flatten rank ordering. Admission is
 gated by the validity check (improvement over baseline or
 `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
-penalty `÷(1 + n_children_already)` to spread offspring.
+penalty `÷(1 + n_children_already)` and a hard
+`MAX_CHILDREN_PER_PARENT = 2` cap to spread offspring.
 
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
 Prompt assembly for mutation and crossover. Mutation boldness is a
-continuous function of population stagnation, not a fixed phase
-schedule.
+continuous function of two evidence signals — population stagnation
+*and* the Rechenberg 1/5 success rate of recent offspring — not a fixed
+phase schedule.
 
 - `_compute_stagnation(window=4)` — mean pairwise MiniLM cosine
   similarity over the last 4 non-failure prompt gradients, rescaled so
   the unrelated baseline (`≈0.4`) maps to `0` and full repetition
   (`≥0.8`) maps to `1`.
-- `_get_prompt_step_size(parent_score)` — computes
-  `stagnation_effective = raw_stagnation · (1 − parent_score)`, grows
-  the agent budget from the previous generation's count toward
-  `max_possible_agents = 7` proportionally to it, then samples the
-  actual agent count with a Beta-Binomial biased upward by stagnation.
+- `_compute_success_rate(window=5)` — fraction of the last 5 scored
+  offspring that strictly beat the running best at production time.
+  The Rechenberg 1/5 success rule threshold is `0.20`.
+- `_get_prompt_step_size(parent_score)` — combines the two:
+    * cold start (no scored history yet) — `effective = raw_stagnation`,
+    * `success_rate < 0.20` — `effective = max(raw_stagnation, deficit)`
+       with `deficit = (0.20 − success_rate) / 0.20` (escalate),
+    * `success_rate ≥ 0.20` — `effective = raw_stagnation · (1 − progress)`
+       with `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`
+       (damp boldness in proportion to real progress),
+    * near-finish floor: when `parent_score > 0.95`, multiply by
+       `(1 − 0.5 · (parent_score − 0.95) / 0.05)` so a 0.96 parent isn't
+       gambled away one generation before early-stop.
+  Then it grows the agent budget from the previous generation's count
+  toward `max_possible_agents = 7` proportionally to `effective`, and
+  samples the actual agent count with a Beta-Binomial biased upward by
+  `effective`.
 
-| Stagnation effective | Agent budget | Mutation scope (advisory)                                  |
-|----------------------|--------------|-------------------------------------------------------------|
-| <0.20                | ≈ current    | prompt-only little tweak                                    |
-| <0.40                | current+1    | prompt, handoff, tools — improve information flow           |
-| <0.60                | current+2    | significant redesign while keeping topology                 |
-| <0.80                | current+3    | bold rewire — restructure or grow the agent set             |
-| ≥0.80                | up to 7      | complete rethink — discard inherited topology / prompts     |
+| Effective boldness | Agent budget | Mutation scope (advisory)                                  |
+|--------------------|--------------|-------------------------------------------------------------|
+| <0.20              | ≈ current    | prompt-only little tweak                                    |
+| <0.40              | current+1    | prompt, handoff, tools — improve information flow           |
+| <0.60              | current+2    | significant redesign while keeping topology                 |
+| <0.80              | current+3    | bold rewire — restructure or grow the agent set             |
+| ≥0.80              | up to 7      | complete rethink — discard inherited topology / prompts     |
 
 Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
@@ -385,7 +400,7 @@ EvolutionEngine.start_workflow_evolution(goal)
         ├─ SelectionPressure.validate_survivor() → archive admit?
         ├─ record_lineage()
         ├─ select next parent (archive QD-roulette)
-        ├─ choose crossover (~0.3 rate) or mutation
+        ├─ choose crossover (~0.4 rate, once initial_population met) or mutation
         └─ recurse → stop on threshold OR max_depth
     ↓
 WorkspaceManager.restore_best(best_uuid)
