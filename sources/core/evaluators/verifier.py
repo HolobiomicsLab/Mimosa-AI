@@ -176,11 +176,9 @@ class VerifierEvaluator(
         {execution_text}
         Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
-        Here are the past diagnoses for recent workflows, which may provide additional context on common failure:
-        {history}
         Make a short code name for the diagnosis followed by a a few short line for each issue that describe the behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
         Format: "<diagnosis_CODE>:\n<- <short diagnosis error 1>\n<- <short diagnosis error 2>\n... (up to 5 lines of diagnosis)"
-        If possible, reuses diagnosis codes from past runs when the failure modes are similar, to help track recurring issues.
+        Warning: Do not surface failures that would require modifying provided inputs (e.g. files under `data/`). Surface the next most critical fixable issue instead.
         Example:
         FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """

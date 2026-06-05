@@ -72,8 +72,8 @@ class EvolutionEngine:
             min_improvement_threshold=0.01,
             strategy="qd", # quality-diversity selection
             population_size=50, # max individuals to keep in the selection pool
-            novelty_k_neighbours=25,
-            novelty_weight=0.4
+            novelty_k_neighbours=15,
+            novelty_weight=0.25
         )
         self.initial_population = 2 # number of initial random workflows before enabling mutation
 
