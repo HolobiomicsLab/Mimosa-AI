@@ -7,7 +7,17 @@ from __future__ import annotations
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
+
+
+# ----- Importance rating fan-out ---------------------------------------------
+# Phase B (rating) is split into batches of this size and run in a thread pool.
+# Single-shot rating on 30+ claims with rationales is the slowest verifier step
+# because it generates one big structured JSON output; fanning it out collapses
+# wall-clock without changing the rubric.
+_IMPORTANCE_BATCH_SIZE = 10
+_IMPORTANCE_PARALLELISM = 4
 
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
@@ -592,18 +602,22 @@ on-disk artefacts can actually support.
         claims: list[dict[str, Any]],
         grounding: str = "",
     ) -> list[dict[str, Any]]:
-        """Rate each merged claim on a 1-10 importance scale and drop duplicates.
+        """Drop near-duplicates and rate every surviving claim 1-10 vs the goal.
 
-        Replaces the previous hard/soft step-function tier. A single judge call
-        sees the goal and the full merged claim list; it returns (a) ids to drop
-        as near-duplicates and (b) an importance + one-sentence rationale for
-        each surviving claim. Goal-alignment is the dominant axis — the prompt
-        anchors the scale on what the user explicitly asked for.
+        Runs as two phases so the slow part is parallelisable:
 
-        On parse failure or judge error every input claim is returned with
-        ``importance = _DEFAULT_CLAIM_IMPORTANCE``: the run still scores rather
-        than crashing, but the gradient is intentionally muted so the next
-        iteration is not steered by a noisy rating.
+        * **Phase A — dedup (1 call):** the judge sees the full merged list of
+          ``(id, short description)`` pairs and returns only the ids of
+          near-duplicates to drop. Output is tiny so this call is cheap.
+        * **Phase B — rating (parallel batches):** surviving claims are sliced
+          into batches of ``_IMPORTANCE_BATCH_SIZE`` and each batch is rated
+          independently on ``_IMPORTANCE_PARALLELISM`` threads. Each entry
+          carries a *terse* rationale (≤8 words) instead of a full sentence,
+          which is what made the old single-call version slow.
+
+        On phase failure the affected claims fall back to
+        ``importance = _DEFAULT_CLAIM_IMPORTANCE`` with an empty rationale, so
+        the run still scores rather than crashing.
 
         Args:
             uuid: Workflow identifier (used for the judge call).
@@ -613,69 +627,174 @@ on-disk artefacts can actually support.
 
         Returns:
             Filtered claim list with ``importance`` (int 1-10) and
-            ``importance_rationale`` (one-sentence str) populated on every entry.
+            ``importance_rationale`` (short phrase) populated on every entry.
         """
         if not claims:
             return claims
 
-        prompt = self._build_importance_prompt(goal, claims, grounding)
+        t_dedup = time.time()
+        drop_ids = self._run_dedup_pass(uuid, goal, claims, grounding)
+        surviving = [c for c in claims if c.get("id") not in drop_ids]
+        print_ok(
+            f"Importance dedup for {uuid}: dropped {len(drop_ids)} of "
+            f"{len(claims)} in {time.time() - t_dedup:.1f}s"
+        )
+
+        if not surviving:
+            return surviving
+
+        t_rate = time.time()
+        importance_by_id = self._rate_importance_parallel(
+            uuid, goal, surviving, grounding
+        )
+        print_ok(
+            f"Importance rating for {uuid}: rated {len(importance_by_id)} of "
+            f"{len(surviving)} in {time.time() - t_rate:.1f}s "
+            f"(batches of {_IMPORTANCE_BATCH_SIZE}, parallelism={_IMPORTANCE_PARALLELISM})"
+        )
+
+        kept: list[dict[str, Any]] = []
+        for c in surviving:
+            imp, rationale = importance_by_id.get(
+                c.get("id"), (self._DEFAULT_CLAIM_IMPORTANCE, "")
+            )
+            kept.append({**c, "importance": imp, "importance_rationale": rationale})
+        return kept
+
+    def _run_dedup_pass(
+        self,
+        uuid: str,
+        goal: str,
+        claims: list[dict[str, Any]],
+        grounding: str,
+    ) -> set[str]:
+        """Single cheap LLM call returning only ids to drop as near-duplicates.
+
+        Output is just a list of ids, so the call generates almost no tokens
+        and finishes in seconds even on slow judges. On any error the dedup is
+        skipped (empty set) — duplicates will then bias the aggregate slightly
+        but the run still completes.
+        """
+        prompt = self._build_dedup_prompt(goal, claims, grounding)
         data, err = self._call_judge_for_json(
-            uuid, "verifier_declare_importance", prompt
+            uuid, "verifier_dedup_claims", prompt
         )
         if err is not None or not isinstance(data, dict):
             self.logger.warning(
-                f"importance rater failed for {uuid} ({err or 'non-dict JSON'}); "
-                f"falling back to uniform importance={self._DEFAULT_CLAIM_IMPORTANCE}"
+                f"dedup pass failed for {uuid} ({err or 'non-dict JSON'}); "
+                f"keeping all {len(claims)} claims"
             )
-            return [self._with_default_importance(c) for c in claims]
+            return set()
+        return self._extract_drop_ids(data)
 
-        drop_ids = self._extract_drop_ids(data)
-        importance_by_id = self._extract_importance_map(data)
+    def _rate_importance_parallel(
+        self,
+        uuid: str,
+        goal: str,
+        claims: list[dict[str, Any]],
+        grounding: str,
+    ) -> dict[str, tuple[int, str]]:
+        """Split rating into batches and fan out across threads.
 
-        kept: list[dict[str, Any]] = []
-        for c in claims:
-            cid = c.get("id")
-            if cid in drop_ids:
-                self.logger.debug(f"importance rater dropped duplicate claim {cid}")
-                continue
-            imp, rationale = importance_by_id.get(
-                cid, (self._DEFAULT_CLAIM_IMPORTANCE, "")
+        Each batch only needs to see its own claims (dedup already happened in
+        phase A), so batches are independent and threads suffice — the LLM
+        client is sync HTTP. Failures in one batch fall back to default
+        importance for those claims; other batches keep their real ratings.
+        """
+        batches = [
+            claims[i : i + _IMPORTANCE_BATCH_SIZE]
+            for i in range(0, len(claims), _IMPORTANCE_BATCH_SIZE)
+        ]
+        if not batches:
+            return {}
+        workers = max(1, min(len(batches), _IMPORTANCE_PARALLELISM))
+        merged: dict[str, tuple[int, str]] = {}
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {
+                ex.submit(
+                    self._rate_one_importance_batch,
+                    uuid, goal, batch, grounding, idx,
+                ): idx
+                for idx, batch in enumerate(batches)
+            }
+            for f in as_completed(futures):
+                merged.update(f.result())
+        return merged
+
+    def _rate_one_importance_batch(
+        self,
+        uuid: str,
+        goal: str,
+        batch: list[dict[str, Any]],
+        grounding: str,
+        batch_idx: int,
+    ) -> dict[str, tuple[int, str]]:
+        """Rate one batch; default-importance fallback on parse/call error."""
+        prompt = self._build_importance_batch_prompt(goal, batch, grounding)
+        agent_name = f"verifier_rate_importance_b{batch_idx}"
+        data, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        if err is not None or not isinstance(data, dict):
+            self.logger.warning(
+                f"importance batch {batch_idx} failed for {uuid} "
+                f"({err or 'non-dict JSON'}); defaulting {len(batch)} claim(s)"
             )
-            kept.append({
-                **c,
-                "importance": imp,
-                "importance_rationale": rationale,
-            })
+            return {
+                str(c.get("id")): (self._DEFAULT_CLAIM_IMPORTANCE, "")
+                for c in batch
+                if c.get("id")
+            }
+        return self._extract_importance_map(data)
 
-        print_ok(
-            f"Rated {len(kept)} claims for {uuid} "
-            f"(dropped {len(drop_ids)} duplicate(s))"
-        )
-        return kept
-
-    def _build_importance_prompt(
+    def _build_dedup_prompt(
         self,
         goal: str,
         claims: list[dict[str, Any]],
         grounding: str,
     ) -> str:
-        """Render the rater prompt: scale anchors + goal + claim list.
+        """Render the dedup-only prompt. Output is just a list of ids."""
+        grounding_block = (
+            grounding.strip() if grounding else "(no literature grounding available)"
+        )
+        claim_lines = "\n".join(
+            f"- id={c.get('id')!r}  source={c.get('source', 'unknown')}  "
+            f"desc={str(c.get('description', '')).strip()[:200]}"
+            for c in claims
+        )
+        return f"""You are pruning near-duplicate verification claims.
 
-        Args:
-            goal: Workflow goal text.
-            claims: Merged claims to rate.
-            grounding: Optional grounding block; may be empty.
+WORKFLOW GOAL:
+{goal}
 
-        Returns:
-            Fully formatted prompt string for the rater judge.
-        """
+LITERATURE GROUNDING:
+{grounding_block}
+
+CLAIMS:
+{claim_lines}
+
+TASK:
+Identify near-duplicate claims (same checked property, different wording or
+source). Return the redundant ids to drop. Keep the clearest version of each
+cluster. Do NOT drop claims that check different facets — only true duplicates.
+If nothing is duplicated, return an empty list.
+
+Return STRICT JSON only, in this exact shape:
+{{"drop_ids": ["<id>", ...]}}
+"""
+
+    def _build_importance_batch_prompt(
+        self,
+        goal: str,
+        batch: list[dict[str, Any]],
+        grounding: str,
+    ) -> str:
+        """Render the per-batch rating prompt. Rationale is a short phrase."""
         grounding_block = (
             grounding.strip() if grounding else "(no literature grounding available)"
         )
         claim_lines = "\n".join(
             f"- id={c.get('id')!r}  source={c.get('source', 'unknown')}  "
             f"desc={str(c.get('description', '')).strip()[:300]}"
-            for c in claims
+            for c in batch
         )
         return f"""You are rating verification claims by how much they matter for the user's goal.
 
@@ -690,20 +809,19 @@ LITERATURE GROUNDING:
 CLAIMS TO RATE:
 {claim_lines}
 
-TASKS:
-1. Identify near-duplicate claims (same checked property, different wording or
-   source) and list the redundant ids to drop. Keep the clearest version of
-   each cluster. Do NOT drop claims that check different facets — only true
-   duplicates.
-2. For every surviving claim, return an integer importance 1–10 anchored on
-   the scale above (goal-alignment dominates), plus a one-sentence rationale
-   stating what makes the claim that important.
+TASK:
+For every claim listed above, return an integer importance 1–10 anchored on
+the scale (goal-alignment dominates). For each claim also give a TERSE
+rationale: a short phrase, MAX 8 words / 60 characters, no full sentence,
+no punctuation at the end. Examples of acceptable rationales:
+  "literal deliverable; named in goal"
+  "sanity property; prevents silent corruption"
+  "style hygiene; advisory only"
 
 Return STRICT JSON only, in this exact shape:
 {{
-  "drop_ids": ["<id>", ...],
   "importance": [
-    {{"id": "<id>", "importance": <int 1-10>, "rationale": "<one sentence>"}},
+    {{"id": "<id>", "importance": <int 1-10>, "rationale": "<≤8 words>"}},
     ...
   ]
 }}
@@ -772,7 +890,11 @@ if __name__ == "__main__":
         "_build_source_e_prompt",
         "_parse_and_filter_claims",
         "_declare_claim_importance",
-        "_build_importance_prompt",
+        "_run_dedup_pass",
+        "_rate_importance_parallel",
+        "_rate_one_importance_batch",
+        "_build_dedup_prompt",
+        "_build_importance_batch_prompt",
         "_extract_drop_ids",
         "_extract_importance_map",
         "_with_default_importance",
