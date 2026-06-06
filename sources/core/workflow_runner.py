@@ -53,7 +53,14 @@ class RuntimeConfig:
     """Configuration controlling how the workflow runner spawns Python.
 
     Attributes:
-        python_version: Target Python version string (e.g. ``"3.12"``).
+        python_version: Target Python version string (e.g. ``"3.12"``). Used
+            to resolve an interpreter from ``PATH`` when ``python_executable``
+            is not set.
+        python_executable: Explicit path to a Python interpreter (e.g.
+            ``sys.executable``). When provided it overrides ``python_version``
+            entirely: the runner uses this exact interpreter and skips the
+            ``PATH``-based version resolution, so it never depends on a
+            matching ``pythonX.Y`` being installed on ``PATH``.
         timeout: Maximum execution time per command, in seconds.
         max_memory_mb: Soft memory cap, in megabytes (advisory).
         max_cpu_percent: Soft CPU cap, as a percentage (advisory).
@@ -68,6 +75,8 @@ class RuntimeConfig:
     """
 
     python_version: str = "3.12"
+    # Explicit interpreter path; when set, overrides python_version resolution.
+    python_executable: str | None = None
     timeout: int = 1800
     max_memory_mb: int = 1024
     max_cpu_percent: int = 100
@@ -120,13 +129,24 @@ class WorkflowRunner:
         # Convert temp_dir to absolute path to ensure it's created in the right location
         self.config.temp_dir = os.path.abspath(self.config.temp_dir)
         os.makedirs(self.config.temp_dir, exist_ok=True)
-        # Validate python version availability and resolve the executable
+        # Validate python availability and resolve the executable
         if not self._check_python_version():
-            raise RuntimeError(f"Python {self.config.python_version} not available")
+            target = (
+                self.config.python_executable
+                or f"Python {self.config.python_version}"
+            )
+            raise RuntimeError(f"{target} not available")
 
     def _resolve_python_executable(self) -> list[str] | None:
         """
         Find a working Python executable for the configured version.
+
+        When ``config.python_executable`` is set, it short-circuits this
+        resolution: the caller has deliberately chosen an interpreter (e.g.
+        ``sys.executable``, where verifier helper packages were installed), so
+        it is used directly after a ``--version`` smoke check, bypassing the
+        ``PATH``/version search entirely. This is what lets verifiers run on a
+        host that has no ``pythonX.Y`` matching ``python_version`` on ``PATH``.
 
         Versioned candidates are always tried first and accepted as-is because
         they target the exact version by construction:
@@ -143,6 +163,21 @@ class WorkflowRunner:
         """
         import subprocess
         import sys
+
+        # An explicit interpreter path overrides version-based PATH resolution.
+        explicit = self.config.python_executable
+        if explicit:
+            try:
+                result = subprocess.run(
+                    [explicit, "--version"],
+                    capture_output=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    return [explicit]
+            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                pass
+            return None
 
         version = self.config.python_version  # e.g. "3.10"
 

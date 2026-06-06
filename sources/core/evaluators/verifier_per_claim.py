@@ -648,17 +648,21 @@ Return STRICT JSON only, in one of these two shapes:
         """
         scratch = self._runner_temp_root / uuid
         scratch.mkdir(parents=True, exist_ok=True)
+        # Run verifiers under the exact interpreter running Mimosa: that is
+        # where the verifier helper packages were installed, and it avoids
+        # depending on a system pythonX.Y being on PATH. Passing this via the
+        # config (rather than overriding runner._python_cmd after construction)
+        # ensures WorkflowRunner's construction-time availability check uses
+        # this interpreter too, instead of failing when no matching
+        # python_version is found on PATH.
         runner_config = RuntimeConfig(
+            python_executable=sys.executable,
             timeout=self.verifier_timeout,
             temp_dir=scratch,
             requirements_file=None,
             use_pty=False,
         )
         runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
-        # Use the Python that's running Mimosa, not the system python3.12 the
-        # runner's resolver picks: that interpreter is where the verifier
-        # helper packages were installed.
-        runner._python_cmd = [sys.executable]
         execution_id = f"verify_{claim_id}"
         thread_timeout = self.verifier_timeout + 10
         result = None
