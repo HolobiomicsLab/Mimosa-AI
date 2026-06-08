@@ -242,6 +242,8 @@ class _VerifierClaimExtractionMixin:
         """
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
         return f"""You are extracting  claims for a verification rubric: requirements the peer-reviewed literature places on any correct solution to this task, independent of what the agents actually did.
+GOAL:
+{goal}
 
 LITERATURE GROUNDING:
 {grounding_block}
@@ -261,6 +263,8 @@ correct solution:
 - Required constraints / sanity properties standard in the field
   (e.g. "probabilities sum to 1", "the contact matrix is symmetric",
   "the conformation is a valid self-avoiding walk").
+- Do not extract claims that conflict with the goal requirements or aren't possible per goal requirements
+  (e.g. if the goal explicitly relaxes a standard or dataset preview imply that a method cann't be used, don't extract claims that would require it.)
 
 MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
 produced the specific scientific deliverable the task requested AND that
