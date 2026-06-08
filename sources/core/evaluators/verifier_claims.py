@@ -75,10 +75,14 @@ Return STRICT JSON only, no prose, in this exact form:
 # tokens and tend to confuse small judges.
 _IMPORTANCE_ANCHOR_BLOCK = """Importance scale (1–10), anchored:
 - 10: literal deliverable named in the goal (the exact file, the headline metric).
--  8: required methodology step without which the result is invalid.
+-  9: essential methodology step named in the goal (the exact model, the exact dataset, the exact tool).
+-  8: required methodology step from literature without which the result is invalid.
+-  7: required output property from literature without which the result is invalid.
 -  6: non-negotiable sanity property (probabilities in [0,1], no NaN, train/test disjoint).
+-  5: non-negotiable computational-reproducibility requirement (requirements.txt, pinned dependencies).
 -  4: literature-recommended best practice (seeded RNG, pinned dependencies).
--  2: minor / advisory (entrypoint name, workspace clutter).
+-  2: minor / advisory (workspace clutter).
+-  1: nice-to-have but not expected (a README, docstrings, tests, type hints).
 Use the FULL scale; do not collapse to 5–7 by default. Goal-alignment dominates."""
 
 
@@ -761,13 +765,6 @@ on-disk artefacts can actually support.
             for c in claims
         )
         return f"""You are pruning near-duplicate verification claims.
-
-WORKFLOW GOAL:
-{goal}
-
-LITERATURE GROUNDING:
-{grounding_block}
-
 CLAIMS:
 {claim_lines}
 
@@ -776,6 +773,8 @@ Identify near-duplicate claims (same checked property, different wording or
 source). Return the redundant ids to drop. Keep the clearest version of each
 cluster. Do NOT drop claims that check different facets — only true duplicates.
 If nothing is duplicated, return an empty list.
+Also remove any claim that's only about the sources dataset files. (eg: the file data/train.csv has duplicate rows)
+Do not remove claims about the output artefacts, even if they mention input files, as long as they check a property of the output (eg: the output predictions.csv has duplicate rows)
 
 Return STRICT JSON only, in this exact shape:
 {{"drop_ids": ["<id>", ...]}}

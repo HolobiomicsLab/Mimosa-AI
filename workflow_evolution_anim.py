@@ -74,7 +74,7 @@ STAGE_COLORS = {
     "workflow_creator": VIOLET,
     "task_builder": INFO,
     "task_grounded_validator": SUCCESS,
-    "verifier_abstract_prompt_gradient": AMBER,
+    "verifier_abstract_textual_gradient": AMBER,
 }
 
 EVO_COLORS = {

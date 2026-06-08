@@ -38,7 +38,7 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/mlegrand/Desktop/Deniz/tools/Toolomics-main/workspace_dert"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-pro"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
+        self.smolagent_model_id: str = "openrouter/mistralai/mistral-large-2407"
+        self.judge_model = "openrouter/qwen/qwen3.7-max"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
@@ -303,20 +303,44 @@ class Config:
 
     def __str__(self) -> str:
         """String representation of the configuration."""
-        return (
-            f"Config(workflow_dir={self.workflow_dir},\n"
-            f"schema_code_path={self.schema_code_path},\n"
-            f"smolagent_factory_code_path={self.smolagent_factory_code_path},\n"
-            f"prompt_workflow_creator={self.prompt_workflow_creator}\n"
-            f"workflow_llm_model={self.workflow_llm_model},\n"
-            f"reasoning_effort={self.reasoning_effort},\n"
-            f"runner_default_python_version={self.runner_default_python_version},\n"
-            f"runner_default_timeout={self.runner_default_timeout},\n"
-            f"agent_execution_timeout={self.agent_execution_timeout},\n"
-            f"runner_default_max_memory_mb={self.runner_default_max_memory_mb},\n"
-            f"runner_default_max_cpu_percent={self.runner_default_max_cpu_percent},\n"
-            f"runner_temp_dir={self.runner_temp_dir})\n"
-        )
+        lines = ["Config("]
+        lines.append(f"  workspace_dir={self.workspace_dir}")
+        lines.append(f"  discovery_addresses={self.discovery_addresses}")
+        lines.append(f"  planner_llm_model={self.planner_llm_model}")
+        lines.append(f"  workflow_llm_model={self.workflow_llm_model}")
+        lines.append(f"  smolagent_model_id={self.smolagent_model_id}")
+        lines.append(f"  judge_model={self.judge_model}")
+        lines.append(f"  capsule_namer_model={self.capsule_namer_model}")
+        lines.append(f"  engine_name={self.engine_name}")
+        lines.append(f"  prompt_planner={self.prompt_planner}")
+        lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")
+        lines.append(f"  prompt_smolagent={self.prompt_smolagent}")
+        lines.append(f"  reasoning_effort={self.reasoning_effort}")
+        lines.append(f"  max_tokens={self.max_tokens}")
+        lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
+        lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
+        lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
+        lines.append(f"  schema_code_path={self.schema_code_path}")
+        lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")
+        lines.append(f"  runs_capsule_dir={self.runs_capsule_dir}")
+        lines.append(f"  workflow_dir={self.workflow_dir}")
+        lines.append(f"  memory_dir={self.memory_dir}")
+        lines.append(f"  reuse_lineage_rubric={self.reuse_lineage_rubric}")
+        lines.append(f"  openrouter_provider={self.openrouter_provider}")
+        lines.append(f"  openrouter_provider_by_model={self.openrouter_provider_by_model}")
+        lines.append(f"  openrouter_quantizations_by_model={self.openrouter_quantizations_by_model}")
+        lines.append(f"  default_openrouter_quantizations={self.default_openrouter_quantizations}")
+        lines.append(f"  runner_default_python_version={self.runner_default_python_version}")
+        lines.append(f"  runner_default_timeout={self.runner_default_timeout}")
+        lines.append(f"  agent_execution_timeout={self.agent_execution_timeout}")
+        lines.append(f"  runner_default_max_memory_mb={self.runner_default_max_memory_mb}")
+        lines.append(f"  runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}")
+        lines.append(f"  runner_temp_dir={self.runner_temp_dir}")
+        lines.append(f"  runner_requirements={self.runner_requirements}")
+        lines.append(f"  pushover_token={'***' if self.pushover_token else None}")
+        lines.append(f"  pushover_user={'***' if self.pushover_user else None}")
+        lines.append(")")
+        return "\n".join(lines)
 
 if __name__ == "__main__":
     config = Config()

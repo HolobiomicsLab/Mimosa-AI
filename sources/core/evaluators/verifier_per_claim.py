@@ -401,6 +401,7 @@ defensibility of a conclusion), set "executable": false and explain briefly.
 Don't forget to include the library you need such as json, numpy, etc..
 You can use library from the standard library and the available imports.
 AVAILABLE IMPORTS: {packages}
+Do not use any other imports, as the verifier will fail to run.
 
 Return STRICT JSON only, in one of these two shapes:
   {{"executable": true,  "code": "<full python script as one string>"}}
@@ -812,9 +813,6 @@ executable in code; please judge it against the concrete context below.
 
 WORKSPACE FILES:
 {workspace_listing}
-
-RELEVANT FILE PREVIEWS:
-{relevant_previews}
 
 LITERATURE GROUNDING (peer-reviewed evidence relevant to this task):
 {grounding_block}

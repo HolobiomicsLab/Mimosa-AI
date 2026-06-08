@@ -11,17 +11,17 @@ sys.path.append(str(Path(__file__).parent.parent))
 from sources.core.variation_engine import VariationEngine
 
 
-def test_prompt_gradient_similarity_bounds_and_identity():
+def test_textual_gradient_similarity_bounds_and_identity():
     ve = VariationEngine()
-    sim_same = ve._prompt_gradient_similarity("foo bar baz", "foo bar baz")
+    sim_same = ve._textual_gradient_similarity("foo bar baz", "foo bar baz")
     assert 0.99 <= sim_same <= 1.0 + 1e-6
-    assert ve._prompt_gradient_similarity("", "anything") == 0.0
-    assert ve._prompt_gradient_similarity("foo", "") == 0.0
-    assert ve._prompt_gradient_similarity("", "") == 0.0
+    assert ve._textual_gradient_similarity("", "anything") == 0.0
+    assert ve._textual_gradient_similarity("foo", "") == 0.0
+    assert ve._textual_gradient_similarity("", "") == 0.0
 
 
 def _stub_similarity(ve: VariationEngine, fn) -> None:
-    ve._prompt_gradient_similarity = fn.__get__(ve, type(ve))  # type: ignore[attr-defined]
+    ve._textual_gradient_similarity = fn.__get__(ve, type(ve))  # type: ignore[attr-defined]
 
 
 def test_stagnation_empty_history_is_zero():
@@ -73,7 +73,7 @@ def test_failure_entries_persist_in_history_for_audit():
     ve = VariationEngine()
     ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("real diag")
-    assert ve.prompt_gradient_history == [("crash", True), ("real diag", False)]
+    assert ve.textual_gradient_history == [("crash", True), ("real diag", False)]
 
 
 def test_step_size_damped_when_recent_offspring_improve():
@@ -174,10 +174,10 @@ def test_mutation_prompt_does_not_touch_gradient_history():
 
     class _FakeWfInfo:
         overall_score = 0.5
-        abstracted_prompt_gradient = "FAKE_DIAG_should_not_be_recorded"
+        abstracted_textual_gradient = "FAKE_DIAG_should_not_be_recorded"
         state_result = None
 
-    before = len(ve.prompt_gradient_history)
+    before = len(ve.textual_gradient_history)
     ve.mutation_prompt(
         goal="g",
         wf_info=_FakeWfInfo(),
@@ -186,7 +186,7 @@ def test_mutation_prompt_does_not_touch_gradient_history():
         iteration_count=0,
         max_iterations=10,
     )
-    assert len(ve.prompt_gradient_history) == before
+    assert len(ve.textual_gradient_history) == before
 
 
 if __name__ == "__main__":

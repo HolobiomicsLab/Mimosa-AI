@@ -183,6 +183,7 @@ class VerifierEvaluator(
             Example: error regarding module X reported fixed and verification confirm proper behavior regarding module X).
         - Claim programs that crashed (tracebacks, NameError, serialization errors) are verifier
           measurement failures. Do not report them.
+        - Sort diagnosis by importance: a failure in a high-importance claim is more actionable than a failure in a low-importance claim.
 
         Here is the agents execution text (agent narration and produced output):
         {execution_text}
@@ -190,7 +191,6 @@ class VerifierEvaluator(
         {report}
         OUTPUT:
         Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 25 lines of diagnosis)"
-        Warning: Do not surface failures that would require modifying provided inputs (e.g. files under `data/`). Surface the next most critical fixable issue instead.
         Example:
         FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """
@@ -300,13 +300,7 @@ class VerifierEvaluator(
             self._save_results(scores, uuid, "verifier")
             return {"uuid": uuid, "claims": [], **scores}
 
-        t = time.time()
         self._ensure_verifier_packages()
-        phase_timings.append(("ensure verifier packages", time.time() - t))
-        print_ok(
-            f"[verifier {uuid}] ensure_verifier_packages done in "
-            f"{phase_timings[-1][1]:.1f}s"
-        )
 
         anchored_specs = {
             c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
@@ -316,8 +310,6 @@ class VerifierEvaluator(
 
         # Pre-resolve specs: anchor-cache hits are O(disk read) each, but every
         # other claim costs two judge round-trips (file selection + spec gen).
-        # Fan those out via threads so the per-claim loop only pays for the
-        # sandbox execution, not for serial LLM latency.
         anchor_preloaded: dict[str, dict[str, Any]] = {}
         needs_generation: list[dict[str, Any]] = []
         for claim in claims_to_verify:
