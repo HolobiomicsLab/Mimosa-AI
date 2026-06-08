@@ -103,7 +103,7 @@ class VariationEngine:
         emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
         return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
-    def _compute_stagnation(self, window: int = 4) -> float:
+    def _compute_stagnation(self, window: int = 10) -> float:
         """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1].
 
         Args:
@@ -236,11 +236,46 @@ class VariationEngine:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
         bands = [
-            (0.30, "prompt-only tweak, fixing agent behaviour, try to tweak instructions and wording to put it on the right manifold"),
-            (0.45, "prompt, handoff information and tool change - improve the information flow"),
-            (0.65, "topology, prompts, handoff format, tools — significant redesign while keeping topology"),
-            (0.85, "bold rewire — restructure or grow the agent set"),
-            (1.01, "complete rethink — discard inherited topology/prompts and innovate freely"),
+            (
+                0.35,
+                "EXPLOITATION (Point Mutation):\n"
+                "- Objective: Micro-tune the current high-performing lineage.\n"
+                "- Scope: Modify only minor phrasing, system instructions, or prompt adjectives.\n"
+                "- Invariance: DO NOT alter the agent graph, agent roles, tool definitions, or handoff structures.\n"
+                "- Strategy: Keep 90% of the prompt identical. Optimize for nuance and alignment."
+            ),
+            (
+                0.50,
+                "ALIGNMENT (Interface Optimization):\n"
+                "- Objective: Smooth out execution friction and coordination errors between nodes.\n"
+                "- Scope: Update agent handoff prompts, context-passing schemas, or tool usage instructions.\n"
+                "- Invariance: Keep the macro-topology and core agent identities exactly as they are.\n"
+                "- Strategy: Focus heavily on clarifying the input/output boundaries and communication contracts between agents."
+            ),
+            (
+                0.65,
+                "ADAPTATION (Component Overhaul):\n"
+                "- Objective: Major behavioral adjustment to fix localized stagnation.\n"
+                "- Scope: Completely rewrite the system prompts of lagging or failing agents. Swap, add, or deprecate specific tools.\n"
+                "- Invariance: Maintain the structural routing/topology of the multi-agent graph.\n"
+                "- Strategy: Retain the overall workflow architecture, but radically re-engineer how individual nodes think and execute."
+            ),
+            (
+                0.90,
+                "EXPLORATION (Macro Structural Mutation):\n"
+                "- Objective: Break out of a severe local minimum or chronic structural failure.\n"
+                "- Scope: Mutate the graph topology. Add a new specialized agent, merge two redundant agents, or change the routing logic.\n"
+                "- Invariance: Keep the fundamental task goal, but completely change the operational workflow.\n"
+                "- Strategy: Restructure the cognitive pipeline. Introduce parallel processing, voting consensus, or multi-step validation loops."
+            ),
+            (
+                1.01,
+                "RE-SPECIATION (Systemic Paradigm Shift):\n"
+                "- Objective: The current evolutionary branch is a dead end. Escape entirely.\n"
+                "- Scope: Clean-slate redesign of the multi-agent architecture.\n"
+                "- Invariance: None. Only the core task description and learned constraints/task specifications remain constant.\n"
+                "- Strategy: Rethink the entire approach. If it was a sequential pipeline, turn it into an autonomous swarm. If it was highly fragmented, design a single ultra-dense prompt. Radical experimentation."
+            ),
         ]
         scope = next(label for threshold, label in bands if effective < threshold)
         self.last_variation_state = {
