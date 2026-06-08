@@ -512,7 +512,7 @@ class EvolutionEngine:
                 else float(wf_info.overall_score)
             )
             self.variation.record_offspring_gradient(
-                wf_info.abstracted_prompt_gradient,
+                wf_info.abstracted_textual_gradient,
                 is_failure=is_failure,
                 child_score=child_score,
                 best_before=best_before,

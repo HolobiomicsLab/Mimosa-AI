@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-05T09:26:40.015680",
+  "timestamp": "2026-06-06T18:10:55.445219",
   "pricing": {
     "nvidia/nemotron-3.5-content-safety:free": {
       "input": 0.0,
@@ -227,7 +227,7 @@
     },
     "google/gemma-4-31b-it": {
       "input": 0.12,
-      "output": 0.37
+      "output": 0.36
     },
     "qwen/qwen3.6-plus": {
       "input": 0.325,
@@ -773,10 +773,6 @@
       "input": 0.39999999999999997,
       "output": 2.0
     },
-    "baidu/ernie-4.5-vl-28b-a3b": {
-      "input": 0.14,
-      "output": 0.56
-    },
     "z-ai/glm-4.5v": {
       "input": 0.6,
       "output": 1.7999999999999998
@@ -948,10 +944,6 @@
     "google/gemini-2.5-pro-preview-05-06": {
       "input": 1.25,
       "output": 10.0
-    },
-    "arcee-ai/spotlight": {
-      "input": 0.18,
-      "output": 0.18
     },
     "arcee-ai/maestro-reasoning": {
       "input": 0.8999999999999999,
@@ -1297,14 +1289,6 @@
       "input": 0.65,
       "output": 0.65
     },
-    "sao10k/l3-euryale-70b": {
-      "input": 1.48,
-      "output": 1.48
-    },
-    "nousresearch/hermes-2-pro-llama-3-8b": {
-      "input": 0.14,
-      "output": 0.14
-    },
     "openai/gpt-4o-2024-05-13": {
       "input": 5.0,
       "output": 15.0
@@ -1314,8 +1298,8 @@
       "output": 10.0
     },
     "meta-llama/llama-3-8b-instruct": {
-      "input": 0.04,
-      "output": 0.04
+      "input": 0.14,
+      "output": 0.14
     },
     "meta-llama/llama-3-70b-instruct": {
       "input": 0.51,
@@ -1352,10 +1336,6 @@
     "openrouter/auto": {
       "input": -1000000.0,
       "output": -1000000.0
-    },
-    "openai/gpt-4-1106-preview": {
-      "input": 10.0,
-      "output": 30.0
     },
     "openai/gpt-3.5-turbo-instruct": {
       "input": 1.5,

@@ -27,17 +27,12 @@ class VariationEngine:
 
     def __init__(self) -> None:
         """Initialise empty history buffers and lazy embedder state."""
-        self.prompt_gradient_history: list[tuple[str, bool]] = []
-        # Per-offspring (child_score, best_before, is_failure) for the
-        # Rechenberg 1/5 success rule. ``None`` slots mark offspring whose
-        # scores were not supplied (back-compat path).
+        self.textual_gradient_history: list[tuple[str, bool]] = []
+        # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self._embedder: SentenceTransformer | None = None
-        # Last `_get_prompt_step_size` snapshot — consumed by
-        # evolution_engine to write variation_log.jsonl. Empty until the
-        # first mutation/crossover prompt has been assembled.
         self.last_variation_state: dict = {}
 
     def record_offspring_gradient(
@@ -64,7 +59,7 @@ class VariationEngine:
                 in the Rechenberg sense.
         """
         text = (gradient or "").strip() or "UNKNOWN_GRADIENT: No feedback captured."
-        self.prompt_gradient_history.append((text, bool(is_failure)))
+        self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
     def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
@@ -90,7 +85,7 @@ class VariationEngine:
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
-    def _prompt_gradient_similarity(self, a: str, b: str) -> float:
+    def _textual_gradient_similarity(self, a: str, b: str) -> float:
         """Cosine similarity over MiniLM-encoded diagnoses.
 
         Args:
@@ -118,12 +113,12 @@ class VariationEngine:
             Stagnation in ``[0, 1]``; ``0.0`` when fewer than two non-failure
             gradients are available.
         """
-        semantic = [g for g, is_failure in self.prompt_gradient_history if not is_failure]
+        semantic = [g for g, is_failure in self.textual_gradient_history if not is_failure]
         recent = semantic[-window:]
         if len(recent) < 2:
             return 0.0
         sims = [
-            self._prompt_gradient_similarity(recent[i], recent[j])
+            self._textual_gradient_similarity(recent[i], recent[j])
             for i in range(len(recent))
             for j in range(i + 1, len(recent))
         ]
@@ -172,7 +167,7 @@ class VariationEngine:
         Boldness is driven by two evidence signals, not by the parent's
         absolute score:
 
-        - ``raw_stagnation`` — cosine similarity of recent prompt gradients.
+        - ``raw_stagnation`` — cosine similarity of recent textual gradients.
           High → the search keeps diagnosing the same failure.
         - ``success_rate`` — fraction of recent offspring that beat the
           running best. Below the Rechenberg 1/5 threshold → step size is
@@ -241,10 +236,10 @@ class VariationEngine:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
         bands = [
-            (0.20, "prompt-only little tweak"),
-            (0.40, "prompt, handoff information and tool change - improve the information flow"),
-            (0.60, "topology, prompts, handoff format, tools — significant redesign while keeping topology"),
-            (0.80, "bold rewire — restructure or grow the agent set"),
+            (0.30, "prompt-only tweak, fixing agent behaviour, try to tweak instructions and wording to put it on the right manifold"),
+            (0.45, "prompt, handoff information and tool change - improve the information flow"),
+            (0.65, "topology, prompts, handoff format, tools — significant redesign while keeping topology"),
+            (0.85, "bold rewire — restructure or grow the agent set"),
             (1.01, "complete rethink — discard inherited topology/prompts and innovate freely"),
         ]
         scope = next(label for threshold, label in bands if effective < threshold)
@@ -292,19 +287,20 @@ class VariationEngine:
             One of a curated set of human-readable topology descriptions used
             to seed initial workflow generations.
         """
+
         return np.random.choice([
-            "simple linear chain",
-            "hub-and-spoke with 3-4 agents",
-            "fully connected mesh",
             "single-agent",
-            "debate (two+ agents argue, judge decides)",
-            "reflection pair (actor + critic loop)",
-            "blackboard (shared debate scratchpad, no direct messaging)",
-            "map-reduce (fan-out subtasks, aggregator merges)",
+            "simple linear chain",
             "sequential pipeline (output of one is input to next)",
-            "round-robin group chat (shared conversation thread)",
-            "mixture-of-experts (router picks expert per step)",
-            "verifier-generator (generator proposes, verifier gates)"
+            "reflection pair (actor → critic loop, fixed iterations)",
+            "debate with fixed turns (proposer → opponent → judge, no adaptation)",
+            "relay race (agent A → B → C → D, fixed handoff)",
+            "assembly line (specialized stations in fixed order)",
+            "ping-pong (two agents, fixed alternation)",
+            "cascading refinement (draft → edit → polish → finalize)",
+            "waterfall (analysis → design → implementation → review, no backtracking)",
+            "serial verification (generator → verifier → generator → verifier, fixed rounds)",
+            "staged gate (must pass checkpoint before next stage, fixed sequence)"
         ])
 
     def seed_genome_prompt(self, goal: str) -> str:
@@ -355,15 +351,15 @@ class VariationEngine:
             The fully assembled mutation prompt string.
         """
         score      = wf_info.overall_score        if wf_info else 0.0
-        prompt_gradient  = wf_info.abstracted_prompt_gradient if wf_info else ""
+        textual_gradient  = wf_info.abstracted_textual_gradient if wf_info else ""
         wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Execution evidence ───────────────────────────────────────────────
         agent_answers = self._extract_agent_answers(wf_state)
         fail_msg = "FAILURE:Last run likely failed with no feedback captured. Focus on fixing syntax errors or langraph patterns."
-        prompt_gradient_block = (
-            prompt_gradient.strip()
-            if prompt_gradient and prompt_gradient.strip()
+        textual_gradient_block = (
+            textual_gradient.strip()
+            if textual_gradient and textual_gradient.strip()
             else (run_stderr or fail_msg).strip()
             or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
         ).replace('_', ' ')[:2048]
@@ -388,7 +384,7 @@ class VariationEngine:
                 #"</agents_answers>",
                 "<diagnosis>",
                 "",
-                prompt_gradient_block,
+                textual_gradient_block,
                 "</diagnosis>",
                 "<boldness>",
                 step_block,
@@ -434,16 +430,16 @@ class VariationEngine:
             zip(wf_infos, genotypes, run_stderrs)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
-            prompt_gradient = wf_info.abstracted_prompt_gradient if wf_info else ""
-            # Layer 1: rubric-blind prompt_gradient instead of raw judge log.
-            # Fall back to stderr tail only when no prompt_gradient exists.
-            prompt_gradient = prompt_gradient.strip() or (stderr or "").strip()[-1024:]
+            textual_gradient = wf_info.abstracted_textual_gradient if wf_info else ""
+            # Layer 1: rubric-blind textual_gradient instead of raw judge log.
+            # Fall back to stderr tail only when no textual_gradient exists.
+            textual_gradient = textual_gradient.strip() or (stderr or "").strip()[-1024:]
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
                 "index":     i + 1,
                 "score":     score,
                 "code":      genotype,
-                "prompt_gradient": prompt_gradient,
+                "textual_gradient": textual_gradient,
                 "answers":   answers,
             })
 

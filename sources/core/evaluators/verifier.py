@@ -1,7 +1,7 @@
 """Per-claim verifier-based workflow evaluator (orchestrator).
 
 This module owns the public ``VerifierEvaluator`` class and the pipeline that
-turns a workflow run into a numeric score plus a prompt gradient. The
+turns a workflow run into a numeric score plus a textual gradient. The
 mechanical steps — extracting claims, generating and running per-claim
 scripts, listing the workspace, rendering file previews — live in sibling
 modules and are mixed in:
@@ -151,13 +151,13 @@ class VerifierEvaluator(
             f"use_grounding={use_grounding}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
-        self._prompt_gradient_history: list[str] = []
+        self._textual_gradient_history: list[str] = []
 
     # ------------------------------------------------------------------
-    # Prompt gradient — only signal returned to the mutator
+    # textual gradient — only signal returned to the mutator
     # ------------------------------------------------------------------
 
-    def _build_abstractec_prompt_gradient(self, uuid: str, report: str, execution_text: str) -> str:
+    def _build_abstractec_textual_gradient(self, uuid: str, report: str, execution_text: str) -> str:
         """Residual signal passed to the orchestrator to avoid Goodhart's cheating.
 
         Args:
@@ -169,9 +169,9 @@ class VerifierEvaluator(
         Returns:
             Short code-tagged single-sentence diagnosis usable by the mutator.
         """
-        history = "\n".join(self._prompt_gradient_history[-5:])
+        history = "\n".join(self._textual_gradient_history[-5:])
         prompt = f"""
-        You convert the judge's report into few short, directional diagnosis that steers the
+        You convert the judge's report into per claim short, directional diagnosis that steers the
         next mutation.
 
         GROUND TRUTH AND TRUST ORDER (critical):
@@ -188,18 +188,18 @@ class VerifierEvaluator(
         {execution_text}
         Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
-        Make a short code name for the diagnosis followed by a a few short line for each issue that describe the behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
-        Format: "<diagnosis_CODE>:\n<- <short diagnosis error 1>\n<- <short diagnosis error 2>\n... (up to 5 lines of diagnosis)"
+        OUTPUT:
+        Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 25 lines of diagnosis)"
         Warning: Do not surface failures that would require modifying provided inputs (e.g. files under `data/`). Surface the next most critical fixable issue instead.
         Example:
         FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """
         diag = self._call_judge(
             uuid,
-            "verifier_abstract_prompt_gradient",
+            "verifier_abstract_textual_gradient",
             prompt,
         )
-        self._prompt_gradient_history.append(diag)
+        self._textual_gradient_history.append(diag)
         return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
@@ -383,16 +383,16 @@ class VerifierEvaluator(
             min_importance=self._GRADIENT_MIN_IMPORTANCE,
         )
         t = time.time()
-        prompt_gradient = self._build_abstractec_prompt_gradient(
+        textual_gradient = self._build_abstractec_textual_gradient(
             uuid, gradient_report, execution_text
         )
-        phase_timings.append(("prompt gradient builder", time.time() - t))
+        phase_timings.append(("textual gradient builder", time.time() - t))
         print_ok(
-            f"[verifier {uuid}] prompt gradient done in "
+            f"[verifier {uuid}] textual gradient done in "
             f"{phase_timings[-1][1]:.1f}s"
         )
-        scores["abstractec_prompt_gradient"] = prompt_gradient
-        self._persist_prompt_gradient(uuid, prompt_gradient)
+        scores["abstractec_textual_gradient"] = textual_gradient
+        self._persist_textual_gradient(uuid, textual_gradient)
 
         try:
             self._save_results(scores, uuid, "verifier")
@@ -565,14 +565,14 @@ class VerifierEvaluator(
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
-            "abstractec_prompt_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
+            "abstractec_textual_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
         }
         try:
             self._write_report(uuid, [], [], scores, cheat=None)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
-        self._persist_prompt_gradient(uuid, "")
+        self._persist_textual_gradient(uuid, "")
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -941,7 +941,7 @@ class VerifierEvaluator(
         return result
 
     # ------------------------------------------------------------------
-    # Cheat penalty + fallback prompt gradient
+    # Cheat penalty + fallback textual gradient
     #
     # These two methods are reserved for the cheat-detector rewrite (see the
     # ``cheat = None`` in ``evaluate`` and the ``_CHEAT_*`` constants at the
@@ -974,7 +974,7 @@ class VerifierEvaluator(
         return scores
 
     @staticmethod
-    def _fallback_prompt_gradient(
+    def _fallback_textual_gradient(
         scores: dict[str, Any], cheat: Any
     ) -> str:
         """Deterministic fallback when the abstractor LLM is unavailable.
@@ -1007,21 +1007,21 @@ class VerifierEvaluator(
             )
         return " ".join(bits)
 
-    def _persist_prompt_gradient(self, uuid: str, prompt_gradient: str) -> None:
-        """Write the prompt_gradient to ``prompt_gradient.txt`` alongside the report.
+    def _persist_textual_gradient(self, uuid: str, textual_gradient: str) -> None:
+        """Write the textual_gradient to ``textual_gradient.txt`` alongside the report.
 
         Args:
             uuid: Workflow identifier; selects the on-disk output folder.
-            prompt_gradient: Text to persist; empty strings are skipped.
+            textual_gradient: Text to persist; empty strings are skipped.
         """
-        if not prompt_gradient:
+        if not textual_gradient:
             return
-        path = self.workflow_dir / uuid / "prompt_gradient.txt"
+        path = self.workflow_dir / uuid / "textual_gradient.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            path.write_text(prompt_gradient, encoding="utf-8")
+            path.write_text(textual_gradient, encoding="utf-8")
         except OSError as e:
-            self.logger.warning(f"could not write prompt_gradient.txt for {uuid}: {e}")
+            self.logger.warning(f"could not write textual_gradient.txt for {uuid}: {e}")
 
     # ------------------------------------------------------------------
     # Report rendering + persistence
