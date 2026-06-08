@@ -453,9 +453,9 @@ class VariationEngine:
                 "<python>",
                 p["code"] or "(construction failed)",
                 "</python>",
-                "<agents_answers>",
-                p["answers"],
-                "</agents_answers>"
+                "<error_diagnosis>",
+                p["textual_gradient"],
+                "</error_diagnosis>"
             ]))
 
         return "\n".join([
