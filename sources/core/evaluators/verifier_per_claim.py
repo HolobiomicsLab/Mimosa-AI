@@ -47,7 +47,8 @@ _VERIFIER_BASE_PACKAGES: tuple[str, ...] = (
     "pydantic",
     "pandera",
     "jsonschema",
-    "sympy"
+    "sympy",
+    "openpyxl"
 )
 
 # Python module names corresponding to ``_VERIFIER_BASE_PACKAGES``
