@@ -123,7 +123,7 @@ class WorkflowInfo:
         """Cached overall (post-cap) workflow score."""
         if self._overall_score is None:
             self._overall_score = self.calculate_overall_score()
-        return self._overall_score
+        return self._overall_score or 0.0
 
     @property
     def overall_score_uncapped(self) -> float:
