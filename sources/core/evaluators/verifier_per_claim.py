@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypeVar
@@ -137,8 +138,11 @@ class _VerifierPerClaimMixin:
                 verifier-generation LLM call are skipped.
 
         Returns:
-            Scored claim dict including verifier spec, status and score.
+            Scored claim dict including verifier spec, status, score, and the
+            ``elapsed_s`` wall-clock spent in this call (used by the
+            orchestrator to render a per-claim timing table).
         """
+        t_start = time.time()
         if preloaded_spec is None:
             rel_files = self._llm_select_files(
                 uuid, claim, execution_text, workspace_listing
@@ -200,12 +204,14 @@ class _VerifierPerClaimMixin:
 
         scored["claim"] = claim
         scored["spec"] = spec
+        scored["elapsed_s"] = round(time.time() - t_start, 3)
 
         final = (
             f"id:     {claim.get('id')}\n"
             f"kind:   {scored.get('verifier_kind')}\n"
             f"status: {scored.get('status')}\n"
-            f"score:  {scored.get('score')}"
+            f"score:  {scored.get('score')}\n"
+            f"elapsed:{scored['elapsed_s']}s"
         )
         print_box(
             final,
@@ -395,6 +401,7 @@ defensibility of a conclusion), set "executable": false and explain briefly.
 Don't forget to include the library you need such as json, numpy, etc..
 You can use library from the standard library and the available imports.
 AVAILABLE IMPORTS: {packages}
+Do not use any other imports, as the verifier will fail to run.
 
 Return STRICT JSON only, in one of these two shapes:
   {{"executable": true,  "code": "<full python script as one string>"}}
@@ -642,17 +649,21 @@ Return STRICT JSON only, in one of these two shapes:
         """
         scratch = self._runner_temp_root / uuid
         scratch.mkdir(parents=True, exist_ok=True)
+        # Run verifiers under the exact interpreter running Mimosa: that is
+        # where the verifier helper packages were installed, and it avoids
+        # depending on a system pythonX.Y being on PATH. Passing this via the
+        # config (rather than overriding runner._python_cmd after construction)
+        # ensures WorkflowRunner's construction-time availability check uses
+        # this interpreter too, instead of failing when no matching
+        # python_version is found on PATH.
         runner_config = RuntimeConfig(
+            python_executable=sys.executable,
             timeout=self.verifier_timeout,
             temp_dir=scratch,
             requirements_file=None,
             use_pty=False,
         )
         runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
-        # Use the Python that's running Mimosa, not the system python3.12 the
-        # runner's resolver picks: that interpreter is where the verifier
-        # helper packages were installed.
-        runner._python_cmd = [sys.executable]
         execution_id = f"verify_{claim_id}"
         thread_timeout = self.verifier_timeout + 10
         result = None
@@ -802,9 +813,6 @@ executable in code; please judge it against the concrete context below.
 
 WORKSPACE FILES:
 {workspace_listing}
-
-RELEVANT FILE PREVIEWS:
-{relevant_previews}
 
 LITERATURE GROUNDING (peer-reviewed evidence relevant to this task):
 {grounding_block}

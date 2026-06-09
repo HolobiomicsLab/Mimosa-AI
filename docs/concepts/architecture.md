@@ -41,13 +41,16 @@ recursively evolves workflows, with help from:
 - **WorkflowSelector** — picks parents from the live archive or, on a cold
   start, from previous runs on disk (filtered by task-text cosine similarity).
 - **SelectionPressure** — Quality-Diversity archive (`population_size=50`,
-  `k=25`, `novelty_weight=0.4`). Admission is gated by the validity check
+  `k=15`, `novelty_weight=0.25`). Admission is gated by the validity check
   (improvement over baseline or `qd_score > admit_threshold`); capacity is
   curated by lowest-`qd_score` eviction.
-- **VariationEngine** — assembles mutation or crossover prompts, with a
-  stagnation-driven mutation scope: boldness grows as recent prompt
-  gradients converge (the offspring keep failing the same way) and is
-  damped by the parent's score so near-winners stay protected.
+- **VariationEngine** — assembles mutation or crossover prompts, with an
+  evidence-driven mutation scope: boldness grows as recent prompt
+  gradients converge (the offspring keep failing the same way) *and* as
+  the Rechenberg 1/5 success rate of recent scored offspring drops
+  below 20 %. A near-finish floor only damps boldness once the parent
+  score is above 0.95, so near-winners aren't gambled away one
+  generation before early-stop.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
   callable per generation.
 

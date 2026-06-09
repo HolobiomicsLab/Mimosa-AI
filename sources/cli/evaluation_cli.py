@@ -210,8 +210,8 @@ class EvaluationCLI:
     # ------------------------------------------------------------------
 
     def _choose_agent_model(self, run_config: Config) -> None:
-        _info("workflow_llm_model is fixed to anthropic/claude-opus-4-5 for evaluations.")
-        run_config.workflow_llm_model = "anthropic/claude-opus-4-5"
+        _info("workflow_llm_model is fixed to openrouter/z-ai/glm-5.1 for evaluations.")
+        run_config.workflow_llm_model = "openrouter/z-ai/glm-5.1"
 
         available: list[tuple[str, str]] = [
             (label, model_id)
@@ -634,6 +634,7 @@ class EvaluationCLI:
             "run_id": spec.run_id,
             "smolagent_model_id": spec.config.smolagent_model_id,
             "workflow_llm_model": spec.config.workflow_llm_model,
+            "judge_model": spec.config.judge_model,
             "eval_mode": spec.eval_mode,
             "csv_runs_limit": spec.csv_runs_limit,
             "discovery_addresses": [

@@ -1,7 +1,7 @@
 """Per-claim verifier-based workflow evaluator (orchestrator).
 
 This module owns the public ``VerifierEvaluator`` class and the pipeline that
-turns a workflow run into a numeric score plus a prompt gradient. The
+turns a workflow run into a numeric score plus a textual gradient. The
 mechanical steps — extracting claims, generating and running per-claim
 scripts, listing the workspace, rendering file previews — live in sibling
 modules and are mixed in:
@@ -22,12 +22,15 @@ descendants score against an ancestor's claim set for stable QD ranking.
 import json
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 from sources.cli.pretty_print import (
+    CYAN,
     RED,
     print_box,
+    print_ok,
 )
 
 from .base import (
@@ -45,6 +48,11 @@ _VERIFIER_MAX_CLAIMS = 90
 _VERIFIER_MIN_CLAIMS = 30
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 _VERIFIER_GEN_PARALLELISM = 16
+# Per-claim verifier execution fan-out. Capped low because executable verifier
+# scripts can be CPU-bound (numpy/pandas on full artefacts); higher concurrency
+# starves rather than helps. Threading is enough because the slow path is
+# subprocess I/O via WorkflowRunner.
+_VERIFIER_EXEC_PARALLELISM = 4
 
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
 _INFO_BONUS_ALPHA = 0.05
@@ -89,6 +97,7 @@ class VerifierEvaluator(
         info_bonus_beta: float = _INFO_BONUS_BETA,
         use_cheat_detector: bool = True,
         gen_parallelism: int = _VERIFIER_GEN_PARALLELISM,
+        exec_parallelism: int = _VERIFIER_EXEC_PARALLELISM,
     ) -> None:
         """Initialise the evaluator; ``workspace_dir`` defaults to ``config.workspace_dir``.
 
@@ -107,6 +116,8 @@ class VerifierEvaluator(
             info_bonus_beta: Saturation rate of the information bonus.
             use_cheat_detector: Reserved; cheat detector currently disabled.
             gen_parallelism: Max concurrent LLM calls for verifier generation.
+            exec_parallelism: Max concurrent claim verifications (executable
+                sandbox runs and soft-LLM checks share this pool).
         """
         super().__init__(config)
         self.workspace_dir = Path(
@@ -126,6 +137,7 @@ class VerifierEvaluator(
         self.info_bonus_beta = max(1e-6, info_bonus_beta)
         self.use_cheat_detector = use_cheat_detector
         self.gen_parallelism = max(1, int(gen_parallelism))
+        self.exec_parallelism = max(1, int(exec_parallelism))
         self._preview_cache: dict[str, str] = {}
         self._workspace_files: set[str] = set()
         self._grounding_cache: dict[str, str] = {}
@@ -139,13 +151,13 @@ class VerifierEvaluator(
             f"use_grounding={use_grounding}, "
             f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
         )
-        self._prompt_gradient_history: list[str] = []
+        self._textual_gradient_history: list[str] = []
 
     # ------------------------------------------------------------------
-    # Prompt gradient — only signal returned to the mutator
+    # textual gradient — only signal returned to the mutator
     # ------------------------------------------------------------------
 
-    def _build_abstractec_prompt_gradient(self, uuid: str, report: str, execution_text: str) -> str:
+    def _build_abstractec_textual_gradient(self, uuid: str, report: str, execution_text: str) -> str:
         """Residual signal passed to the orchestrator to avoid Goodhart's cheating.
 
         Args:
@@ -157,9 +169,9 @@ class VerifierEvaluator(
         Returns:
             Short code-tagged single-sentence diagnosis usable by the mutator.
         """
-        history = "\n".join(self._prompt_gradient_history[-5:])
+        history = "\n".join(self._textual_gradient_history[-5:])
         prompt = f"""
-        You convert the judge's report into few short, directional diagnosis that steers the
+        You convert the judge's report into per claim short, directional diagnosis that steers the
         next mutation.
 
         GROUND TRUTH AND TRUST ORDER (critical):
@@ -171,23 +183,23 @@ class VerifierEvaluator(
             Example: error regarding module X reported fixed and verification confirm proper behavior regarding module X).
         - Claim programs that crashed (tracebacks, NameError, serialization errors) are verifier
           measurement failures. Do not report them.
+        - Sort diagnosis by importance: a failure in a high-importance claim is more actionable than a failure in a low-importance claim.
 
         Here is the agents execution text (agent narration and produced output):
         {execution_text}
         Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
-        Make a short code name for the diagnosis followed by a a few short line for each issue that describe the behavior and failure modes, focused on the most critical issues, without mentioning specific claim verdicts or scores.
-        Format: "<diagnosis_CODE>:\n<- <short diagnosis error 1>\n<- <short diagnosis error 2>\n... (up to 5 lines of diagnosis)"
-        Warning: Do not surface failures that would require modifying provided inputs (e.g. files under `data/`). Surface the next most critical fixable issue instead.
+        OUTPUT:
+        Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 25 lines of diagnosis)"
         Example:
         FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """
         diag = self._call_judge(
             uuid,
-            "verifier_abstract_prompt_gradient",
+            "verifier_abstract_textual_gradient",
             prompt,
         )
-        self._prompt_gradient_history.append(diag)
+        self._textual_gradient_history.append(diag)
         return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
@@ -223,6 +235,10 @@ class VerifierEvaluator(
         if not uuid or not isinstance(uuid, str):
             raise EvaluatorError("Invalid uuid: must be a non-empty string")
 
+        t_total = time.time()
+        phase_timings: list[tuple[str, float]] = []
+
+        t = time.time()
         execution_text, success = self.workflow_execution_text(uuid)
         if not execution_text:
             raise WorkflowDataError(f"Cannot generate execution text for workflow {uuid}")
@@ -234,17 +250,25 @@ class VerifierEvaluator(
             return self._short_circuit_failed_run(uuid)
 
         workspace_listing = self._list_workspace()
+        phase_timings.append(("setup (exec text + workspace listing)", time.time() - t))
+        print_ok(f"[verifier {uuid}] setup done in {phase_timings[-1][1]:.1f}s")
+
         # Use explicit empty-run marker rather than the brittle ``success`` flag
         # — ``success`` is ``not "[]" in json.dumps(answers)``, which mis-fires
         # whenever an answer payload contains a (possibly nested) empty list.
         is_truly_empty = (
             not execution_text or _EMPTY_RUN_MARKER in execution_text
         )
+        t = time.time()
         grounding = (
             self._get_grounding(uuid, execution_text, wf_info.goal)
             if not is_truly_empty
             else self._GROUNDING_DISABLED
         )
+        phase_timings.append(("grounding fetch", time.time() - t))
+        print_ok(f"[verifier {uuid}] grounding fetch done in {phase_timings[-1][1]:.1f}s")
+
+        t = time.time()
         anchored_records = (
             self._load_anchored_claims(rubric_anchor_uuid)
             if rubric_anchor_uuid
@@ -265,6 +289,11 @@ class VerifierEvaluator(
             claims = self._extract_claims(
                 uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
             )
+        phase_timings.append(("claim extraction + importance", time.time() - t))
+        print_ok(
+            f"[verifier {uuid}] claim extraction + importance done in "
+            f"{phase_timings[-1][1]:.1f}s ({len(claims)} claims)"
+        )
         if not claims:
             self.logger.warning(f"No claims extracted for {uuid}; verifier returns 0.0")
             scores = {"overall_score": 0.0, "n_claims": 0, "n_pass": 0, "n_fail": 0}
@@ -281,8 +310,6 @@ class VerifierEvaluator(
 
         # Pre-resolve specs: anchor-cache hits are O(disk read) each, but every
         # other claim costs two judge round-trips (file selection + spec gen).
-        # Fan those out via threads so the per-claim loop only pays for the
-        # sandbox execution, not for serial LLM latency.
         anchor_preloaded: dict[str, dict[str, Any]] = {}
         needs_generation: list[dict[str, Any]] = []
         for claim in claims_to_verify:
@@ -302,30 +329,33 @@ class VerifierEvaluator(
             workspace_listing,
             self.gen_parallelism,
         )
-        et = time.time()
+        gen_dt = time.time() - st
+        phase_timings.append(("spec generation (parallel)", gen_dt))
         print_box(
             f"Verifier spec generation for {len(needs_generation)} claims took "
-            f"{et - st:.1f}s (parallelism={self.gen_parallelism})",
+            f"{gen_dt:.1f}s (parallelism={self.gen_parallelism})",
             title="Verifier generation timing",
         )
 
-        per_claim: list[dict[str, Any]] = []
-        for claim in claims_to_verify:
-            cid = claim["id"]
-            if cid in anchor_preloaded:
-                target_claim = claim
-                preloaded_spec = anchor_preloaded[cid]
-            else:
-                target_claim, preloaded_spec = generated[cid]
-            result = self._verify_claim(
-                uuid,
-                target_claim,
-                execution_text,
-                workspace_listing,
-                grounding,
-                preloaded_spec=preloaded_spec,
-            )
-            per_claim.append(result)
+        t_loop = time.time()
+        per_claim = self._verify_claims_parallel(
+            uuid,
+            claims_to_verify,
+            anchor_preloaded,
+            generated,
+            execution_text,
+            workspace_listing,
+            grounding,
+        )
+        loop_dt = time.time() - t_loop
+        phase_timings.append(
+            (f"per-claim verification (parallel x{self.exec_parallelism})", loop_dt)
+        )
+        print_ok(
+            f"[verifier {uuid}] per-claim verification done in {loop_dt:.1f}s "
+            f"({len(per_claim)} claims, parallelism={self.exec_parallelism})"
+        )
+        self._print_per_claim_timings(per_claim)
 
         scores = self._aggregate(per_claim)
 
@@ -344,18 +374,163 @@ class VerifierEvaluator(
             cheat,
             min_importance=self._GRADIENT_MIN_IMPORTANCE,
         )
-        prompt_gradient = self._build_abstractec_prompt_gradient(
+        t = time.time()
+        textual_gradient = self._build_abstractec_textual_gradient(
             uuid, gradient_report, execution_text
         )
-        scores["abstractec_prompt_gradient"] = prompt_gradient
-        self._persist_prompt_gradient(uuid, prompt_gradient)
+        phase_timings.append(("textual gradient builder", time.time() - t))
+        print_ok(
+            f"[verifier {uuid}] textual gradient done in "
+            f"{phase_timings[-1][1]:.1f}s"
+        )
+        scores["abstractec_textual_gradient"] = textual_gradient
+        self._persist_textual_gradient(uuid, textual_gradient)
 
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
             self.logger.error(f"Failed to persist verifier scores for {uuid}: {e}")
 
+        phase_timings.append(("TOTAL evaluate()", time.time() - t_total))
+        self._print_phase_summary(uuid, phase_timings)
+
         return {"uuid": uuid, "claims": per_claim, **scores}
+
+    def _verify_claims_parallel(
+        self,
+        uuid: str,
+        claims_to_verify: list[dict[str, Any]],
+        anchor_preloaded: dict[str, dict[str, Any]],
+        generated: dict[str, tuple[dict[str, Any], dict[str, Any]]],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> list[dict[str, Any]]:
+        """Fan claim verification out across ``self.exec_parallelism`` threads.
+
+        Claim ordering is preserved so the downstream report, aggregator, and
+        rubric cache see the same order they would in the old sequential loop.
+        A per-claim exception is converted into an ``error`` result rather than
+        crashing the whole batch — mirrors the soft-fail contract of
+        ``_generate_specs_parallel``.
+
+        Args:
+            uuid: Workflow identifier (used for judge calls + sandbox dirs).
+            claims_to_verify: Claims in the desired output order.
+            anchor_preloaded: Specs reconstructed from a lineage anchor.
+            generated: Specs produced by ``_generate_specs_parallel``.
+            execution_text: Agent narration / produced output text.
+            workspace_listing: Rendered listing of workspace files.
+            grounding: Optional peer-reviewed literature grounding block.
+
+        Returns:
+            Scored per-claim list in the same order as ``claims_to_verify``.
+        """
+        if not claims_to_verify:
+            return []
+        results: list[dict[str, Any] | None] = [None] * len(claims_to_verify)
+        workers = max(1, min(len(claims_to_verify), self.exec_parallelism))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {
+                ex.submit(
+                    self._verify_one_claim_safe,
+                    uuid, claim, anchor_preloaded, generated,
+                    execution_text, workspace_listing, grounding,
+                ): idx
+                for idx, claim in enumerate(claims_to_verify)
+            }
+            for f in as_completed(futures):
+                idx = futures[f]
+                results[idx] = f.result()
+        return [r for r in results if r is not None]
+
+    def _verify_one_claim_safe(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        anchor_preloaded: dict[str, dict[str, Any]],
+        generated: dict[str, tuple[dict[str, Any], dict[str, Any]]],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> dict[str, Any]:
+        """Resolve the right spec for one claim and run ``_verify_claim``.
+
+        Soft-fails to an ``error`` result so one bad claim cannot crash the
+        thread-pool batch.
+        """
+        cid = claim["id"]
+        if cid in anchor_preloaded:
+            target_claim = claim
+            preloaded_spec = anchor_preloaded[cid]
+        else:
+            target_claim, preloaded_spec = generated[cid]
+        try:
+            return self._verify_claim(
+                uuid,
+                target_claim,
+                execution_text,
+                workspace_listing,
+                grounding,
+                preloaded_spec=preloaded_spec,
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"parallel claim verification failed for {cid}: "
+                f"{type(e).__name__}: {e}"
+            )
+            return {
+                "claim": target_claim,
+                "spec": preloaded_spec,
+                "score": 0.0,
+                "verifier_kind": "executable" if preloaded_spec.get("executable") else "soft",
+                "status": "error",
+                "details": f"verify_claim raised: {type(e).__name__}: {e}",
+                "elapsed_s": 0.0,
+            }
+
+    @staticmethod
+    def _print_per_claim_timings(per_claim: list[dict[str, Any]]) -> None:
+        """Render a sorted table of per-claim elapsed times.
+
+        Slow claims rise to the top so the cost concentration is obvious at a
+        glance — typically a handful of executable scripts dominate the loop.
+        """
+        if not per_claim:
+            return
+        rows = sorted(
+            per_claim,
+            key=lambda c: float(c.get("elapsed_s") or 0.0),
+            reverse=True,
+        )
+        total = sum(float(c.get("elapsed_s") or 0.0) for c in rows)
+        header = f"{'claim_id':<38} {'kind':<11} {'status':<7} {'elapsed_s':>10}"
+        body = "\n".join(
+            f"{str((c.get('claim') or {}).get('id') or '?')[:38]:<38} "
+            f"{str(c.get('verifier_kind') or '?'):<11} "
+            f"{str(c.get('status') or '?'):<7} "
+            f"{float(c.get('elapsed_s') or 0.0):>10.2f}"
+            for c in rows
+        )
+        print_box(
+            f"{header}\n{body}\n"
+            f"{'-' * 68}\n"
+            f"sum of per-claim elapsed: {total:.1f}s over {len(rows)} claims",
+            title="Per-claim verification timings (slowest first)",
+            color=CYAN,
+        )
+
+    @staticmethod
+    def _print_phase_summary(uuid: str, phases: list[tuple[str, float]]) -> None:
+        """Render the end-of-evaluate phase breakdown."""
+        if not phases:
+            return
+        body = "\n".join(f"{name:<46} {dt:>8.2f}s" for name, dt in phases)
+        print_box(
+            body,
+            title=f"Verifier phase summary · {uuid}",
+            color=CYAN,
+        )
 
     def _short_circuit_failed_run(self, uuid: str) -> dict[str, Any]:
         """Return 0.0 without running scripts when the workflow produced nothing.
@@ -382,14 +557,14 @@ class VerifierEvaluator(
             "n_error": 0,
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
-            "abstractec_prompt_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
+            "abstractec_textual_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
         }
         try:
             self._write_report(uuid, [], [], scores, cheat=None)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
-        self._persist_prompt_gradient(uuid, "")
+        self._persist_textual_gradient(uuid, "")
         try:
             self._save_results(scores, uuid, "verifier")
         except Exception as e:
@@ -758,7 +933,7 @@ class VerifierEvaluator(
         return result
 
     # ------------------------------------------------------------------
-    # Cheat penalty + fallback prompt gradient
+    # Cheat penalty + fallback textual gradient
     #
     # These two methods are reserved for the cheat-detector rewrite (see the
     # ``cheat = None`` in ``evaluate`` and the ``_CHEAT_*`` constants at the
@@ -791,7 +966,7 @@ class VerifierEvaluator(
         return scores
 
     @staticmethod
-    def _fallback_prompt_gradient(
+    def _fallback_textual_gradient(
         scores: dict[str, Any], cheat: Any
     ) -> str:
         """Deterministic fallback when the abstractor LLM is unavailable.
@@ -824,21 +999,21 @@ class VerifierEvaluator(
             )
         return " ".join(bits)
 
-    def _persist_prompt_gradient(self, uuid: str, prompt_gradient: str) -> None:
-        """Write the prompt_gradient to ``prompt_gradient.txt`` alongside the report.
+    def _persist_textual_gradient(self, uuid: str, textual_gradient: str) -> None:
+        """Write the textual_gradient to ``textual_gradient.txt`` alongside the report.
 
         Args:
             uuid: Workflow identifier; selects the on-disk output folder.
-            prompt_gradient: Text to persist; empty strings are skipped.
+            textual_gradient: Text to persist; empty strings are skipped.
         """
-        if not prompt_gradient:
+        if not textual_gradient:
             return
-        path = self.workflow_dir / uuid / "prompt_gradient.txt"
+        path = self.workflow_dir / uuid / "textual_gradient.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            path.write_text(prompt_gradient, encoding="utf-8")
+            path.write_text(textual_gradient, encoding="utf-8")
         except OSError as e:
-            self.logger.warning(f"could not write prompt_gradient.txt for {uuid}: {e}")
+            self.logger.warning(f"could not write textual_gradient.txt for {uuid}: {e}")
 
     # ------------------------------------------------------------------
     # Report rendering + persistence

@@ -104,6 +104,10 @@ class SelectionPressure:
         self._archive: list[PopulationMember] = []
         # Count of offspring rejected by the admit gate (S2 telemetry)
         self._n_admit_rejected: int = 0
+        # UUID evicted by the most recent admission, or ``None``. Cleared
+        # at the start of each ``_validate_open_ended`` call so callers
+        # can surface it in their archive log without stale carryover.
+        self._last_evicted_uuid: str | None = None
 
     def validate_survivor(
         self,
@@ -367,6 +371,9 @@ class SelectionPressure:
             ``novelty_score``, ``qd_score``, ``archive_size``,
             ``admit_rejected`` and ``admit_rejected_total``.
         """
+        # Reset the per-call eviction slot before _try_admit may set it.
+        self._last_evicted_uuid = None
+
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
         best_new = max(new_list, key=lambda r: _safe_attr(r, "reward", 0.0))
@@ -403,9 +410,13 @@ class SelectionPressure:
         )
         result["novelty_score"] = novelty
         result["qd_score"] = qd_score
+        result["quality_norm"] = quality_norm
+        result["novelty_norm"] = novelty_norm
+        result["behaviour_descriptor"] = descriptor
         result["archive_size"] = len(self._archive)
         result["admit_rejected"] = admit_rejected
         result["admit_rejected_total"] = self._n_admit_rejected
+        result["evicted_uuid"] = self._last_evicted_uuid
 
         self._log_validation(is_valid, relative_improvement, baseline_reward, new_reward, confidence, threshold)
         if self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
@@ -494,6 +505,7 @@ class SelectionPressure:
         if len(self._archive) > self.population_size:
             weakest = min(self._archive, key=lambda m: m.qd_score)
             self._archive.remove(weakest)
+            self._last_evicted_uuid = getattr(weakest, "uuid", None)
             self.logger.debug(
                 f"Evicted archive member (qd={weakest.qd_score:.3f}, "
                 f"reward={weakest.reward:.3f}) — archive full"

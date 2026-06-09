@@ -78,6 +78,7 @@ class WorkflowEval:
                 if i >= self.csv_runs_limit:
                     break
 
+                goal = "<unavailable>"
                 try:
                     iteration_start_time = time.time()
                     goal, _, _ = CsvEvaluationMode._generate_next_task(CsvEvaluationMode(self.config), row, dataset_type)

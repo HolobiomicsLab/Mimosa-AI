@@ -340,7 +340,7 @@ class ExecutionSandbox:
             py_files = list(self.capsule_path.glob("*.py"))
             if not py_files:
                 return False, "No Python file found in capsule"
-            if script_path not in py_files:
+            if script_path is not None and script_path not in py_files:
                 self.logger.warning(f"[SANDBOX] Specified script {script_path.name} not found in capsule, using smart file selection")
             # Smart file selection based on eval_script_path
             generated_script = self._select_best_matching_file(py_files, script_name)
@@ -616,7 +616,10 @@ class ExecutionSandbox:
 
     def __del__(self):
         """Destructor to ensure cleanup is performed."""
-        self.cleanup()
+        try:
+            self.cleanup()
+        except Exception:
+            pass
 
     def _parse_eval_output(self, output: str) -> tuple[bool, str]:
         """Parse evaluation script output."""

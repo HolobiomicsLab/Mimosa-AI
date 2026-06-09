@@ -123,7 +123,7 @@ class WorkflowInfo:
         """Cached overall (post-cap) workflow score."""
         if self._overall_score is None:
             self._overall_score = self.calculate_overall_score()
-        return self._overall_score
+        return self._overall_score or 0.0
 
     @property
     def overall_score_uncapped(self) -> float:
@@ -165,24 +165,24 @@ class WorkflowInfo:
             return "No evaluation. execution failed."
 
     @property
-    def abstracted_prompt_gradient(self) -> str:
-        """Behavioral prompt_gradient written by the verifier abstractor (Layer 1).
+    def abstracted_textual_gradient(self) -> str:
+        """Behavioral textual_gradient written by the verifier abstractor (Layer 1).
 
         This is the ONLY evaluation signal the mutator should see; raw
         ``judge_evaluation`` leaks rubric mechanism into the mutation prompt
         and causes the workflow to learn the judge's epistemology instead of
         the task. Resolution order: ``state_result.evaluation.verifier
-        .abstracted_prompt_gradient`` → sidecar ``prompt_gradient.txt`` → empty string
+        .abstracted_textual_gradient`` → sidecar ``textual_gradient.txt`` → empty string
         (callers must handle the empty case rather than fall through to the
         raw evaluation log).
         """
         state = self.load_state_result()
         if isinstance(state, dict):
             verifier = (state.get("evaluation") or {}).get("verifier") or {}
-            text = verifier.get("abstracted_prompt_gradient")
+            text = verifier.get("abstracted_textual_gradient")
             if isinstance(text, str) and text.strip():
                 return text.strip()
-        sidecar = self.workflow_folder / "prompt_gradient.txt"
+        sidecar = self.workflow_folder / "textual_gradient.txt"
         if sidecar.exists():
             try:
                 return sidecar.read_text(encoding="utf-8").strip()

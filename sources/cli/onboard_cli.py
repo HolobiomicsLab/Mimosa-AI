@@ -66,9 +66,9 @@ TOTAL_STEPS = 9
 # (env_key, display_label, litellm_model_id)
 # ---------------------------------------------------------------------------
 _MODEL_PRESETS: list[tuple[str, str, str]] = [
-    ("ANTHROPIC_API_KEY",  "Claude Sonnet 4.5  (Anthropic)",  "anthropic/claude-sonnet-4-5"),
-    ("DEEPSEEK_API_KEY",   "DeepSeek Chat      (DeepSeek)",   "deepseek/deepseek-chat"),
     ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5"),
+    ("ANTHROPIC_API_KEY",  "Claude Opus 4.7  (Anthropic)",  "anthropic/claude-opus-4-7"),
+    ("DEEPSEEK_API_KEY",   "DeepSeek Chat      (DeepSeek)",   "deepseek/deepseek-chat"),
     ("OPENAI_API_KEY",     "GPT-4o             (OpenAI)",     "openai/gpt-4o"),
     ("MISTRAL_API_KEY",    "Mistral Large      (Mistral)",    "mistral/mistral-large-latest"),
 ]

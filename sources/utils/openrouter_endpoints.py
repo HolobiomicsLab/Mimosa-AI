@@ -26,11 +26,67 @@ _QUANT_RANK: dict[str, int] = {
     "unknown": -1,
 }
 
+# Routing slugs known to be the model creator's own serving endpoint, not a
+# community reseller. Sorted ahead of community providers within a tier:
+# even when they expose `quantization: "unknown"` (which ranks -1), they
+# should win over an fp8 community endpoint because they serve the reference
+# weights at intended precision.
+FIRST_PARTY_SLUGS: frozenset[str] = frozenset({
+    "anthropic", "openai", "google-vertex", "google-ai-studio",
+    "xai", "deepseek", "mistral", "cohere", "moonshotai",
+    "z-ai", "alibaba", "minimax", "perplexity",
+})
+
+# Mapping from model-slug author (the segment before '/') to the OpenRouter
+# provider slugs that are the official first-party serving endpoint for that
+# author's models.  When a provider IS the model creator, its ``unknown``
+# quantization tag is trusted as full-precision reference weights and should
+# not be penalised.  Community resellers with ``unknown`` quant are demoted
+# below fp8 because ``unknown`` usually means a low quantization.
+_MODEL_AUTHOR_PROVIDERS: dict[str, frozenset[str]] = {
+    "anthropic":   frozenset({"anthropic"}),
+    "cohere":      frozenset({"cohere"}),
+    "deepseek":    frozenset({"deepseek"}),
+    "google":      frozenset({"google-vertex", "google-ai-studio"}),
+    "meta-llama":  frozenset(),          # Meta doesn't self-host on OpenRouter
+    "minimax":     frozenset({"minimax"}),
+    "mistralai":   frozenset({"mistral"}),
+    "moonshotai":  frozenset({"moonshotai"}),
+    "openai":      frozenset({"openai"}),
+    "perplexity":  frozenset({"perplexity"}),
+    "qwen":        frozenset({"alibaba"}),
+    "x-ai":        frozenset({"xai"}),
+}
+
 logger = logging.getLogger(__name__)
 
 
 def quant_rank(q: str) -> int:
     return _QUANT_RANK.get((q or "unknown").lower(), -1)
+
+
+def is_first_party(slug: str) -> bool:
+    return (slug or "").lower() in FIRST_PARTY_SLUGS
+
+
+def is_model_creator(slug: str, model_slug: str) -> bool:
+    """True when *slug* is the first-party creator / official host of *model_slug*.
+
+    ``model_slug`` is the bare OpenRouter model id, e.g.
+    ``deepseek/deepseek-v3.2`` — the author is the first ``/``-segment.
+
+    Community resellers (e.g. ``alibaba`` serving a DeepSeek model) return
+    False even though they appear in :data:`FIRST_PARTY_SLUGS`, because they
+    are only first-party for their *own* models.
+    """
+    author = model_slug.split("/", 1)[0].lower() if model_slug else ""
+    provider = (slug or "").lower()
+    known = _MODEL_AUTHOR_PROVIDERS.get(author)
+    if known is not None:
+        return provider in known
+    # Fallback for authors not yet in the map: exact slug match + must be a
+    # recognised first-party slug so we don't accidentally promote randoms.
+    return provider == author and provider in FIRST_PARTY_SLUGS
 
 
 def fetch_endpoints(model_id: str, timeout: int = 30) -> list[dict]:
@@ -67,6 +123,12 @@ def providers_for_model(model_id: str) -> dict[str, str]:
     """
     out: dict[str, str] = {}
     for ep in fetch_endpoints(model_id):
+        # Skip endpoints OpenRouter has flagged as not currently serving.
+        # Observed values: 0 = active, -2 = deprecated/down. Probing a
+        # negative-status endpoint reliably returns 404 or rate-limits, so
+        # it just burns a probe slot.
+        if (ep.get("status") or 0) < 0:
+            continue
         # `tag` looks like "baidu/fp8" or just "friendli"; the prefix before
         # the slash is the lowercase routing slug used by extra_body.provider.
         # `provider_name` is display-cased ("Baidu") and NOT usable for routing.

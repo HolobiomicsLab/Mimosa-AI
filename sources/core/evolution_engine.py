@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import time
+from dataclasses import asdict, is_dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,7 @@ from sources.core.evaluators.evaluator import WorkflowEvaluator
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
+from sources.utils.run_metrics import append_jsonl, write_run_metrics
 from sources.utils.visualization import VisualizationUtils
 from sources.utils.workspace_management import WorkspaceManager
 
@@ -37,6 +40,26 @@ from .selection import SelectionPressure
 from .variation_engine import VariationEngine
 from .workflow_info import WorkflowInfo
 from .workflow_selection import WorkflowSelector
+
+
+def _scalar(value: Any) -> float | None:
+    """Coerce ``value`` to a finite float, or ``None`` when missing/non-numeric."""
+    if value is None:
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out == out else None  # filter NaN
+
+
+def _to_jsonable(obj: Any) -> Any:
+    """Convert dataclasses (e.g. ``SelectionLog``) to plain dicts; pass through otherwise."""
+    if obj is None:
+        return None
+    if is_dataclass(obj):
+        return asdict(obj)
+    return obj
 
 
 class EvolutionEngine:
@@ -431,6 +454,7 @@ class EvolutionEngine:
         on_error = False
         uuid = None
         current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
+        verdict: dict | None = None  # populated only when survivor validation runs
 
         # ── Reset workspace to the initial state before each run ─────
         if workspace_mgr is not None:
@@ -488,7 +512,7 @@ class EvolutionEngine:
                 else float(wf_info.overall_score)
             )
             self.variation.record_offspring_gradient(
-                wf_info.abstracted_prompt_gradient,
+                wf_info.abstracted_textual_gradient,
                 is_failure=is_failure,
                 child_score=child_score,
                 best_before=best_before,
@@ -527,6 +551,21 @@ class EvolutionEngine:
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
+
+        # Persist per-iteration metrics & QD verdict to disk.
+        ctx = {
+            "verdict": verdict,
+            "iteration_cost": current_iteration_cost,
+            "iteration_start_time": iteration_start_time,
+            "on_error": on_error,
+        }
+        self._persist_iteration_metrics(
+            uuid, self._build_run_metrics_snapshot(runs[-1], wf_info, ctx)
+        )
+        if verdict is not None:
+            self._persist_qd_archive(
+                self._build_qd_archive_entry(runs[-1], uuid, verdict)
+            )
 
         # Log and notify completion (show per-iteration cost, not cumulative)
         self._log_iteration_completion(
@@ -622,6 +661,10 @@ class EvolutionEngine:
             parent_uuids=next_parent_uuids,
             evolution_kind=next_kind,
         ))
+
+        self._persist_variation_log(
+            self._build_variation_log_entry(runs[-1], parent_uuid_of=uuid)
+        )
 
         runs = await self.evolve_generation(
             runs,
@@ -881,6 +924,106 @@ class EvolutionEngine:
             self.logger.info(f"Saved evolution prompt to: {prompt_path}")
         except Exception as e:
             self.logger.error(f"Failed to save evolution prompt: {e}")
+
+    def _build_run_metrics_snapshot(
+        self, run: "IndividualRun", wf_info: "WorkflowInfo", ctx: dict,
+    ) -> dict:
+        """Assemble the per-iteration dict written to ``run_metrics.json``.
+
+        Args:
+            run: Current ``IndividualRun`` (post-evaluation, post cumulative-cost update).
+            wf_info: Workflow info exposing scores.
+            ctx: Iteration locals: ``verdict``, ``iteration_cost``,
+                ``iteration_start_time``, ``on_error``.
+        """
+        verdict = ctx.get("verdict") or {}
+        return {
+            "uuid": run.current_uuid,
+            "iteration": run.iteration_count,
+            "evolution_kind": run.evolution_kind,
+            "parent_uuids": list(run.parent_uuids or []),
+            "iteration_wall_time_s": round(time.time() - ctx["iteration_start_time"], 3),
+            "iteration_cost_usd": float(ctx["iteration_cost"]),
+            "cumulative_cost_usd": float(run.cost),
+            "overall_score": _scalar(wf_info.overall_score),
+            "overall_score_uncapped": _scalar(wf_info.overall_score_uncapped),
+            "on_error": bool(ctx["on_error"]),
+            "selection_log": _to_jsonable(run.selection_log),
+            "qd_descriptor": list(verdict.get("behaviour_descriptor", [])),
+            "qd_score": _scalar(verdict.get("qd_score")),
+            "novelty_score": _scalar(verdict.get("novelty_score")),
+            "variation_state": dict(self.variation.last_variation_state),
+            "finished_at": datetime.utcnow().isoformat(),
+        }
+
+    def _build_qd_archive_entry(
+        self, run: "IndividualRun", uuid: str, verdict: dict,
+    ) -> dict:
+        """Assemble one ``qd_archive.jsonl`` row from a survivor verdict."""
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "iteration": run.iteration_count,
+            "uuid": uuid,
+            "evolution_kind": run.evolution_kind,
+            "parent_uuids": list(run.parent_uuids or []),
+            "qd_descriptor": list(verdict.get("behaviour_descriptor", [])),
+            "qd_score": _scalar(verdict.get("qd_score")),
+            "quality_norm": _scalar(verdict.get("quality_norm")),
+            "novelty_norm": _scalar(verdict.get("novelty_norm")),
+            "novelty_score": _scalar(verdict.get("novelty_score")),
+            "is_valid": bool(verdict.get("valid")),
+            "admit_rejected": bool(verdict.get("admit_rejected")),
+            "archive_size": verdict.get("archive_size"),
+            "evicted_uuid": verdict.get("evicted_uuid"),
+        }
+
+    def _build_variation_log_entry(
+        self, next_run: "IndividualRun", parent_uuid_of: str | None,
+    ) -> dict:
+        """Assemble one ``variation_log.jsonl`` row.
+
+        Args:
+            next_run: The freshly-appended ``IndividualRun`` whose prompt
+                was just produced by the variation engine.
+            parent_uuid_of: UUID of the run that produced ``next_run``'s
+                prompt (the predecessor in the recursion).
+        """
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "for_iteration": next_run.iteration_count,
+            "from_uuid": parent_uuid_of,
+            "evolution_kind": next_run.evolution_kind,
+            "parent_uuids": list(next_run.parent_uuids or []),
+            **dict(self.variation.last_variation_state),
+        }
+
+    def _persist_iteration_metrics(self, uuid: str, snapshot: dict) -> None:
+        """Write ``run_metrics.json`` next to the workflow run.
+
+        Args:
+            uuid: Workflow UUID identifying the destination folder.
+            snapshot: JSON-serialisable mapping of per-iteration metrics.
+        """
+        if not uuid:
+            return
+        try:
+            write_run_metrics(Path(self.workflow_dir) / uuid, snapshot)
+        except Exception as e:
+            self.logger.warning(f"run_metrics write failed for {uuid}: {e}")
+
+    def _persist_qd_archive(self, entry: dict) -> None:
+        """Append one QD validation verdict to ``qd_archive.jsonl``."""
+        try:
+            append_jsonl(Path(self.workflow_dir) / "qd_archive.jsonl", entry)
+        except Exception as e:
+            self.logger.warning(f"qd_archive append failed: {e}")
+
+    def _persist_variation_log(self, entry: dict) -> None:
+        """Append one mutation-scope snapshot to ``variation_log.jsonl``."""
+        try:
+            append_jsonl(Path(self.workflow_dir) / "variation_log.jsonl", entry)
+        except Exception as e:
+            self.logger.warning(f"variation_log append failed: {e}")
 
     def _save_final_plots(self, assertion_history: list, reward_history: list, uuid: str) -> str:
         """Save final assertion plots.

@@ -27,14 +27,13 @@ class VariationEngine:
 
     def __init__(self) -> None:
         """Initialise empty history buffers and lazy embedder state."""
-        self.prompt_gradient_history: list[tuple[str, bool]] = []
-        # Per-offspring (child_score, best_before, is_failure) for the
-        # Rechenberg 1/5 success rule. ``None`` slots mark offspring whose
-        # scores were not supplied (back-compat path).
+        self.textual_gradient_history: list[tuple[str, bool]] = []
+        # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self._embedder: SentenceTransformer | None = None
+        self.last_variation_state: dict = {}
 
     def record_offspring_gradient(
         self,
@@ -60,7 +59,7 @@ class VariationEngine:
                 in the Rechenberg sense.
         """
         text = (gradient or "").strip() or "UNKNOWN_GRADIENT: No feedback captured."
-        self.prompt_gradient_history.append((text, bool(is_failure)))
+        self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
     def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
@@ -86,7 +85,7 @@ class VariationEngine:
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
-    def _prompt_gradient_similarity(self, a: str, b: str) -> float:
+    def _textual_gradient_similarity(self, a: str, b: str) -> float:
         """Cosine similarity over MiniLM-encoded diagnoses.
 
         Args:
@@ -104,7 +103,7 @@ class VariationEngine:
         emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
         return F.cosine_similarity(emb_a, emb_b, dim=0).item()
 
-    def _compute_stagnation(self, window: int = 4) -> float:
+    def _compute_stagnation(self, window: int = 10) -> float:
         """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1].
 
         Args:
@@ -114,12 +113,12 @@ class VariationEngine:
             Stagnation in ``[0, 1]``; ``0.0`` when fewer than two non-failure
             gradients are available.
         """
-        semantic = [g for g, is_failure in self.prompt_gradient_history if not is_failure]
+        semantic = [g for g, is_failure in self.textual_gradient_history if not is_failure]
         recent = semantic[-window:]
         if len(recent) < 2:
             return 0.0
         sims = [
-            self._prompt_gradient_similarity(recent[i], recent[j])
+            self._textual_gradient_similarity(recent[i], recent[j])
             for i in range(len(recent))
             for j in range(i + 1, len(recent))
         ]
@@ -168,7 +167,7 @@ class VariationEngine:
         Boldness is driven by two evidence signals, not by the parent's
         absolute score:
 
-        - ``raw_stagnation`` — cosine similarity of recent prompt gradients.
+        - ``raw_stagnation`` — cosine similarity of recent textual gradients.
           High → the search keeps diagnosing the same failure.
         - ``success_rate`` — fraction of recent offspring that beat the
           running best. Below the Rechenberg 1/5 threshold → step size is
@@ -237,13 +236,56 @@ class VariationEngine:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
         bands = [
-            (0.20, "prompt-only little tweak"),
-            (0.40, "prompt, handoff information and tool change - improve the information flow"),
-            (0.60, "topology, prompts, handoff format, tools — significant redesign while keeping topology"),
-            (0.80, "bold rewire — restructure or grow the agent set"),
-            (1.01, "complete rethink — discard inherited topology/prompts and innovate freely"),
+            (
+                0.35,
+                "EXPLOITATION (Point Mutation):\n"
+                "- Objective: Micro-tune the current high-performing lineage.\n"
+                "- Scope: Modify only minor phrasing, system instructions, or prompt adjectives.\n"
+                "- Invariance: DO NOT alter the agent graph, agent roles, tool definitions, or handoff structures.\n"
+                "- Strategy: Keep 90% of the prompt identical. Optimize for nuance and alignment."
+            ),
+            (
+                0.50,
+                "ALIGNMENT (Interface Optimization):\n"
+                "- Objective: Smooth out execution friction and coordination errors between nodes.\n"
+                "- Scope: Update agent handoff prompts, context-passing schemas, or tool usage instructions.\n"
+                "- Invariance: Keep the macro-topology and core agent identities exactly as they are.\n"
+                "- Strategy: Focus heavily on clarifying the input/output boundaries and communication contracts between agents."
+            ),
+            (
+                0.65,
+                "ADAPTATION (Component Overhaul):\n"
+                "- Objective: Major behavioral adjustment to fix localized stagnation.\n"
+                "- Scope: Completely rewrite the system prompts of lagging or failing agents. Swap, add, or deprecate specific tools.\n"
+                "- Invariance: Maintain the structural routing/topology of the multi-agent graph.\n"
+                "- Strategy: Retain the overall workflow architecture, but radically re-engineer how individual nodes think and execute."
+            ),
+            (
+                0.90,
+                "EXPLORATION (Macro Structural Mutation):\n"
+                "- Objective: Break out of a severe local minimum or chronic structural failure.\n"
+                "- Scope: Mutate the graph topology. Add a new specialized agent, merge two redundant agents, or change the routing logic.\n"
+                "- Invariance: Keep the fundamental task goal, but completely change the operational workflow.\n"
+                "- Strategy: Restructure the cognitive pipeline. Introduce parallel processing, voting consensus, or multi-step validation loops."
+            ),
+            (
+                1.01,
+                "RE-SPECIATION (Systemic Paradigm Shift):\n"
+                "- Objective: The current evolutionary branch is a dead end. Escape entirely.\n"
+                "- Scope: Clean-slate redesign of the multi-agent architecture.\n"
+                "- Invariance: None. Only the core task description and learned constraints/task specifications remain constant.\n"
+                "- Strategy: Rethink the entire approach. If it was a sequential pipeline, turn it into an autonomous swarm. If it was highly fragmented, design a single ultra-dense prompt. Radical experimentation."
+            ),
         ]
         scope = next(label for threshold, label in bands if effective < threshold)
+        self.last_variation_state = {
+            "stagnation": float(raw_stagnation),
+            "success_rate": None if success_rate is None else float(success_rate),
+            "effective_boldness": float(effective),
+            "parent_score": float(parent_score),
+            "scope_band": scope,
+            "agent_budget": int(n_agents),
+        }
         return f"Mutation scope: {scope}. Boldness: {effective*100:.2f}%. Use at most {n_agents} agent(s).\n"
 
     # ── Utility ───────────────────────────────────────────────────────────────
@@ -280,19 +322,20 @@ class VariationEngine:
             One of a curated set of human-readable topology descriptions used
             to seed initial workflow generations.
         """
+
         return np.random.choice([
-            "simple linear chain",
-            "hub-and-spoke with 3-4 agents",
-            "fully connected mesh",
             "single-agent",
-            "debate (two+ agents argue, judge decides)",
-            "reflection pair (actor + critic loop)",
-            "blackboard (shared debate scratchpad, no direct messaging)",
-            "map-reduce (fan-out subtasks, aggregator merges)",
+            "simple linear chain",
             "sequential pipeline (output of one is input to next)",
-            "round-robin group chat (shared conversation thread)",
-            "mixture-of-experts (router picks expert per step)",
-            "verifier-generator (generator proposes, verifier gates)"
+            "reflection pair (actor → critic loop, fixed iterations)",
+            "debate with fixed turns (proposer → opponent → judge, no adaptation)",
+            "relay race (agent A → B → C → D, fixed handoff)",
+            "assembly line (specialized stations in fixed order)",
+            "ping-pong (two agents, fixed alternation)",
+            "cascading refinement (draft → edit → polish → finalize)",
+            "waterfall (analysis → design → implementation → review, no backtracking)",
+            "serial verification (generator → verifier → generator → verifier, fixed rounds)",
+            "staged gate (must pass checkpoint before next stage, fixed sequence)"
         ])
 
     def seed_genome_prompt(self, goal: str) -> str:
@@ -343,15 +386,15 @@ class VariationEngine:
             The fully assembled mutation prompt string.
         """
         score      = wf_info.overall_score        if wf_info else 0.0
-        prompt_gradient  = wf_info.abstracted_prompt_gradient if wf_info else ""
+        textual_gradient  = wf_info.abstracted_textual_gradient if wf_info else ""
         wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Execution evidence ───────────────────────────────────────────────
         agent_answers = self._extract_agent_answers(wf_state)
         fail_msg = "FAILURE:Last run likely failed with no feedback captured. Focus on fixing syntax errors or langraph patterns."
-        prompt_gradient_block = (
-            prompt_gradient.strip()
-            if prompt_gradient and prompt_gradient.strip()
+        textual_gradient_block = (
+            textual_gradient.strip()
+            if textual_gradient and textual_gradient.strip()
             else (run_stderr or fail_msg).strip()
             or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
         ).replace('_', ' ')[:2048]
@@ -376,7 +419,7 @@ class VariationEngine:
                 #"</agents_answers>",
                 "<diagnosis>",
                 "",
-                prompt_gradient_block,
+                textual_gradient_block,
                 "</diagnosis>",
                 "<boldness>",
                 step_block,
@@ -422,16 +465,16 @@ class VariationEngine:
             zip(wf_infos, genotypes, run_stderrs)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
-            prompt_gradient = wf_info.abstracted_prompt_gradient if wf_info else ""
-            # Layer 1: rubric-blind prompt_gradient instead of raw judge log.
-            # Fall back to stderr tail only when no prompt_gradient exists.
-            prompt_gradient = prompt_gradient.strip() or (stderr or "").strip()[-1024:]
+            textual_gradient = wf_info.abstracted_textual_gradient if wf_info else ""
+            # Layer 1: rubric-blind textual_gradient instead of raw judge log.
+            # Fall back to stderr tail only when no textual_gradient exists.
+            textual_gradient = textual_gradient.strip() or (stderr or "").strip()[-1024:]
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
                 "index":     i + 1,
                 "score":     score,
                 "code":      genotype,
-                "prompt_gradient": prompt_gradient,
+                "textual_gradient": textual_gradient,
                 "answers":   answers,
             })
 
@@ -445,9 +488,9 @@ class VariationEngine:
                 "<python>",
                 p["code"] or "(construction failed)",
                 "</python>",
-                "<agents_answers>",
-                p["answers"],
-                "</agents_answers>"
+                "<error_diagnosis>",
+                p["textual_gradient"],
+                "</error_diagnosis>"
             ]))
 
         return "\n".join([
