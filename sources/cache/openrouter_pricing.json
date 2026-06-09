@@ -1,6 +1,10 @@
 {
-  "timestamp": "2026-06-08T10:15:43.864866",
+  "timestamp": "2026-06-09T12:20:21.879505",
   "pricing": {
+    "nex-agi/nex-n2-pro:free": {
+      "input": 0.0,
+      "output": 0.0
+    },
     "nvidia/nemotron-3.5-content-safety:free": {
       "input": 0.0,
       "output": 0.0
@@ -500,10 +504,6 @@
     "z-ai/glm-4.6v": {
       "input": 0.3,
       "output": 0.8999999999999999
-    },
-    "nex-agi/deepseek-v3.1-nex-n1": {
-      "input": 0.135,
-      "output": 0.5
     },
     "essentialai/rnj-1-instruct": {
       "input": 0.15,

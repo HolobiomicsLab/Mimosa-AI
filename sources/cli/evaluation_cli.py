@@ -634,6 +634,7 @@ class EvaluationCLI:
             "run_id": spec.run_id,
             "smolagent_model_id": spec.config.smolagent_model_id,
             "workflow_llm_model": spec.config.workflow_llm_model,
+            "judge_model": spec.config.judge_model,
             "eval_mode": spec.eval_mode,
             "csv_runs_limit": spec.csv_runs_limit,
             "discovery_addresses": [

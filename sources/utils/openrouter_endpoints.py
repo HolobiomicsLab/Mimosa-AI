@@ -37,6 +37,27 @@ FIRST_PARTY_SLUGS: frozenset[str] = frozenset({
     "z-ai", "alibaba", "minimax", "perplexity",
 })
 
+# Mapping from model-slug author (the segment before '/') to the OpenRouter
+# provider slugs that are the official first-party serving endpoint for that
+# author's models.  When a provider IS the model creator, its ``unknown``
+# quantization tag is trusted as full-precision reference weights and should
+# not be penalised.  Community resellers with ``unknown`` quant are demoted
+# below fp8 because ``unknown`` usually means a low quantization.
+_MODEL_AUTHOR_PROVIDERS: dict[str, frozenset[str]] = {
+    "anthropic":   frozenset({"anthropic"}),
+    "cohere":      frozenset({"cohere"}),
+    "deepseek":    frozenset({"deepseek"}),
+    "google":      frozenset({"google-vertex", "google-ai-studio"}),
+    "meta-llama":  frozenset(),          # Meta doesn't self-host on OpenRouter
+    "minimax":     frozenset({"minimax"}),
+    "mistralai":   frozenset({"mistral"}),
+    "moonshotai":  frozenset({"moonshotai"}),
+    "openai":      frozenset({"openai"}),
+    "perplexity":  frozenset({"perplexity"}),
+    "qwen":        frozenset({"alibaba"}),
+    "x-ai":        frozenset({"xai"}),
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +67,26 @@ def quant_rank(q: str) -> int:
 
 def is_first_party(slug: str) -> bool:
     return (slug or "").lower() in FIRST_PARTY_SLUGS
+
+
+def is_model_creator(slug: str, model_slug: str) -> bool:
+    """True when *slug* is the first-party creator / official host of *model_slug*.
+
+    ``model_slug`` is the bare OpenRouter model id, e.g.
+    ``deepseek/deepseek-v3.2`` — the author is the first ``/``-segment.
+
+    Community resellers (e.g. ``alibaba`` serving a DeepSeek model) return
+    False even though they appear in :data:`FIRST_PARTY_SLUGS`, because they
+    are only first-party for their *own* models.
+    """
+    author = model_slug.split("/", 1)[0].lower() if model_slug else ""
+    provider = (slug or "").lower()
+    known = _MODEL_AUTHOR_PROVIDERS.get(author)
+    if known is not None:
+        return provider in known
+    # Fallback for authors not yet in the map: exact slug match + must be a
+    # recognised first-party slug so we don't accidentally promote randoms.
+    return provider == author and provider in FIRST_PARTY_SLUGS
 
 
 def fetch_endpoints(model_id: str, timeout: int = 30) -> list[dict]:

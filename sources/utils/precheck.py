@@ -32,7 +32,7 @@ import litellm
 
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.utils.openrouter_endpoints import (
-    is_first_party,
+    is_model_creator,
     providers_for_model,
     quant_rank,
 )
@@ -237,6 +237,9 @@ class PreCheck:
             print(f"\n⚠️  No OpenRouter endpoints found for {name} ({model_id}).")
             return []
 
+        # Bare model slug needed for model-creator checks below.
+        _, model_slug = extract_model_pattern(model_id)
+
         # Order candidates by discovered quant (best first) — affects probe
         # order under thread pool but not final ranking (we sort results below).
         candidates.sort(key=lambda x: -quant_rank(x[1]))
@@ -256,14 +259,15 @@ class PreCheck:
             results = [fut.result() for fut in concurrent.futures.as_completed(futures)]
 
         # Final sort: pass-strict first, then drift, then fail.
-        # Within each tier: first-party model creators before community
-        # resellers, then higher quant rank, then lower latency. First-party
-        # wins over quant because the creator serves reference weights at
-        # intended precision (even when OpenRouter reports it as `unknown`).
+        # Within each tier: the model's own creator before community
+        # resellers, then higher quant rank, then lower latency.  Only the
+        # actual model creator (e.g. deepseek for deepseek/*) gets the
+        # first-party boost — community resellers with quant=unknown are
+        # demoted below fp8 providers.
         results.sort(
             key=lambda r: (
                 r["tier"] if r["tier"] != 0 else 99,
-                0 if is_first_party(r["provider"]) else 1,
+                0 if is_model_creator(r["provider"], model_slug) else 1,
                 -quant_rank(r["discovered_quant"]),
                 r["mean_latency"],
             )
@@ -307,11 +311,12 @@ class PreCheck:
         empty_required: list[str] = []
 
         for model_id, results in all_results.items():
+            _, model_slug = extract_model_pattern(model_id)
             kept = [
                 (
                     r["provider"],
                     r["tier"],
-                    0 if is_first_party(r["provider"]) else 1,
+                    0 if is_model_creator(r["provider"], model_slug) else 1,
                     quant_rank(r["discovered_quant"]),
                     r["mean_latency"],
                     r["discovered_quant"],
@@ -319,7 +324,7 @@ class PreCheck:
                 for r in results
                 if r["tier"] != 0
             ]
-            # Stable sort: strict before drift; within each, first-party
+            # Stable sort: strict before drift; within each, the model's own
             # creator before community, then higher precision, then faster.
             kept.sort(key=lambda x: (x[1], x[2], -x[3], x[4]))
             new_list = [t[0] for t in kept]
