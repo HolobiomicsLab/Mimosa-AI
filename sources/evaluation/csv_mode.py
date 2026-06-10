@@ -31,7 +31,7 @@ from sources.cli.pretty_print import (
 )
 
 
-_INPUT_TIMEOUT = 10  # seconds before auto-accepting the default
+_INPUT_TIMEOUT = 30  # seconds before auto-accepting the default
 
 
 async def _input_with_timeout(prompt: str, default: str = "0", timeout: float = _INPUT_TIMEOUT) -> str:

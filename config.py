@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openrouter/minimax/minimax-m3"
+        self.smolagent_model_id: str = "openrouter/mistralai/mistral-large-2407"
+        self.judge_model = "openrouter/qwen/qwen3.7-max"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 

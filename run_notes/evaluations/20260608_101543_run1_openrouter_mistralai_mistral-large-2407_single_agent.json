@@ -1,0 +1,44 @@
+{
+  "started_at": "2026-06-08T10:15:43.649003",
+  "run_id": 1,
+  "smolagent_model_id": "openrouter/mistralai/mistral-large-2407",
+  "workflow_llm_model": "openrouter/z-ai/glm-5.1",
+  "eval_mode": "single_agent",
+  "csv_runs_limit": 10,
+  "discovery_addresses": [
+    {
+      "ip": "0.0.0.0",
+      "port_min": 5100,
+      "port_max": 5200
+    }
+  ],
+  "workspace_dir": "/home/martin/Projects/CNRS/Toolomics/workspace_2",
+  "detected_mcps": [
+    "mcp_5100: 4 tools available | running on 0.0.0.0:5100",
+    "mcp_5101: 5 tools available | running on 0.0.0.0:5101",
+    "mcp_5102: 5 tools available | running on 0.0.0.0:5102",
+    "mcp_5103: 2 tools available | running on 0.0.0.0:5103",
+    "mcp_5104: 12 tools available | running on 0.0.0.0:5104",
+    "mcp_5105: 3 tools available | running on 0.0.0.0:5105",
+    "mcp_5106: 10 tools available | running on 0.0.0.0:5106",
+    "mcp_5107: 5 tools available | running on 0.0.0.0:5107",
+    "mcp_5108: 10 tools available | running on 0.0.0.0:5108",
+    "mcp_5109: 3 tools available | running on 0.0.0.0:5109",
+    "mcp_5110: 6 tools available | running on 0.0.0.0:5110"
+  ],
+  "dataset": "datasets/ScienceAgentBench.csv",
+  "status": "running",
+  "queue_size": 1,
+  "final_results": {
+    "steps_evaluated": 9,
+    "successful_runs": 8,
+    "success_rate": "88.9%",
+    "ver_success": 4,
+    "ver_total": 8,
+    "sr_success": 1,
+    "sr_total": 8,
+    "avg_cbs": 0.9056779066322573,
+    "total_cost": 4.997864
+  },
+  "finished_at": "2026-06-08T11:41:56.912824"
+}
