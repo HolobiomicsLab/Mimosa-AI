@@ -189,8 +189,10 @@ class VerifierEvaluator(
         {execution_text}
         Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
+
+        Focus on the report on the most important claims and the most actionable diagnosis. Be concise and specific, avoid vague language. Do not mention the importance but order the claims by importance.
         OUTPUT:
-        Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 25 lines of diagnosis)"
+        Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 7 lines of diagnosis maximum)"
         Example:
         FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
         """
