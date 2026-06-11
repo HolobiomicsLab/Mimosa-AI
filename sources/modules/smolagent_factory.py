@@ -215,17 +215,25 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
     def parse_memory_output(self):
         actions, observations, success = [], [], []
         for step in self.agent.memory.steps:
-            if isinstance(step, ActionStep):
-                error, obs = step.error, step.observations
+            if not isinstance(step, ActionStep):
+                continue
+
+            step_action = getattr(step, "code_action", "") or ""
+            if not step_action and getattr(step, "tool_calls", None):
+                tc = step.tool_calls[0]
+                args = getattr(getattr(tc, "function", tc), "arguments", "")
+                step_action = args if isinstance(args, str) else json.dumps(args)
+
+            if isinstance(step.observations, str) and step.observations:
+                step_obs = step.observations
+            elif step.error is not None:
+                step_obs = str(step.error)
+            else:
                 step_obs = ""
-                step_action = ""
-                feedback = obs if obs else error
-                if type(feedback) is not str:
-                    step_obs = feedback.dict()["message"] if "message" in feedback.dict() else ""
-                    step_action = feedback.dict()["code_action"] if "code_action" in feedback.dict() else ""
-                actions.append(step_action)
-                observations.append(step_obs)
-                success.append(step.error is None)
+
+            actions.append(step_action)
+            observations.append(step_obs)
+            success.append(step.error is None)
         return actions, observations, success
 
     def save_memories(self, workflow_uuid: str):
