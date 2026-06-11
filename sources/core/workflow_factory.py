@@ -153,7 +153,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
-            max_tokens=getattr(self.config, 'max_tokens', 8192),
+            max_tokens=16384,
             openrouter_provider=None, # use default
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
@@ -492,5 +492,8 @@ if WORKFLOW_PATH:
 
         self.logger.debug(f"Workflow path: {workflow_path}")
         self.logger.debug(f"Memory path: {memory_path}")
+
+        print(f"Workflow generated with UUID: {uuid_str}")
+        print(complete_code)
 
         return complete_code, workflow_genotype_code, uuid_str
