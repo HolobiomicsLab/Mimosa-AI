@@ -91,7 +91,7 @@ class WorkflowOrchestrator:
         else:
             print_err(f"Workflow execution failed: {result.stderr}")
             raise Exception(f"Workflow execution failed: {result.stderr}")
-    
+
     def perspicacite_grounding_task(self, task: str) -> str:
         """Query Perspicacite-AI for a literature-grounded approach to a task.
 
@@ -373,3 +373,19 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
                         pass
         except Exception:
             pass
+
+async def test_workflow_orchestrator():
+    evolution_prommt = '''
+put here evolution prompt to test
+'''
+    goal = "Given the target structure of acetylcholinesterase, design a 5-amino-acid peptide sequence that would act as an irreversible inhibitor. Provide the sequence and predicted binding affinity."
+    from config import Config
+    config = Config()
+    orch = WorkflowOrchestrator(config)
+    await orch._generate_workflow_code(
+        goal, evolution_prommt, single_agent_mode=False, original_task=goal
+    )
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_workflow_orchestrator())
