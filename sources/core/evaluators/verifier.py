@@ -33,6 +33,11 @@ from sources.cli.pretty_print import (
     print_ok,
 )
 
+from sources.core.failure_fingerprint import (
+    DESCRIPTOR_DIM as _FP_DIM,
+    compute_failure_fingerprint,
+)
+
 from .base import (
     BaseEvaluator,
     EvaluatorError,
@@ -360,6 +365,7 @@ class VerifierEvaluator(
         self._print_per_claim_timings(per_claim)
 
         scores = self._aggregate(per_claim)
+        scores["failure_fingerprint"] = compute_failure_fingerprint(per_claim)
 
         # Layer 3: independent cheat audit over the agents' produced script.
         cheat = None  # NOTE: cheat_detector was crap. Will need to be rethink.
@@ -561,6 +567,14 @@ class VerifierEvaluator(
             "skipped_reason": "workflow_generation_or_execution_failed",
             "abstractec_textual_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
             "cheat_penalty": 0.0,
+            # Zero-profile fingerprint: no source emitted any claim, so the
+            # presence mask is all-zero and the centered vector is all-zero
+            # — the run is neutral relative to peers along every axis.
+            "failure_fingerprint": {
+                "vector": [0.0] * _FP_DIM,
+                "presence_mask": [0.0] * _FP_DIM,
+                "pass_rates": [0.5] * _FP_DIM,
+            },
         }
         try:
             self._write_report(uuid, [], [], scores, cheat=None)

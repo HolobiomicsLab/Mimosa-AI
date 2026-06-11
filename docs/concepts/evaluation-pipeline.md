@@ -20,6 +20,12 @@ fingerprint). The single signal that flows back to the mutator is a short
 **prompt gradient** that summarizes failure modes without leaking the
 verified claims themselves.
 
+The same per-claim verdicts are projected into a 6-dim **failure
+fingerprint** that the [evolution engine](evolution-engine.md#behaviour-descriptor-failure-fingerprint)
+uses as the behaviour descriptor for QD novelty. The descriptor is
+centered so overall quality cannot leak into novelty — see the firewall
+section below.
+
 ![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
 
 ## The pipeline
@@ -121,6 +127,39 @@ overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_c
   flags `hard_fail_capped = True`.
 - The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.
+
+## Failure fingerprint (QD behaviour descriptor)
+
+The verifier doesn't just emit a score — the same per-claim verdicts feed
+the QD novelty signal as a **failure fingerprint**: a centered vector
+of per-source pass rates that tells the archive *how* a candidate fails,
+not *whether* it failed.
+
+```python
+# Per source A..F (six entries, always — absent sources get a neutral value).
+pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
+presence[s]  = 1.0                                if total[s] > 0  else 0.0
+# Center so the descriptor encodes profile shape, not quality level.
+mean_present = mean(pass_rate[s] for s where presence[s] == 1)
+vector[s]    = pass_rate[s] - mean_present       if presence[s] == 1
+             = 0                                  otherwise
+```
+
+**The quality firewall.** An all-pass run and an all-fail run both yield
+the zero profile. This is intended and asserted in the tests
+(`test_all_pass_yields_zero_profile`,
+`test_all_fail_yields_zero_profile`). The QD score combines quality and
+novelty *additively* — `(1 − w)·quality_norm + w·novelty_norm` — so
+quality already drives `quality_norm`. If quality also leaked into
+novelty, QD would collapse back into greedy search. The centering step
+is what keeps these two terms separable.
+
+The fingerprint is persisted under
+`state_result.json` → `evaluation.verifier.failure_fingerprint.vector`
+and consumed by
+[`SelectionPressure._extract_behaviour_descriptor`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py).
+Full info-flow audit:
+[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
 
 ## Prompt gradient
 

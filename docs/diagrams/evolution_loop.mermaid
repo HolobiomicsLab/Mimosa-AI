@@ -79,11 +79,11 @@ flowchart TB
 
     %% ===== sidebars =====
     subgraph QD["Quality-Diversity machinery"]
-        BD["behaviour descriptor<br/>extract_code_features() →<br/>[n_agents, n_edges, n_branches,<br/> prompt_chars] / SCALES"]
-        Nov["k-NN novelty<br/>(k=15, against archive)"]
-        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.25)<br/>quality from reward_uncapped"]
+        BD["behaviour descriptor<br/>failure_fingerprint(per_claim) →<br/>centered per-source pass rates<br/>over sources A..F (6-D)"]
+        Nov["k-NN novelty<br/>(k=25, against archive)"]
+        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.4)<br/>quality from reward_uncapped<br/>(additive: no quality leak into novelty)"]
     end
-    State -. AST .-> BD
+    State -. verifier per-claim verdicts .-> BD
     Archive -. distances .-> Nov
     BD --> QDscore
     Nov --> QDscore

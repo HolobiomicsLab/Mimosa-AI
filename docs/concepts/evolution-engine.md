@@ -64,12 +64,15 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
 
 - A **session archive** holds up to `population_size = 50` members.
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
-  `w = novelty_weight = 0.25`.
+  `w = novelty_weight = 0.4`. Quality and novelty are **additive** — never
+  multiplied — so high quality cannot rescue a redundant profile and high
+  novelty cannot drag a broken run above peers.
 - Quality is sourced from `reward_uncapped` so the hard-fail cap doesn't
   flatten rank ordering.
-- Novelty is k-NN distance (`k = 15`) in behaviour-descriptor space, where
-  the descriptor is `[n_agents, n_edges, n_branches, prompt_chars]`
-  extracted by [`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py).
+- Novelty is k-NN distance (`k = 25`) in **failure-fingerprint** space.
+  The descriptor is the centered per-source pass-rate vector produced by
+  [`failure_fingerprint.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
+  from the verifier's per-claim verdicts (see below).
 - Admission gate: candidate is admitted when it either improves over
   baseline by `min_improvement_threshold` or clears
   `qd_score > admit_threshold`. When the archive reaches capacity, the
@@ -83,6 +86,42 @@ When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/
 falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.5` on MiniLM
 embeddings of `original_task`, `score ≥ 0.05`) — this lets useful workflows
 transfer across tasks.
+
+### Behaviour descriptor: failure fingerprint
+
+The novelty signal compares candidates in **failure-fingerprint** space.
+Per source A–F (literature, user goal, agent narration, math invariants,
+computational reproducibility, statistical fingerprint), the verifier
+records a pass rate. Sources with zero claims get the neutral value
+`0.5` and a presence-mask entry of `0`. The vector is then **centered**:
+the mean pass rate across present sources is subtracted from every entry.
+
+The centering is the *quality firewall*. Without it, an all-pass run sits
+at `[1,1,1,1,1,1]` and an all-fail run at `[0,0,0,0,0,0]` — Euclidean
+distance between them is large, and quality silently leaks into novelty.
+After centering, **both** runs collapse to the zero profile and novelty
+encodes only the *shape* of which sources fail relative to the others.
+Two workflows that fail in the same way are redundant regardless of how
+different their DAGs look; two that fail in different ways explore
+different basins and both deserve a seat in the archive.
+
+The fingerprint is computed at the end of `VerifierEvaluator.evaluate()`
+and persisted in `state_result.json` under
+`evaluation.verifier.failure_fingerprint.vector`. The full audit trail —
+which variable comes from where, the failure modes the descriptor must
+survive, and the centering invariant asserted by the tests — lives in
+[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
+
+When a run has no usable fingerprint (verifier short-circuit on a fully
+failed workflow), `SelectionPressure._extract_behaviour_descriptor`
+returns a neutral zero vector so distance lookups stay well-defined and
+the cold path doesn't artificially win or lose on novelty.
+
+The legacy structural descriptor (`[n_agents, n_edges, n_branches,
+prompt_chars]`) shipped by
+[`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py)
+is retained for ablations and offline analysis but is **no longer used**
+for QD novelty — empirical work showed it barely co-varies with outcomes.
 
 ## Variation: evidence-driven mutation scope (Rechenberg 1/5 rule)
 

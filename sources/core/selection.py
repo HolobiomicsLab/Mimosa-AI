@@ -13,7 +13,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from .code_features import extract_code_features
+from .failure_fingerprint import (
+    DESCRIPTOR_DIM as _DESCRIPTOR_DIM,
+    failure_fingerprint_from_state_result,
+    neutral_fingerprint,
+)
 
 MAX_CHILDREN_PER_PARENT = 2
 
@@ -34,8 +38,9 @@ class PopulationMember:
         reward: Capped reward used for greedy comparisons.
         cost: Monetary or compute cost spent to produce this member.
         uuid: Workflow UUID; ``None`` for members without on-disk artifacts.
-        behaviour_descriptor: Fixed-length structural feature vector used
-            for novelty distance.
+        behaviour_descriptor: Fixed-length failure-fingerprint vector used
+            for novelty distance — centered per-source pass rates from the
+            verifier, produced by :mod:`sources.core.failure_fingerprint`.
         novelty_score: k-NN novelty against the rest of the archive.
         qd_score: Combined quality-diversity score.
         reward_uncapped: Base + info-bonus − cheat, with no hard-fail cap.
@@ -427,17 +432,28 @@ class SelectionPressure:
         return result
 
     def _extract_behaviour_descriptor(self, run: Any) -> list[float]:
-        """Topology-based descriptor parsed from the workflow source.
+        """Failure-fingerprint descriptor read from the verifier's output.
 
-        Reads ``run.code`` and returns a fixed-length vector of structural features.
+        Per-source pass rates are centered to a quality-free profile by
+        :func:`failure_fingerprint.compute_failure_fingerprint` and persisted
+        under ``state_result['evaluation']['verifier']['failure_fingerprint']``.
+        This method projects that vector out so QD novelty measures *how*
+        candidates fail relative to each other, not whether they fail.
+
+        When the run has no usable fingerprint (verifier not yet run,
+        short-circuit on a fully failed workflow) the neutral zero vector
+        is returned so distance lookups stay well-defined.
 
         Args:
-            run: Object exposing a ``code`` attribute with workflow source.
+            run: Object exposing a ``state_result`` attribute populated by
+                the evolution loop after evaluation.
 
         Returns:
-            Fixed-length feature vector used as a behaviour descriptor.
+            Centered fingerprint of length ``DESCRIPTOR_DIM``.
         """
-        return extract_code_features(_safe_attr(run, "code", None))
+        state_result = _safe_attr(run, "state_result", None)
+        fp = failure_fingerprint_from_state_result(state_result)
+        return fp if fp is not None else neutral_fingerprint()
 
     def _compute_novelty(self, descriptor: list[float]) -> float:
         """Compute novelty as mean distance to k-nearest archive members.
@@ -676,21 +692,42 @@ def _euclidean(a: list[float], b: list[float]) -> float:
 if __name__ == "__main__":
     from types import SimpleNamespace
 
-    sp = SelectionPressure(strategy="qd", population_size=50, novelty_k_neighbours=25, novelty_weight=0.4)
+    def _state(vector: list[float]) -> dict[str, Any]:
+        """Build a state_result stub carrying a centered failure fingerprint."""
+        return {
+            "evaluation": {
+                "verifier": {
+                    "failure_fingerprint": {
+                        "vector": vector,
+                        "presence_mask": [1.0] * _DESCRIPTOR_DIM,
+                        "pass_rates": [0.5] * _DESCRIPTOR_DIM,
+                    }
+                }
+            }
+        }
+
+    sp = SelectionPressure(
+        strategy="qd", population_size=50, novelty_k_neighbours=25, novelty_weight=0.4,
+    )
 
     seed = SimpleNamespace(
         reward=0.97, reward_uncapped=1.05, current_uuid="seed",
-        iteration_count=1, cost=0.0, code="x=1",
+        iteration_count=1, cost=0.0,
+        state_result=_state([0.3, -0.2, 0.0, 0.0, -0.1, 0.0]),
     )
     sp._validate_open_ended([seed], [seed], threshold=0.01)
     assert len(sp._archive) == 1, sp._archive
 
+    # Different failure profile: D and E refuted instead of A — should land
+    # despite a lower reward, because its fingerprint is far from the seed's.
     distinct = SimpleNamespace(
         reward=0.91, reward_uncapped=0.91, current_uuid="distinct",
         iteration_count=5, cost=0.0,
-        code="\n".join(["def f():"] + ["    x = 'y' * 800"] * 6),
+        state_result=_state([-0.2, 0.1, 0.0, -0.4, 0.5, 0.0]),
     )
     sp._validate_open_ended([seed], [distinct], threshold=0.01)
-    assert len(sp._archive) == 2, f"distinct sibling rejected; archive={[m.uuid for m in sp._archive]}"
+    assert len(sp._archive) == 2, (
+        f"distinct sibling rejected; archive={[m.uuid for m in sp._archive]}"
+    )
 
-    print("smoke OK: distinct sibling admitted alongside higher-reward seed")
+    print("smoke OK: distinct failure profile admitted alongside higher-reward seed")
