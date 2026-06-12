@@ -178,20 +178,51 @@ def load_memory_chunks(memory_dir: Path) -> list[MemoryChunk]:
     return chunks
 
 
+def _available_runs(base: Path) -> list[str]:
+    """Return run-directory names under *base* that contain memory JSONs,
+    sorted newest-first by mtime.
+    """
+    try:
+        candidates = [
+            p for p in base.iterdir()
+            if p.is_dir() and any(p.glob("*.json"))
+        ]
+    except OSError:
+        return []
+    return [p.name for p in sorted(
+        candidates, key=lambda p: p.stat().st_mtime, reverse=True,
+    )]
+
+
 def resolve_run_dir(config: Config, run_uuid: str | None) -> Path:
     """Return the memory directory for *run_uuid* or the latest run if None."""
     base = Path(config.memory_dir)
     if not base.is_dir():
-        raise FileNotFoundError(f"Memory base directory missing: {base}")
+        raise FileNotFoundError(
+            f"Memory base directory missing: {base}\n"
+            "Run Mimosa at least once to populate sources/memory/<run_uuid>/."
+        )
     if run_uuid:
         target = base / run_uuid
         if not target.is_dir():
-            raise FileNotFoundError(f"Memory run directory missing: {target}")
+            available = _available_runs(base)
+            hint = ""
+            if available:
+                preview = ", ".join(available[:5])
+                more = f" (+{len(available) - 5} more)" if len(available) > 5 else ""
+                hint = f"\nAvailable runs (newest first): {preview}{more}"
+            else:
+                hint = f"\nNo populated run directories found under {base}."
+            raise FileNotFoundError(
+                f"Memory run directory missing: {target}{hint}"
+            )
         return target
-    candidates = [p for p in base.iterdir() if p.is_dir() and any(p.glob("*.json"))]
-    if not candidates:
-        raise FileNotFoundError(f"No run subdirectories found under {base}")
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    available = _available_runs(base)
+    if not available:
+        raise FileNotFoundError(
+            f"No run subdirectories with memory JSONs found under {base}."
+        )
+    return base / available[0]
 
 
 # ── Retrieval index ───────────────────────────────────────────────────────
@@ -201,14 +232,32 @@ class MemoryIndex:
     def __init__(self, chunks: list[MemoryChunk],
                  model_name: str = DEFAULT_EMBED_MODEL) -> None:
         """Embed all *chunks* with *model_name* (downloaded on first use)."""
-        from sentence_transformers import SentenceTransformer
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError(
+                "sentence-transformers is required for memory chat. "
+                "Install it with: pip install sentence-transformers"
+            ) from exc
         self.chunks = chunks
-        self.model = SentenceTransformer(model_name)
+        try:
+            self.model = SentenceTransformer(model_name)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load embedding model '{model_name}': {exc}. "
+                "Check your network connection (the model is downloaded "
+                "on first use) and that the model name is correct."
+            ) from exc
         texts = [c.embed_text for c in chunks]
         if texts:
-            vectors = self.model.encode(
-                texts, normalize_embeddings=True, show_progress_bar=False
-            )
+            try:
+                vectors = self.model.encode(
+                    texts, normalize_embeddings=True, show_progress_bar=False
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to embed {len(texts)} memory chunk(s): {exc}"
+                ) from exc
             self.matrix = np.asarray(vectors, dtype=np.float32)
         else:
             self.matrix = np.zeros((0, 0), dtype=np.float32)
@@ -340,6 +389,7 @@ class MemoryChatCLI:
         self.cursor = 0  # index into self.turns (which one we're viewing)
         self.scroll = 0
         self.code_scroll = 0
+        self._status_message: str = ""  # transient banner shown on row 1
 
     # -- bootstrap -----------------------------------------------------
     def _bootstrap(self) -> None:
@@ -398,6 +448,14 @@ class MemoryChatCLI:
             stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
         except curses.error:
             pass
+        # Transient status banner (one line, cleared after the next keypress).
+        if self._status_message:
+            try:
+                stdscr.attron(curses.color_pair(3))
+                stdscr.addstr(1, 0, self._status_message.ljust(width)[:width])
+                stdscr.attroff(curses.color_pair(3))
+            except curses.error:
+                pass
 
     def _draw_help(self, stdscr, h: int, w: int) -> None:
         try:
@@ -472,13 +530,48 @@ class MemoryChatCLI:
             return
         # Show a busy banner so the user knows we're querying
         stdscr.clear()
-        stdscr.addstr(0, 0, "  Thinking… (retrieving + querying judge model)")
-        stdscr.refresh()
-        turn = self._ask(question)
+        try:
+            stdscr.addstr(0, 0, "  Thinking… (retrieving + querying judge model)")
+            stdscr.refresh()
+        except curses.error:
+            pass
+        try:
+            turn = self._ask(question)
+        except Exception as exc:
+            # Never let an LLM/retrieval error crash the curses UI — surface
+            # the error inside a Turn so the user can keep browsing.
+            turn = _Turn(
+                question=question,
+                answer=f"[Error while answering this question: {exc}]",
+                hits=[],
+            )
+            self._status_message = f"⚠ ask failed: {exc}"
         self.turns.append(turn)
         self.cursor = len(self.turns) - 1
         self.scroll = 0
         self.code_scroll = 0
+
+    def _handle_reload(self) -> None:
+        """Reload memory chunks from disk and rebuild the embedding index."""
+        try:
+            reloaded = load_memory_chunks(self.run_dir)
+        except Exception as exc:
+            self._status_message = f"⚠ reload failed: {exc}"
+            return
+        if not reloaded:
+            self._status_message = (
+                f"⚠ reload found no memory chunks in {self.run_dir.name} "
+                "— keeping current index."
+            )
+            return
+        try:
+            new_index = MemoryIndex(reloaded)
+        except Exception as exc:
+            self._status_message = f"⚠ reload index rebuild failed: {exc}"
+            return
+        self.chunks = reloaded
+        self.index = new_index
+        self._status_message = f"✓ reloaded {len(self.chunks)} chunks."
 
     def _loop(self, stdscr) -> None:
         """Curses main loop — runs until the user quits."""
@@ -486,6 +579,9 @@ class MemoryChatCLI:
         while True:
             self._render(stdscr)
             key = stdscr.getch()
+            # Clear transient status banner on the next keypress so it doesn't
+            # linger forever.
+            self._status_message = ""
             if key in (ord("q"), ord("Q")):
                 return
             if key in (ord("a"), ord("A")):
@@ -507,15 +603,19 @@ class MemoryChatCLI:
             elif key == ord("C"):
                 self.code_scroll = max(0, self.code_scroll - 5)
             elif key in (ord("r"), ord("R")):
-                self.chunks = load_memory_chunks(self.run_dir)
-                if self.chunks:
-                    self.index = MemoryIndex(self.chunks)
+                self._handle_reload()
 
     # -- public entry --------------------------------------------------
     def run(self) -> None:
         """Bootstrap the index/LLM and launch the curses UI."""
         print(f"  Loading memory from {self.run_dir} …")
-        self._bootstrap()
+        try:
+            self._bootstrap()
+        except RuntimeError as exc:
+            # Surfaced from MemoryIndex (embedding model load/encoding) or
+            # missing chunks. Print a clean message and bail without curses.
+            print(f"\n  ❌  Could not initialise memory chat: {exc}\n")
+            return
         print(f"  Loaded {len(self.chunks)} chunks. Embedding ready.")
         print("  Starting interactive UI…")
 
