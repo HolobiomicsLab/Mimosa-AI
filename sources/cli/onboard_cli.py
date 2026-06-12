@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import os
 import sys
@@ -154,15 +155,169 @@ def _call_llm(llm: LLMProvider, system: str, user: str) -> str:
     return llm(user, use_cache=False)
 
 
-def _parse_json_response(raw: str) -> dict:
-    """Strip markdown fences and parse JSON."""
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = "\n".join(
-            line for line in raw.splitlines()
+_TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
+
+
+def _strip_md_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = "\n".join(
+            line for line in text.splitlines()
             if not line.strip().startswith("```")
         ).strip()
-    return json.loads(raw)
+    return text
+
+
+def _repair_json(text: str) -> str:
+    """Apply small lossless repairs to make malformed LLM JSON parseable.
+
+    Currently: drop trailing commas before `}` or `]`. We deliberately do NOT
+    try to escape interior quotes here — that requires real parsing and the
+    regex fallback in `_parse_json_response` handles that case instead.
+    """
+    return _TRAILING_COMMA_RE.sub(r"\1", text)
+
+
+def _extract_string_field(text: str, key: str) -> str | None:
+    """Lenient extraction of a JSON string field, tolerating unescaped quotes.
+
+    Uses a lazy match anchored on the next key (`"key": `) or the closing `}`,
+    so interior `"` characters are preserved instead of prematurely closing
+    the string.
+    """
+    pattern = (
+        rf'"{re.escape(key)}"\s*:\s*"(.*?)"\s*'
+        rf'(?=,\s*"[A-Za-z_][A-Za-z0-9_]*"\s*:|\}})'
+    )
+    m = re.search(pattern, text, flags=re.DOTALL)
+    return m.group(1) if m else None
+
+
+def _extract_bool_field(text: str, key: str) -> bool | None:
+    m = re.search(
+        rf'"{re.escape(key)}"\s*:\s*(true|false)\b',
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        return None
+    return m.group(1).lower() == "true"
+
+
+def _extract_number_field(text: str, key: str) -> float | None:
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*(-?\d+(?:\.\d+)?)', text)
+    return float(m.group(1)) if m else None
+
+
+def _extract_known_keys(text: str, expected_keys: dict[str, str]) -> dict | None:
+    """Pull out a known set of top-level keys via regex.
+
+    Last-ditch fallback for when ``json.loads`` cannot parse the LLM response
+    (typically because of unescaped quotes deep inside a long string value).
+
+    Args:
+        text: Raw JSON-ish text.
+        expected_keys: Mapping of ``key -> "str" | "bool" | "number"``.
+
+    Returns:
+        Dict with whatever keys were successfully extracted, or None if nothing
+        could be pulled out.
+    """
+    out: dict = {}
+    for key, kind in expected_keys.items():
+        if kind == "str":
+            val = _extract_string_field(text, key)
+        elif kind == "bool":
+            val = _extract_bool_field(text, key)
+        elif kind == "number":
+            val = _extract_number_field(text, key)
+        else:
+            val = None
+        if val is not None:
+            out[key] = val
+    return out or None
+
+
+def _parse_json_response(
+    raw: str,
+    expected_keys: dict[str, str] | None = None,
+) -> dict:
+    """Robustly parse JSON from an LLM response.
+
+    Stages:
+      1. Strip markdown fences.
+      2. ``json.loads`` directly.
+      3. Substring between the first '{' and last '}', then ``json.loads``.
+      4. Light repair (trailing-comma removal), then ``json.loads``.
+      5. Regex extraction of known keys (only when ``expected_keys`` provided).
+
+    The regex stage is what saves us from unescaped quotes inside long string
+    values — the classic OpenRouter-quantized-provider failure mode.
+    """
+    text = _strip_md_fences(raw)
+    if not text:
+        raise ValueError("Empty LLM response.")
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    start, end = text.find("{"), text.rfind("}")
+    snippet = text[start : end + 1] if 0 <= start < end else text
+
+    try:
+        return json.loads(snippet)
+    except json.JSONDecodeError:
+        pass
+
+    repaired = _repair_json(snippet)
+    last_err: Exception
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError as exc:
+        last_err = exc
+
+    if expected_keys:
+        extracted = _extract_known_keys(snippet, expected_keys)
+        if extracted:
+            return extracted
+
+    raise ValueError(f"Could not parse JSON ({last_err}).")
+
+
+def _call_llm_json(
+    llm: LLMProvider,
+    system: str,
+    user: str,
+    expected_keys: dict[str, str] | None = None,
+    retries: int = 2,
+) -> dict:
+    """Call the LLM expecting JSON; retry with self-correction on parse failure.
+
+    On each parse failure the user prompt is augmented with the parser error
+    plus an explicit reminder to escape interior quotes, newlines and
+    backslashes. This recovers the common case where the LLM emitted nearly
+    valid JSON but missed an escape.
+    """
+    last_err: Exception | None = None
+    current_user = user
+    for _ in range(retries + 1):
+        raw = _call_llm(llm, system, current_user)
+        try:
+            return _parse_json_response(raw, expected_keys=expected_keys)
+        except (ValueError, json.JSONDecodeError) as exc:
+            last_err = exc
+            current_user = (
+                f"{user}\n\n"
+                f"IMPORTANT: your previous response could not be parsed as JSON "
+                f"(parser error: {exc}). Return ONLY a single valid JSON object "
+                f"— no prose, no markdown fences. Escape every interior "
+                f'double-quote as \\", every newline as \\n, and every '
+                f"backslash as \\\\."
+            )
+    assert last_err is not None
+    raise last_err
 
 
 # ---------------------------------------------------------------------------
@@ -181,14 +336,21 @@ Given the user's current objective (and any additional context they provided), d
    can act on directly (include dataset names, metrics, file paths, or any specifics \
    already mentioned).
 
-Return ONLY valid JSON (no markdown fences) in this exact shape:
+Return ONLY valid JSON (no markdown fences, no prose before or after) in this exact shape:
 {
   "is_clear": true | false,
   "question": "<single clarifying question, or empty string if clear>",
   "refined_prompt": "<actionable restatement of the full objective, or empty string if not yet clear>"
 }
 
-Rules:
+JSON formatting rules (CRITICAL — failure to follow these breaks downstream parsing):
+- Escape EVERY interior double-quote as \\".  e.g. write  She said \\"hi\\"  not  She said "hi".
+- Escape every newline inside a string as \\n.
+- Escape every backslash as \\\\.
+- No trailing commas, no comments, no markdown fences.
+- The entire response must be a single JSON object — nothing else.
+
+Content rules:
 - Ask at most ONE question per turn.
 - Only mark is_clear=true when you have enough detail to write a rich refined_prompt.
 - The refined_prompt must incorporate ALL context provided so far.
@@ -209,13 +371,18 @@ MODES:
   building an end-to-end ML pipeline from scratch, running a complete bioinformatics
   analysis across several steps.
 
-Return ONLY valid JSON (no markdown fences) like:
+Return ONLY valid JSON (no markdown fences, no prose) in this exact shape:
 {
   "mode": "task" | "goal",
   "confidence": 0.0-1.0,
   "reasoning": "<one sentence>",
-  "suggested_label": "<a short ≤ 8-word label for the objective>"
+  "suggested_label": "<a short label of 8 words or fewer for the objective>"
 }
+
+JSON formatting rules:
+- Escape interior quotes as \\", newlines as \\n, backslashes as \\\\.
+- No trailing commas, no comments, no fences.
+- The entire response must be a single JSON object — nothing else.
 """
 
 
@@ -530,18 +697,33 @@ class OnboardCLI:
             print(f"    {CYAN}none{RESET}          – {RED}delete all{RESET} files in the workspace")
             print()
 
-            choice = _ask("Files to keep").strip().lower()
+            while True:
+                choice = _ask("Files to keep").strip().lower()
 
-            if choice == "all":
-                kept_files = list(file_list)
-                _ok(f"Keeping all {len(kept_files)} file(s).")
-            elif choice == "none" or choice == "":
-                # Delete everything
-                kept_files = []
-            else:
+                if choice == "all":
+                    kept_files = list(file_list)
+                    _ok(f"Keeping all {len(kept_files)} file(s).")
+                    break
+                if choice == "none":
+                    # Delete everything (explicit user choice)
+                    kept_files = []
+                    if not _ask_yn(
+                        "Confirm: delete ALL files in the workspace?",
+                        default=False,
+                    ):
+                        _info("Aborted — please choose again.")
+                        continue
+                    break
+                if choice == "":
+                    _warn("Empty input — please type numbers, 'all', or 'none'.")
+                    continue
+
                 # Parse comma-separated indices
                 selected_indices: set[int] = set()
+                had_bad_token = False
                 for part in choice.replace(" ", "").split(","):
+                    if not part:
+                        continue
                     # Support ranges like "1-5"
                     if "-" in part:
                         bounds = part.split("-", 1)
@@ -549,21 +731,36 @@ class OnboardCLI:
                             lo, hi = int(bounds[0]), int(bounds[1])
                             selected_indices.update(range(lo, hi + 1))
                         except ValueError:
-                            _warn(f"Ignoring invalid range: {part}")
+                            _warn(f"Invalid range: {part}")
+                            had_bad_token = True
                     else:
                         try:
                             selected_indices.add(int(part))
                         except ValueError:
-                            _warn(f"Ignoring invalid number: {part}")
+                            _warn(f"Invalid number: {part}")
+                            had_bad_token = True
 
-                for idx in sorted(selected_indices):
-                    if 1 <= idx <= len(file_list):
-                        kept_files.append(file_list[idx - 1])
+                kept_files = [
+                    file_list[idx - 1]
+                    for idx in sorted(selected_indices)
+                    if 1 <= idx <= len(file_list)
+                ]
 
                 if kept_files:
                     _ok(f"Keeping {len(kept_files)} file(s).")
+                    break
+                # No valid indices — re-ask instead of silently deleting all.
+                if had_bad_token:
+                    _warn(
+                        "No valid file numbers recognised. "
+                        "Please type indices like '1,3,5' or '1-5', "
+                        "or 'all' / 'none'."
+                    )
                 else:
-                    _warn("No valid files selected — all files will be deleted.")
+                    _warn(
+                        "No files selected. Type 'none' explicitly if you "
+                        "want to delete everything."
+                    )
 
             # ── Perform deletion of un-kept files ─────────────────────
             if kept_files and len(kept_files) < len(file_list):
@@ -697,31 +894,45 @@ class OnboardCLI:
             _warn("No matching API key found — enter a model ID manually.")
 
         print()
-        if suggested:
-            choice = _ask(
-                "Select number, 'c' for custom, or Enter to keep current",
-                default="",
-            )
-        else:
-            choice = _ask("Select number or 'c' for custom")
+        while True:
+            if suggested:
+                choice = _ask(
+                    "Select number, 'c' for custom, or Enter to keep current",
+                    default="",
+                )
+            else:
+                choice = _ask("Select number or 'c' for custom")
 
-        if not choice and suggested:
-            return suggested
-        if choice.lower() == "c" or (not available):
-            custom = _ask(
-                "Enter model ID  (e.g. openai/gpt-4o, "
-                "anthropic/claude-3-5-sonnet-20241022)"
-            )
-            return custom.strip() if custom.strip() else suggested
-        # Numbered selection
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(available):
-                return available[idx][1]
-            _warn(f"Invalid selection '{choice}'. Using default.")
-        except ValueError:
-            _warn(f"Unrecognised input '{choice}'. Using default.")
-        return suggested or (available[0][1] if available else "")
+            if not choice and suggested:
+                return suggested
+            if choice.lower() == "c" or (not available):
+                custom = _ask(
+                    "Enter model ID  (e.g. openai/gpt-4o, "
+                    "anthropic/claude-3-5-sonnet-20241022)"
+                ).strip()
+                if custom:
+                    return custom
+                if suggested:
+                    _warn("No model ID entered — keeping current.")
+                    return suggested
+                _warn("No model ID entered — please try again.")
+                continue
+            # Numbered selection
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(available):
+                    return available[idx][1]
+                _warn(
+                    f"Number out of range: {choice}. "
+                    f"Please pick 1-{len(available)} or 'c'."
+                )
+                continue
+            except ValueError:
+                _warn(
+                    f"Unrecognised input '{choice}'. "
+                    "Please pick a number, 'c', or press Enter to keep current."
+                )
+                continue
 
     def _choose_models(self) -> None:
         """Step 3 – model selection.
@@ -829,7 +1040,14 @@ class OnboardCLI:
             width=70, indent=2,
         ))
 
-        llm = _build_llm(self.config, temperature=0.3, max_tokens=768)
+        # Lower temperature → more reliable JSON; bigger token budget so long
+        # refined_prompts don't get truncated mid-string.
+        llm = _build_llm(self.config, temperature=0.1, max_tokens=1024)
+        expected_keys = {
+            "is_clear": "bool",
+            "question": "str",
+            "refined_prompt": "str",
+        }
 
         # Accumulate context: original objective + Q&A pairs
         context_lines: list[str] = [f"Objective: {self._objective}"]
@@ -841,21 +1059,32 @@ class OnboardCLI:
             print(f"\n{DIM}  [Clarification round {round_num + 1}/{max_clarification_rounds}]{RESET}")
 
             try:
-                raw = _call_llm(llm, _CLARIFIER_SYSTEM, full_context)
-                result = _parse_json_response(raw)
+                result = _call_llm_json(
+                    llm,
+                    _CLARIFIER_SYSTEM,
+                    full_context,
+                    expected_keys=expected_keys,
+                )
             except Exception as exc:
-                _warn(f"LLM clarification failed ({exc}). Skipping refinement.")
+                _warn(
+                    f"LLM clarification failed after retries ({exc}). "
+                    "Falling back to manual refinement."
+                )
+                self._manual_refinement_fallback()
                 return
 
-            is_clear = result.get("is_clear", False)
-            question = result.get("question", "").strip()
-            refined_prompt = result.get("refined_prompt", "").strip()
+            is_clear = bool(result.get("is_clear", False))
+            question = str(result.get("question", "")).strip()
+            refined_prompt = str(result.get("refined_prompt", "")).strip()
 
             if not is_clear and question:
                 # Ask the clarifying question
                 print()
                 print(f"  {BOLD}Assistant:{RESET}  {question}")
-                answer = _ask("Your answer")
+                answer = _ask("Your answer (or 'skip' to stop clarifying)")
+                if answer.lower() in ("skip", "stop", "done"):
+                    _info("Stopping clarification — using current objective.")
+                    return
                 if answer:
                     context_lines.append(f"Q: {question}")
                     context_lines.append(f"A: {answer}")
@@ -888,11 +1117,34 @@ class OnboardCLI:
                     _ok(f"Continuing with: {self._objective[:80]}")
                     return
 
+            # Neither a usable question nor a refined prompt — nudge the LLM
+            # and retry within the same loop round budget.
+            _info("LLM returned an incomplete response — retrying.")
+            context_lines.append(
+                "(Reminder: respond with valid JSON containing either a "
+                "clarifying question OR a refined_prompt — never both empty.)"
+            )
+
         # Exhausted rounds without clarity — keep whatever we have
         _warn(
             f"Clarification loop completed ({max_clarification_rounds} rounds). "
             "Using current objective as-is."
         )
+
+    def _manual_refinement_fallback(self) -> None:
+        """Offer the user a way to refine the objective by hand when the LLM
+        clarification round cannot recover.
+        """
+        print()
+        _info("You can refine your objective manually below.")
+        edited = _ask(
+            "Edit your objective (press Enter to keep it as-is)"
+        )
+        if edited:
+            self._objective = edited.strip()
+            _ok(f"Objective updated: {self._objective[:80]}")
+        else:
+            _info("Keeping objective as-is.")
 
     def _classify_and_confirm(self) -> None:
         """Use LLM to classify objective as goal or task, confirm with user."""
@@ -903,23 +1155,46 @@ class OnboardCLI:
         ))
 
         classification: dict | None = None
-        llm = _build_llm(self.config, temperature=0.0, max_tokens=256)
+        llm = _build_llm(self.config, temperature=0.0, max_tokens=384)
+        expected_keys = {
+            "mode": "str",
+            "confidence": "number",
+            "reasoning": "str",
+            "suggested_label": "str",
+        }
 
         try:
-            raw = _call_llm(
+            classification = _call_llm_json(
                 llm,
                 _CLASSIFIER_SYSTEM,
                 f"Classify this research objective:\n\n{self._objective}",
+                expected_keys=expected_keys,
             )
-            classification = _parse_json_response(raw)
         except Exception as exc:
-            _warn(f"LLM classification failed ({exc}). Falling back to manual selection.")
+            _warn(
+                f"LLM classification failed after retries ({exc}). "
+                "Falling back to manual selection."
+            )
 
         if classification:
-            mode       = classification.get("mode", "task")
-            confidence = float(classification.get("confidence", 0.0))
-            reasoning  = classification.get("reasoning", "")
-            label      = classification.get("suggested_label", self._objective[:40])
+            mode_raw = str(classification.get("mode", "")).lower().strip()
+            if mode_raw not in ("task", "goal"):
+                _warn(
+                    f"LLM returned an unexpected mode '{mode_raw}'. "
+                    "Falling back to manual selection."
+                )
+                classification = None
+
+        if classification:
+            mode       = mode_raw  # validated above
+            try:
+                confidence = float(classification.get("confidence", 0.0))
+            except (TypeError, ValueError):
+                confidence = 0.0
+            reasoning  = str(classification.get("reasoning", ""))
+            label      = str(
+                classification.get("suggested_label", self._objective[:40])
+            )
 
             print()
             print(f"  {BOLD}Suggested mode:{RESET}  {CYAN}{mode.upper()}{RESET}  "
@@ -939,13 +1214,20 @@ class OnboardCLI:
                 self._mode = mode  # type: ignore[assignment]
                 return
 
-        # Manual fallback / override
+        # Manual fallback / override — loop until the user picks a valid mode.
         print()
         print(f"  {BOLD}Available modes:{RESET}")
         print(f"    {CYAN}goal{RESET}  – high-level research objective (planner + evolution engine)")
         print(f"    {CYAN}task{RESET}  – single focused operation (evolution engine only)")
-        choice = _ask("Choose mode", default="task").lower()
-        self._mode = "goal" if choice.startswith("g") else "task"
+        while True:
+            choice = _ask("Choose mode (goal/task)", default="task").lower().strip()
+            if choice in ("goal", "g"):
+                self._mode = "goal"
+                break
+            if choice in ("task", "t"):
+                self._mode = "task"
+                break
+            _warn(f"Unrecognised choice '{choice}'. Please type 'goal' or 'task'.")
         _ok(f"Mode set to: {self._mode.upper()}")
 
     def _collect_options(self) -> None:
