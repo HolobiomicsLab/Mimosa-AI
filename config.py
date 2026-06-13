@@ -38,17 +38,17 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace_2"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5100)
+            AddressMCP(ip="0.0.0.0", port_min=5101, port_max=5200)
         ]
 
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/mistralai/mistral-large-2407"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-pro"
         self.judge_model = "openrouter/qwen/qwen3.7-max"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
@@ -68,8 +68,8 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.94
-        self.max_learning_evolve_iterations = 35
+        self.learned_score_threshold = 0.9
+        self.max_learning_evolve_iterations = 20
 
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 2  # Number of concurrent tasks for CSV evaluation mode
