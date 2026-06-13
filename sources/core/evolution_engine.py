@@ -542,7 +542,7 @@ class EvolutionEngine:
             rewards_history, assertion_history,
             runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
-        self._refresh_evolution_tree()
+        self._refresh_evolution_tree(runs[-1].goal, uuid)
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
@@ -883,16 +883,31 @@ class EvolutionEngine:
             title=f"Workflow {uuid} completed.",
         )
 
-    def _refresh_evolution_tree(self) -> None:
-        """Re-render the evolution-tree PNG after each iteration.
+    def _refresh_evolution_tree(
+        self, goal: str | None = None, uuid: str | None = None
+    ) -> None:
+        """Re-render the goal-specific evolution-tree PNG after each iteration.
+
+        Scans only workflows whose ``goal_<uuid>.txt`` matches *goal* so trees
+        from different runs no longer pile into one root-level image, and writes
+        the result to ``<workflow_dir>/<uuid>/evolution_tree.png``.
 
         Best-effort: scanning failures are logged and swallowed so an issue
         rendering the tree never aborts an evolution run. The visualizer is
         imported lazily to avoid a circular import via ``sources.core``.
         """
+        if not uuid:
+            return
+        workflow_path = Path(self.workflow_dir) / uuid
+        if not workflow_path.is_dir():
+            return
         try:
             from sources.utils.evolution_tree import render_evolution_tree
-            output = render_evolution_tree(self.workflow_dir)
+            output = render_evolution_tree(
+                self.workflow_dir,
+                output_path=workflow_path / "evolution_tree.png",
+                goal=goal,
+            )
             if output is not None:
                 self.logger.info(f"Evolution tree refreshed: {output}")
         except Exception as e:
