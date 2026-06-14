@@ -3,7 +3,7 @@
   "discovery_addresses": [
     {
       "ip": "0.0.0.0",
-      "port_min": 5000,
+      "port_min": 5001,
       "port_max": 5200
     }
   ],
