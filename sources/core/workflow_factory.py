@@ -90,10 +90,6 @@ class WorkflowFactory(Factory):
     def remove_imports(self, code: str) -> str:
         """Strip ``import``/``from ... import`` lines from LLM-generated code.
 
-        The generated workflow body is concatenated with a host script that
-        already provides the standard imports, so any LLM-emitted imports are
-        stripped here to avoid duplication and unauthorised modules.
-
         Args:
             code: Source code potentially containing import statements.
 
@@ -119,10 +115,6 @@ class WorkflowFactory(Factory):
         allow_cache: bool,
     ) -> str:
         """Ask the LLM to generate a workflow body.
-
-        Builds the user prompt from ``craft_instructions`` and
-        ``existing_tool_prompt`` and dispatches a single LLM call via
-        :class:`LLMProvider`.
 
         Args:
             system_prompt: System prompt that steers the workflow-creator LLM.
@@ -150,7 +142,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
-        temperature = random.uniform(0.7, 1.3)
+        temperature = random.uniform(0.7, 1.3) # enhance workflow diversity and avoid error repetition.
         self.logger.info(f"Workflow LLM temperature: {temperature:.2f}")
         llm_config = LLMConfig(
             model=model,

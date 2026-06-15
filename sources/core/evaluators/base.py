@@ -128,6 +128,7 @@ class BaseEvaluator:
                 self.llm_config = LLMConfig().from_dict({
                     "model": model,
                     "provider": provider,
+                    "temperature": 0.2,
                     "reasoning_effort": config.reasoning_effort,
                     "max_tokens": getattr(config, 'max_tokens', 8192),
                     "openrouter_provider": config.openrouter_provider_for(self.judge_model),
