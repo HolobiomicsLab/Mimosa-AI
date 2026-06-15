@@ -1056,6 +1056,8 @@ class VerifierEvaluator(
         """Render a plain-text report from per-claim results and aggregate scores."""
         lines: list[str] = list(self._format_report_header(scores, min_importance))
         for c in per_claim:
+            if c["status"] == "error":
+                continue # this avoid execution error of verifier passed to textual gradient
             lines.extend(self._format_claim_entry(c, min_importance))
         lines.extend(self._format_cheat_section(cheat))
         return "\n".join(lines) + "\n"
