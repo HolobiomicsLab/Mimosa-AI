@@ -4,8 +4,6 @@ VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evo
 """
 
 import math
-from sentence_transformers import SentenceTransformer
-import torch.nn.functional as F
 from .workflow_info import WorkflowInfo
 
 from sources.cli.pretty_print import (
@@ -16,23 +14,16 @@ from sources.cli.pretty_print import (
 import numpy as np
 
 class VariationEngine:
-    """
-    Orchestrates iterative LLM-driven workflow search via structured prompt mutation.
-    Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
-      - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
-      - Applies a stagnation-driven mutation scope that widens exploration
-        breadth and grows the agent budget as recent offspring keep failing
-        the same way, damped by parent score so near-winners stay protected.
-    """
+    """Assemble mutation/crossover prompts and pick mutation scope from
+    Rechenberg 1/5 success rate and a non-improvement plateau counter."""
 
     def __init__(self) -> None:
-        """Initialise empty history buffers and lazy embedder state."""
+        """Initialise empty history buffers."""
         self.textual_gradient_history: list[tuple[str, bool]] = []
         # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
-        self._embedder: SentenceTransformer | None = None
         self.last_variation_state: dict = {}
 
     def record_offspring_gradient(
@@ -49,7 +40,7 @@ class VariationEngine:
             gradient: Free-text diagnosis of the offspring's failure mode.
                 Empty values are replaced with a sentinel placeholder.
             is_failure: Whether the offspring failed to execute at all
-                (excluded from semantic stagnation and success-rate stats).
+                (excluded from plateau-counter and success-rate stats).
             child_score: Overall score of the produced offspring, in ``[0, 1]``.
                 ``None`` when unavailable; such entries do not contribute to
                 the success-rate signal.
@@ -62,12 +53,11 @@ class VariationEngine:
         self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
-    def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
-        """Sample a random agent count within ``[lo, hi]``, biased upward by stagnation.
+    def _sample_agent_count(self, boldness: float, lo: int, hi: int, concentration: float = 4.0) -> int:
+        """Sample a random agent count within ``[lo, hi]``, biased upward by boldness.
 
         Args:
-            stagnation: Stagnation level in ``[0, 1]`` pulling the mean toward
-                ``hi``.
+            boldness: Boldness level in ``[0, 1]`` pulling the mean toward ``hi``.
             lo: Inclusive lower bound on the agent count.
             hi: Inclusive upper bound on the agent count.
             concentration: Beta concentration parameter; higher values
@@ -78,59 +68,32 @@ class VariationEngine:
         """
         if lo == hi:
             return lo
-        target_mean = lo + stagnation * (hi - lo)
+        target_mean = lo + boldness * (hi - lo)
         p = np.clip((target_mean - lo) / (hi - lo), 0.05, 0.95)
         alpha = p * concentration
         beta = (1 - p) * concentration
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
-    def _textual_gradient_similarity(self, a: str, b: str) -> float:
-        """Cosine similarity over MiniLM-encoded diagnoses.
+    def _iters_since_improvement(self) -> int:
+        """Length of the current run of scored offspring that did not beat best-so-far.
 
-        Args:
-            a: First diagnosis text.
-            b: Second diagnosis text.
-
-        Returns:
-            Cosine similarity in ``[-1, 1]``, or ``0.0`` when either text is empty.
+        Failures and ``None``-scored entries are skipped (no count, no break).
+        Returns ``0`` when the most recent scored offspring improved.
         """
-        if not a or not b:
-            return 0.0
-        if self._embedder is None:
-            self._embedder = SentenceTransformer("all-MiniLM-L6-v2", token=False)
-        emb_a = self._embedder.encode(a, convert_to_tensor=True, show_progress_bar=False)
-        emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
-        return F.cosine_similarity(emb_a, emb_b, dim=0).item()
+        count = 0
+        for c, b, is_failure in reversed(self.score_history):
+            if is_failure or c is None or b is None:
+                continue
+            if c > b + 1e-6:
+                break
+            count += 1
+        return count
 
-    def _compute_stagnation(self, window: int = 10) -> float:
-        """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1].
-
-        Args:
-            window: How many recent semantic gradients to consider.
-
-        Returns:
-            Stagnation in ``[0, 1]``; ``0.0`` when fewer than two non-failure
-            gradients are available.
-        """
-        semantic = [g for g, is_failure in self.textual_gradient_history if not is_failure]
-        recent = semantic[-window:]
-        if len(recent) < 2:
-            return 0.0
-        sims = [
-            self._textual_gradient_similarity(recent[i], recent[j])
-            for i in range(len(recent))
-            for j in range(i + 1, len(recent))
-        ]
-        raw = sum(sims) / len(sims) if sims else 0.0
-        # MiniLM unrelated baseline ≈ 0.4; treat 0.8+ as fully stagnated.
-        return float(np.clip((raw - 0.4) / 0.4, 0, 1))
-
-    # The Rechenberg success threshold — fraction of recent offspring that
-    # must improve on the best-so-far for the search to be considered
-    # "making progress". Below this, step size is grown; above, damped.
-    # 0.20 is the classical 1/5 success rule (Rechenberg 1973).
-    _SUCCESS_RULE_THRESHOLD = 0.20
+    _SUCCESS_RULE_THRESHOLD = 0.20   # Classical Rechenberg 1/5 rule.
+    _PLATEAU_PATIENCE = 6
+    _RESPECIATION_PATIENCE = 8
+    _RESPECIATION_CLAMP = 0.89       # Just below the 0.90 RE-SPECIATION band.
 
     def _compute_success_rate(self, window: int = 5) -> float | None:
         """Fraction of recent scored offspring that improved on best-so-far.
@@ -162,62 +125,48 @@ class VariationEngine:
         return sum(1 for c, b in recent if c > b + 1e-6) / len(recent)
 
     def _get_prompt_step_size(self, parent_score: float = 0.0) -> str:
-        """Evidence-based mutation scope (Rechenberg 1/5 success rule, 1973).
+        """Pick a boldness level and matching scope band for the next mutation.
 
-        Boldness is driven by two evidence signals, not by the parent's
-        absolute score:
+        Blends two fitness-grounded signals: ``success_rate`` (Rechenberg 1/5)
+        and ``plateau`` (``iters_since_improvement`` over ``_PLATEAU_PATIENCE``).
+        ``parent_score`` enters only as a near-finish damper in the last 5 %
+        of range. The top RE-SPECIATION band is hysteresis-gated: both
+        ``iters_since_improvement >= _RESPECIATION_PATIENCE`` and
+        ``success_rate in {None, 0.0}`` must hold.
 
-        - ``raw_stagnation`` — cosine similarity of recent textual gradients.
-          High → the search keeps diagnosing the same failure.
-        - ``success_rate`` — fraction of recent offspring that beat the
-          running best. Below the Rechenberg 1/5 threshold → step size is
-          too small / search is stuck → grow scope. Above → damp scope.
-
-        ``parent_score`` no longer multiplies the whole signal (that was a
-        state-based damper that locked high-score lineages into "tiny
-        tweak" mode even when the gradient repeated identically). It only
-        re-enters as a *near-finish* soft floor in the last 5 % of score
-        range, where a single regression could blow up a workflow about to
-        hit the early-stop threshold.
-
-        Updates ``self.agent_count_history`` as a side effect.
+        Updates ``self.agent_count_history`` and ``self.last_variation_state``.
 
         Args:
             parent_score: Parent reward in ``[0, 1]``.
 
         Returns:
-            A one-line human-readable mutation-scope directive embeddable in
-            the LLM prompt.
+            One-line mutation-scope directive embeddable in the LLM prompt.
         """
-        raw_stagnation = self._compute_stagnation()
+        iters_since_improvement = self._iters_since_improvement()
+        plateau = min(1.0, iters_since_improvement / self._PLATEAU_PATIENCE)
         success_rate = self._compute_success_rate()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
 
-        # ── Rechenberg 1/5 rule, projected onto a [0, 1] boldness scalar ──
         thr = self._SUCCESS_RULE_THRESHOLD
         if success_rate is None:
-            # Cold start — no improvement evidence yet. Trust gradient
-            # repetition alone; also the back-compat path when the caller
-            # does not pass scores.
-            effective = raw_stagnation
-        elif success_rate < thr:
-            # Search is stuck (or has never improved). Below 1/5, escalate
-            # at least up to the deficit even when gradient repetition is mild.
-            deficit = (thr - success_rate) / thr  # ∈ [0, 1]
-            effective = max(raw_stagnation, deficit)
-        else:
-            # Above 1/5 — real progress. Damp boldness in proportion to
-            # how far above threshold we are; at success_rate ≥ 0.80
-            # boldness collapses regardless of stagnation.
+            effective = 0.3 * plateau                            # cold start cap
+        elif success_rate >= thr:
             progress = min(1.0, (success_rate - thr) / (0.80 - thr))
-            effective = raw_stagnation * (1.0 - progress)
+            effective = plateau * (1.0 - progress)
+        else:
+            deficit = (thr - success_rate) / thr
+            effective = 0.5 * deficit + 0.5 * plateau
 
-        # Near-finish floor: only in the last 5 % of the score range do we
-        # re-introduce a mild parent_score damper, so the optimiser does
-        # not gamble away a 0.96 parent one generation before early-stop.
         near_finish = max(0.0, (parent_score - 0.95) / 0.05)
         effective *= (1.0 - 0.5 * near_finish)
         effective = float(np.clip(effective, 0.0, 1.0))
+
+        respeciation_allowed = (
+            iters_since_improvement >= self._RESPECIATION_PATIENCE
+            and (success_rate is None or success_rate == 0.0)
+        )
+        if not respeciation_allowed:
+            effective = min(effective, self._RESPECIATION_CLAMP)
 
         curr = self.agent_count_history[-1] if self.agent_count_history else 1
         budget = curr + round(effective * (self.max_possible_agents - curr))
@@ -227,7 +176,7 @@ class VariationEngine:
         sr_repr = "n/a" if success_rate is None else f"{success_rate:.2f}"
         msg = (
             f"Boldness effective={effective:.2f} "
-            f"(raw_stagnation={raw_stagnation:.2f}, "
+            f"(plateau={plateau:.2f}, iters_no_improve={iters_since_improvement}, "
             f"success_rate={sr_repr}, parent_score={parent_score:.2f})."
         )
         if effective > 0.5:
@@ -279,10 +228,12 @@ class VariationEngine:
         ]
         scope = next(label for threshold, label in bands if effective < threshold)
         self.last_variation_state = {
-            "stagnation": float(raw_stagnation),
+            "iters_since_improvement": int(iters_since_improvement),
+            "plateau": float(plateau),
             "success_rate": None if success_rate is None else float(success_rate),
             "effective_boldness": float(effective),
             "parent_score": float(parent_score),
+            "respeciation_gate_open": bool(respeciation_allowed),
             "scope_band": scope,
             "agent_budget": int(n_agents),
         }
@@ -513,37 +464,65 @@ class VariationEngine:
 if __name__ == "__main__":
     np.random.seed(0)
 
-    # ── _compute_stagnation: failures are excluded ────────────────────────
+    # ── _iters_since_improvement: empty history ──────────────────────────
+    ve = VariationEngine()
+    assert ve._iters_since_improvement() == 0
+    assert ve._compute_success_rate() is None
+
+    # ── _iters_since_improvement: failures and unscored entries skipped ──
     ve = VariationEngine()
     for _ in range(4):
         ve.record_offspring_gradient("anything", is_failure=True)
-    assert ve._compute_stagnation() == 0.0
-    assert ve._compute_success_rate() is None  # no scored offspring
+    ve.record_offspring_gradient("no scores attached")  # child_score=None
+    assert ve._iters_since_improvement() == 0
+    assert ve._compute_success_rate() is None
 
-    # ── _compute_stagnation: repeated gradient ⇒ high cosine ──────────────
+    # ── _iters_since_improvement: counts only consecutive non-improvers ──
+    ve = VariationEngine()
+    ve.record_offspring_gradient("improve", child_score=0.30, best_before=0.20)
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    ve.record_offspring_gradient("crash",   is_failure=True)  # transparent
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    assert ve._iters_since_improvement() == 3, ve._iters_since_improvement()
+
+    # ── _iters_since_improvement: latest improvement resets streak to 0 ──
     ve = VariationEngine()
     for _ in range(4):
-        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
-    assert ve._compute_stagnation() > 0.8
+        ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
+    ve.record_offspring_gradient("up", child_score=0.6, best_before=0.5)
+    assert ve._iters_since_improvement() == 0
 
-    # ── Plateau case: same gradient, zero improvement, high parent_score.
-    #    Old behaviour (state-based damping) wrongly returned "tiny tweak".
-    #    New behaviour (1/5 rule) must escalate scope.
+    # ── Plateau case: 5 non-improving offspring at 0.92.
+    #    Hysteresis gate keeps us out of RE-SPECIATION (iters=5 < 8) but
+    #    boldness must clear the smallest band.
     ve = VariationEngine()
     for _ in range(5):
         ve.record_offspring_gradient(
             "DATA_LEAKAGE: same diagnosis again",
             child_score=0.92,
-            best_before=0.92,  # no improvement
+            best_before=0.92,
         )
-    assert ve._compute_success_rate() == 0.0, "5/5 non-improving offspring"
+    assert ve._compute_success_rate() == 0.0
     plateau_step = ve._get_prompt_step_size(parent_score=0.92)
-    assert "tweak" not in plateau_step, (
-        "1/5 rule must lift scope past the smallest band when stuck:\n"
-        + plateau_step
-    )
+    state = ve.last_variation_state
+    assert state["effective_boldness"] >= 0.35, state
+    assert state["effective_boldness"] < 0.90, state
+    assert state["respeciation_gate_open"] is False, state
+    assert "RE-SPECIATION" not in plateau_step, plateau_step
 
-    # ── Real progress: every offspring beats best_before ⇒ damp boldness ──
+    # ── Hysteresis gate opens at iters_since_improvement ≥ 8 + success=0. ──
+    ve = VariationEngine()
+    for _ in range(8):
+        ve.record_offspring_gradient(
+            "stuck", child_score=0.5, best_before=0.5,
+        )
+    deep_stuck_step = ve._get_prompt_step_size(parent_score=0.5)
+    state = ve.last_variation_state
+    assert state["respeciation_gate_open"] is True, state
+    assert "RE-SPECIATION" in deep_stuck_step, deep_stuck_step
+
+    # ── Real progress: improvements drop boldness to the smallest band. ──
     ve = VariationEngine()
     prev_best = 0.5
     for inc in (0.05, 0.07, 0.09, 0.11, 0.13):
@@ -555,32 +534,30 @@ if __name__ == "__main__":
         prev_best += inc
     assert ve._compute_success_rate() == 1.0
     progress_step = ve._get_prompt_step_size(parent_score=0.5)
-    assert "tweak" in progress_step or "information flow" in progress_step, (
-        "When the search is improving steadily, scope should stay small:\n"
-        + progress_step
-    )
+    assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
+    assert "EXPLOITATION" in progress_step, progress_step
 
-    # ── Near-finish floor: at parent_score≥0.95 we damp by 50 %  ──────────
+    # ── Near-finish floor: at parent=1.0 the damper halves the pre-clamp
+    #    boldness. Use a 3-iter streak so the result stays well below the
+    #    hysteresis clamp at both parent scores — otherwise the clamp
+    #    masks the comparison.
     ve = VariationEngine()
-    for _ in range(5):
+    for _ in range(3):
         ve.record_offspring_gradient(
-            "stuck near finish",
-            child_score=0.96,
-            best_before=0.96,
+            "stuck near finish", child_score=0.5, best_before=0.5,
         )
-    near_finish_step = ve._get_prompt_step_size(parent_score=0.96)
-    # Boldness should still be > 0 (we are stuck), but capped.
-    print("near-finish step:", near_finish_step)
+    ve._get_prompt_step_size(parent_score=0.50)
+    bold_low_val = ve.last_variation_state["effective_boldness"]
+    ve._get_prompt_step_size(parent_score=1.00)
+    bold_high_val = ve.last_variation_state["effective_boldness"]
+    assert bold_low_val < 0.89 and bold_high_val < 0.89, (bold_low_val, bold_high_val)
+    assert abs(bold_high_val - 0.5 * bold_low_val) < 1e-6, (bold_high_val, bold_low_val)
 
-    # ── Cold start (no scores supplied): fall back to gradient-only ───────
+    # ── Cold start (no scores supplied): boldness stays ≤ 0.30. ───────────
     ve = VariationEngine()
-    for g in (
-        "DEEPCHEM_API_MISMATCH:The workflow produced a usable two-task probability prediction table, but the final training script is not reliably runnable because it calls an unavailable DeepChem model API, and it also lacks a clear held-out classification metric report.",
-        "INCONSISTENT_MULTITASK_SPLIT:The workflow generated plausible probability predictions, but its script and outputs were internally inconsistent, with duplicate molecule rows and weak evidence that the provided train/test split, ECFP features, and both ClinTox endpoints were actually used in a true two-output multitask classifier.",
-        "INCONSISTENT_MULTITASK_SPLIT:The workflow produced a plausible multitask ClinTox prediction table, but it showed serious integrity issues around endpoint/positive-class mapping, possible train-test contamination, and unclear alignment between molecules and their predicted probabilities.",
-    ):
+    for g in ("alpha", "beta", "gamma"):
         ve.record_offspring_gradient(g)
-        stag = ve._compute_stagnation()
         step = ve._get_prompt_step_size(parent_score=0.5)
-        print(f"Gradient prompt: {g}\nStagnation: {stag:.2f}\nPrompt step:\n{step}\n{'-'*40}")
+        assert ve.last_variation_state["effective_boldness"] <= 0.3 + 1e-9, ve.last_variation_state
+        print(f"Cold-start gradient '{g}': {step}")
     print("smoke OK")
