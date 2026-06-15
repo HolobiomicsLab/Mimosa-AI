@@ -263,7 +263,7 @@ class WorkflowSelector:
         goal: str,
         selection_pressure: SelectionPressure,
         n_parents: int = 2,
-        crossover_rate: float = 0.3,
+        crossover_rate: float = 0.1,
         threshold_similarity: float = 0.8,
         threshold_score: float = 0.1,
     ) -> tuple[list[WorkflowInfo], bool]:
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         goal=goal,
         selection_pressure=sp,
         n_parents=2,
-        crossover_rate=0.5,
+        crossover_rate=0.1,
     )
     mode = "CROSSOVER" if crossover else "MUTATION"
     print(f"  Mode: {mode}, Parents: {len(selected)}")

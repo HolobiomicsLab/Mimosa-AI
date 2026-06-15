@@ -244,7 +244,7 @@ class EvolutionEngine:
         self,
         goal: str,
         template_uuid: str | None = None,
-        crossover_rate: float = 0.4,
+        crossover_rate: float = 0.1,
         n_parents: int = 2,
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.

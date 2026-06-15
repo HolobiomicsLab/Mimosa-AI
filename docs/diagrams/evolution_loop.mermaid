@@ -27,7 +27,7 @@ flowchart TB
         ParentDraw{{"archive populated?"}}
         DrawArch["select_parent_workflows()<br/>QD-roulette over archive<br/>÷ (1 + n_children_already)"]
         DrawDisk["cold-start fallback:<br/>similarity-filtered disk scan"]
-        Decide{{"crossover_rate ≈ 0.4?<br/>(only once initial_population met)"}}
+        Decide{{"crossover_rate ≈ 0.1?<br/>(only once initial_population met)"}}
         Mut["mutation_prompt()<br/>evidence-driven scope (Rechenberg 1/5)<br/>raw_stagnation × success-rate gating"]
         Cross["crossover_prompt()<br/>best-parent-first ordering<br/>rubric-blind diagnosis"]
 
