@@ -1,6 +1,4 @@
-"""
-Per-claim verifier generation, sandboxed execution and scoring.
-"""
+"""Per-claim verifier generation, sandboxed execution and scoring."""
 
 from __future__ import annotations
 
@@ -12,21 +10,17 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Coroutine
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any, TypeVar
 
 if __name__ == "__main__":
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    )
 
-from sources.cli.pretty_print import (
-    CYAN,
-    DIM,
-    GREEN,
-    RED,
-    YELLOW,
-    print_box,
-)
+from sources.cli.pretty_print import CYAN, DIM, GREEN, RED, YELLOW, print_box
 from sources.core.workflow_runner import (
+    ExecutionResult,
     ExecutionStatus,
     RuntimeConfig,
     WorkflowRunner,
@@ -35,28 +29,40 @@ from sources.core.workflow_runner import (
 
 # ----- Verifier helper packages ----------------------------------------------
 # Installed once per process so verifier scripts can rely on them being
-# importable. Kept deliberately minimal: numerical + tabular + classical stats
-# + standard ML primitives. Anything heavier should be inferred from the
-# workflow's own declared dependencies, not bolted onto the verifier.
+# importable. Minimal on purpose: numerical + tabular + classical stats + ML.
 _VERIFIER_BASE_PACKAGES: tuple[str, ...] = (
-    "numpy",
-    "pandas",
-    "scipy",
-    "scikit-learn",
-    "pint",
-    "pydantic",
-    "pandera",
-    "jsonschema",
-    "sympy",
-    "openpyxl"
+    "numpy", "pandas", "scipy", "scikit-learn", "pint",
+    "pydantic", "pandera", "jsonschema", "sympy", "openpyxl",
 )
-
-# Python module names corresponding to ``_VERIFIER_BASE_PACKAGES``
-# (scikit-learn → sklearn). Used by the post-install smoke check.
+# Python module names corresponding to ``_VERIFIER_BASE_PACKAGES`` for the
+# post-install smoke check (scikit-learn → sklearn).
 _VERIFIER_BASE_IMPORTS: tuple[str, ...] = ("numpy", "pandas", "scipy", "sklearn")
 
 _VERIFIER_PACKAGES_INSTALLED = False
 _VERIFIER_INSTALL_LOCK = threading.Lock()
+
+# ----- Tunables --------------------------------------------------------------
+# Caps applied during the bounded-retry policy so a pathological claim cannot
+# snowball into an open-ended install + regen loop.
+_RECOVERY_MAX_INSTALL_PACKAGES = 6
+_RECOVERY_INSTALL_TIMEOUT_SECONDS = 300
+_RECOVERY_STDERR_FEEDBACK_LINES = 30
+# Substrings that identify a missing-dependency stderr; anything else is
+# treated as a generated-code bug and routed through script regeneration.
+_RECOVERY_IMPORT_MARKERS: tuple[str, ...] = (
+    "ModuleNotFoundError",
+    "ImportError: No module named",
+    "ImportError: cannot import name",
+)
+_BASE_INSTALL_TIMEOUT_SECONDS = 600
+_RUNNER_CLEANUP_TIMEOUT = 15
+_RUNNER_SMOKE_TIMEOUT = 15.0
+_RUNNER_EXTRA_TIMEOUT = 10
+_PIP_INSTALL_FLAGS: tuple[str, ...] = (
+    "--quiet", "--disable-pip-version-check", "--break-system-packages",
+)
+_PRINT_TRUNCATE_BYTES = 256
+_STDERR_TAIL_BYTES = 400
 
 
 T = TypeVar("T")
@@ -66,35 +72,25 @@ def _run_coro_sync(
     coro_factory: Callable[[], Coroutine[Any, Any, T]],
     thread_timeout: float | None = None,
 ) -> T:
-    """Run an async coroutine from sync code, even if a loop is already running.
-
-    The coroutine is built lazily so it can never be orphaned on a failed run.
-
-    Args:
-        coro_factory: Zero-arg callable that constructs the coroutine to await.
-        thread_timeout: When already inside a running loop, time budget in
-            seconds for the worker thread to finish before raising.
-
-    Returns:
-        The value returned by the coroutine.
-
-    Raises:
-        TimeoutError: When the worker thread exceeds ``thread_timeout``.
-        BaseException: Re-raises any exception raised by the coroutine.
-    """
+    """Run an async coroutine from sync code, even if a loop already runs."""
     try:
         asyncio.get_running_loop()
         in_loop = True
     except RuntimeError:
         in_loop = False
-
     if not in_loop:
         return asyncio.run(coro_factory())
+    return _run_coro_in_worker(coro_factory, thread_timeout)
 
+
+def _run_coro_in_worker(
+    coro_factory: Callable[[], Coroutine[Any, Any, T]],
+    thread_timeout: float | None,
+) -> T:
+    """Spawn a daemon thread to run *coro_factory*; raise on timeout/error."""
     holder: dict[str, Any] = {}
 
     def _target() -> None:
-        """Run the coroutine inside a worker thread and stash result/error."""
         try:
             holder["result"] = asyncio.run(coro_factory())
         except BaseException as exc:
@@ -126,98 +122,129 @@ class _VerifierPerClaimMixin:
         grounding: str = "",
         preloaded_spec: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Generate, execute (if executable) and score a single claim.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls and logs).
-            claim: Normalised claim dict with id, importance, description.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            grounding: Optional peer-reviewed literature grounding block.
-            preloaded_spec: Pre-built verifier spec from a lineage anchor.
-                When provided, both the file-selection LLM call and the
-                verifier-generation LLM call are skipped.
-
-        Returns:
-            Scored claim dict including verifier spec, status, score, and the
-            ``elapsed_s`` wall-clock spent in this call (used by the
-            orchestrator to render a per-claim timing table).
-        """
+        """Generate, execute and score a single claim; return the result dict."""
         t_start = time.time()
-        if preloaded_spec is None:
-            rel_files = self._llm_select_files(
-                uuid, claim, execution_text, workspace_listing
-            )
-            claim = {**claim, "likely_relevant_files": rel_files}
-        else:
-            rel_files = list(claim.get("likely_relevant_files") or [])
-        claim_text = (
-            f"id:          {claim.get('id')}\n"
-            f"importance:  {claim.get('importance')}\n"
-            f"description: {claim.get('description')}\n"
-            f"files:       {rel_files if rel_files else '(none)'}"
+        claim = self._resolve_relevant_files(
+            uuid, claim, execution_text, workspace_listing, preloaded_spec
         )
-        print_box(claim_text, title=f"Verifying claim {claim.get('id')}", color=CYAN)
-
-        spec = (
-            preloaded_spec
-            if preloaded_spec is not None
-            else self._generate_verifier(uuid, claim, execution_text, workspace_listing)
+        self._print_claim_header(claim)
+        spec = preloaded_spec or self._generate_verifier(
+            uuid, claim, execution_text, workspace_listing
         )
-
-        if spec.get("executable") and spec.get("code"):
-            code = spec["code"]
-            exec_result = self._run_verifier(uuid, claim["id"], code)
-
-            exit_status = exec_result.get("exit_status", "?")
-            run_status = exec_result.get("status", "?")
-            details = exec_result.get("details", "") or ""
-            stdout = exec_result.get("raw_stdout", "") or ""
-            stderr = exec_result.get("raw_stderr", "") or ""
-
-            run_color = GREEN if run_status == "pass" else (YELLOW if run_status == "fail" else RED)
-            summary = (
-                f"status:      {run_status}\n"
-                f"exit_status: {exit_status}\n"
-                f"details:     {details}"
-            )
-            print_box(summary, title=f"Verifier run · {claim.get('id')}", color=run_color)
-
-            if stdout.strip():
-                print_box(stdout, title=f"stdout · {claim.get('id')}", color=DIM, truncate=256)
-            if stderr.strip():
-                print_box(stderr, title=f"stderr · {claim.get('id')}", color=RED, truncate=256)
-
-            scored = self._score_executable(claim, spec, exec_result)
-        else:
-            reason = spec.get("reason", "")
-            print_box(
-                f"Marked non-executable.\nreason: {reason or '(none provided)'}",
-                title=f"Verifier spec · {claim.get('id')}",
-                color=YELLOW,
-            )
-            scored = self._score_soft(uuid, claim, execution_text, workspace_listing, reason, grounding)
-            print_box(
-                f"verdict:   {scored.get('status')}\nrationale: {scored.get('rationale', '')}",
-                title=f"Soft check · {claim.get('id')}",
-                color=GREEN if scored.get("score", 0) >= 0.5 else RED,
-            )
-
+        spec, scored = self._run_and_score(
+            uuid, claim, spec, execution_text, workspace_listing, grounding
+        )
         scored["claim"] = claim
         scored["spec"] = spec
         scored["elapsed_s"] = round(time.time() - t_start, 3)
+        self._print_claim_verdict(claim, scored)
+        return scored
 
-        final = (
+    def _resolve_relevant_files(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        preloaded_spec: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Populate ``likely_relevant_files`` via judge call when not anchored."""
+        if preloaded_spec is not None:
+            return claim
+        rel_files = self._llm_select_files(
+            uuid, claim, execution_text, workspace_listing
+        )
+        return {**claim, "likely_relevant_files": rel_files}
+
+    @staticmethod
+    def _print_claim_header(claim: dict[str, Any]) -> None:
+        """Render the per-claim opening box."""
+        files = claim.get("likely_relevant_files") or "(none)"
+        body = (
+            f"id:          {claim.get('id')}\n"
+            f"importance:  {claim.get('importance')}\n"
+            f"description: {claim.get('description')}\n"
+            f"files:       {files}"
+        )
+        print_box(body, title=f"Verifying claim {claim.get('id')}", color=CYAN)
+
+    @staticmethod
+    def _print_claim_verdict(claim: dict[str, Any], scored: dict[str, Any]) -> None:
+        """Render the final per-claim verdict box."""
+        body = (
             f"id:     {claim.get('id')}\n"
             f"kind:   {scored.get('verifier_kind')}\n"
             f"status: {scored.get('status')}\n"
             f"score:  {scored.get('score')}\n"
             f"elapsed:{scored['elapsed_s']}s"
         )
+        color = GREEN if scored.get("score", 0) >= 0.5 else RED
+        print_box(body, title=f"Claim verdict · {claim.get('id')}", color=color)
+
+    def _run_and_score(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Dispatch to executable or soft branch; return ``(final_spec, scored)``."""
+        if spec.get("executable") and spec.get("code"):
+            spec, exec_result = self._run_verifier_with_recovery(
+                uuid, claim, spec, execution_text, workspace_listing
+            )
+            self._print_executable_summary(claim, exec_result)
+            return spec, self._score_executable(claim, spec, exec_result)
+        return spec, self._run_soft_branch(
+            uuid, claim, spec, execution_text, workspace_listing, grounding
+        )
+
+    @staticmethod
+    def _print_executable_summary(
+        claim: dict[str, Any], exec_result: dict[str, Any]
+    ) -> None:
+        """Render run-status / stdout / stderr boxes for an executable run."""
+        cid = claim.get("id")
+        run_status = exec_result.get("status", "?")
+        color = GREEN if run_status == "pass" else (YELLOW if run_status == "fail" else RED)
+        summary = (
+            f"status:      {run_status}\n"
+            f"exit_status: {exec_result.get('exit_status', '?')}\n"
+            f"details:     {exec_result.get('details') or ''}"
+        )
+        print_box(summary, title=f"Verifier run · {cid}", color=color)
+        stdout = (exec_result.get("raw_stdout") or "").strip()
+        stderr = (exec_result.get("raw_stderr") or "").strip()
+        if stdout:
+            print_box(stdout, title=f"stdout · {cid}", color=DIM, truncate=_PRINT_TRUNCATE_BYTES)
+        if stderr:
+            print_box(stderr, title=f"stderr · {cid}", color=RED, truncate=_PRINT_TRUNCATE_BYTES)
+
+    def _run_soft_branch(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> dict[str, Any]:
+        """Run the non-executable scoring branch and render its boxes."""
+        reason = spec.get("reason", "")
+        cid = claim.get("id")
         print_box(
-            final,
-            title=f"Claim verdict · {claim.get('id')}",
-            color=GREEN if scored.get("score", 0) >= 0.5 else RED,
+            f"Marked non-executable.\nreason: {reason or '(none provided)'}",
+            title=f"Verifier spec · {cid}", color=YELLOW,
+        )
+        scored = self._score_soft(
+            uuid, claim, execution_text, workspace_listing, reason, grounding
+        )
+        verdict_color = GREEN if scored.get("score", 0) >= 0.5 else RED
+        print_box(
+            f"verdict:   {scored.get('status')}\nrationale: {scored.get('rationale', '')}",
+            title=f"Soft check · {cid}", color=verdict_color,
         )
         return scored
 
@@ -233,44 +260,23 @@ class _VerifierPerClaimMixin:
         workspace_listing: str,
         max_files: int = 3,
     ) -> list[str]:
-        """Pick workspace files most likely to hold this claim's artefact.
-
-        Per-claim judge call that fuses the agent narration (names the files
-        the agents wrote), the workspace listing (ground truth of what's on
-        disk), and the claim description. Returns only paths present in the
-        workspace — hallucinated entries are dropped. On parse or provider
-        failure falls back to all eligible workspace files so the downstream
-        verifier-gen step is never blind.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claim: Normalised claim dict.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            max_files: Maximum number of files to return.
-
-        Returns:
-            List of workspace-relative paths the verifier should open.
-        """
+        """Pick workspace files most likely to hold this claim's artefact."""
         eligible = self._eligible_workspace_files()
         if not eligible:
             return []
         prompt = self._build_select_files_prompt(
             claim, execution_text, workspace_listing, max_files
         )
-        agent_name = f"verifier_select_files_{claim.get('id', 'unknown')}"
-        parsed, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        cid = str(claim.get("id", "unknown"))
+        parsed, err = self._call_judge_for_json(
+            uuid, f"verifier_select_files_{cid}", prompt
+        )
         if err or not isinstance(parsed, dict):
-            self.logger.debug(
-                f"file selection failed for {claim.get('id')}: "
-                f"{err or 'non-dict JSON'}"
-            )
+            self.logger.debug(f"file selection failed for {cid}: {err or 'non-dict JSON'}")
             return eligible
         selected = self._validate_workspace_paths(
-            parsed.get("files"),
-            allowed=set(eligible),
-            max_count=max_files,
-            label=str(claim.get("id", "unknown")),
+            parsed.get("files"), allowed=set(eligible),
+            max_count=max_files, label=cid,
         )
         return selected or eligible
 
@@ -281,17 +287,7 @@ class _VerifierPerClaimMixin:
         workspace_listing: str,
         max_files: int,
     ) -> str:
-        """Build the per-claim file-selection prompt sent to the judge.
-
-        Args:
-            claim: Normalised claim dict.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            max_files: Maximum number of files to request.
-
-        Returns:
-            Fully formatted prompt string for the judge.
-        """
+        """Build the per-claim file-selection prompt sent to the judge."""
         return f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
 
 WORKSPACE FILES (name<TAB>size, relative to workspace root, cwd at runtime):
@@ -324,23 +320,17 @@ Return STRICT JSON only:
         execution_text: str,
         workspace_listing: str,
     ) -> dict[str, Any]:
-        """Ask the judge for a verifier script (or a non-executable rationale).
+        """Ask the judge for a verifier script (or a non-executable rationale)."""
+        prompt = self._build_verifier_prompt(claim, workspace_listing)
+        return self._call_and_parse_verifier(uuid, claim, prompt, attempt=1)
 
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claim: Normalised claim dict.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-
-        Returns:
-            Spec dict with either ``executable=True`` and ``code``, or
-            ``executable=False`` and a ``reason``.
-        """
-        relevant_previews = self._render_relevant_previews(
-            claim.get("likely_relevant_files", [])
-        )
-        packages = ', '.join(_VERIFIER_BASE_PACKAGES)
-        prompt = f"""
+    def _build_verifier_prompt(
+        self, claim: dict[str, Any], workspace_listing: str
+    ) -> str:
+        """Build the verifier-generation prompt for one claim."""
+        previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
+        packages = ", ".join(_VERIFIER_BASE_PACKAGES)
+        return f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
 
@@ -348,7 +338,7 @@ WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
 
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
-{relevant_previews}
+{previews}
 
 CLAIM TO VERIFY:
 - id: {claim['id']}
@@ -408,7 +398,6 @@ Return STRICT JSON only, in one of these two shapes:
   {{"executable": true,  "code": "<full python script as one string>"}}
   {{"executable": false, "reason": "<one sentence>"}}
 """
-        return self._call_and_parse_verifier(uuid, claim, prompt, attempt=1)
 
     def _call_and_parse_verifier(
         self,
@@ -417,22 +406,9 @@ Return STRICT JSON only, in one of these two shapes:
         prompt: str,
         attempt: int,
     ) -> dict[str, Any]:
-        """Call the judge for a verifier spec; soft-fail to ``executable: False``.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claim: Normalised claim dict.
-            prompt: Pre-built verifier-generation prompt.
-            attempt: 1 for the first try, >1 for retries (suffixes the agent name).
-
-        Returns:
-            Spec dict; on errors returns ``{"executable": False, "reason": ...}``.
-        """
-        agent_name = (
-            f"verifier_gen_{claim['id']}"
-            if attempt == 1
-            else f"verifier_gen_{claim['id']}_retry"
-        )
+        """Call the judge for a verifier spec; soft-fail to ``executable: False``."""
+        suffix = "" if attempt == 1 else "_retry"
+        agent_name = f"verifier_gen_{claim['id']}{suffix}"
         spec, err = self._call_judge_for_json(uuid, agent_name, prompt)
         if err is not None:
             return {"executable": False, "reason": err}
@@ -451,29 +427,12 @@ Return STRICT JSON only, in one of these two shapes:
         execution_text: str,
         workspace_listing: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """One claim's pre-flight: pick relevant files, then generate the spec.
-
-        These two judge calls are sequential within a single claim (the spec
-        prompt needs the file previews chosen here), so they're bundled
-        together as one worker unit for parallel fan-out across claims.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claim: Normalised claim dict.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-
-        Returns:
-            ``(updated_claim, spec)`` — the claim with ``likely_relevant_files``
-            populated, and the verifier spec from ``_generate_verifier``.
-        """
+        """Pick relevant files then generate one claim's verifier spec."""
         rel_files = self._llm_select_files(
             uuid, claim, execution_text, workspace_listing
         )
         updated = {**claim, "likely_relevant_files": rel_files}
-        spec = self._generate_verifier(
-            uuid, updated, execution_text, workspace_listing
-        )
+        spec = self._generate_verifier(uuid, updated, execution_text, workspace_listing)
         return updated, spec
 
     def _generate_specs_parallel(
@@ -484,23 +443,7 @@ Return STRICT JSON only, in one of these two shapes:
         workspace_listing: str,
         max_workers: int,
     ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
-        """Fan out file selection + verifier generation across claims via threads.
-
-        The LLM calls under the hood are sync HTTP; threading is enough to
-        overlap their network latency. Each claim writes to its own memory
-        file (agent name is keyed by ``claim['id']``), so no cache collisions.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claims: Claims that need a freshly generated spec (anchored ones
-                should already be filtered out by the caller).
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            max_workers: Upper bound on concurrent LLM calls.
-
-        Returns:
-            Dict keyed by claim id mapping to ``(updated_claim, spec)``.
-        """
+        """Fan out file selection + verifier generation across claims via threads."""
         if not claims:
             return {}
         results: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
@@ -515,117 +458,85 @@ Return STRICT JSON only, in one of these two shapes:
             }
             for f in as_completed(futures):
                 cid = futures[f]
-                try:
-                    results[cid] = f.result()
-                except Exception as e:
-                    # Mirror the soft-fail contract of _call_and_parse_verifier:
-                    # never let one bad claim crash the whole batch.
-                    self.logger.warning(
-                        f"parallel spec generation failed for {cid}: "
-                        f"{type(e).__name__}: {e}"
-                    )
-                    results[cid] = (
-                        {**next(c for c in claims if c["id"] == cid),
-                         "likely_relevant_files": []},
-                        {"executable": False, "reason": f"spec generation raised: {e}"},
-                    )
+                results[cid] = self._collect_spec_future(f, cid, claims)
         return results
+
+    def _collect_spec_future(
+        self,
+        future: Future,
+        cid: str,
+        claims: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Resolve one parallel-gen future; on raise return a non-executable fallback."""
+        try:
+            return future.result()
+        except Exception as e:
+            self.logger.warning(
+                f"parallel spec generation failed for {cid}: {type(e).__name__}: {e}"
+            )
+            base = next(c for c in claims if c["id"] == cid)
+            return (
+                {**base, "likely_relevant_files": []},
+                {"executable": False, "reason": f"spec generation raised: {e}"},
+            )
 
     # ------------------------------------------------------------------
     # Verifier helper-package install (idempotent, lock-guarded)
     # ------------------------------------------------------------------
 
     def _ensure_verifier_packages(self) -> None:
-        """Make verifier helper packages importable under ``sys.executable``.
-
-        The verifier ``WorkflowRunner`` is forced to use ``sys.executable`` so
-        installs and runs target the same interpreter (the one running
-        Mimosa, typically a uv-managed venv). Idempotent across evaluator
-        instances via a module-level flag + lock. Logged-and-skipped on
-        failure — verifier scripts must then restrict themselves to stdlib.
-        """
+        """Make verifier helper packages importable under ``sys.executable``."""
         global _VERIFIER_PACKAGES_INSTALLED
         if _VERIFIER_PACKAGES_INSTALLED:
             return
         with _VERIFIER_INSTALL_LOCK:
             if _VERIFIER_PACKAGES_INSTALLED:
                 return
+            _VERIFIER_PACKAGES_INSTALLED = self._install_verifier_helpers()
 
-            smoke_cmd = [
-                sys.executable, "-c",
-                "import " + ", ".join(_VERIFIER_BASE_IMPORTS),
-            ]
+    def _install_verifier_helpers(self) -> bool:
+        """Install base helper packages if missing; True iff importable after."""
+        smoke_cmd = [sys.executable, "-c", "import " + ", ".join(_VERIFIER_BASE_IMPORTS)]
+        if self._smoke_check(smoke_cmd):
+            self.logger.info(
+                f"Verifier helper packages already importable under {sys.executable}"
+            )
+            return True
+        if not self._pip_install_base():
+            return False
+        if self._smoke_check(smoke_cmd):
+            self.logger.info(
+                f"Verifier helper packages ready: {list(_VERIFIER_BASE_PACKAGES)} "
+                f"(via {sys.executable})"
+            )
+            return True
+        self.logger.warning(
+            "Verifier helper packages installed but not importable under "
+            "sys.executable; scripts will see ImportError."
+        )
+        return False
 
-            # Early-exit if the helper packages are already importable —
-            # common when Mimosa runs in a venv that already has them.
-            if self._smoke_check(smoke_cmd):
-                _VERIFIER_PACKAGES_INSTALLED = True
-                self.logger.info(
-                    f"Verifier helper packages already importable under "
-                    f"{sys.executable}"
-                )
-                return
-
-            # ``--break-system-packages`` is the documented escape from PEP 668
-            # on system Pythons; inside a venv it is silently ignored. Modern
-            # uv-managed envs have a recent pip that supports the flag.
-            pip_cmd = [
-                sys.executable, "-m", "pip", "install", "--quiet",
-                "--disable-pip-version-check", "--break-system-packages",
-                *_VERIFIER_BASE_PACKAGES,
-            ]
-            try:
-                r = subprocess.run(pip_cmd, capture_output=True, timeout=600)
-            except subprocess.TimeoutExpired:
-                self.logger.warning(
-                    "Verifier helper package install timed out after 600s"
-                )
-                return
-            except FileNotFoundError as e:
-                self.logger.warning(
-                    f"pip not found for verifier helper install: {e}"
-                )
-                return
-            except Exception as e:
-                self.logger.warning(
-                    f"Verifier helper install raised: {type(e).__name__}: {e}"
-                )
-                return
-
-            if r.returncode != 0:
-                stderr_tail = r.stderr.decode(errors="replace")[-400:]
-                self.logger.warning(
-                    f"Verifier helper install failed (rc={r.returncode}); "
-                    f"scripts must restrict themselves to stdlib. "
-                    f"stderr tail: {stderr_tail}"
-                )
-                return
-
-            # Pip can exit 0 yet land packages where the runtime Python can't
-            # see them — verify by actually importing.
-            if self._smoke_check(smoke_cmd):
-                _VERIFIER_PACKAGES_INSTALLED = True
-                self.logger.info(
-                    f"Verifier helper packages ready: "
-                    f"{list(_VERIFIER_BASE_PACKAGES)} (via {sys.executable})"
-                )
-            else:
-                self.logger.warning(
-                    "Verifier helper packages installed but not importable "
-                    "under sys.executable; scripts will see ImportError."
-                )
+    def _pip_install_base(self) -> bool:
+        """Run ``pip install`` for the verifier base packages; True on rc==0."""
+        cmd = [
+            sys.executable, "-m", "pip", "install",
+            *_PIP_INSTALL_FLAGS, *_VERIFIER_BASE_PACKAGES,
+        ]
+        r = self._run_pip(cmd, _BASE_INSTALL_TIMEOUT_SECONDS, list(_VERIFIER_BASE_PACKAGES))
+        if r is None:
+            return False
+        if r.returncode != 0:
+            tail = r.stderr.decode(errors="replace")[-_STDERR_TAIL_BYTES:]
+            self.logger.warning(
+                f"Verifier helper install failed (rc={r.returncode}); "
+                f"scripts must restrict themselves to stdlib. stderr tail: {tail}"
+            )
+            return False
+        return True
 
     @staticmethod
-    def _smoke_check(cmd: list[str], timeout: float = 15.0) -> bool:
-        """Return True iff *cmd* exits 0 within *timeout*.
-
-        Args:
-            cmd: Command and arguments to invoke via ``subprocess.run``.
-            timeout: Wall-clock seconds before treating the run as a failure.
-
-        Returns:
-            True when the command exits with status 0; False otherwise.
-        """
+    def _smoke_check(cmd: list[str], timeout: float = _RUNNER_SMOKE_TIMEOUT) -> bool:
+        """Return True iff *cmd* exits 0 within *timeout*."""
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=timeout)
         except Exception:
@@ -637,116 +548,384 @@ Return STRICT JSON only, in one of these two shapes:
     # ------------------------------------------------------------------
 
     def _run_verifier(self, uuid: str, claim_id: str, code: str) -> dict[str, Any]:
-        """Execute a single verifier script in the agents' workspace.
-
-        Args:
-            uuid: Workflow identifier (used to name the scratch directory).
-            claim_id: Identifier of the claim being verified.
-            code: Python source code of the verifier script.
-
-        Returns:
-            Dict with ``status``, ``actual``, ``details`` plus raw stdout/stderr
-            and the underlying execution ``exit_status``.
-        """
-        scratch = self._runner_temp_root / uuid
-        scratch.mkdir(parents=True, exist_ok=True)
-        # Run verifiers under the exact interpreter running Mimosa: that is
-        # where the verifier helper packages were installed, and it avoids
-        # depending on a system pythonX.Y being on PATH. Passing this via the
-        # config (rather than overriding runner._python_cmd after construction)
-        # ensures WorkflowRunner's construction-time availability check uses
-        # this interpreter too, instead of failing when no matching
-        # python_version is found on PATH.
-        runner_config = RuntimeConfig(
-            python_executable=sys.executable,
-            timeout=self.verifier_timeout,
-            temp_dir=scratch,
-            requirements_file=None,
-            use_pty=False,
-        )
-        runner = WorkflowRunner(runner_config, execution_dir=str(self.workspace_dir))
+        """Execute one verifier script and return the parsed/normalised result."""
+        runner = self._build_runner(uuid)
         execution_id = f"verify_{claim_id}"
-        thread_timeout = self.verifier_timeout + 10
-        result = None
+        thread_timeout = self.verifier_timeout + _RUNNER_EXTRA_TIMEOUT
         try:
             result = _run_coro_sync(
                 lambda: runner.execute(code, execution_id=execution_id),
                 thread_timeout=thread_timeout,
             )
         except TimeoutError as e:
-            return {
-                "status": "error",
-                "actual": None,
-                "details": f"verifier execution did not return in time: {e}",
-                "raw_stdout": "",
-                "raw_stderr": "",
-                "exit_status": "timeout",
-            }
+            return self._error_result("timeout", f"verifier execution did not return in time: {e}")
         except Exception as e:
-            return {
-                "status": "error",
-                "actual": None,
-                "details": f"verifier execution raised: {type(e).__name__}: {e}",
-                "raw_stdout": "",
-                "raw_stderr": "",
-                "exit_status": "error",
-            }
+            return self._error_result("error", f"verifier execution raised: {type(e).__name__}: {e}")
         finally:
-            try:
-                _run_coro_sync(runner.cleanup, thread_timeout=15)
-            except Exception as e:
-                self.logger.debug(f"verifier runner cleanup failed: {e}")
+            self._safe_cleanup(runner)
+        return self._finalize_run_result(result, claim_id)
 
+    def _build_runner(self, uuid: str) -> WorkflowRunner:
+        """Construct a sandboxed ``WorkflowRunner`` scoped to ``uuid``."""
+        scratch = self._runner_temp_root / uuid
+        scratch.mkdir(parents=True, exist_ok=True)
+        cfg = RuntimeConfig(
+            python_executable=sys.executable,
+            timeout=self.verifier_timeout,
+            temp_dir=scratch,
+            requirements_file=None,
+            use_pty=False,
+        )
+        return WorkflowRunner(cfg, execution_dir=str(self.workspace_dir))
+
+    def _safe_cleanup(self, runner: WorkflowRunner) -> None:
+        """Best-effort cleanup of *runner*; never raise."""
+        try:
+            _run_coro_sync(runner.cleanup, thread_timeout=_RUNNER_CLEANUP_TIMEOUT)
+        except Exception as e:
+            self.logger.debug(f"verifier runner cleanup failed: {e}")
+
+    @staticmethod
+    def _error_result(exit_tag: str, details: str) -> dict[str, Any]:
+        """Shape an error exec_result with empty stdout/stderr."""
+        return {
+            "status": "error",
+            "actual": None,
+            "details": details,
+            "raw_stdout": "",
+            "raw_stderr": "",
+            "exit_status": exit_tag,
+        }
+
+    def _finalize_run_result(
+        self, result: ExecutionResult, claim_id: str
+    ) -> dict[str, Any]:
+        """Merge runner result fields onto the parsed stdout dict."""
         parsed = self._parse_verifier_stdout(result.stdout, claim_id)
+        status = result.status
         parsed.update({
             "raw_stdout": result.stdout,
             "raw_stderr": result.stderr,
-            "exit_status": result.status.value if isinstance(result.status, ExecutionStatus) else str(result.status),
+            "exit_status": status.value if isinstance(status, ExecutionStatus) else str(status),
         })
-        if result.status == ExecutionStatus.TIMEOUT:
+        if status == ExecutionStatus.TIMEOUT:
             parsed["status"] = "error"
-            parsed["details"] = (parsed.get("details") or "") + f" (script timed out after {self.verifier_timeout}s)"
-        elif result.status == ExecutionStatus.FAILED and parsed.get("status") not in ("pass", "fail"):
+            parsed["details"] = (parsed.get("details") or "") + (
+                f" (script timed out after {self.verifier_timeout}s)"
+            )
+        elif status == ExecutionStatus.FAILED and parsed.get("status") not in ("pass", "fail"):
             parsed["status"] = "error"
-            parsed["details"] = (parsed.get("details") or "") + f" (script exit code {result.return_code})"
+            parsed["details"] = (parsed.get("details") or "") + (
+                f" (script exit code {result.return_code})"
+            )
         return parsed
+
+    # ------------------------------------------------------------------
+    # Bounded retry / recovery for verifier-side failures
+    # ------------------------------------------------------------------
+
+    def _run_verifier_with_recovery(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Run the verifier with one corrective retry on verifier-side failures.
+
+        Import errors trigger an LLM package check + sandbox install. Code bugs
+        (or empty install lists) trigger a single regeneration with traceback
+        feedback. Failures still present after the retry are returned as-is;
+        the aggregator excludes them from the importance-weighted mean.
+        """
+        cid = claim["id"]
+        exec_result = self._run_verifier(uuid, cid, spec["code"])
+        kind = self._classify_exec_failure(exec_result)
+        if kind == "ok":
+            return spec, exec_result
+        self.logger.info(
+            f"[recovery {cid}] initial run errored as {kind}; "
+            f"attempting one corrective action"
+        )
+        if kind == "import":
+            recovered = self._try_install_and_rerun(uuid, claim, spec, exec_result)
+            if recovered is not None:
+                return spec, recovered
+        return self._regenerate_and_rerun(
+            uuid, claim, spec, exec_result, execution_text, workspace_listing
+        )
+
+    def _try_install_and_rerun(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        exec_result: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Install LLM-vetted packages and re-run; ``None`` falls through to regen."""
+        cid = claim["id"]
+        stderr = exec_result.get("raw_stderr", "") or ""
+        packages = self._llm_packages_needed_for_claim(uuid, claim, stderr)
+        if not packages or not self._sandbox_install_packages(packages):
+            self.logger.info(
+                f"[recovery {cid}] no installable packages "
+                f"(LLM returned {packages or 'empty'}); regenerating instead"
+            )
+            return None
+        self.logger.info(f"[recovery {cid}] installed {packages}; re-running script")
+        return self._run_verifier(uuid, cid, spec["code"])
+
+    def _regenerate_and_rerun(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        exec_result: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Regenerate the script once with traceback feedback and re-run it."""
+        cid = claim["id"]
+        new_spec = self._regenerate_verifier_with_feedback(
+            uuid, claim, spec, exec_result, execution_text, workspace_listing
+        )
+        if not (new_spec.get("executable") and new_spec.get("code")):
+            reason = str(new_spec.get("reason") or "regenerated spec missing code")
+            self.logger.info(
+                f"[recovery {cid}] regeneration produced no executable code: {reason}"
+            )
+            return spec, self._attach_giveup_reason(exec_result, reason)
+        retry = self._run_verifier(uuid, cid, new_spec["code"])
+        return new_spec, retry
+
+    @staticmethod
+    def _attach_giveup_reason(
+        exec_result: dict[str, Any], reason: str
+    ) -> dict[str, Any]:
+        """Return *exec_result* with status forced to error and *reason* appended."""
+        details = (exec_result.get("details") or "").strip()
+        suffix = f"(regeneration gave up: {reason})"
+        return {
+            **exec_result,
+            "status": "error",
+            "details": f"{details} {suffix}".strip(),
+        }
+
+    @classmethod
+    def _classify_exec_failure(cls, exec_result: dict[str, Any]) -> str:
+        """Bucket a run outcome as ``ok``, ``import``, or ``code_bug``."""
+        if exec_result.get("status") != "error":
+            return "ok"
+        blob = (exec_result.get("raw_stderr") or "") + "\n" + (exec_result.get("details") or "")
+        if any(marker in blob for marker in _RECOVERY_IMPORT_MARKERS):
+            return "import"
+        return "code_bug"
+
+    def _llm_packages_needed_for_claim(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        stderr: str,
+    ) -> list[str]:
+        """Ask the judge which missing pip packages are genuinely required."""
+        prompt = self._build_package_check_prompt(claim, stderr)
+        parsed, err = self._call_judge_for_json(
+            uuid, f"verifier_pkg_check_{claim['id']}", prompt
+        )
+        if err is not None or not isinstance(parsed, dict):
+            self.logger.debug(
+                f"package-need check failed for {claim['id']}: "
+                f"{err or 'non-dict JSON'}"
+            )
+            return []
+        raw = parsed.get("packages")
+        return self._clean_package_list(raw) if isinstance(raw, list) else []
+
+    @staticmethod
+    def _build_package_check_prompt(claim: dict[str, Any], stderr: str) -> str:
+        """Build the package-need check prompt sent to the judge."""
+        lines = (stderr or "").splitlines()[-_RECOVERY_STDERR_FEEDBACK_LINES:]
+        tail = "\n".join(lines) or "(no traceback available)"
+        base_pkgs = ", ".join(_VERIFIER_BASE_PACKAGES)
+        return f"""
+A verifier program for ONE atomic claim crashed because it tried to import an unavailable Python package.
+
+CLAIM:
+- id: {claim['id']}
+- description: {claim.get('description', '')}
+
+TRACEBACK (last {_RECOVERY_STDERR_FEEDBACK_LINES} lines):
+{tail}
+
+ALREADY AVAILABLE (do NOT list these): {base_pkgs}, plus the Python standard library.
+
+QUESTION: are the missing packages STRICTLY required to verify this claim, or could the verifier be rewritten in pure Python using only the available imports?
+
+Return STRICT JSON only:
+  {{"packages": ["<pip name>", ...]}}
+
+Rules:
+- Empty list ({{"packages": []}}) iff the claim can be verified without third-party packages.
+- Use pip-install names (``scikit-learn``, not ``sklearn``; ``Pillow``, not ``PIL``).
+- Never list a package that is already available.
+- At most {_RECOVERY_MAX_INSTALL_PACKAGES} entries.
+"""
+
+    @staticmethod
+    def _clean_package_list(raw: list[Any]) -> list[str]:
+        """Dedupe and cap the LLM-returned package list; drop already-available ones."""
+        already = {p.lower() for p in _VERIFIER_BASE_PACKAGES}
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for entry in raw:
+            if not isinstance(entry, str):
+                continue
+            name = entry.strip()
+            if not name or name.lower() in already or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            cleaned.append(name)
+            if len(cleaned) >= _RECOVERY_MAX_INSTALL_PACKAGES:
+                break
+        return cleaned
+
+    def _sandbox_install_packages(self, packages: list[str]) -> bool:
+        """Pip-install *packages* under ``sys.executable``; True iff rc==0."""
+        if not packages:
+            return False
+        cmd = [sys.executable, "-m", "pip", "install", *_PIP_INSTALL_FLAGS, *packages]
+        r = self._run_pip(cmd, _RECOVERY_INSTALL_TIMEOUT_SECONDS, packages)
+        if r is None:
+            return False
+        if r.returncode != 0:
+            tail = r.stderr.decode(errors="replace")[-_STDERR_TAIL_BYTES:]
+            self.logger.warning(
+                f"sandbox install failed (rc={r.returncode}) for {packages}; "
+                f"stderr tail: {tail}"
+            )
+            return False
+        self.logger.info(f"sandbox-installed verifier packages: {packages}")
+        return True
+
+    def _run_pip(
+        self,
+        cmd: list[str],
+        timeout: int,
+        packages: list[str],
+    ) -> subprocess.CompletedProcess | None:
+        """Wrap ``subprocess.run`` for pip; log and return ``None`` on failure."""
+        try:
+            return subprocess.run(cmd, capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"sandbox install timed out after {timeout}s for {packages}")
+        except FileNotFoundError as e:
+            self.logger.warning(f"pip not found for verifier helper install: {e}")
+        except Exception as e:
+            self.logger.warning(f"sandbox install raised: {type(e).__name__}: {e}")
+        return None
+
+    def _regenerate_verifier_with_feedback(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        prev_spec: dict[str, Any],
+        exec_result: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> dict[str, Any]:
+        """Ask the judge to fix the previous script given the traceback."""
+        prompt = self._build_regen_prompt(claim, prev_spec, exec_result)
+        return self._call_and_parse_verifier(uuid, claim, prompt, attempt=2)
+
+    def _build_regen_prompt(
+        self,
+        claim: dict[str, Any],
+        prev_spec: dict[str, Any],
+        exec_result: dict[str, Any],
+    ) -> str:
+        """Build the verifier-regeneration prompt fed with the previous traceback."""
+        prev_code = prev_spec.get("code", "")
+        stderr_lines = (exec_result.get("raw_stderr") or "").splitlines()[
+            -_RECOVERY_STDERR_FEEDBACK_LINES:
+        ]
+        stderr_tail = "\n".join(stderr_lines) or "(no stderr captured)"
+        details = exec_result.get("details", "") or ""
+        previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
+        packages = ", ".join(_VERIFIER_BASE_PACKAGES)
+        return f"""
+Your previous verifier script for ONE atomic claim crashed at runtime. Fix it and resubmit the FULL corrected script.
+
+CLAIM:
+- id: {claim['id']}
+- importance: {claim.get('importance', self._DEFAULT_CLAIM_IMPORTANCE)} (1-10; 10 = literal deliverable)
+- description: {claim['description']}
+- likely_relevant_files: {claim.get('likely_relevant_files', [])}
+
+RELEVANT FILE PREVIEWS:
+{previews}
+
+PREVIOUS SCRIPT (do not repeat its mistake):
+{prev_code}
+
+RUNTIME ERROR DETAILS: {details}
+
+STDERR (last {_RECOVERY_STDERR_FEEDBACK_LINES} lines):
+{stderr_tail}
+
+INSTRUCTIONS:
+- Diagnose the failure from the traceback above and emit a corrected script.
+- Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
+  {{"claim_id": "{claim['id']}", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
+- Catch your own exceptions inside the script and emit status="error" — never let the script raise.
+- Read files with relative paths (cwd is the workspace).
+- AVAILABLE IMPORTS: {packages}. Do NOT introduce any other third-party imports.
+- If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
+
+Return STRICT JSON only:
+  {{"executable": true, "code": "<full corrected python script as one string>"}}
+"""
+
+    # ------------------------------------------------------------------
+    # Stdout parsing
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _parse_verifier_stdout(stdout: str, claim_id: str) -> dict[str, Any]:
-        """Pull the last JSON line matching ``claim_id`` from the script stdout.
-
-        Args:
-            stdout: Raw captured stdout from the verifier script.
-            claim_id: Identifier the JSON line must reference.
-
-        Returns:
-            Dict with ``status``, ``actual`` and ``details``; status is set to
-            ``"error"`` when no matching line is found.
-        """
+        """Pull the last JSON line matching ``claim_id`` from script stdout."""
         if not stdout:
             return {"status": "error", "actual": None, "details": "no stdout from verifier"}
         for line in reversed(stdout.splitlines()):
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+            obj = _VerifierPerClaimMixin._try_json(line.strip())
             if isinstance(obj, dict) and obj.get("claim_id") == claim_id:
-                status = obj.get("status")
-                if status not in ("pass", "fail", "error"):
-                    return {
-                        "status": "error",
-                        "actual": obj.get("actual"),
-                        "details": f"unrecognised status '{status}' from verifier",
-                    }
-                return {
-                    "status": status,
-                    "actual": obj.get("actual"),
-                    "details": str(obj.get("details", "")),
-                }
+                return _VerifierPerClaimMixin._normalise_status(obj)
         return {"status": "error", "actual": None, "details": "no matching JSON line in verifier stdout"}
+
+    @staticmethod
+    def _try_json(line: str) -> Any:
+        """Return ``json.loads(line)`` or ``None`` when not a JSON object."""
+        if not line.startswith("{"):
+            return None
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            return None
+
+    @staticmethod
+    def _normalise_status(obj: dict[str, Any]) -> dict[str, Any]:
+        """Reduce a verifier-line dict to the canonical (status, actual, details) shape."""
+        status = obj.get("status")
+        if status not in ("pass", "fail", "error"):
+            return {
+                "status": "error",
+                "actual": obj.get("actual"),
+                "details": f"unrecognised status '{status}' from verifier",
+            }
+        return {
+            "status": status,
+            "actual": obj.get("actual"),
+            "details": str(obj.get("details", "")),
+        }
 
     # ------------------------------------------------------------------
     # Per-claim scoring
@@ -758,20 +937,10 @@ Return STRICT JSON only, in one of these two shapes:
         spec: dict[str, Any],
         exec_result: dict[str, Any],
     ) -> dict[str, Any]:
-        """Convert an executable-verifier run into a scored result dict.
-
-        Args:
-            claim: Normalised claim dict (unused but kept for signature parity).
-            spec: Verifier spec returned by the judge (unused here).
-            exec_result: Dict produced by ``_run_verifier``.
-
-        Returns:
-            Scored claim dict with ``score`` 1.0 for ``pass`` and 0.0 otherwise.
-        """
+        """Convert an executable-verifier run into a scored result dict."""
         status = exec_result.get("status")
-        score = 1.0 if status == "pass" else 0.0
         return {
-            "score": score,
+            "score": 1.0 if status == "pass" else 0.0,
             "verifier_kind": "executable",
             "status": status,
             "actual": exec_result.get("actual"),
@@ -780,6 +949,8 @@ Return STRICT JSON only, in one of these two shapes:
             "raw_stderr": exec_result.get("raw_stderr", ""),
             "exit_status": exec_result.get("exit_status", ""),
         }
+
+    _SOFT_VERDICT_SCORE = {"pass": 1.0, "unsure": 0.5, "fail": 0.0}
 
     def _score_soft(
         self,
@@ -790,25 +961,40 @@ Return STRICT JSON only, in one of these two shapes:
         reason: str,
         grounding: str = "",
     ) -> dict[str, Any]:
-        """Narrow LLM verdict for one non-executable claim, anchored on grounding.
-
-        Args:
-            uuid: Workflow identifier (used for judge calls).
-            claim: Normalised claim dict.
-            execution_text: Agent narration / produced output text.
-            workspace_listing: Rendered listing of workspace files.
-            reason: Justification string for why the claim is non-executable.
-            grounding: Optional peer-reviewed literature grounding block.
-
-        Returns:
-            Scored claim dict with ``score`` in {0.0, 0.5, 1.0} and a
-            ``rationale`` from the judge.
-        """
-        relevant_previews = self._render_relevant_previews(
-            claim.get("likely_relevant_files", [])
+        """Narrow LLM verdict for one non-executable claim, anchored on grounding."""
+        prompt = self._build_soft_check_prompt(
+            claim, execution_text, workspace_listing, reason, grounding
         )
+        data, err = self._call_judge_for_json(
+            uuid, f"verifier_soft_{claim['id']}", prompt
+        )
+        if err is not None or not isinstance(data, dict):
+            return {
+                "score": 0.0, "verifier_kind": "soft", "status": "error",
+                "details": f"soft check failed: {err or 'verdict JSON not an object'}",
+                "rationale": "",
+            }
+        verdict = data.get("verdict", "unsure")
+        rationale = str(data.get("rationale", ""))
+        return {
+            "score": self._SOFT_VERDICT_SCORE.get(verdict, 0.5),
+            "verifier_kind": "soft",
+            "status": verdict,
+            "details": rationale,
+            "rationale": rationale,
+        }
+
+    def _build_soft_check_prompt(
+        self,
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        reason: str,
+        grounding: str,
+    ) -> str:
+        """Build the soft-check (non-executable verdict) prompt."""
         grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
-        prompt = f"""
+        return f"""
 You are checking ONE claim from a multi-agent workflow. The claim is not
 executable in code; please judge it against the concrete context below.
 
@@ -845,49 +1031,64 @@ for the absence of grounding.
 
 Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one sentence>"}}
 """
-        data, err = self._call_judge_for_json(
-            uuid, f"verifier_soft_{claim['id']}", prompt
-        )
-        if err is not None or not isinstance(data, dict):
-            # No usable verdict — treat as non-signal so it neither rewards nor
-            # punishes the workflow. Aggregator excludes errors from the mean.
-            return {
-                "score": 0.0,
-                "verifier_kind": "soft",
-                "status": "error",
-                "details": f"soft check failed: {err or 'verdict JSON not an object'}",
-                "rationale": "",
-            }
-        verdict = data.get("verdict", "unsure")
-        score = {"pass": 1.0, "unsure": 0.5, "fail": 0.0}.get(verdict, 0.5)
-        return {
-            "score": score,
-            "verifier_kind": "soft",
-            "status": verdict,
-            "details": str(data.get("rationale", "")),
-            "rationale": str(data.get("rationale", "")),
-        }
 
 
 if __name__ == "__main__":
     expected = {
+        # Top-level orchestration
         "_verify_claim",
+        "_resolve_relevant_files",
+        "_print_claim_header",
+        "_print_claim_verdict",
+        "_run_and_score",
+        "_print_executable_summary",
+        "_run_soft_branch",
+        # File selection
         "_llm_select_files",
         "_build_select_files_prompt",
+        # Spec generation
         "_generate_verifier",
+        "_build_verifier_prompt",
         "_call_and_parse_verifier",
         "_select_files_and_generate_spec",
         "_generate_specs_parallel",
+        "_collect_spec_future",
+        # Base-package install
         "_ensure_verifier_packages",
+        "_install_verifier_helpers",
+        "_pip_install_base",
         "_smoke_check",
+        # Execution
         "_run_verifier",
+        "_build_runner",
+        "_safe_cleanup",
+        "_error_result",
+        "_finalize_run_result",
+        # Recovery
+        "_run_verifier_with_recovery",
+        "_try_install_and_rerun",
+        "_regenerate_and_rerun",
+        "_attach_giveup_reason",
+        "_classify_exec_failure",
+        "_llm_packages_needed_for_claim",
+        "_build_package_check_prompt",
+        "_clean_package_list",
+        "_sandbox_install_packages",
+        "_run_pip",
+        "_regenerate_verifier_with_feedback",
+        "_build_regen_prompt",
+        # Stdout parsing
         "_parse_verifier_stdout",
+        "_try_json",
+        "_normalise_status",
+        # Scoring
         "_score_executable",
         "_score_soft",
+        "_build_soft_check_prompt",
     }
     actual = {n for n in dir(_VerifierPerClaimMixin) if not n.startswith("__")}
     missing = expected - actual
     assert not missing, f"per-claim mixin missing methods: {missing}"
-    # _run_coro_sync is module-level — sanity-check it's reachable too.
     assert callable(_run_coro_sync), "_run_coro_sync missing at module level"
+    assert callable(_run_coro_in_worker), "_run_coro_in_worker missing at module level"
     print("verifier_per_claim: smoke ok")
