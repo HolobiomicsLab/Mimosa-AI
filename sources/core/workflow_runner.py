@@ -221,6 +221,28 @@ class WorkflowRunner:
             return True
         return False
 
+    def _ensure_venv(self) -> None:
+        """Create a managed venv under ``temp_dir`` and use it for installs/execs.
+
+        No-op when the caller pinned ``python_executable`` (the verifier path
+        depends on running under ``sys.executable``). Idempotent — reuses an
+        existing venv at the same path. After this call ``self._python_cmd``
+        points at the venv's interpreter.
+        """
+        import subprocess
+        if self.config.python_executable:
+            return
+        venv_dir = Path(self.config.temp_dir) / "mimosa_venv"
+        bin_dir = "Scripts" if sys.platform == "win32" else "bin"
+        venv_python = venv_dir / bin_dir / ("python.exe" if sys.platform == "win32" else "python")
+        if not venv_python.exists():
+            subprocess.run(
+                [*self._python_cmd, "-m", "venv", str(venv_dir)],
+                check=True, capture_output=True, timeout=120,
+            )
+            self.logger.info(f"Created venv at {venv_dir}")
+        self._python_cmd = [str(venv_python)]
+
     async def ensure_pip(self) -> None:
         """Ensure pip is installed and up-to-date."""
         import subprocess
@@ -270,6 +292,7 @@ class WorkflowRunner:
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
 
+        self._ensure_venv()
         await self.ensure_pip()
 
         cmd = [*self._python_cmd, "-m", "pip", "install"]
