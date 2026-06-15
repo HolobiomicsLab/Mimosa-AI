@@ -158,7 +158,6 @@ class EvolutionEngine:
             with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
-            print(f"Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
             return None
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
@@ -263,7 +262,6 @@ class EvolutionEngine:
             a flag telling the caller whether to apply crossover or mutation.
         """
         if not os.path.exists(self.workflow_dir):
-            print(f"Workflow directory {self.workflow_dir} does not exist.")
             return [], False
 
         workflows = [
@@ -271,7 +269,6 @@ class EvolutionEngine:
             if os.path.isfile(os.path.join(self.workflow_dir, f, "state_result.json"))
         ]
         if not workflows:
-            print(f"No workflows found in {self.workflow_dir}.")
             return [], False
 
         # Explicit template → single parent, mutation only
@@ -684,7 +681,6 @@ class EvolutionEngine:
         """
         human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
         if human_validation not in ["yes", "y"]:
-            print("Exiting evolution loop.")
             return False
         return True
 

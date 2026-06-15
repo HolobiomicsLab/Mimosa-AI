@@ -493,7 +493,4 @@ if WORKFLOW_PATH:
         self.logger.debug(f"Workflow path: {workflow_path}")
         self.logger.debug(f"Memory path: {memory_path}")
 
-        print(f"Workflow generated with UUID: {uuid_str}")
-        print(complete_code)
-
         return complete_code, workflow_genotype_code, uuid_str
