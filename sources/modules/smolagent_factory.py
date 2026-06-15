@@ -101,7 +101,7 @@ class SmolAgentFactory:
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
                 additional_authorized_imports = [
-                    'requests', 'bs4', 'json', 'requests.exceptions',
+                    'requests', 'json', 'requests.exceptions',
                     # Core Utilities
                     'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
                     'configparser', 'logging',

@@ -91,7 +91,7 @@ print(df)
 **Authorized import in code_block tag**
 
 [
-    'requests', 'bs4', 'json', 'requests.exceptions',
+    'requests', 'json', 'requests.exceptions',
     # Core Utilities
     'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
     'configparser', 'logging',
