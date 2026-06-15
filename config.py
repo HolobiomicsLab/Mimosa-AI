@@ -71,6 +71,17 @@ class Config:
         self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 20
 
+        # QD novelty + length penalty (open-ended modes)
+        # novelty_comparison: "archive_knn" (default) compares against the
+        # k-NN archive; "previous_n" compares only against the last N
+        # produced genotypes (lighter-weight, no archive memory).
+        self.novelty_comparison: str = "archive_knn"
+        self.novelty_previous_n: int = 5
+        # Length penalty: genotype size at which the penalty starts to
+        # grow; lambda is small so it only breaks near-ties.
+        self.length_penalty_baseline_chars: int = 5000
+        self.length_penalty_lambda: float = 0.05
+
         # evaluation concurrency settings
         self.max_concurrent_eval_tasks: int = 2  # Number of concurrent tasks for CSV evaluation mode
 
@@ -215,6 +226,10 @@ class Config:
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "novelty_comparison": self.novelty_comparison,
+            "novelty_previous_n": self.novelty_previous_n,
+            "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
+            "length_penalty_lambda": self.length_penalty_lambda,
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "runs_capsule_dir": self.runs_capsule_dir,
@@ -256,6 +271,16 @@ class Config:
         )
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
+        )
+        self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
+        self.novelty_previous_n = int(
+            data.get("novelty_previous_n", self.novelty_previous_n)
+        )
+        self.length_penalty_baseline_chars = int(
+            data.get("length_penalty_baseline_chars", self.length_penalty_baseline_chars)
+        )
+        self.length_penalty_lambda = float(
+            data.get("length_penalty_lambda", self.length_penalty_lambda)
         )
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get(
@@ -319,6 +344,10 @@ class Config:
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
+        lines.append(f"  novelty_comparison={self.novelty_comparison}")
+        lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
+        lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
+        lines.append(f"  length_penalty_lambda={self.length_penalty_lambda}")
         lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
         lines.append(f"  schema_code_path={self.schema_code_path}")
         lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")
