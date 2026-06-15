@@ -308,25 +308,10 @@ class VerifierEvaluator(
             return {"uuid": uuid, "claims": [], **scores}
 
         self._ensure_verifier_packages()
-
-        anchored_specs = {
-            c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
-            for c in (anchored_records or [])
-        }
         claims_to_verify = claims[: self.max_claims]
-
-        # Pre-resolve specs: anchor-cache hits are O(disk read) each, but every
-        # other claim costs two judge round-trips (file selection + spec gen).
-        anchor_preloaded: dict[str, dict[str, Any]] = {}
-        needs_generation: list[dict[str, Any]] = []
-        for claim in claims_to_verify:
-            if anchored_records and rubric_anchor_uuid and claim["id"] in anchored_specs:
-                executable, reason = anchored_specs[claim["id"]]
-                anchor_preloaded[claim["id"]] = self._spec_from_anchor(
-                    rubric_anchor_uuid, claim["id"], executable, reason
-                )
-            else:
-                needs_generation.append(claim)
+        anchor_preloaded, needs_generation = self._partition_specs_by_anchor(
+            claims_to_verify, anchored_records, rubric_anchor_uuid
+        )
 
         st = time.time()
         generated = self._generate_specs_parallel(
@@ -730,6 +715,33 @@ class VerifierEvaluator(
             }
         return rec
 
+    def _partition_specs_by_anchor(
+        self,
+        claims_to_verify: list[dict[str, Any]],
+        anchored_records: list[dict[str, Any]] | None,
+        rubric_anchor_uuid: str | None,
+    ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+        """Split claims into anchor-preloaded specs vs. those needing generation.
+
+        Anchor-cache hits are O(disk read); every other claim costs two judge
+        round-trips (file selection + spec gen).
+        """
+        anchored_specs = {
+            c["id"]: (bool(c.get("executable")), str(c.get("reason") or ""))
+            for c in (anchored_records or [])
+        }
+        anchor_preloaded: dict[str, dict[str, Any]] = {}
+        needs_generation: list[dict[str, Any]] = []
+        for claim in claims_to_verify:
+            if anchored_specs and rubric_anchor_uuid and claim["id"] in anchored_specs:
+                executable, reason = anchored_specs[claim["id"]]
+                anchor_preloaded[claim["id"]] = self._spec_from_anchor(
+                    rubric_anchor_uuid, claim["id"], executable, reason
+                )
+            else:
+                needs_generation.append(claim)
+        return anchor_preloaded, needs_generation
+
     def _spec_from_anchor(
         self,
         anchor_uuid: str,
@@ -1035,6 +1047,10 @@ class VerifierEvaluator(
     # Report rendering + persistence
     # ------------------------------------------------------------------
 
+    _REPORT_SEPARATOR_BAR = "=" * 60
+    _REPORT_SECTION_BAR = "-" * 60
+    _REPORT_STDERR_TAIL_LINES = 5
+
     def _build_report(
         self,
         per_claim: list[dict[str, Any]],
@@ -1044,89 +1060,104 @@ class VerifierEvaluator(
     ) -> str:
         """Render a plain-text report from per-claim results and aggregate scores.
 
-        Args:
-            per_claim: List of per-claim scored dicts.
-            scores: Aggregated score dict from ``_aggregate``.
-            cheat: Cheat-detector report, or ``None``.
-            min_importance: When > 0, only claims with importance ≥ this value
-                are rendered. The aggregate header still reflects the full run.
-                Used to build a noise-suppressed view for the prompt-gradient
-                builder, while the on-disk ``evaluation.txt`` keeps the full
-                report (``min_importance=0``).
-
-        Returns:
-            Multi-line report string terminated with a newline.
+        When ``min_importance > 0`` only claims at or above that bar are
+        rendered; the aggregate header still reflects the full run. Used by
+        the prompt-gradient builder for a noise-suppressed view, while the
+        on-disk ``evaluation.txt`` keeps the full report (``min_importance=0``).
         """
-        lines: list[str] = []
-        w = lines.append
-
-        w("Verifier Evaluation")
-        w("=" * 60)
-        w(
-            f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
-            f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
-            f"unsure={scores.get('n_unsure', 0)}  "
-            f"scored={scores.get('n_scored', 0)}"
-        )
-        w(
-            f"Overall: {scores['overall_score']:.3f}"
-            f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
-            f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
-            f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
-        )
-        w(
-            f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
-            f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
-            f"n_high_importance_pass={scores.get('n_high_importance_pass', 0)}  "
-            f"high_importance_pass_mass={scores.get('high_importance_pass_mass', 0.0):.3f}  "
-            f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}"
-        )
-        if min_importance > 0:
-            w(f"(filtered view: importance ≥ {min_importance})")
-
+        lines: list[str] = list(self._format_report_header(scores, min_importance))
         for c in per_claim:
-            cl = c["claim"]
-            imp = int(cl.get("importance", self._DEFAULT_CLAIM_IMPORTANCE))
-            if imp < min_importance:
-                continue
-            rationale = str(cl.get("importance_rationale") or "").strip()
-            header = (
-                f"[{cl['id']}] (importance={imp}; {rationale}) {cl['description']}"
-                if rationale
-                else f"[{cl['id']}] (importance={imp}) {cl['description']}"
-            )
-            w(header)
-            rel = cl.get("likely_relevant_files", [])
-            if rel:
-                w(f"  relevant_files: {rel}")
-            w(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}")
-            if c.get("details"):
-                w(f"  details: {c['details']}")
-            if c.get("verifier_kind") == "executable" and c.get("raw_stderr"):
-                stderr_snippet = c["raw_stderr"].strip().splitlines()[-5:]
-                if stderr_snippet:
-                    w("  stderr (tail):")
-                    for line in stderr_snippet:
-                        w(f"    {line}")
-            w("")
-
-        if cheat is not None:
-            w("-" * 60)
-            w("Independent cheat audit")
-            w(f"  penalty: {cheat.penalty:.3f}")
-            if cheat.error:
-                w(f"  error:   {cheat.error}")
-            if cheat.behavioral:
-                w("  behavioral findings (also fed to mutator):")
-                for b in cheat.behavioral:
-                    w(f"    - {b}")
-            if cheat.mechanism:
-                w("  mechanism findings (audit-only — NOT fed to mutator):")
-                for m in cheat.mechanism:
-                    w(f"    - {m}")
-            w("")
-
+            lines.extend(self._format_claim_entry(c, min_importance))
+        lines.extend(self._format_cheat_section(cheat))
         return "\n".join(lines) + "\n"
+
+    def _format_report_header(
+        self, scores: dict[str, Any], min_importance: int
+    ) -> list[str]:
+        """Render the report header (title, counts, score breakdown, filter note)."""
+        lines = [
+            "Verifier Evaluation",
+            self._REPORT_SEPARATOR_BAR,
+            (
+                f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
+                f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
+                f"unsure={scores.get('n_unsure', 0)}  "
+                f"scored={scores.get('n_scored', 0)}"
+            ),
+            (
+                f"Overall: {scores['overall_score']:.3f}"
+                f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
+                f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
+                f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
+            ),
+            (
+                f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
+                f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
+                f"n_high_importance_pass={scores.get('n_high_importance_pass', 0)}  "
+                f"high_importance_pass_mass={scores.get('high_importance_pass_mass', 0.0):.3f}  "
+                f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}"
+            ),
+        ]
+        if min_importance > 0:
+            lines.append(f"(filtered view: importance ≥ {min_importance})")
+        return lines
+
+    def _format_claim_entry(
+        self, c: dict[str, Any], min_importance: int
+    ) -> list[str]:
+        """Render one claim's block; empty list when filtered out."""
+        cl = c["claim"]
+        imp = int(cl.get("importance", self._DEFAULT_CLAIM_IMPORTANCE))
+        if imp < min_importance:
+            return []
+        lines = [self._format_claim_header(cl, imp)]
+        rel = cl.get("likely_relevant_files", [])
+        if rel:
+            lines.append(f"  relevant_files: {rel}")
+        lines.append(f"  kind={c['verifier_kind']} status={c['status']} score={c['score']}")
+        if c.get("details"):
+            lines.append(f"  details: {c['details']}")
+        lines.extend(self._format_stderr_tail(c))
+        lines.append("")
+        return lines
+
+    @staticmethod
+    def _format_claim_header(cl: dict[str, Any], imp: int) -> str:
+        """Format one claim's heading line (optionally suffixed with rationale)."""
+        rationale = str(cl.get("importance_rationale") or "").strip()
+        if rationale:
+            return f"[{cl['id']}] (importance={imp}; {rationale}) {cl['description']}"
+        return f"[{cl['id']}] (importance={imp}) {cl['description']}"
+
+    @classmethod
+    def _format_stderr_tail(cls, c: dict[str, Any]) -> list[str]:
+        """Render the tail of stderr for executable verifiers; empty otherwise."""
+        if c.get("verifier_kind") != "executable" or not c.get("raw_stderr"):
+            return []
+        tail = c["raw_stderr"].strip().splitlines()[-cls._REPORT_STDERR_TAIL_LINES:]
+        if not tail:
+            return []
+        return ["  stderr (tail):", *(f"    {line}" for line in tail)]
+
+    def _format_cheat_section(self, cheat: Any) -> list[str]:
+        """Render the cheat-audit block; empty when no cheat report available."""
+        if cheat is None:
+            return []
+        lines = [
+            self._REPORT_SECTION_BAR,
+            "Independent cheat audit",
+            f"  penalty: {cheat.penalty:.3f}",
+        ]
+        if cheat.error:
+            lines.append(f"  error:   {cheat.error}")
+        if cheat.behavioral:
+            lines.append("  behavioral findings (also fed to mutator):")
+            lines.extend(f"    - {b}" for b in cheat.behavioral)
+        if cheat.mechanism:
+            lines.append("  mechanism findings (audit-only — NOT fed to mutator):")
+            lines.extend(f"    - {m}" for m in cheat.mechanism)
+        lines.append("")
+        return lines
 
     def _write_report(
         self,
