@@ -153,7 +153,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
-            max_tokens=16384,
+            max_tokens=32000,
             openrouter_provider=None, # use default
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
@@ -275,7 +275,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             raise ValueError(f"START targets non-existent node '{entry_node}'")
         self.logger.debug(f"Workflow entry point: START → {entry_node}")
 
-        self.logger.info("✅ Workflow structure validation passed")
+        self.logger.info("Workflow structure validation passed")
 
     def assemble_workflow(
         self,

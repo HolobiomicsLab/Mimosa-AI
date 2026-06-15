@@ -296,7 +296,7 @@ class WorkflowSelector:
                 scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
                 mode = "CROSSOVER" if use_crossover else "MUTATION"
                 logger.info(
-                    f"🧬 Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
+                    f"Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
                     f"{len(selected_workflows)} parent(s) from archive size={len(selection_pressure._archive)} "
                     f"— UUIDs={uuids}, scores={scores}"
                 )
@@ -326,7 +326,7 @@ class WorkflowSelector:
         scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
         mode = "CROSSOVER" if use_crossover else "MUTATION"
         logger.info(
-            f"🧬 Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
+            f"Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
             f"{len(selected_workflows)} parent(s) from {len(candidates)} disk candidates "
             f"— UUIDs={uuids}, scores={scores}"
         )

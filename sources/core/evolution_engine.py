@@ -1,5 +1,5 @@
 """
-Darwinian Evolution of multi-agent workflows.
+Neuroevolution-inspired, LLM driven evolution of Multi-Agents workflows.
 """
 
 import json
@@ -63,7 +63,7 @@ def _to_jsonable(obj: Any) -> Any:
 
 
 class EvolutionEngine:
-    """Darwin Machine for evolution of workflow workflows."""
+    """Evolution Engine: Handle the evolution of Multi-agents workflows."""
     def __init__(
         self,
         config: "Config",
@@ -350,9 +350,7 @@ class EvolutionEngine:
             The list of :class:`IndividualRun` produced across the evolution.
         """
         wf = None
-        max_iteration = 1
-        if enable_evolution:
-            max_iteration = self.config.max_learning_evolve_iterations
+        max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
 
         # Reset archive at session start
         self.selection._archive = []
@@ -726,7 +724,7 @@ class EvolutionEngine:
         eval_type = None
         exec_cost = 0.0
 
-        if judge and uuid:
+        if judge and uuid and executed:
             agent_answers = agent_answers if executed else "workflow failed to execute."
             eval_type = await self._evaluate_workflow_phenotype(uuid, agent_answers, scenario_rubric, assertion_history)
         # Calculate cost regardless of execution success

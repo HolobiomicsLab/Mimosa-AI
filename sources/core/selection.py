@@ -162,19 +162,13 @@ class SelectionPressure:
 
         In greedy mode: always returns the best-scoring run from `runs`.
         In tournament mode: probabilistic tournament among a random subset of `runs`.
-        In novelty/QD mode: samples a `PopulationMember` from `_archive`
-            biased toward high QD-score, falling back to greedy over `runs`
-            when the archive is empty (cold start).
-        Callers driving from archive must rehydrate the chosen member's
-        UUID into their domain object (e.g., WorkflowInfo).
+        In novelty/QD mode: samples a `PopulationMember` from `_archive` biased toward high QD-score
 
         Args:
             runs: Candidate pool. May be a list of `PopulationMember` (archive
                 draw) or any object with a `reward` attribute (greedy/tournament).
             child_counts: Optional ``{uuid: n_children_already}`` map used in
-                QD/novelty mode to apply a ``1/(1+n_children)`` penalty so
-                already-mined parents don't keep dominating the offspring stream.
-                v2_evolution §7 leveraged-move #4.
+                QD/novelty mode to apply a ``1/(1+n_children)`` penalty
 
         Returns:
             The chosen parent (a run object or a ``PopulationMember``), or

@@ -511,10 +511,10 @@ class ExecutionSandbox:
                     continue
             if copied_files:
                 for name, size in copied_files:
-                    self.logger.info(f"  📄 {name:<30} {size:>12,} bytes")
+                    self.logger.info(f"  {name:<30} {size:>12,} bytes")
             if copied_dirs:
                 for name, count in copied_dirs:
-                    self.logger.info(f"  📁 {name}/ ({count} nested files)")
+                    self.logger.info(f"{name}/ ({count} nested files)")
             if errors:
                 self.logger.warning(f"[SANDBOX] Failed items ({len(errors)}):")
                 for name, err in errors:
