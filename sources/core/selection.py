@@ -76,7 +76,7 @@ class SelectionPressure:
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
         novelty_k_neighbours: int = 10,
-        novelty_weight: float = 0.4,
+        novelty_weight: float = 0.25,
         admit_threshold: float = 0.3,
         max_children: int = MAX_CHILDREN_PER_PARENT,
     ) -> None:
