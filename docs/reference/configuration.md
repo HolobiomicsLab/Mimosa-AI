@@ -70,7 +70,7 @@ See [Troubleshooting → OpenRouter quantization](troubleshooting.md#openrouter-
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `runner_default_python_version` | `str` | `3.10` | Python in the sandbox. |
+| `runner_default_python_version` | `str` | `3.12` | Python in the sandbox. |
 | `runner_default_timeout` | `int` | `3600` | Per-run timeout (s). |
 | `runner_default_max_memory_mb` | `int` | `1024` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `int` | `100` | CPU cap (%). |

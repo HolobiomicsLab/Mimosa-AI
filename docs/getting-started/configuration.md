@@ -78,7 +78,7 @@ The sandbox enforces resource caps per generated workflow:
 
 | Field | Default | Purpose |
 | ----- | ------- | ------- |
-| `runner_default_python_version` | `3.10` | Python version inside the sandbox. |
+| `runner_default_python_version` | `3.12` | Python version inside the sandbox. |
 | `runner_default_timeout` | `3600` | Per-run timeout (seconds). |
 | `runner_default_max_memory_mb` | `1024` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `100` | CPU cap (%). |

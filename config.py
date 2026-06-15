@@ -38,11 +38,11 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace_2"
+        self.workspace_dir = "/Users/mlg/Documents/CNRS/toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5101, port_max=5200)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
 
         # LLMs choices
@@ -97,7 +97,7 @@ class Config:
         self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
         self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
         # runner settings
-        self.runner_default_python_version: str = "3.10"
+        self.runner_default_python_version: str = "3.12"
         self.runner_default_timeout: int = 10800
         # Per-agent (SmolAgentFactory) execution timeout in seconds. Injected into
         # the generated workflow as AGENT_EXECUTION_TIMEOUT. 3600 = 1 hour.
