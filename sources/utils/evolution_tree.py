@@ -130,6 +130,7 @@ def render_evolution_tree(
     workflow_dir: str | Path,
     output_path: str | Path | None = None,
     title: str | None = None,
+    goal: str | None = None,
 ) -> Path | None:
     """Scan ``workflow_dir`` and render the evolution tree to PNG.
 
@@ -138,12 +139,15 @@ def render_evolution_tree(
         output_path: Where to write the PNG. Defaults to
             ``<workflow_dir>/evolution_tree.png``.
         title: Optional plot title; defaults to a generic header.
+        goal: When provided, restrict the tree to workflows whose
+            ``goal_<uuid>.txt`` matches this text, so a single run's tree isn't
+            polluted by other goals' workflows.
 
     Returns:
         Path to the written PNG, or None if no workflows were found.
     """
     root = Path(workflow_dir)
-    records = scan_all(root)
+    records = scan_all(root, goal=goal)
     if not records:
         logger.info(f"evolution_tree: no workflows under {root}")
         return None
