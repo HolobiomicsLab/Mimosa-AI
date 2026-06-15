@@ -4,6 +4,7 @@ This class handles the creation and assembly of Langraph-SmolAgent workflow gene
 
 import logging
 import os
+import random
 import re
 import time
 import uuid
@@ -149,9 +150,12 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
+        temperature = random.uniform(0.7, 1.3)
+        self.logger.info(f"Workflow LLM temperature: {temperature:.2f}")
         llm_config = LLMConfig(
             model=model,
             provider=provider,
+            temperature=temperature,
             reasoning_effort=self.config.reasoning_effort,
             max_tokens=16384,
             openrouter_provider=None, # use default
