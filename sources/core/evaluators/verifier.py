@@ -855,11 +855,6 @@ class VerifierEvaluator(
         smooth gradient: flipping an importance-10 deliverable claim moves the
         score ~5× more than flipping a low-importance hygiene claim.
 
-        The thoroughness bonus saturates on importance-weighted mass of
-        high-importance passes (importance ≥ ``_INFO_BONUS_MIN_IMPORTANCE``).
-        The hard-fail cap fires when any claim with importance
-        ≥ ``_HARD_FAIL_IMPORTANCE`` is refuted (not errored, not unsure).
-
         Args:
             per_claim: List of per-claim scored dicts from ``_verify_claim``.
 
@@ -1058,13 +1053,7 @@ class VerifierEvaluator(
         cheat: Any,
         min_importance: int = 0,
     ) -> str:
-        """Render a plain-text report from per-claim results and aggregate scores.
-
-        When ``min_importance > 0`` only claims at or above that bar are
-        rendered; the aggregate header still reflects the full run. Used by
-        the prompt-gradient builder for a noise-suppressed view, while the
-        on-disk ``evaluation.txt`` keeps the full report (``min_importance=0``).
-        """
+        """Render a plain-text report from per-claim results and aggregate scores."""
         lines: list[str] = list(self._format_report_header(scores, min_importance))
         for c in per_claim:
             lines.extend(self._format_claim_entry(c, min_importance))

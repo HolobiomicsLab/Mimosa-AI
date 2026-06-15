@@ -1,12 +1,5 @@
 """Genotype-embedding behaviour descriptor for the QD archive.
 
-The descriptor must be orthogonal to fitness so the archive can separate
-"different ways of being good" from "different ways of being mediocre".
-This module exposes the workflow genotype's unit-norm code embedding as
-the QD behaviour descriptor — two workflows whose generated code is
-semantically similar collapse to the same point, so QD keeps only
-genotypes that explored a different approach.
-
 Backend selection lives in :mod:`sources.core.genotype_embedding`; this
 file is only the QD-facing shim.
 """

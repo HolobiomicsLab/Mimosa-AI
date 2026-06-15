@@ -155,12 +155,6 @@ class _VerifierWorkspaceMixin:
         (hallucination guard). When ``max_count`` is given, truncates to that
         cap. Returns paths in input order.
 
-        Lives on the workspace mixin because the validation is against
-        ``self._workspace_files`` — both the claim extractor (validating LLM
-        paths) and the per-claim file selector (validating verifier-input
-        paths) call this; centralising here avoids the claims mixin owning a
-        helper whose primary state lives elsewhere.
-
         Args:
             raw: Candidate iterable of path strings from a model response.
             allowed: Optional whitelist of workspace-relative paths.

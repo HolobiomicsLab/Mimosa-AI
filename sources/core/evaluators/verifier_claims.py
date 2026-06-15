@@ -109,17 +109,6 @@ class _VerifierClaimExtractionMixin:
     ) -> list[dict[str, Any]]:
         """Extract atomic claims by polling six independent source prompts.
 
-        Source A asks an LLM for what the LITERATURE demands of a correct
-        solution; Source B asks what the USER explicitly required in the goal
-        text; Source C asks for mathematical sanity properties of the
-        produced artefacts; Source D asks for the non-negotiable
-        computational-reproducibility requirements; Source E asks the
-        statistical-fingerprint / non-triviality questions.
-
-        After merging across sources, ``_declare_claim_importance`` runs a
-        single rater pass that drops near-duplicates and assigns each
-        surviving claim an integer importance (1-10) anchored on the goal.
-
         Args:
             uuid: Workflow identifier (used for logging and judge calls).
             goal: Original workflow goal text.
@@ -557,10 +546,6 @@ on-disk artefacts can actually support.
     ) -> list[dict[str, Any]]:
         """Validate the LLM JSON, normalise each claim, drop confabulated paths.
 
-        Importance is intentionally NOT assigned here — it is rated by a
-        separate post-merge pass (``_declare_claim_importance``) so the
-        per-source extractors only need to enumerate candidates.
-
         Args:
             uuid: Workflow identifier (used in error context).
             data: Parsed JSON payload from the judge; expected to contain a
@@ -612,21 +597,6 @@ on-disk artefacts can actually support.
     ) -> list[dict[str, Any]]:
         """Drop near-duplicates and rate every surviving claim 1-10 vs the goal.
 
-        Runs as two phases so the slow part is parallelisable:
-
-        * **Phase A — dedup (1 call):** the judge sees the full merged list of
-          ``(id, short description)`` pairs and returns only the ids of
-          near-duplicates to drop. Output is tiny so this call is cheap.
-        * **Phase B — rating (parallel batches):** surviving claims are sliced
-          into batches of ``_IMPORTANCE_BATCH_SIZE`` and each batch is rated
-          independently on ``_IMPORTANCE_PARALLELISM`` threads. Each entry
-          carries a *terse* rationale (≤8 words) instead of a full sentence,
-          which is what made the old single-call version slow.
-
-        On phase failure the affected claims fall back to
-        ``importance = _DEFAULT_CLAIM_IMPORTANCE`` with an empty rationale, so
-        the run still scores rather than crashing.
-
         Args:
             uuid: Workflow identifier (used for the judge call).
             goal: Workflow goal text — primary anchor for importance.
@@ -676,13 +646,7 @@ on-disk artefacts can actually support.
         claims: list[dict[str, Any]],
         grounding: str,
     ) -> set[str]:
-        """Single cheap LLM call returning only ids to drop as near-duplicates.
-
-        Output is just a list of ids, so the call generates almost no tokens
-        and finishes in seconds even on slow judges. On any error the dedup is
-        skipped (empty set) — duplicates will then bias the aggregate slightly
-        but the run still completes.
-        """
+        """Single cheap LLM call returning only ids to drop as near-duplicates."""
         prompt = self._build_dedup_prompt(goal, claims, grounding)
         data, err = self._call_judge_for_json(
             uuid, "verifier_dedup_claims", prompt
@@ -702,13 +666,7 @@ on-disk artefacts can actually support.
         claims: list[dict[str, Any]],
         grounding: str,
     ) -> dict[str, tuple[int, str]]:
-        """Split rating into batches and fan out across threads.
-
-        Each batch only needs to see its own claims (dedup already happened in
-        phase A), so batches are independent and threads suffice — the LLM
-        client is sync HTTP. Failures in one batch fall back to default
-        importance for those claims; other batches keep their real ratings.
-        """
+        """Split rating into batches and fan out across threads."""
         batches = [
             claims[i : i + _IMPORTANCE_BATCH_SIZE]
             for i in range(0, len(claims), _IMPORTANCE_BATCH_SIZE)
@@ -843,10 +801,6 @@ Return STRICT JSON only, in this exact shape:
         data: dict[str, Any],
     ) -> dict[str, tuple[int, str]]:
         """Project the ``importance`` array into ``{id: (importance, rationale)}``.
-
-        Importance values are clamped to ``[1, 10]`` and rationales coerced to
-        strings; malformed entries are skipped silently — the caller falls back
-        to the default importance for any claim missing from the map.
 
         Args:
             data: Parsed rater JSON.

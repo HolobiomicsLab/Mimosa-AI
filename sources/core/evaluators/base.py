@@ -17,10 +17,6 @@ from sources.core.workflow_info import WorkflowInfo
 def extract_json_payload(text: str) -> str:
     """First balanced JSON object/array in *text*, tolerant of fences and prose.
 
-    Lives at module level (not on ``BaseEvaluator``) so non-evaluator callers
-    can use it too. Used by ``BaseEvaluator._call_judge_for_json`` and by any
-    code path that parses an LLM JSON response wrapped in commentary.
-
     Args:
         text: Arbitrary string possibly containing a JSON document, with or
             without ``` fences and with prose around it.

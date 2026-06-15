@@ -324,12 +324,6 @@ Respond in this exact JSON format:
     def evaluate(self, uuid: str, agent_answers: str | None = None) -> None:
         """Perform generic evaluation of a workflow.
 
-        Each evaluation criterion is assessed independently with a fresh LLM
-        context to avoid inter-criteria bias. The answer_plausibility criterion
-        additionally uses scientific literature grounding from Perspicacite.
-        Results are written to ``evaluation.txt`` in the workflow folder and
-        the score dictionary is persisted via ``_save_results``.
-
         Args:
             uuid: UUID of the workflow to evaluate.
             agent_answers: Optional answers from agents for evaluation

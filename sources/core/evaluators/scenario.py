@@ -46,10 +46,6 @@ class ScenarioEvaluator(BaseEvaluator):
     def evaluate(self, uuid: str, scenario_rubric: str) -> dict[str, Any]:
         """Evaluate a workflow against a scenario with scoring.
 
-        Dispatches to the rubric or legacy evaluation path depending on the
-        scenario's structure. If ``uuid`` is ``None``, returns a zero-score
-        placeholder result.
-
         Args:
             uuid: UUID of the workflow to evaluate.
             scenario_rubric: ID of the scenario to evaluate against.

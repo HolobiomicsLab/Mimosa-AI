@@ -1,19 +1,6 @@
-"""Failure-fingerprint behaviour descriptor for the QD archive.
-
-Replaces the topology-based descriptor for novelty: instead of measuring
-"different DAG shapes", we measure "different failure profiles" — two
-workflows that fail in the same way are redundant regardless of how
-different their structure looks; two that fail in different ways explore
-different basins and should both survive.
-
-Per source A-F, the descriptor uses the per-claim pass rate. Sources with
-zero claims get a neutral value of ``0.5`` and presence-mask ``0``. The
-final vector is then **centered**: the mean pass rate across present
-sources is subtracted from every entry. This encodes the *profile shape*
-of which sources fail relative to the others — NOT the overall quality
-level. An all-pass run and an all-fail run both yield the zero profile;
-quality already drives ``quality_norm`` in QD, and must not leak into
-novelty or QD collapses back into greedy search.
+"""
+Failure-fingerprint behaviour descriptor for the QD archive.
+[DEPRECATED] This descriptor is no longer used in the archive as diversity metrics
 """
 
 import json

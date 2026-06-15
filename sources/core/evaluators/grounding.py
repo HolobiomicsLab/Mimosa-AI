@@ -4,10 +4,6 @@ from sources.utils.perspicacite_client import query_perspicacite
 def get_perspicacite_grounding(goal: str) -> str:
     """Query Perspicacite for citation-grounded expectations of how a science goal should be achieved.
 
-    Builds a detailed prompt asking for 15-35 concrete success indicators with
-    literature backing, then dispatches it to Perspicacite via
-    :func:`sources.utils.perspicacite_client.query_perspicacite`.
-
     Args:
         goal: The science goal given to the agents.
 
