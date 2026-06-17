@@ -396,7 +396,7 @@ class ExecutionSandbox:
 
             output = result.stdout.strip()
             self.logger.info("[SANDBOX] Generated code executed successfully")
-            return True, f"Code executed successfully. Output: {output[:200]}"
+            return True, f"Code executed. Output: {output[:100000]}"
 
         except subprocess.TimeoutExpired:
             self.logger.error(f"[SANDBOX] Generated code timeout after {timeout}s")
