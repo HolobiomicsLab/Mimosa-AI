@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://holobiomicslab.github.io/Mimosa-AI/getting-started/index.html">
+        <link rel="canonical" href="https://holobiomicslab.github.io/Mimosa-AI/papers_bench_evaluation.html">
       
       
-        <link rel="prev" href="../index.html">
+        <link rel="prev" href="science_agent_bench_evaluation.html">
       
       
-        <link rel="next" href="installation.html">
+        <link rel="next" href="evaluation/custom-benchmarks.html">
       
       
         
       
       
-      <link rel="icon" href="../images/logo_mimosa.png">
+      <link rel="icon" href="images/logo_mimosa.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Overview - Mimosa-AI</title>
+        <title>PaperBench - Mimosa-AI</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,9 +53,9 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started" class="md-skip">
+        <a href="#running-paperbench-locally" class="md-skip">
           Skip to content
         </a>
       
@@ -96,9 +96,9 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../index.html" title="Mimosa-AI" class="md-header__button md-logo" aria-label="Mimosa-AI" data-md-component="logo">
+    <a href="index.html" title="Mimosa-AI" class="md-header__button md-logo" aria-label="Mimosa-AI" data-md-component="logo">
       
-  <img src="../images/logo_mimosa.png" alt="logo">
+  <img src="images/logo_mimosa.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              PaperBench
             
           </span>
         </div>
@@ -227,7 +227,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../index.html" class="md-tabs__link">
+      <a href="index.html" class="md-tabs__link">
         
   
   
@@ -244,13 +244,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="index.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="getting-started/index.html" class="md-tabs__link">
           
   
   
@@ -272,7 +270,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../concepts/index.html" class="md-tabs__link">
+        <a href="concepts/index.html" class="md-tabs__link">
           
   
   
@@ -294,7 +292,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../usage/index.html" class="md-tabs__link">
+        <a href="usage/index.html" class="md-tabs__link">
           
   
   
@@ -312,11 +310,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../evaluation/index.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="evaluation/index.html" class="md-tabs__link">
           
   
   
@@ -338,7 +338,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../reference/cli.html" class="md-tabs__link">
+        <a href="reference/cli.html" class="md-tabs__link">
           
   
   
@@ -360,7 +360,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../DEVELOPER_GUIDE.html" class="md-tabs__link">
+        <a href="DEVELOPER_GUIDE.html" class="md-tabs__link">
           
   
   
@@ -382,7 +382,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../about/citation.html" class="md-tabs__link">
+        <a href="about/citation.html" class="md-tabs__link">
           
   
   
@@ -424,9 +424,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../index.html" title="Mimosa-AI" class="md-nav__button md-logo" aria-label="Mimosa-AI" data-md-component="logo">
+    <a href="index.html" title="Mimosa-AI" class="md-nav__button md-logo" aria-label="Mimosa-AI" data-md-component="logo">
       
-  <img src="../images/logo_mimosa.png" alt="logo">
+  <img src="images/logo_mimosa.png" alt="logo">
 
     </a>
     Mimosa-AI
@@ -453,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../index.html" class="md-nav__link">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -477,8 +477,6 @@
       
   
   
-    
-  
   
   
     
@@ -500,23 +498,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="index.html" class="md-nav__link md-nav__link--active">
+            <a href="getting-started/index.html" class="md-nav__link ">
               
   
   
@@ -534,13 +531,13 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -560,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="installation.html" class="md-nav__link">
+      <a href="getting-started/installation.html" class="md-nav__link">
         
   
   
@@ -588,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="quickstart.html" class="md-nav__link">
+      <a href="getting-started/quickstart.html" class="md-nav__link">
         
   
   
@@ -616,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="configuration.html" class="md-nav__link">
+      <a href="getting-started/configuration.html" class="md-nav__link">
         
   
   
@@ -644,7 +641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="env.html" class="md-nav__link">
+      <a href="getting-started/env.html" class="md-nav__link">
         
   
   
@@ -716,7 +713,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../concepts/index.html" class="md-nav__link ">
+            <a href="concepts/index.html" class="md-nav__link ">
               
   
   
@@ -760,7 +757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/architecture.html" class="md-nav__link">
+      <a href="concepts/architecture.html" class="md-nav__link">
         
   
   
@@ -788,7 +785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/evolution-engine.html" class="md-nav__link">
+      <a href="concepts/evolution-engine.html" class="md-nav__link">
         
   
   
@@ -816,7 +813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/evaluation-pipeline.html" class="md-nav__link">
+      <a href="concepts/evaluation-pipeline.html" class="md-nav__link">
         
   
   
@@ -844,7 +841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/tools-and-mcp.html" class="md-nav__link">
+      <a href="concepts/tools-and-mcp.html" class="md-nav__link">
         
   
   
@@ -872,7 +869,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/toolomics.html" class="md-nav__link">
+      <a href="concepts/toolomics.html" class="md-nav__link">
         
   
   
@@ -900,7 +897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/grounding.html" class="md-nav__link">
+      <a href="concepts/grounding.html" class="md-nav__link">
         
   
   
@@ -972,7 +969,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../usage/index.html" class="md-nav__link ">
+            <a href="usage/index.html" class="md-nav__link ">
               
   
   
@@ -1016,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/modes.html" class="md-nav__link">
+      <a href="usage/modes.html" class="md-nav__link">
         
   
   
@@ -1044,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/learning.html" class="md-nav__link">
+      <a href="usage/learning.html" class="md-nav__link">
         
   
   
@@ -1072,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/workspace.html" class="md-nav__link">
+      <a href="usage/workspace.html" class="md-nav__link">
         
   
   
@@ -1100,7 +1097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/transparency.html" class="md-nav__link">
+      <a href="usage/transparency.html" class="md-nav__link">
         
   
   
@@ -1128,7 +1125,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/notifications.html" class="md-nav__link">
+      <a href="usage/notifications.html" class="md-nav__link">
         
   
   
@@ -1156,7 +1153,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/telemetry.html" class="md-nav__link">
+      <a href="usage/telemetry.html" class="md-nav__link">
         
   
   
@@ -1188,6 +1185,8 @@
       
   
   
+    
+  
   
   
     
@@ -1207,22 +1206,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../evaluation/index.html" class="md-nav__link ">
+            <a href="evaluation/index.html" class="md-nav__link ">
               
   
   
@@ -1240,13 +1240,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1266,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../science_agent_bench_evaluation.html" class="md-nav__link">
+      <a href="science_agent_bench_evaluation.html" class="md-nav__link">
         
   
   
@@ -1291,10 +1291,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../papers_bench_evaluation.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PaperBench
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="papers_bench_evaluation.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1310,6 +1337,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-image-pull-issue-quick-resolution-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Image Pull Issue - Quick Resolution Report
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Image Pull Issue - Quick Resolution Report">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paper-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paper IDs:
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-choose-the-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Choose the split
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-example-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Example commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Example commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#code-dev-judge-checks-code-structure-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code-Dev (judge checks code structure only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-evaluation-reproduction-grading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full evaluation (reproduction + grading)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-inspecting-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Inspecting results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1322,7 +1502,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evaluation/custom-benchmarks.html" class="md-nav__link">
+      <a href="evaluation/custom-benchmarks.html" class="md-nav__link">
         
   
   
@@ -1421,7 +1601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli.html" class="md-nav__link">
+      <a href="reference/cli.html" class="md-nav__link">
         
   
   
@@ -1449,7 +1629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/configuration.html" class="md-nav__link">
+      <a href="reference/configuration.html" class="md-nav__link">
         
   
   
@@ -1477,7 +1657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/file-layout.html" class="md-nav__link">
+      <a href="reference/file-layout.html" class="md-nav__link">
         
   
   
@@ -1505,7 +1685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/troubleshooting.html" class="md-nav__link">
+      <a href="reference/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -1602,7 +1782,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../DEVELOPER_GUIDE.html" class="md-nav__link">
+      <a href="DEVELOPER_GUIDE.html" class="md-nav__link">
         
   
   
@@ -1630,7 +1810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../developer/extending.html" class="md-nav__link">
+      <a href="developer/extending.html" class="md-nav__link">
         
   
   
@@ -1658,7 +1838,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../developer/contributing.html" class="md-nav__link">
+      <a href="developer/contributing.html" class="md-nav__link">
         
   
   
@@ -1755,7 +1935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../about/citation.html" class="md-nav__link">
+      <a href="about/citation.html" class="md-nav__link">
         
   
   
@@ -1783,7 +1963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../licensing-notes.html" class="md-nav__link">
+      <a href="licensing-notes.html" class="md-nav__link">
         
   
   
@@ -1811,7 +1991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cla-process.html" class="md-nav__link">
+      <a href="cla-process.html" class="md-nav__link">
         
   
   
@@ -1859,6 +2039,147 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-image-pull-issue-quick-resolution-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Image Pull Issue - Quick Resolution Report
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Image Pull Issue - Quick Resolution Report">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paper-ids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paper IDs:
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-choose-the-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Choose the split
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-example-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Example commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Example commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#code-dev-judge-checks-code-structure-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code-Dev (judge checks code structure only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-evaluation-reproduction-grading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full evaluation (reproduction + grading)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-inspecting-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Inspecting results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1882,7 +2203,7 @@
   
   
     <li class="md-path__item">
-      <a href="../index.html" class="md-path__link">
+      <a href="index.html" class="md-path__link">
         
   <span class="md-ellipsis">
     Home
@@ -1900,10 +2221,10 @@
     
     
       <li class="md-path__item">
-        <a href="index.html" class="md-path__link">
+        <a href="evaluation/index.html" class="md-path__link">
           
   <span class="md-ellipsis">
-    Getting Started
+    Evaluation
   </span>
 
         </a>
@@ -1925,44 +2246,154 @@
   
 
 
-<h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h1>
-<p>Five pages to take you from a fresh clone to a finished workflow.</p>
-<table>
-<thead>
-<tr>
-<th>Page</th>
-<th>What you'll do</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="installation.html">Installation</a></td>
-<td>Install dependencies and the Toolomics MCP server.</td>
-</tr>
-<tr>
-<td><a href="quickstart.html">Quickstart</a></td>
-<td>Run your first task, end-to-end.</td>
-</tr>
-<tr>
-<td><a href="configuration.html">Configuration</a></td>
-<td>Pick your LLMs, workspace path, and learning thresholds.</td>
-</tr>
-<tr>
-<td><a href="env.html">API keys &amp; environment</a></td>
-<td>What to put in <code>.env</code> and which provider to choose.</td>
-</tr>
-<tr>
-<td><a href="../concepts/index.html">Concepts</a></td>
-<td>Once it runs, understand <em>how</em> it runs.</td>
-</tr>
-</tbody>
-</table>
-<div class="admonition tip">
-<p class="admonition-title">New to Mimosa?</p>
-<p>Skip the manual onboarding entirely the first time: run <code>uv run main.py</code>
-with no arguments and the interactive wizard will walk you through
-everything below.</p>
+<h1 id="running-paperbench-locally">Running PaperBench Locally<a class="headerlink" href="#running-paperbench-locally" title="Permanent link">&para;</a></h1>
+<div class="admonition info">
+<p class="admonition-title">Two different things called 'evaluation'</p>
+<p>PaperBench is an <strong>external benchmark grader</strong> released by OpenAI's
+frontier-evals team — not the Mimosa judge. PaperBench takes a
+candidate submission and grades it against a paper's expected
+reproduction outputs using its own scaffolded judge and runtime.</p>
+<p>The Mimosa-internal verifier (<a href="concepts/evaluation-pipeline.html">Evaluation pipeline</a>)
+runs <em>during</em> workflow evolution, produces the prompt gradient that
+drives the mutator, and is separate from PaperBench. When you run
+PaperBench on a Mimosa capsule, you are sending an artefact that
+Mimosa's evolution loop produced into a grading system Mimosa has
+no control over.</p>
 </div>
+<p>This note captures the minimum you need to run PaperBench with pre-existing submissions (via <code>PBDirectSubmissionSolver</code>). For a full walkthrough see <code>paperbench/README.md</code>.</p>
+<h2 id="1-prerequisites">1. Prerequisites<a class="headerlink" href="#1-prerequisites" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Clone OpenAI frontier-evals repository and enter paperbench folder:</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/openai/frontier-evals.git<span class="w"> </span>--filter<span class="o">=</span>blob:none
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>frontier-evals/project/paperbench
+</span></code></pre></div>
+<ol>
+<li>Install dependencies:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>sync
+</span></code></pre></div></li>
+<li>Hydrate the dataset (Git LFS) and set <code>PAPERBENCH_DATA_DIR</code> if it lives outside this repository.</li>
+<li>Build the required Docker images once:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bash<span class="w"> </span>paperbench/scripts/build-docker-images.sh
+</span></code></pre></div></li>
+<li>Prepare your submissions directory (need to rename the capsule to <paper-id-1> and add submission_try_1 manually):
+   <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>/path/to/mimosa/runs_capsule/
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    &lt;paper-id-1&gt;/
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        submission_try_1/
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        submission_try_2/
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    &lt;paper-id-2&gt;/
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        submission_try_1/
+</span></code></pre></div>
+   Each <code>submission_try_*</code> folder should contain the files you want graded. Missing paper folders simply count as zero for that paper.</li>
+</ol>
+<h2 id="docker-image-pull-issue-quick-resolution-report">Docker Image Pull Issue - Quick Resolution Report<a class="headerlink" href="#docker-image-pull-issue-quick-resolution-report" title="Permanent link">&para;</a></h2>
+<h3 id="issue">Issue<a class="headerlink" href="#issue" title="Permanent link">&para;</a></h3>
+<p>When running PaperBench evaluations, you get the error:
+<code>ImageNotFound: pull access denied for pb-env, repository does not exist or may require 'docker login'</code></p>
+<p><strong>Root Cause:</strong>
+The system defaults to pulling Docker images from remote registries (Docker Hub) instead of using your locally built pb-env:latest image.</p>
+<h3 id="quick-fix">Quick Fix<a class="headerlink" href="#quick-fix" title="Permanent link">&para;</a></h3>
+<p>Configure your LocalConfig with pull_from_registry=False:</p>
+<p><strong>Command Line:</strong></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python<span class="w"> </span>-m<span class="w"> </span>paperbench.nano.eval<span class="w"> </span>--paperbench.solver.computer_runtime.env<span class="o">=</span><span class="s2">&quot;alcatraz.clusters.local:LocalConfig(pull_from_registry=False)&quot;</span>
+</span></code></pre></div>
+<p>Or in your config:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>LocalConfig<span class="o">(</span><span class="nv">pull_from_registry</span><span class="o">=</span>False<span class="o">)</span><span class="w">  </span><span class="c1"># instead of default LocalConfig()</span>
+</span></code></pre></div>
+<h2 id="paper-ids"><strong>Paper IDs:</strong><a class="headerlink" href="#paper-ids" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>adaptive-pruning</strong>: APT: Adaptive Pruning and Tuning Pretrained Language Models for Efficient Training and Inference</p>
+</li>
+<li>
+<p><strong>all-in-one</strong>: All-in-one simulation-based inference</p>
+</li>
+<li>
+<p><strong>bbox</strong>: Batch and match: black-box variational inference with a score-based divergence</p>
+</li>
+<li>
+<p><strong>fre</strong>: Unsupervised Zero-Shot Reinforcement Learning via Functional Reward Encodings</p>
+</li>
+</ol>
+<p>5.<strong>ftrl</strong>: Fine-tuning reinforcement models is a secretyly a forgetting problem</p>
+<ol>
+<li>
+<p><strong>bam</strong>: Refined coreset selection</p>
+</li>
+<li>
+<p><strong>lca-on-the-line</strong>: LCA-on-the-Line: Benchmarking Out of Distribution Generalization with Class Taxonomies</p>
+</li>
+<li>
+<p><strong>mechanistic-understanding</strong>: A Mechanistic Understanding of Alignment Algorithms: A Case Study on DPO and Toxicity</p>
+</li>
+<li>
+<p><strong>pinn</strong>: Challenges in Training PINNs: A Loss Landscape Perspective</p>
+</li>
+<li>
+<p><strong>rice</strong>: RICE: Breaking Through the Training Bottlenecks of Reinforcement Learning with Explanation ML</p>
+</li>
+<li>
+<p><strong>robust-clip</strong>: Robust CLIP: Unsupervised Adversarial Fine-Tuning of Vision Embeddings for Robust Large Vision-Language Models</p>
+</li>
+<li>
+<p><strong>sample-specific-masks</strong>: Sample-specific Masks for Visual Reprogramming-based Prompting</p>
+</li>
+<li>
+<p><strong>sapg</strong>: SAPG: Split and Aggregate Policy Gradients</p>
+</li>
+<li>
+<p><strong>sequential-neural-score-estimation</strong>: Sequential Neural Score Estimation: Likelihood-Free Inference with Conditional Score Based Diffusion Models</p>
+</li>
+<li>
+<p><strong>stay-on-topic-with-classifier-free-guidance</strong>: Stay on Topic with Classifier-Free Guidance</p>
+</li>
+<li>
+<p><strong>stochastic-interpolants</strong>: Stochastic Interpolants with Data-Dependent Couplings</p>
+</li>
+<li>
+<p><strong>test-time-model-adaptation</strong>: Test-Time Model Adaptation with Only Forward Passes</p>
+</li>
+<li>
+<p><strong>what-will-my-model-forget</strong>: What Will My Model Forget? Forecasting Forgotten Examples in Language Model Refinement</p>
+</li>
+</ol>
+<h2 id="2-choose-the-split">2. Choose the split<a class="headerlink" href="#2-choose-the-split" title="Permanent link">&para;</a></h2>
+<p>PaperBench launches one task per paper listed in <code>paperbench/experiments/splits/&lt;split&gt;.txt</code>. Make sure the split references only papers you actually have submissions for (e.g., create a custom split containing <code>all-in-one</code> if that is your only target).</p>
+<h2 id="3-example-commands">3. Example commands<a class="headerlink" href="#3-example-commands" title="Permanent link">&para;</a></h2>
+<p>Run all commands from the repository root.</p>
+<h3 id="code-dev-judge-checks-code-structure-only">Code-Dev (judge checks code structure only)<a class="headerlink" href="#code-dev-judge-checks-code-structure-only" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>paperbench.nano.entrypoint<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span>paperbench.paper_split<span class="o">=</span>all-in-one<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span>paperbench.solver<span class="o">=</span>paperbench.solvers.direct_submission.solver:PBDirectSubmissionSolver<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span>paperbench.solver.submissions_dir<span class="o">=</span>/home/mlegrand/Projects/foo_eval<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span>paperbench.judge.scaffold<span class="o">=</span>simple<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span>runner.recorder<span class="o">=</span>nanoeval.json_recorder:json_recorder<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span>paperbench.judge.code_only<span class="o">=</span>True
+</span></code></pre></div>
+<h3 id="full-evaluation-reproduction-grading">Full evaluation (reproduction + grading)<a class="headerlink" href="#full-evaluation-reproduction-grading" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>paperbench.nano.entrypoint<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>paperbench.paper_split<span class="o">=</span>all-in-one<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>paperbench.solver<span class="o">=</span>paperbench.solvers.direct_submission.solver:PBDirectSubmissionSolver<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>paperbench.solver.submissions_dir<span class="o">=</span>/home/mlegrand/Projects/foo_eval<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>paperbench.judge.scaffold<span class="o">=</span>simple<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>runner.recorder<span class="o">=</span>nanoeval.json_recorder:json_recorder
+</span></code></pre></div>
+<h2 id="4-inspecting-results">4. Inspecting results<a class="headerlink" href="#4-inspecting-results" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Each run creates a directory under <code>paperbench/runs/&lt;run_group_id&gt;/&lt;paper_id_run_id&gt;/</code> with logs, grades, and archived submissions.</li>
+<li><code>grade.json</code> contains the final score and judge output.</li>
+<li><code>group.log</code> summarizes the entire launch.</li>
+</ul>
+<p>If a run reports "No checkpoint exists", confirm the submissions directory contains a folder named exactly after the paper(s) in your split. If reproduction fails because Python/Jupyter are missing in the base container, rerun after pulling the latest code (the runtime now auto-installs Python when necessary).</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="concepts/evaluation-pipeline.html">Evaluation pipeline</a> — Mimosa's
+  in-loop verifier, which is <strong>not</strong> PaperBench.</li>
+<li><a href="science_agent_bench_evaluation.html">ScienceAgentBench evaluation</a> —
+  the other external benchmark grader Mimosa is wired into.</li>
+<li><a href="https://github.com/openai/frontier-evals">PaperBench (frontier-evals)</a> —
+  upstream source, the canonical reference for the grader itself.</li>
+</ul>
 
 
 
@@ -2000,7 +2431,7 @@ everything below.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../index.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Home">
+          <a href="science_agent_bench_evaluation.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: ScienceAgentBench">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2010,20 +2441,20 @@ everything below.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Home
+                ScienceAgentBench
               </div>
             </div>
           </a>
         
         
           
-          <a href="installation.html" class="md-footer__link md-footer__link--next" aria-label="Next: Installation">
+          <a href="evaluation/custom-benchmarks.html" class="md-footer__link md-footer__link--next" aria-label="Next: Custom benchmarks">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Installation
+                Custom benchmarks
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -2093,10 +2524,10 @@ everything below.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
