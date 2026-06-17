@@ -256,9 +256,9 @@ Each recursive step:
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
-Termination: `overall_score > learned_score_threshold` (default 0.94) in
+Termination: `overall_score >= learned_score_threshold` (default 0.9) in
 `--learn` mode, or `max_depth` reached
-(`max_learning_evolve_iterations`, default 45; single-shot uses
+(`max_learning_evolve_iterations`, default 20; single-shot uses
 `max_depth=1`).
 
 ### 2. `SelectionPressure` — [`sources/core/selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
@@ -278,39 +278,45 @@ penalty `÷(1 + n_children_already)` and a hard
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
 Prompt assembly for mutation and crossover. Mutation boldness is a
-continuous function of two evidence signals — population stagnation
-*and* the Rechenberg 1/5 success rate of recent offspring — not a fixed
-phase schedule.
+continuous function of two evidence signals — an
+`iters_since_improvement` plateau counter *and* the Rechenberg 1/5
+success rate of recent offspring — not a fixed phase schedule.
 
-- `_compute_stagnation(window=4)` — mean pairwise MiniLM cosine
-  similarity over the last 4 non-failure prompt gradients, rescaled so
-  the unrelated baseline (`≈0.4`) maps to `0` and full repetition
-  (`≥0.8`) maps to `1`.
+- `_iters_since_improvement()` — length of the trailing run of scored
+  offspring that did not strictly beat best-so-far (failures and
+  unscored entries skipped). Normalised as
+  `plateau = min(1, iters / _PLATEAU_PATIENCE)` with
+  `_PLATEAU_PATIENCE = 6`.
 - `_compute_success_rate(window=5)` — fraction of the last 5 scored
   offspring that strictly beat the running best at production time.
   The Rechenberg 1/5 success rule threshold is `0.20`.
 - `_get_prompt_step_size(parent_score)` — combines the two:
-    * cold start (no scored history yet) — `effective = raw_stagnation`,
-    * `success_rate < 0.20` — `effective = max(raw_stagnation, deficit)`
+    * cold start (fewer than two comparable scored offspring) —
+      `effective = 0.3 · plateau` (capped ramp),
+    * `success_rate < 0.20` — `effective = 0.5 · deficit + 0.5 · plateau`
        with `deficit = (0.20 − success_rate) / 0.20` (escalate),
-    * `success_rate ≥ 0.20` — `effective = raw_stagnation · (1 − progress)`
+    * `success_rate ≥ 0.20` — `effective = plateau · (1 − progress)`
        with `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`
        (damp boldness in proportion to real progress),
     * near-finish floor: when `parent_score > 0.95`, multiply by
        `(1 − 0.5 · (parent_score − 0.95) / 0.05)` so a 0.96 parent isn't
-       gambled away one generation before early-stop.
+       gambled away one generation before early-stop,
+    * RE-SPECIATION gate: unless `iters_since_improvement ≥ 8` *and*
+      `success_rate ∈ {None, 0.0}`, `effective` is clamped to
+      `_RESPECIATION_CLAMP = 0.89`, just below the EXPLORATION/
+      RE-SPECIATION boundary at `0.90`.
   Then it grows the agent budget from the previous generation's count
   toward `max_possible_agents = 7` proportionally to `effective`, and
   samples the actual agent count with a Beta-Binomial biased upward by
   `effective`.
 
-| Effective boldness | Agent budget | Mutation scope (advisory)                                  |
-|--------------------|--------------|-------------------------------------------------------------|
-| <0.20              | ≈ current    | prompt-only little tweak                                    |
-| <0.40              | current+1    | prompt, handoff, tools — improve information flow           |
-| <0.60              | current+2    | significant redesign while keeping topology                 |
-| <0.80              | current+3    | bold rewire — restructure or grow the agent set             |
-| ≥0.80              | up to 7      | complete rethink — discard inherited topology / prompts     |
+| Effective boldness | Mutation scope (advisory)                                                   |
+|--------------------|-----------------------------------------------------------------------------|
+| < 0.35             | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
+| < 0.50             | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
+| < 0.65             | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
+| < 0.90             | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
+| ≥ 0.90             | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
 
 Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
@@ -323,7 +329,7 @@ Two-mode parent retrieval:
 - **Steady state**: when `selection_pressure._archive` is populated, draws
   parents from the live session archive via QD-roulette.
 - **Cold start**: empty archive → similarity-filtered disk scan
-  (`cosine ≥ 0.5` on MiniLM embeddings of `original_task`, `score ≥ 0.05`)
+  (`cosine ≥ 0.8` on MiniLM embeddings of `original_task`, `score ≥ 0.1`)
   routed through the same `select_parents()` weighting.
 
 ### 5. `WorkflowOrchestrator` — [`sources/core/orchestrator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/orchestrator.py)
@@ -401,7 +407,7 @@ EvolutionEngine.start_workflow_evolution(goal)
         ├─ SelectionPressure.validate_survivor() → archive admit?
         ├─ record_lineage()
         ├─ select next parent (archive QD-roulette)
-        ├─ choose crossover (~0.4 rate, once initial_population met) or mutation
+        ├─ choose crossover (default crossover_rate=0.1, once initial_population met) or mutation
         └─ recurse → stop on threshold OR max_depth
     ↓
 WorkspaceManager.restore_best(best_uuid)

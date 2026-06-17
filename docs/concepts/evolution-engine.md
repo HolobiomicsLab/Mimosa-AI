@@ -17,7 +17,7 @@ flowchart TB
     Seed -- yes --> SeedPrompt[Seed genome prompt<br/>or template mutation]
     Seed -- no --> Pick[Pick parents via QD-roulette<br/>fallback to disk similarity scan]
     SeedPrompt --> Orch[Orchestrate workflow<br/>LLM → sandbox]
-    Pick --> Decide{Crossover ≈ 0.4?}
+    Pick --> Decide{Crossover ≈ 0.1?}
     Decide -- mutation --> Mut[Mutation prompt<br/>stagnation-scoped]
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
     Mut --> Orch
@@ -52,9 +52,9 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score > learned_score_threshold` (default `0.94`) in `--learn` mode, *or*
+- `overall_score >= learned_score_threshold` (default `0.9`) in `--learn` mode, *or*
 - `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
-  (default `45`) in `--learn` mode.
+  (default `20`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 
@@ -64,12 +64,12 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
 
 - A **session archive** holds up to `population_size = 50` members.
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
-  `w = novelty_weight = 0.4`. Quality and novelty are **additive** — never
+  `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
   multiplied — so high quality cannot rescue a redundant profile and high
   novelty cannot drag a broken run above peers.
 - Quality is sourced from `reward_uncapped` so the hard-fail cap doesn't
   flatten rank ordering.
-- Novelty is k-NN distance (`k = 25`) in **failure-fingerprint** space.
+- Novelty is k-NN distance (`k = 15`) in **failure-fingerprint** space.
   The descriptor is the centered per-source pass-rate vector produced by
   [`failure_fingerprint.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
   from the verifier's per-claim verdicts (see below).
@@ -83,8 +83,8 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
   offspring stream stays spread across the archive.
 
 When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
-falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.5` on MiniLM
-embeddings of `original_task`, `score ≥ 0.05`) — this lets useful workflows
+falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.8` on MiniLM
+embeddings of `original_task`, `score ≥ 0.1`) — this lets useful workflows
 transfer across tasks.
 
 ### Behaviour descriptor: failure fingerprint
@@ -128,14 +128,15 @@ for QD novelty — empirical work showed it barely co-varies with outcomes.
 [`VariationEngine`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 assembles mutation and crossover prompts. There is no fixed phase
 schedule by iteration progress; mutation boldness is a continuous
-function of two evidence signals — how much the population is
-repeating itself, *and* how often recent offspring have actually
-improved on the best-so-far.
+function of two evidence signals — how long the lineage has been
+failing to improve, *and* how often recent offspring actually beat the
+best-so-far.
 
-**Stagnation signal.** `_compute_stagnation(window=4)` takes the last
-4 non-failure prompt gradients, computes their pairwise MiniLM cosine
-similarity, and rescales the mean (`0.4` ≈ unrelated → `0`,
-`0.8+` ≈ fully stagnated → `1`).
+**Plateau signal.** `_iters_since_improvement()` counts the run of
+trailing scored offspring (failures and unscored entries skipped) that
+did not strictly beat the best-so-far at the moment they were
+produced. It is normalised to `plateau = min(1, iters / _PLATEAU_PATIENCE)`
+with `_PLATEAU_PATIENCE = 6`.
 
 **Success-rate signal.** `_compute_success_rate(window=5)` counts the
 fraction of the last 5 scored offspring whose `overall_score` strictly
@@ -146,42 +147,49 @@ is happening and step size should be damped.
 
 **Effective boldness.** Combining the two signals:
 
-- **Cold start** (no scored offspring yet) — `effective = raw_stagnation`.
-- **Below 1/5** (`success_rate < 0.20`) — escalate at least to the
-  deficit: `effective = max(raw_stagnation, deficit)`, where
-  `deficit = (0.20 − success_rate) / 0.20`. A repeated gradient and a
-  flat reward curve both force scope up.
+- **Cold start** (fewer than two comparable scored offspring) —
+  `effective = 0.3 · plateau`. A capped cold-start ramp avoids jumping
+  straight into RE-SPECIATION before any feedback has accumulated.
+- **Below 1/5** (`success_rate < 0.20`) — average the deficit and the
+  plateau: `effective = 0.5 · deficit + 0.5 · plateau`, where
+  `deficit = (0.20 − success_rate) / 0.20`. A run of no-improvements
+  and a stalling success rate both push scope up.
 - **Above 1/5** — damp boldness in proportion to how far above
-  threshold we are: `effective = raw_stagnation · (1 − progress)`,
-  where `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`.
-  At `success_rate ≥ 0.80` boldness collapses regardless of stagnation.
+  threshold we are: `effective = plateau · (1 − progress)`, where
+  `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`. At
+  `success_rate ≥ 0.80` boldness collapses regardless of plateau.
 - **Near-finish floor** — only in the last 5 % of the score range,
   `effective` is multiplied by `(1 − 0.5 · near_finish)` where
-  `near_finish = (parent_score − 0.95) / 0.05`. This is the *only*
-  point where the parent's absolute score re-enters the boldness
+  `near_finish = max(0, (parent_score − 0.95) / 0.05)`. This is the
+  *only* point where the parent's absolute score re-enters the boldness
   calculation, so a 0.96 parent isn't gambled away one generation
   before early-stop.
+- **RE-SPECIATION gate.** The top band is hysteresis-gated: unless
+  `iters_since_improvement ≥ _RESPECIATION_PATIENCE` (default `8`) *and*
+  `success_rate ∈ {None, 0.0}`, `effective` is clamped to
+  `_RESPECIATION_CLAMP = 0.89` — just below the EXPLORATION/RE-SPECIATION
+  boundary at `0.90`.
 
 Notably, `parent_score` no longer multiplies the whole signal — that
 older behaviour locked high-score lineages into "tiny tweak" mode even
-when the gradient kept repeating identically.
+when offspring kept failing identically.
 
 **Agent budget.** The current agent count grows toward
 `max_possible_agents = 7` proportionally to `effective`, then a
 Beta-Binomial draw samples the actual count inside that window
 (biased upward by `effective`). The seed generation samples agents
-from `[1, 4]` with a `0.5` stagnation prior.
+from `[1, 4]` with a `0.5` boldness prior.
 
 **Scope band.** A single advisory line is added to the mutation prompt,
 chosen by `effective`:
 
-| Effective boldness  | Mutation scope                                                         |
-| ------------------- | ---------------------------------------------------------------------- |
-| < 0.20              | prompt-only little tweak                                               |
-| < 0.40              | prompt, handoff, tools — improve information flow                      |
-| < 0.60              | significant redesign while keeping topology                            |
-| < 0.80              | bold rewire — restructure or grow the agent set                        |
-| ≥ 0.80              | complete rethink — discard inherited topology / prompts                |
+| Effective boldness  | Mutation scope                                                              |
+| ------------------- | --------------------------------------------------------------------------- |
+| < 0.35              | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
+| < 0.50              | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
+| < 0.65              | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
+| < 0.90              | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
+| ≥ 0.90              | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
 
 The bands are advisory text steered to the LLM, not hard gates: the
 LLM can still pick any topology. The hard control is the agent-count
@@ -189,9 +197,9 @@ budget passed in the same prompt block.
 
 ## Crossover
 
-With probability ~0.4 per generation (and only once at least
-`initial_population = 2` runs have happened), two parents are combined
-instead of one being mutated. The crossover prompt is
+With probability `crossover_rate` per generation (default `0.1`, and only
+once at least `initial_population = 2` runs have happened), two parents
+are combined instead of one being mutated. The crossover prompt is
 **best-parent-first**: the strongest parent's code structure leads,
 weaker parents contribute specific improvements rather than competing
 for the skeleton, and the offspring is hard-capped at the highest
@@ -225,8 +233,10 @@ Each iteration also writes structured metrics for post-hoc analysis:
   `iteration_wall_time_s`, `iteration_cost_usd`, `cumulative_cost_usd`,
   `overall_score{,_uncapped}`, `qd_descriptor`, `qd_score`,
   `novelty_score`, the `selection_log`, and the
-  `variation_state` (`stagnation`, `success_rate`, `effective_boldness`,
-  `scope_band`, `agent_budget`) that produced this offspring.
+  `variation_state` (`iters_since_improvement`, `plateau`,
+  `success_rate`, `effective_boldness`, `parent_score`,
+  `respeciation_gate_open`, `scope_band`, `agent_budget`) that produced
+  this offspring.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`

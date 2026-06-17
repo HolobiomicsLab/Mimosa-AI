@@ -2313,7 +2313,7 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
 <tr>
 <td><code>prompt_workflow_creator</code></td>
 <td><code>str</code></td>
-<td><code>sources/prompts/workflow_v10.md</code></td>
+<td><code>sources/prompts/workflow_v11.md</code></td>
 <td>Workflow-generation prompt.</td>
 </tr>
 <tr>
@@ -2338,13 +2338,13 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
 <tr>
 <td><code>learned_score_threshold</code></td>
 <td><code>float</code></td>
-<td><code>0.97</code></td>
-<td><code>--learn</code> stops when <code>overall_score</code> exceeds this.</td>
+<td><code>0.9</code></td>
+<td><code>--learn</code> stops when <code>overall_score</code> reaches this.</td>
 </tr>
 <tr>
 <td><code>max_learning_evolve_iterations</code></td>
 <td><code>int</code></td>
-<td><code>35</code></td>
+<td><code>20</code></td>
 <td>Hard cap on evolve iterations.</td>
 </tr>
 <tr>

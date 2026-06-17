@@ -42,8 +42,8 @@ Without `--learn`, the engine still runs the verifier but never iterates
 
 Mimosa stops the moment either condition is met:
 
-- `overall_score > learned_score_threshold` (config field, default `0.97`).
-- `iteration ≥ max_learning_evolve_iterations` (default `35`).
+- `overall_score >= learned_score_threshold` (config field, default `0.9`).
+- `iteration ≥ max_learning_evolve_iterations` (default `20`).
 
 The "best" workflow at termination — the one with the highest
 `reward_uncapped` in the archive — has its workspace snapshot restored as
@@ -54,28 +54,31 @@ the run's final state.
       stops early; you'll always hit `max_learning_evolve_iterations`.
     - Setting it too low (e.g. `0.7`) means the loop stops after one lucky
       generation that *happens* to fool the judge.
-    - The default `0.97` is a reasonable balance — adjust based on observed
+    - The default `0.9` is a reasonable balance — adjust based on observed
       score distributions for your task family.
 
 ## What evolves between generations
 
-| Stagnation effective | Mutation scope                                          |
-| -------------------- | ------------------------------------------------------- |
-| < 0.20               | prompt-only little tweak                                |
-| < 0.40               | prompt, handoff, tools — improve information flow       |
-| < 0.60               | significant redesign while keeping topology             |
-| < 0.80               | bold rewire — restructure or grow the agent set         |
-| ≥ 0.80               | complete rethink — discard inherited topology / prompts |
+| Effective boldness | Mutation scope                                                              |
+| ------------------ | --------------------------------------------------------------------------- |
+| < 0.35             | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
+| < 0.50             | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
+| < 0.65             | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
+| < 0.90             | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
+| ≥ 0.90             | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
 
-Stagnation is the MiniLM cosine similarity between the last 4
-non-failure prompt gradients (rescaled so unrelated diagnoses ≈ 0,
-near-identical ≈ 1). Effective stagnation is damped by parent score
-(`stagnation · (1 − parent_score)`) so near-winners stay protected
-from disruption. The agent budget grows with stagnation up to a hard
-ceiling of 7.
+Effective boldness is computed from two signals: a plateau counter
+(`iters_since_improvement / 6`) over recent scored offspring, and the
+Rechenberg 1/5 success rate of the last 5 scored offspring (below `0.20`
+the search escalates, above it boldness damps; at `≥ 0.80` it collapses
+regardless of plateau). Only in the last 5 % of the score range does
+the parent's absolute score re-enter, as a near-finish damper, so
+near-winners aren't gambled away one generation before early-stop. The
+agent budget grows with boldness up to a hard ceiling of `7`.
 
-Roughly ~30 % of generations do **crossover** instead of mutation — two
-parents combined, best-parent-first.
+By default `~10 %` of generations do **crossover** instead of mutation
+(`crossover_rate = 0.1`) — two parents combined, best-parent-first, with
+the offspring hard-capped at the highest parent agent count.
 
 ## What you'll see on disk
 

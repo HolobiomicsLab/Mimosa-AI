@@ -920,6 +920,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#failure-fingerprint-qd-behaviour-descriptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure fingerprint (QD behaviour descriptor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt-gradient" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2056,6 +2067,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#failure-fingerprint-qd-behaviour-descriptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure fingerprint (QD behaviour descriptor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt-gradient" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2198,6 +2220,11 @@ narration, math invariants, computational reproducibility, statistical
 fingerprint). The single signal that flows back to the mutator is a short
 <strong>prompt gradient</strong> that summarizes failure modes without leaking the
 verified claims themselves.</p>
+<p>The same per-claim verdicts are projected into a 6-dim <strong>failure
+fingerprint</strong> that the <a href="../evolution-engine/#behaviour-descriptor-failure-fingerprint">evolution engine</a>
+uses as the behaviour descriptor for QD novelty. The descriptor is
+centered so overall quality cannot leak into novelty — see the firewall
+section below.</p>
 <p><img alt="Evaluation pipeline" src="../../images/evaluation_pipeline.png" width="100%" /></p>
 <h2 id="the-pipeline">The pipeline<a class="headerlink" href="#the-pipeline" title="Permanent link">&para;</a></h2>
 <p>The verifier runs four stages per workflow run:</p>
@@ -2325,6 +2352,33 @@ previews and literature grounding, with three outcomes:</p>
 <li>The engine separately keeps <code>overall_score_uncapped</code> (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.</li>
 </ul>
+<h2 id="failure-fingerprint-qd-behaviour-descriptor">Failure fingerprint (QD behaviour descriptor)<a class="headerlink" href="#failure-fingerprint-qd-behaviour-descriptor" title="Permanent link">&para;</a></h2>
+<p>The verifier doesn't just emit a score — the same per-claim verdicts feed
+the QD novelty signal as a <strong>failure fingerprint</strong>: a centered vector
+of per-source pass rates that tells the archive <em>how</em> a candidate fails,
+not <em>whether</em> it failed.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Per source A..F (six entries, always — absent sources get a neutral value).</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">=</span> <span class="n">passes</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">/</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>              <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.5</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>  <span class="o">=</span> <span class="mf">1.0</span>                                <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.0</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Center so the descriptor encodes profile shape, not quality level.</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">mean_present</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="n">where</span> <span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">vector</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>    <span class="o">=</span> <span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">-</span> <span class="n">mean_present</span>       <span class="k">if</span> <span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>             <span class="o">=</span> <span class="mi">0</span>                                  <span class="n">otherwise</span>
+</span></code></pre></div>
+<p><strong>The quality firewall.</strong> An all-pass run and an all-fail run both yield
+the zero profile. This is intended and asserted in the tests
+(<code>test_all_pass_yields_zero_profile</code>,
+<code>test_all_fail_yields_zero_profile</code>). The QD score combines quality and
+novelty <em>additively</em> — <code>(1 − w)·quality_norm + w·novelty_norm</code> — so
+quality already drives <code>quality_norm</code>. If quality also leaked into
+novelty, QD would collapse back into greedy search. The centering step
+is what keeps these two terms separable.</p>
+<p>The fingerprint is persisted under
+<code>state_result.json</code> → <code>evaluation.verifier.failure_fingerprint.vector</code>
+and consumed by
+<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py"><code>SelectionPressure._extract_behaviour_descriptor</code></a>.
+Full info-flow audit:
+<a href="../../info-flow/failure_fingerprint/"><code>docs/info-flow/failure_fingerprint.md</code></a>.</p>
 <h2 id="prompt-gradient">Prompt gradient<a class="headerlink" href="#prompt-gradient" title="Permanent link">&para;</a></h2>
 <p>After aggregation the verifier composes a single-sentence diagnosis (the
 <strong>prompt gradient</strong>) from the per-claim report and recent history of

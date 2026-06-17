@@ -27,8 +27,8 @@ flowchart TB
         ParentDraw{{"archive populated?"}}
         DrawArch["select_parent_workflows()<br/>QD-roulette over archive<br/>÷ (1 + n_children_already)"]
         DrawDisk["cold-start fallback:<br/>similarity-filtered disk scan"]
-        Decide{{"crossover_rate ≈ 0.1?"}}
-        Mut["mutation_prompt()<br/>phase-aware annealing schedule<br/>SEED → ANCHOR → DECOMPOSE → ENGAGE → POLISH"]
+        Decide{{"crossover_rate ≈ 0.1?<br/>(only once initial_population met)"}}
+        Mut["mutation_prompt()<br/>evidence-driven scope (Rechenberg 1/5)<br/>raw_stagnation × success-rate gating"]
         Cross["crossover_prompt()<br/>best-parent-first ordering<br/>rubric-blind diagnosis"]
 
         Orch["WorkflowOrchestrator<br/>LLM → workflow code → install deps → sandbox run"]
@@ -63,8 +63,8 @@ flowchart TB
 
     %% ===== termination =====
     subgraph Term["Termination & restore"]
-        Score{{"overall_score &gt;<br/>learned_score_threshold (0.95)?"}}
-        Depth{{"iteration ≥ max_depth?<br/>(default 25)"}}
+        Score{{"overall_score &gt;<br/>learned_score_threshold (0.94)?"}}
+        Depth{{"iteration ≥ max_depth?<br/>(default 45)"}}
         Restore["WorkspaceManager.restore_best()<br/>copy best run's workspace snapshot"]
         Plots["save reward_progress.png<br/>+ evolution_tree.png"]
         Notify["Pushover notification<br/>(best uuid + score)"]
@@ -79,11 +79,11 @@ flowchart TB
 
     %% ===== sidebars =====
     subgraph QD["Quality-Diversity machinery"]
-        BD["behaviour descriptor<br/>extract_code_features() →<br/>[n_agents, n_edges, n_branches,<br/> prompt_chars] / SCALES"]
+        BD["behaviour descriptor<br/>failure_fingerprint(per_claim) →<br/>centered per-source pass rates<br/>over sources A..F (6-D)"]
         Nov["k-NN novelty<br/>(k=25, against archive)"]
-        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.4)<br/>quality from reward_uncapped"]
+        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.4)<br/>quality from reward_uncapped<br/>(additive: no quality leak into novelty)"]
     end
-    State -. AST .-> BD
+    State -. verifier per-claim verdicts .-> BD
     Archive -. distances .-> Nov
     BD --> QDscore
     Nov --> QDscore

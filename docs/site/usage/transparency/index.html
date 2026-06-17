@@ -1171,6 +1171,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-memory_cli-ask-questions-about-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --memory_cli — ask questions about a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="--memory_cli — ask questions about a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-reach-for-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#memory_timelapsepy-memory-growth-visualisation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2012,6 +2062,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-memory_cli-ask-questions-about-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --memory_cli — ask questions about a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="--memory_cli — ask questions about a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-reach-for-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#memory_timelapsepy-memory-growth-visualisation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2176,10 +2276,96 @@ generation.</p>
 </ul>
 <p>This is the single best tool for understanding <em>why</em> a workflow did what
 it did.</p>
+<h2 id="-memory_cli-ask-questions-about-a-run"><code>--memory_cli</code> — ask questions about a run<a class="headerlink" href="#-memory_cli-ask-questions-about-a-run" title="Permanent link">&para;</a></h2>
+<p>Sometimes you don't want to scroll through every step — you just want to ask
+"<em>what classifier did the task_builder end up using?</em>" or "<em>did any agent hit
+an error involving rdkit?</em>". The memory chat CLI gives you a small RAG-backed
+Q&amp;A interface over a single run's memory.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Latest run by modification time</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--memory_cli
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># A specific run UUID</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--memory_cli<span class="w"> </span>--memory_uuid<span class="w"> </span>20260604_133122_06d6d38f
+</span></code></pre></div>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Chunking.</strong> Every JSON file under <code>sources/memory/&lt;uuid&gt;/</code> is split into
+   searchable chunks. A step-trace file (<code>task_builder.json</code>,
+   <code>task_data_curator.json</code>, …) yields one chunk per smolagent step
+   (<code>step_number</code>, <code>model_output</code>, <code>code_action</code>, <code>observations</code>,
+   <code>action_output</code>, <code>error</code>). A single-call file (<code>workflow_creator.json</code>,
+   …) yields one chunk for the whole LLM completion.</li>
+<li><strong>Embedding.</strong> All chunk summaries are embedded once at startup with
+   <code>sentence-transformers/all-MiniLM-L6-v2</code> (downloaded automatically on
+   first use, ~90 MB).</li>
+<li><strong>Retrieval.</strong> Each question goes through two LLM calls on <code>judge_model</code>
+   (see <a href="../../reference/configuration/">Configuration reference</a>):</li>
+<li><strong>Query rewrite</strong> — the question is compressed into a short
+     keyword-focused search query.</li>
+<li><strong>Answer</strong> — top-K chunks (default <code>K=5</code>) are scored by cosine
+     similarity, formatted as context, and fed back to the judge model
+     which is instructed to answer <strong>only from the retrieved chunks</strong> and
+     cite them by header (e.g. <code>task_builder.json · step 4</code>).</li>
+</ol>
+<h3 id="ui">UI<a class="headerlink" href="#ui" title="Permanent link">&para;</a></h3>
+<p>A curses interface in the same family as <code>memory_explorer.py</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a</code></td>
+<td>Ask a new question (curses pauses, you type at the shell prompt).</td>
+</tr>
+<tr>
+<td><code>↑</code> / <code>↓</code></td>
+<td>Scroll the answer pane.</td>
+</tr>
+<tr>
+<td><code>←</code> / <code>→</code></td>
+<td>Move between previously asked Q&amp;As.</td>
+</tr>
+<tr>
+<td><code>c</code> / <code>C</code></td>
+<td>Scroll the code pane down / up.</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Re-load the memory directory and re-embed (useful if a run finishes while the CLI is open).</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td>Quit.</td>
+</tr>
+</tbody>
+</table>
+<p>The screen is split into:</p>
+<ul>
+<li><strong>Top:</strong> the question, the judge model's answer, and a list of the
+  retrieved chunks with their similarity scores.</li>
+<li><strong>Bottom:</strong> the <em>executed code</em> of the top-ranked chunk (the
+  <code>code_action</code> of that step, or the <code>python_interpreter</code> tool-call
+  arguments). This is what you usually want to see when the answer
+  mentions "the model_builder did X".</li>
+</ul>
+<h3 id="when-to-reach-for-it">When to reach for it<a class="headerlink" href="#when-to-reach-for-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li>You remember a detail from the run but not which agent or step produced
+  it.</li>
+<li>A learning loop produced dozens of step-trace files and <code>memory_explorer.py</code>
+  would be tedious to scroll through.</li>
+<li>You want to confirm whether the agents <em>actually</em> used a specific tool,
+  library, or model name before drawing a conclusion from the score.</li>
+</ul>
+<p>The CLI is read-only — it does not modify any memory file.</p>
 <h2 id="memory_timelapsepy-memory-growth-visualisation"><code>memory_timelapse.py</code> — memory growth visualisation<a class="headerlink" href="#memory_timelapsepy-memory-growth-visualisation" title="Permanent link">&para;</a></h2>
 <p>For longer <code>--learn</code> runs, you may want a coarser view: how the agent's
 memory grew over iterations. Run:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>memory_timelapse.py<span class="w"> </span>&lt;uuid&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>memory_timelapse.py<span class="w"> </span>&lt;uuid&gt;
 </span></code></pre></div>
 <p>It renders an animated frame-by-frame view of the memory state, useful for
 spotting where the agent's understanding shifted.</p>
@@ -2238,7 +2424,7 @@ values) lives in <code>sources/workflows/&lt;uuid&gt;/evaluation.txt</code> alon
 JSON.</p>
 <h2 id="inspecting-the-genotype">Inspecting the genotype<a class="headerlink" href="#inspecting-the-genotype" title="Permanent link">&para;</a></h2>
 <p>The workflow code itself lives at:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sources/workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sources/workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py
 </span></code></pre></div>
 <p>It's plain Python — readable end-to-end, no DSL. Look at it when:</p>
 <ul>
@@ -2249,7 +2435,7 @@ JSON.</p>
   starting point.</li>
 </ul>
 <h2 id="inspecting-the-lineage">Inspecting the lineage<a class="headerlink" href="#inspecting-the-lineage" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json
 </span></code></pre></div>
 <p>Tells you which parent(s) produced this generation and via which operator
 (<code>seed | mutation | crossover</code>). Combine with the <code>evolution_prompt_*.md</code>

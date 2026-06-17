@@ -2178,8 +2178,8 @@ guides you through workspace selection, model choice, and the first run:</p>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--config<span class="w"> </span>my_config.json
 </span></code></pre></div>
 <p>In learning mode, Mimosa evolves up to <code>max_learning_evolve_iterations</code>
-generations or stops as soon as <code>overall_score &gt; learned_score_threshold</code>
-(default <code>0.95</code>). See <a href="../../usage/learning/">Iterative learning</a>.</p>
+generations or stops as soon as <code>overall_score &gt;= learned_score_threshold</code>
+(default <code>0.9</code>). See <a href="../../usage/learning/">Iterative learning</a>.</p>
 <h2 id="4-try-goal-mode">4. Try goal mode<a class="headerlink" href="#4-try-goal-mode" title="Permanent link">&para;</a></h2>
 <p>For multi-step scientific objectives (e.g. reproducing a paper), use
 <code>--goal</code> — Mimosa runs the planner first, then evolves a workflow per task:</p>

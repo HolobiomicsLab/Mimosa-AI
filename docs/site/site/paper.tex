@@ -1,0 +1,1051 @@
+\documentclass{article}
+\usepackage[sort&compress,numbers]{natbib}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{authblk}
+%\usepackage{neurips_2026} use when publication ready
+
+\title{Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research}
+
+\date{February 2026}
+
+\author[1,2]{Martin Legrand\thanks{martin.legrand@univ-cotedazur.fr}}
+\author[1,2]{Matthieu Feraud\thanks{matthieu.feraud@univ-cotedazur.fr}}
+\author[1, 2, 3]{Benjamin Navet\thanks{benjamin.navet@univ-cotedazur.fr}} 
+\author[1,2]{Tao Jiang\thanks{tao.jiang@univ-cotedazur.fr}}
+\author[2, 3]{Yousouf Taghzouti\thanks{yousouf.taghzouti@inria.fr}}
+\author[1]{Elise Dumont\thanks{elise.dumont@univ-cotedazur.fr}}
+\author[2, 3]{Fabien Gandon\thanks{fabien.gandon@inria.fr}}
+\author[1,2]{Louis-F\'elix Nothias\thanks{louis-felix.nothias@cnrs.fr}}
+% add fabien and elise
+
+\affil[1]{Universit\'e C\^ote d'Azur, CNRS, ICN, Nice, France}
+\affil[2]{Interdisciplinary Institute for Artificial Intelligence (3iA) C\^ote d'Azur, Sophia-Antipolis, France}
+\affil[3]{INRIA, Université Côte d’Azur, CNRS, France }
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Current ASR systems function as sophisticated but brittle automation tools, constrained by fixed architectures that suffer inability to evolve and adapt to unique tasks, tools and environments. To address this limitation, we introduce Mimosa: a self-evolving multi-agent system for automated synthesis and refinement of task-specific multi-agent workflows. Mimosa leverages the Model Context Protocol to dynamically compose agent teams based on available tools. Treating workflow synthesis as an optimizable function, Mimosa  refines their prompts and coordination strategies through experimental feedback, continuously improving workflow through experience. Mimosa achieves on ScienceAgentBench a success rate of 43.1\% using DeepSeek-V3.2 as the execution model.
+
+\end{abstract}
+
+\section{Introduction}
+
+\subsection{Problem}
+
+% status: draft
+
+The accelerating pace of data generation in scientific fields such as drug discovery, materials science, climate modeling, and biology has created a critical scalability bottleneck that now limits the pace of discovery itself. Advances in automation, high-throughput experimentation, and computation have exponentially expanded our capacity to produce data, yet the translation of this data into actionable knowledge remains bounded by human cognitive capacity. Researchers face a widening gap between data volume and interpretation capacity, forcing trade-offs between breadth and depth of analysis. In domains where time is existential, such as climate change, delays in knowledge extraction and processing carry escalating societal costs.
+Concurrently, the fragmentation of methods, tools, and reporting standards across laboratories has created a reproducibility crisis where critical findings become difficult or impossible to verify. The accumulation of unverified findings intermingles reliable and unreliable results within the scientific record, rendering them increasingly indistinguishable. Subsequent research builds upon this uncertain foundation without means to efficiently audit prior claims, misdirecting future research.
+
+\subsection{Gap}
+
+% status: draft
+
+Emerging paradigms like Autonomous Scientific Research (ASR) and Self-Driving Labs (SDLs), powered by large language models (LLMs) and agentic AI, offer a compelling vision to address these challenges by automating core scientific reasoning and experimentation. However, current AI-agent systems exhibit significant limitations when deployed in complex, real-world scientific settings. These include context window constraints that lead to progressive information loss, persistent hallucination, semantic drift as context grow in extended tasks, and a fundamental rigidity in their architecture. They typically operate with a fixed set of tools and predefined coordination protocols, lacking the adaptability to evolve when experimental conditions, instruments, or goals change. Consequently, they function as sophisticated but brittle automation tools rather than genuine, adaptive scientific collaborators.
+
+\subsection{Contribution}
+
+% status: draft
+
+To bridge this gap, we introduce Mimosa, an open-source framework for autonomous scientific research. Its modular architecture, leveraging the Model Context Protocol (MCP), enables dynamic integration of a vast array of computational tools and physical laboratory instruments. Crucially, Mimosa moves beyond static, multi-agent pipelines by dynamically composing task-specific workflows tailored to evolving scientific objectives. This adaptability is sustained and enhanced by a meta-learning layer that continuously refines how agentic workflows are designed and coordinated based on prior performance. By providing a transparent, modular, and self-improving platform, Mimosa offers a robust alternative to closed, rigid systems, empowering researchers to automate time consuming scientific tasks,  accelerating reliable discovery and creating new direction for confronting the scalability and reproducibility crises in modern science.
+
+\subsection{Code availability}
+
+% status: draft
+
+The Mimosa framework is developed as an open-source platform to ensure transparency, foster community-driven improvement, and facilitate broad adoption. The complete source code is publicly available under a permissive open-source license. This allows for full inspection, use, and modification by the research community.
+
+The repository can be accessed at:
+
+\begin{center}
+  \url{https://github.com/HolobiomicsLab/Mimosa-AI}
+\end{center}
+
+Another repository, Toolomics, used to expose the MCP servers used by Mimosa can be accessed at:
+
+\begin{center}
+  \url{https://github.com/HolobiomicsLab/toolomics}
+\end{center}
+
+\section{Related work}
+
+\subsection{Autonomous Scientific Research (ASR)}
+
+% status: draft
+
+The emergence of Large Language Models (LLMs) has catalyzed a paradigm shift from "AI for Science" where models act as static predictors to Agentic Science, characterized by autonomous decision-making and iterative reasoning \cite{2_wei_ai_2025}. Unlike traditional automation restricted to predefined tasks, Autonomous Scientific Research (ASR) leverages the reasoning and planning capabilities of agentic systems to navigate the entire research lifecycle \cite{zhou2025autonomousagentsscientificdiscovery}. Recent surveys categorize the evolving role of LLMs in this space as evaluators, collaborators, and independent scientists, emphasizing their ability to move beyond literature synthesis toward active hypothesis generation and experimental design \cite{3_zhang_evolving_2025}.
+
+A critical frontier in ASR is the science of scaling, where the focus shifts from individual model performance to the orchestration of complex agentic systems that can handle high-dimensional scientific data and long-horizon planning \cite{1_tang_ai-researcher_2025}. In this regime, bottlenecks arise not from model capacity alone but from the rigidity of coordination \cite{21_kim_towards_2025}, limitations of context window with data returned by scientific tools \cite{labate2025solvingcontextwindowoverflow}, and decision-making structures over extended discovery trajectories \cite{wang2026reasoningfailsplanplanningcentric}. 
+
+In domains such as molecular docking and materials discovery, ASR systems provide a dual benefit: they explore vast chemical search spaces far beyond human capacity while ensuring that the scientific process is inherently reproducible and auditable by design \cite{1_tang_ai-researcher_2025}, \cite{2_wei_ai_2025}.
+
+While ASR focuses on the cognitive and computational aspects of discovery, Self-Driving Laboratories (SDLs) represent the physical realization of these principles through the tight integration of AI-driven decision-making with automated hardware \cite{6_tom_self-driving_2024}. SDLs close the experimental loop by enabling AI models to design experiments, control physical instruments, and analyze real-time data to inform subsequent iterations \cite{5_tobias_autonomous_2025}.
+
+This closed-loop approach is particularly transformative in materials science and catalysis, where experimental landscapes are often non-linear and highly complex \cite{6_tom_self-driving_2024}. By offloading the execution and optimization phases to autonomous platforms, researchers can prioritize high-level theory development and interpretation.
+
+As ASR systems increasingly close the experimental loop, the primary limitation shifts from data acquisition or automation to the design of agentic architectures capable of sustaining long-horizon reasoning, adaptive coordination, and methodological self-revision under sparse and delayed scientific feedback \cite{zhou2025autonomousagentsscientificdiscovery}.
+
+\subsection{Agentic Architectures for Scientific Discovery}
+
+% status: draft
+
+The transition from static Large Language Models (LLMs) to Agentic Systems is defined by the integration of reasoning, tool-use, and iterative planning \cite{8_huang_towards_2023}. Agents have demonstrated initial success in scientific domains such as synthesis planning \cite{12_xuan-vu_synthelite_2025} and mechanistic enzyme design \cite{16_jacob_beyond_2025}. Yet, adaptability over long horizons requires more than iterative execution and demands mechanisms for agents to revise their strategies, self-reflect and identify collaboration patterns in response to empirical feedback \cite{zhou2025autonomousagentsscientificdiscovery}. Multiple paradigms in architecture have emerged to address these issues.
+
+\subsubsection{Single-Agent Systems}
+
+% status: draft
+
+Early frameworks utilize a single LLM backbone to manage the entire research lifecycle. While capable of accelerating hypothesis generation in specialized fields like protein design \cite{16_jacob_beyond_2025}, single-agent systems are prone to performance collapse when faced with unfamiliar tasks such as newest Kaggle challenges \cite{13_huang_mlagentbench_2024} or novel research challenges \cite{14_zhang_mlrc-bench_2025}.
+Their design implicitly assumes that a single reasoning trajectory can reliably navigate the sparse and stochastic reward landscape of scientific discovery.
+A critical failure mode is the inability to recover from early erroneous hypotheses, leading to terminal reasoning loops. Without external critique or adaptive strategy revision, early stochastic errors can irreversibly corrupt the entire discovery trajectory \cite{zhou2025autonomousagentsscientificdiscovery}.
+
+\subsubsection{Multi-Agent Systems (MAS)}
+
+% status: draft
+
+To address the limitations of individual models, MAS frameworks distribute cognitive load across specialized roles, such as experimenters, analysts, and reviewers, which collaborate to verify results \cite{20_team_internagent_2025}.  While Kim et al. (2025) \cite{21_kim_towards_2025} demonstrate that multi-agent coordination often degrades performance on sequential reasoning tasks, Riedl et al. (2025) \cite{riedl2025emergentcoordinationmultiagentlanguage} establish that under specific prompting conditions, multi-agent systems can develop measurable emergent coordination that improves task performance through complementary role specialization. 
+Furthermore, recent studies suggest mainstream MAS operate as constrained finite-state machines with predefined transition protocols\cite{zhang2025metaagentautomaticallyconstructingmultiagent}, where fixed coordination protocols conflict with the open-ended and non-linear nature of real-world scientific inquiry research involve \cite{anthropic2025multiagentresearch}.
+Scientific discovery requires agents to dynamically reconfigure their collaboration topology in response to task complexity, uncertainty, and unexpected experimental outcomes, capabilities largely absent from static MAS designs \cite{2_wei_ai_2025}.
+
+\subsubsection{Self-Evolving and Meta-Learning Systems}
+
+% status: draft
+
+The frontier of ASR involves agents that exhibit meta-learning, the ability to autonomously modify their own code, tools, and architectures \cite{23_hu_automated_2025}, \cite{26_sheng_self-programming_2023}.  For scientific agents, optimization and evolution are not merely about refining parameters, but about exploring the scientific field, including reasoning strategies, memory structures, and collaborative organization \cite{zhou2025autonomousagentsscientificdiscovery}.
+
+Systems such as the Darwin Gödel Machine \cite{22_zhang_darwin_2025}, MAS-Zero \cite{24_ke_mas-zero_2025} and CASCADE \cite{28_huang_cascade_2025} utilize open-ended evolution to rewrite their internal logic, allowing them to outperform hand-designed baselines.  However, while these self-improving architectures have demonstrated remarkable success in computer science domains such as designing multi-agent workflows for mathematical reasoning and algorithmic tasks, their application to broader scientific discovery remains largely unexplored.
+
+% add about EvoPrompt, Promptbreeder ?
+
+\section{Limitations of existing Architectures}
+
+% status: draft
+
+Despite these advancements, existing architectures exhibit systemic vulnerabilities that impede high-stakes discovery. A fundamental bottleneck in single-agent frameworks is  the semantic drift and reasoning collapse that worsen as context grow \cite{du2025contextlengthhurtsllm}. Lacking external cross-verification, a single stochastic error or "plausible" hallucination can corrupt an entire reasoning chain \cite{13_huang_mlagentbench_2024}. Because these agents prioritize local optimization over global strategy, they often stray into unproductive experimental regions without the meta-awareness required to reorient, leading to terminal loops where flawed hypotheses are pursued to exhaustion \cite{14_zhang_mlrc-bench_2025}.
+
+ The long-horizon nature of discovery requires integrating distant observations, yet context window constraints force agents to continuously discard or compress intermediate data. This leads to a progressive loss of "epistemic memory," where subtle patterns and rejected hypotheses are forgotten \cite{30_zheng_lifelong_2026}, causing repetitive errors and prevent agent from moving beyond forming basic analyses \cite{10_gu_blade_2025}. While MAS attempt to solve this via specialization, they remain bound by a static workflow that cannot adapt when experiments behave unexpectedly or new tools are introduced.
+
+Ultimately, current agents lack true meta-learning, remaining reactive tools rather than adaptive scientists. While they can optimize within a fixed setup, they do not meaningfully improve their own methodologies or tool-utilization over time \cite{23_hu_automated_2025}. This creates a critical research gap: the need for adaptive architectures that treat the system's own coordination and exploration logic as a mutable, learnable component \cite{25_robeyns_self-improving_2025}, \cite{27_pourcel_self-improving_2025}. Without the ability to evolve their internal structure based on experimental feedback, agents remain limited by the boundaries of their initial programming \cite{24_ke_mas-zero_2025}, \cite{28_huang_cascade_2025}.
+
+\section{Methods}
+
+\subsection{Problem definition}
+
+\subsubsection{Token-Level Optimization and semantic drift}
+
+Large language models trained via next-token prediction and RLHF learn to sample from a distributions shaped by human preferences, encoding an implicit reward function within the policy itself \cite{rafailov2024directpreferenceoptimizationlanguage}. During inference, this process can be understood as performing approximate optimization as it samples trajectories through a solution space, with the learned distribution biases sampling toward outputs that satisfy the prompt.
+
+As context accumulates, earlier tokens constrain later generations, causing the effective objective function to shift from task completion toward consistency with prior outputs \cite{mohsin2026fundamentallimitsllmsscale}. A phenomenon often referred to as \textbf{semantic drift}: the progressive divergence between the agent's optimization target and the true task objective \cite{mohsin2026fundamentallimitsllmsscale}.
+
+\subsubsection{Workflow Topology as Constraint Placement}
+
+Multi-agent workflows address error accumulation in large context through task decomposition and bounded generation horizons. Rather than a single agent accumulating context tokens while navigating a long trajectory through the solution space $S$, the system instead decomposes into subtasks the problem, each handled by agent with constrained scope.
+
+Let the global task T be decomposed into subtasks $\{T_1, T_2, \ldots, T_k\}$ where the decomposition is defined by the workflow topology $\mathcal{G} = (V, E)$ with agents as vertices and information flow as edges.
+
+Each agent $a_i$ solves:
+
+$$s_i^* = \arg\max_{s \in S_i} \, R_i(s; T_i, \theta)$$
+
+where $T_i$ is the subtask prompt, $\theta$ represents the parameters of the underlying model used by agent $a_i$, $R_i: S_i \to \mathbb{R}$ is the agent's implicit reward function shaped by its role and tools, and $S_i$ is the constrained solution space for agent $a_i$.
+
+Partitioning addresses several issues:
+
+- \textbf{Constrained search spaces} : Each agent operates with a shorter context window than in a single agent setup. Since semantic drift accumulates as tokens are generated, partitioning into subproblem for multiple agent reduces per-agent drift.
+
+- \textbf{Context reset at agent boundaries}: Each agent begins with a fresh context rather than a complete history. This interrupt the drift phenomenon that happen due to semantic drift over long context generation. Agent $a_i$ trace does not corrupt $a_i+1$ initial state.
+
+- \textbf{Cross-agent verification} : Validation agents or agents debate can detect and correct errors from upstream outputs. Unlike single-agent self-reflection, verification agents evaluate outputs with fresh context, enabling error correction not corrupted by earlier context.
+
+\subsubsection{Meta-Optimization over Workflow Space}
+
+The central insight motivating Mimosa's evolving architecture is that constraint placement constitutes a higher-order optimization problem. The mapping between workflow topology and task performance is non-differentiable and cannot be determined analytically, as it depends on complex interactions between task structure, model behavior, and execution dynamics.
+
+Let $\mathcal{W}$ denote the space of possible workflow topologies. Self-evolution performs empirical search over $\mathcal{W}$:
+\begin{equation}
+    \mathcal{G}^* = \arg\max_{\mathcal{G} \in \mathcal{W}} \, \mathbb{E}_{\tau \sim \mathcal{G}}[J(\tau)]
+\end{equation}
+
+where $\tau$ represents an execution trajectory sampled from workflow G, $\mathbb{E}$ denotes expectation over stochastic execution, and $J(\cdot)$ is an evaluation function assessing trajectory quality.
+
+$J(\cdot)$ is implemented as an LLM-as-a-judge that evaluates workflow trajectories against a configurable set of criteria. In our experiments, we employ a simple judge assessing four dimensions: goal alignment, agent collaboration, output quality, and answer correctness. While this judge provides an approximate rather than exact measure of workflow quality, its basic directional signals and rapid converge make it ideal to demonstrate our evolutionary search mechanism.
+
+Through iterative refinement, the meta-orchestrator adjusts the constraint regions, relocating, merging, or subdividing agent responsibilities to progressively align the workflow topology with the underlying structure of the task's solution space.
+
+\vspace{8em}
+
+\subsection{Architecture}
+
+The Mimosa framework is implemented as a evolving multi-agent system, decomposed into four distinct layers. This structure enables the transition from static pipelines to dynamic, empirically-optimized workflows.
+
+\subsubsection{\textbf{Layer 0 (Optional): Planning}}
+
+To understand the Mimosa planning layer, it is essential to distinguish between the notions of \textit{goal} and \textit{task}.
+
+A \textit{goal} refers to a high-level scientific objective characterized by substantial complexity and scope. Achieving a \textit{goal} requires long horizon planning with the execution of multiple heterogeneous tasks. Goals are usually domain-specific and problem-driven, and they define what is to be achieved.
+
+In contrast, a \textit{task} is a granular, well-defined, and repeatable operation that contributes to the completion of a \textit{goal}. Tasks are generally learnable, reusable across different goals, and often appear in multiple scientific workflows. Tasks define how progress toward a \textit{goal} is made.
+
+For example, the \textit{goal} “Develop a machine learning model to predict protein–ligand binding affinity” can be decomposed into several distinct tasks, such as:
+
+\begin{itemize}
+    \item conducting a literature review on existing binding-affinity prediction methods,
+    \item acquiring and preprocessing datasets from public repositories,
+    \item implementing and training a specific machine learning algorithm,
+    \item evaluating model performance using standardized benchmarks.
+\end{itemize}
+
+Each individual \textit{task} is then given as a prompt for  the Orchestration layer (Layer 2), which learns an optimal workflow for the \textit{task} through iterative improvement. Over successive executions, this layer refines its strategy based on past outcomes, enabling more efficient and reliable task completion.
+
+The planning layer in Mimosa is optional. The system can operate either in \textit{goal} mode, where a planning component decomposes high-level objectives into multiple tasks, or in \textit{task} mode, where prompts are treated as standalone executable units.
+
+Since this work focuses on demonstrating the impact of self-evolution at the individual task level, all evaluations are conducted in task mode. In this setting, the planning layer is omitted, and each prompt is considered as a single, learnable task without explicit goal decomposition. Each task solved by a custom multi-agent workflow created or evolved by the orchestrator.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Mimosa.jpg}
+    \caption{The Mimosa Framework. (illustration of task mode)}
+    \label{fig:placeholder}
+\end{figure}
+
+\subsubsection{\textbf{Layer 1: Tool Discovery}}
+
+To achieve modularity, Mimosa leverages the Model Context Protocol (MCP) for standardized tool integration. Tool discovery is operationalized through \textbf{Toolomics}, a project for automated management of MCP servers maintained by us that exposes computational tools as discoverable services and allow users to easily add integrate custom tool for specific research need.
+
+Before executing a task, the system scans predefined port ranges on local networks to identify available MCP servers. Toolomics provides the infrastructure layer: it handles automated port assignment, workspace isolation, and multi-instance deployment. Each MCP server exposes its capabilities (as tools) via HTTP, allowing Mimosa's orchestrator to dynamically enumerate available resources.
+
+This architecture enables distributed computation across HPC clusters, cloud services, and laboratory instruments via MCP's standardized interface. It supports horizontal scalability: new computational tools (statistical analysis, ML pipelines, wet-lab automation) are registered as MCP servers in Toolomics without modifying Mimosa's core orchestration logic. Toolomics also enables multi-tenancy through isolated workspaces and/or resource allocation, which is critical to avoid dependency conflict, enhance security and for collaborative science scenario where multiple Mimosa instances operate simultaneously.
+
+\subsubsection{\textbf{Layer 2: Meta-Orchestration}}
+
+The core of Mimosa's adaptability lies in its meta-orchestrator, which dynamically generates and refines multi-agent workflows through a self-improvement loop. Rather than relying on static pipeline definitions, the system synthesizes specialized multi-agent architectures on-demand and evolve successful patterns to attempt to optimize future performance.
+
+\paragraph{Workflow Generation.}
+
+When presented with a new task (defined by user in task mode or one of the task defined by the planner in goal mode), the system scan specified port ranges to discover available tools exposed as MCP servers by Toolomics, effectively discovering available capabilities. It then searches its workflow library for similar historical tasks using embedding-based similarity matching on the tasks prompt against the current prompt. If a semantically related task exists, the orchestrator retrieves the highest-performing workflow variant and mutates the previous workflow using a high-capability language model (e.g. Claude Opus 4.5) to attempt a empirical improvement and/or to adapt it for the current context (available tools/task specific constraints). If the task is novel, the system will utilize the same language model to synthesize a custom workflow from scratch.
+
+All workflows are encoded as directed graphs using the LangGraph framework in Python. Graph nodes represent either SmolAgent instances: autonomous code-generating agents responsible for complex reasoning and tool interaction, or deterministic python functions that serve as validation gates, and conditional flow control. This architecture balances the flexibility of agents with the reliability of explicit control logic.
+
+\paragraph{Empirical Workflow Evolution Through Execution Feedback.}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\linewidth]{workflow_mutation.png}
+    \caption{Empirical evolution of workflow.}
+    \label{fig:placeholder}
+\end{figure}
+
+Mimosa treats each task execution as an opportunity to learn and optimize task specific   architectures. Upon  task completion, the system captures execution traces, save the workflow code and perform evaluation on success/failure metrics. When recurring execution of the same task, the orchestrator LLM ingests the complete top-performing workflow code from the workflow library alongside these performance metrics and execution traces summary and proposes a single empirical modification, adjusting agent prompts, reordering steps, introducing new validation gates, or refactoring the graph structure itself.
+
+This evolutionary process ensures that successful workflow variants propagate through the workflow library while inferior patterns are de-prioritized. Over successive executions of similar tasks, the system progressively optimizes both individual workflows and its own workflow generation strategy.
+
+
+\subsubsection{Layer 3: Agent Execution}
+
+
+Agents in synthesized workflows are executed by SmolAgent instances: Hugging Face's code-generating agents that use Python as their native action language. Rather than generating JSON or text representations of tool calls, these agents directly write and execute Python code snippets to invoke MCP-exposed tools, perform computations, and orchestrate multi-step workflows.
+
+This code-as-actions paradigm provides critical advantages for scientific discovery. Agents can perform inline calculations to configure instruments dynamically, for instance, iterating through a combinatorial search space testing hundreds of parameter combinations within a single execution step. Code execution enables native data analysis: agents process raw experimental outputs directly in python, extracting meaningful signals without intermediate parsing. Variables serve as reliable information storage, allowing agents to store computed values, numerical results, and intermediate findings.
+This tight integration of reasoning, computation, and tool orchestration within executable code enables agents to operate with great rigor and precision that scientific tools demand.
+
+
+\subsubsection{Layer 4: Evaluation}
+
+An LLM-based judge evaluates workflow performance against four objective criteria to guide the meta-learning process:
+\begin{enumerate}
+    \item \textbf{Goal Alignment (0.0--1.0):} Measures the extent to which the execution fulfilled the defined objectives without deviation.
+    \item \textbf{Agent Collaboration (0.0--1.0):} Assesses the correctness of inter-agent data flow and error handling.
+    \item \textbf{Output Quality (0.0--1.0):} Analyzes completeness, formatting, and structural validity.
+    \item \textbf{Answer Correctness (0.0--1.0):} Verifies factual accuracy against ground truth when available. Otherwise, assesses logical soundness and theoretical plausibility
+\end{enumerate}
+
+The judge produces structured feedback, citing specific evidence from execution traces (e.g., JSON state paths, error logs) to justify scores. This feedback is utilized by the meta-orchestrator to select and refine workflows for subsequent iterations.
+
+\section{Experiments}
+
+\subsection{Setup}
+
+\subsubsection{Benchmarks choice}
+
+We evaluate Mimosa on one established benchmark targeting distinct capabilities along the spectrum of ASR: \textbf{ScienceAgentBench}.
+
+\textbf{ScienceAgentBench}~\cite{33_chen2025scienceagentbenchrigorousassessmentlanguage} comprises 102 data-driven discoveries tasks extracted from 44 peer-reviewed publications across four scientific disciplines: bioinformatics, computational chemistry, geographic information science, and psychology/cognitive neuroscience. Each task represents a discrete, well-defined operation within a data-driven discovery workflow: data preprocessing, model training, or statistical analysis validated by nine subject matter experts. Crucially, the benchmark emphasizes task-level assessment over end-to-end automation claims, aligning with our objective of demonstrating meta-learning at the individual task granularity. The benchmark's standardized metrics (Valid Execution Rate, Success Rate, CodeBERTScore) and programmatic evaluation enable rigorous comparison of workflow variants across iterative refinement cycles. We operate in \textit{task mode} (planning layer disabled) to isolate the contribution of the orchestration layer's self-improvement mechanism.
+
+%\textbf{PaperBench Code-Dev}~\cite{34_starace2025paperbenchevaluatingaisability} evaluates agents on replicating 20 ICML 2024 Spotlight and Oral papers, with rubrics co-developed with original authors that decompose replication into 8,316 individually gradable sub-tasks. We use the Code-Dev variant, which focuses on code development requirements without GPU-dependent execution assessing whether implementations correctly realize paper contributions rather than whether they reproduce numerical results. This benchmark tests a fundamentally different capability: decomposing a complex, underspecified goal (``reproduce this paper'') into a coherent sequence of implementable subtasks. While ScienceAgentBench tasks are atomic and learnable in isolation, PaperBench papers require understanding implicit dependencies, inferring missing details, and coordinating dozens of interdependent implementation decisions. We operate in \textit{goal mode} to evaluate the planner layer's capacity to decompose such objectives into subtasks that the meta-orchestrator can then optimize individually.
+
+\subsubsection{Models}
+
+The meta-orchestrator uses \texttt{claude-opus-4-5-20251101} for workflow generation and mutation across all experiments.
+
+Agent execution models vary by experiment and are specified in each results table:
+\begin{itemize}
+    \item GPT-4o (OpenAI API)
+    \item DeepSeek-V3.2 (DeepSeek API, \texttt{deepseek-chat})
+    \item Mistral-Large-2407 (OpenRouter)
+    \item Claude Haiku (Anthropic API)
+\end{itemize}
+
+\subsubsection{Execution Modes}
+
+We compare three execution configurations:
+
+\textbf{Single-Agent:} A standalone HuggingFace CodeAgent executes with a prompt near-identical to those used per-agent in multi-agent workflows. This baseline isolates single-model performance.
+
+\textbf{Multi-Agent (One-Shot):} The meta-orchestrator generates a workflow from scratch without subsequent refinement. This isolates the value of multi-agent decomposition independent of iterative learning.
+
+\textbf{Multi-Agent (Meta-Learning):} The meta-orchestrator generates an initial workflow, then iteratively refines it based on execution feedback. Refinement runs for up to 10 iterations with early stopping when the judge score reaches 0.9.
+
+\subsubsection{ScienceAgentBench Evaluation}
+
+We evaluate Mimosa on all 102 available tasks spanning diverse scientific domains.
+
+We adopt three of the four metrics defined by the benchmark authors
+
+- Success Rate (SR) is our primary evaluation metric, as it directly measures whether agents accomplish the underlying scientific objective. SR evaluates whether task outputs satisfy domain-specific success criteria, determined by comparing agent predictions against gold-standard results using task-specific evaluation scripts.
+
+- CodeBERTScore (CBS) quantifies semantic similarity between generated and reference implementations. We compute contextual embeddings using CodeBERT, construct a cosine similarity matrix between token representations, and derive an F1 score via greedy matching.
+
+- API Cost tracks cumulative expenditure from LLM API calls during task execution, reported in USD.
+
+For each task, we execute the following procedure: (1) load task instructions and associated files, (2) execute the task using Mimosa, (3) transfer generated artifacts to an isolated evaluation capsule, (4) compute SR using the task-specific evaluation script, (5) compute CBS against the reference implementation, and (6) record API costs. All execution occurs within sandboxed containers to ensure isolation between tasks.
+
+For all experiments, Mimosa is operated in task mode, without decomposing tasks into sub-tasks. We evaluate Mimosa under three distinct execution modes (not to be confused with task or goal modes):
+(1) Single-agent, using a single SmolAgent CodeAgent instance;
+(2) One-shot multi-agent, where a task-specific multi-agent workflow is generated automatically in a single pass;
+(3) Meta-learning, in which a meta-orchestrator first generates an initial workflow and then iteratively refines it based on execution feedback.
+
+In meta-learning mode, refinement runs for up to 10 iterations, with early stopping triggered when the judge score reaches 0.9.
+
+In the single-agent setting, SmolAgent is provided with the same tools and task prompt as in the multi-agent configurations, ensuring a fair comparison.
+
+%\subsubsection{PaperBench Evaluation}
+
+%The benchmark comprises 20 ICML 2024 papers spanning diverse machine learning domains including reinforcement learning, probabilistic inference, vision-language models, and neural network training dynamics.
+%Each paper is accompanied by a hierarchical evaluation rubric co-developed with the original authors, decomposing implementation requirements into atomic criteria with binary pass/fail judgments.
+
+%The evaluation spans across the following papers: APT (adaptive pruning), All-in-one (simulation-based inference), Batch and Match (black-box variational inference), Functional Reward Encodings (zero-shot RL), Fine-tuning RL with Forgetting, Refined Coreset Selection, LCA-on-the-Line (OOD generalization), Mechanistic Understanding of Alignment, Challenges in Training PINNs, RICE (RL with explanation), Robust CLIP, Sample-specific Masks, SAPG (policy gradients), Sequential Neural Score Estimation, Classifier-Free Guidance, Stochastic Interpolants, and Test-Time Model Adaptation.
+
+%We evaluate Mimosa on all 20 papers. For each paper, we provide Mimosa with the ArXiv link and task it with reproducing the implementation from scratch. We employ the planning mode with a modified orchestrator prompt that constrains Mimosa to focus solely on codebase implementation, excluding experiment execution as specified by the Code-Dev variant and necessitated by our computational constraints.
+
+%Generated submissions are evaluated using the official PaperBench evaluation infrastructure with the SimpleJudge automated grader configured for code-only assessment. The final metric is the replication score, computed as the weight-adjusted proportion of satisfied rubric requirements aggregated across all papers.
+
+\subsection{ScienceAgentBench Results}
+
+We report the following table as for our results on ScienceAgentBench. Each individual value (SR, CBS, Cost) is the mean value across all 102 tasks. The cost include the cost of workflow generation for Multi-agent and Meta-learning execution.
+
+\begin{table}[h]
+  \caption{Performance comparison of Mimosa using different models on ScienceAgentBench, with knowledge}
+  \label{tab:main-results}
+  \centering
+  \begin{tabular}{llccc}
+    \toprule
+%    Mode & Model & SuccessRate (SR) (\%) & CodeBERT (CBS) (\%) & Cost/Task (\$) \\
+    Mode & Model & SuccessRate & CodeBERT& Cost/Task\\
+    &&(SR) (\%)& (CBS) (\%) & (\$) \\
+    \midrule
+    \multirow{3}{*}{Single Agent (SmolAgent)} 
+      & GPT-4o & 3.8 & 0.607 & 0.56 \\
+      & DeepSeek-V3.2 & 38.2 & 0.898 & 0.05 \\
+      & Mistral-Large & 13.5 & 0.681 & 1.3 \\
+      &-2407&&&\\
+      & Claude Haiku 4.5 & 7.8 & 0.57 & 1.46 \\
+    \midrule
+%    \multirow{3}{*}{Multi-Agent One-shot} 
+      & GPT-4o & 18.6 & 0.640 & 1 \\
+      Multi-Agent& DeepSeek-V3.2 & 32.4 & 0.794 & 0.38 \\
+      One-shot& Mistral-Large & -- & -- & -- \\
+      &-2407&&&\\
+      & Claude Haiku 4.5 & 31.3 & 0.773 & 2.2 \\
+    \midrule
+    \multirow{3}{*}{Meta-Learning}
+      & GPT-4o & 21.6 & 0.721 & 3.5 \\
+      & \textbf{DeepSeek-V3.2} & \textbf{43.1} & 0.921 & 1.7 \\
+      & Mistral-Large & -- & -- & -- \\
+      &-2407&&&\\
+      & Claude Haiku 4.5 & 30.3 & 0.885 & 7.8 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:main-results} reveals distinct architectural sensitivities across model families. The transition from single-agent to multi-agent configurations produces heterogeneous performance trajectories: GPT-4o and Claude Haiku 4.5 demonstrate approximately 4× success rate improvements (from 3.8\% to 18.6\% and from 7.8\% to 31.3\% respectively), while DeepSeek-V3.2 exhibits a different pattern. Despite a strong single-agent baseline of 38.2\%, performance initially degrades under static multi-agent orchestration to 32.4\% before surpassing the baseline through meta-learning at 43.1\%.
+The meta-learning paradigm shows model-dependent efficacy. DeepSeek-V3.2 achieves the strongest gains: 33\% relative SR improvement (from 32.4\% to 43.1\%) and substantial CBS enhancement (from 0.794 to 0.921), suggesting effective exploitation of evolutionary workflow optimization. GPT-4o demonstrates moderate meta-learning gains (15\% relative improvement), while Claude Haiku 4.5 exhibits marginal degradation (from 31.3\% to 30.3\%), indicating that meta-learning benefits are not universal but rather contingent on model-specific architectural priors. Preprint-specific note: Full evaluation of Mistral-Large-2407 will be added in future revised version.
+
+%\subsection{PaperBench CodeDev Results}
+% note: better lead with PaperBench ? eval paperBench CodeDev in single agent vs multi-agent vs meta learning
+
+%We report per-paper replication scores in Table 2, computed as the mean of satisfied rubric requirements using the SimpleJudge automated grader provided by the PaperBench authors.
+
+%\begin{table}[h]
+%\centering
+%\caption{Mean SimpleJudge grader score for each individual paper, using self-evolution %for up to 10 iterations, with DeepSeek V3.2 as a execution model for individual agents. }
+
+\section{Discussion}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\linewidth]{reward_gains_plot.png}
+    \caption{Reward gains from successive self-evolution iterations. Average change in reward relative to the previous iteration with SEM error bars. Data is cumulated from runs across all models.}
+    \label{fig:placeholder}
+\end{figure}
+
+We demonstrated the potential of evolving multi-agent workflows as a new paradigm for autonomous scientific research (ASR). Given the complexity of this challenge, we focused on establishing foundational capabilities through computational science tasks, while providing the community with a framework that delivers significant value for scientific applications.
+
+We plot in \textbf{Figure 3} the average reward gains that self-evolution yields, we found consistent positive gains across iterations 1–8, followed by diminishing returns. The persistent positive gains demonstrate that each self-evolution cycle on average, refines and enhances workflow performance. Iteration 10 on the other hand shows the first negative gain, potentially indicating a performance ceiling of our current approach.
+
+Our evaluation on ScienceAgentBench revealed architecture-model interaction effects that challenge assumptions about universal design patterns. The transition from single-agent to multi-agent configurations produced heterogeneous trajectories: GPT-4o and Claude Haiku 4.5 achieved approximately 4× success rate improvements through multi-agent orchestration, while DeepSeek-V3.2 exhibited initial performance degradation (38.2\% to 32.4\%) before achieving the strongest overall results through meta-learning (43.1\%).
+
+This divergence highlights that multi-agent decomposition is not universally beneficial, its value depends on whether the underlying model's instruction-following capabilities are amplified or disrupted by hierarchical orchestration. For GPT-4o, the improvement from single-agent (3.8\%) to multi-agent one-shot (18.6\%) suggests that shorter-horizon subgoals compensated for instruction-following limitations in the HuggingFace CodeAgent framework. In contrast, DeepSeek-V3.2's strong single-agent baseline indicates robust instruction-following that temporarily suffers under static multi-agent decomposition but ultimately benefits from adaptive meta-learning.
+
+The meta-learning paradigm revealed model-specific sensitivities to evolutionary optimization. DeepSeek-V3.2 achieved substantial gains (33\% relative SR improvement, CBS increase from 0.794 to 0.921), demonstrating effective exploitation of hierarchical feedback signals. GPT-4o showed moderate benefits (15\% relative improvement), while Claude Haiku 4.5 exhibited marginal degradation despite 3× cost increase, indicating that meta-learning's computational overhead is not universally justified.
+
+We believe these heterogeneous patterns emerge due to differences in pretraining and RLHF regimes that shape each model's capacity to leverage hierarchical orchestration signals. The results suggest that optimal ASR architectures must be co-designed with model capabilities rather than applied uniformly, and that evolutionary workflow optimization provides the strongest benefits for models with sufficient instruction-following robustness to capitalize on adaptive feedback loops.
+
+While these results validate the core hypothesis that evolving workflows can enhance autonomous research capabilities of agentic systems, they also expose fundamental limitations in our current implementation. The observed performance variance across models and the marginal returns in certain configurations point to architectural challenges that must be addressed before being ready for open-ended scientific discovery.
+
+\section{Conclusion}
+
+We present Mimosa, a framework for autonomous scientific research that adapts to available tools and iteratively refines multi-agent workflows for computational scientific tasks. Unlike rigid, task-specific multi-agent systems, Mimosa combines an adaptability advantage over static multi-agent workflow employed in existing literature with predictability once workflow evolution converge and stop.
+
+Mimosa provides academics with a powerful tool to help them conduct deep research, implement codebases, perform statistical analysis, or even run simulations. Both Mimosa and Toolomics (our platform for rapid MCP server development) are publicly available on GitHub.
+
+On the ScienceAgentBench benchmark, we achieved 43\% success rate using DeepSeek-V3.2, demonstrating that workflow self-evolution outperforms static configurations across diverse scientific computing tasks.
+
+We identified critical challenges, particularly in workflow evolution reliability, which we address in Section 8 along with directions for future work.
+
+Most importantly, we suggest a shift in paradigm in agentic architectures for autonomous scientific research, from brittle, expert-designed systems to adaptive frameworks that learn from experience.
+
+
+\section{Limitations and Future work}
+
+We report several limitations and present our work as an early proof of concept:
+
+- Weak judge feedback signal: Our LLM judge evaluates workflows using only four criteria, producing noisy feedback that may reward judge preferences rather than genuine task performance. Workflows can improve on evaluation metrics without corresponding gains in scientific utility.
+
+- No cross-task generalization: The meta-orchestrator operates without persistent memory across tasks. Without persistent memory of successful architectural patterns, the system cannot learn generalizable design principles or efficiently explore the workflow search space.
+
+- Greedy optimization without exploration: Our evolutionary search employs feedback-driven refinement rather than open-ended exploration. As shown in paper like Darwin Godel Machine paper, such exploitation-focused strategies plateau rapidly at local optima determined by initial conditions.
+
+Future work will be focused on the following directions:
+
+- Investigating evaluation methodologies that yield informative judge feedback signals, enabling reliable performance tracking and theoretically grounded optimization directions.
+
+- Incorporating literature-grounded workflows generation with established scientific principles and domain knowledge.
+
+- Constructing a persistent memory architecture to encode workflow patterns, supporting transfer learning across diverse task domains.
+
+- Adopting open-ended strategies that maintain multiple workflow populations simultaneously, replacing greedy refinement with exploration mechanisms that avoid premature convergence.
+
+\section{Code and Data availability}
+
+All code and data are publicly available online. The Mimosa repository, including the code for running experiments, documentation, and explanatory materials, is accessible at:
+
+\begin{center}
+  \url{https://github.com/HolobiomicsLab/Mimosa-AI}
+\end{center}
+
+The Toolomics framework, used to expose the MCP servers utilized by Mimosa, is available at:
+
+\begin{center}
+  \url{https://github.com/HolobiomicsLab/toolomics}
+\end{center}
+
+\section{Acknowledgement}
+
+This work was supported by the French government through the following institutions:
+
+- Université Côte d’Azur, CNRS, ICN, Nice, France
+
+- Interdisciplinary Institute for Artificial Intelligence (3iA) Côte d’Azur, Sophia Antipolis, France
+
+\section{Ethics Statement}
+
+This study did not involve human participants, animal subjects, or the use of personal data. All datasets and benchmarks are publicly available and used in accordance with their respective licenses.
+
+\section{References}
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\section{Appendix}
+
+\subsection{Deployed MCP tools on Toolomics}
+
+\begin{verbatim}
+[
+    {
+        "path": "mcp_host/mcp_search/server.py",
+        "port": 5000,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/memory/server.py",
+        "port": 5001,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/pdf/server.py",
+        "port": 5002,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/html/server.py",
+        "port": 5003,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/graph_rag/server.py",
+        "port": 5004,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/browser/server.py",
+        "port": 5005,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/image_analysis/server.py",
+        "port": 5006,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/csv/server.py",
+        "port": 5007,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/txt_editor/server.py",
+        "port": 5008,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/python_editor/server.py",
+        "port": 5009,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/Rscript/docker-compose.yml",
+        "port": 5010,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/shell/docker-compose.yml",
+        "port": 5011,
+        "enabled": true
+    },
+    {
+        "path": "mcp_host/browser/searxng/docker-compose.yml",
+        "port": 5012,
+        "enabled": false
+    },
+    {
+        "path": "mcp_host/decimer/docker-compose.yml",
+        "port": 5013,
+        "enabled": false
+    }
+]
+\end{verbatim}
+
+\subsection{Statistical analysis of Workflow evolution rewards}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\linewidth]{statistical_analysis_v1.png}
+    \caption{Statistical validation of self-evolution efficacy. (a) Mean gain by cohort with 95\% bootstrap confidence intervals. All cohorts (2–9) except cohort 10 show significant positive gains (green bars). (b) Probability of improvement (green) versus regression (red) at each transition. Early transitions show improvement rates >50\%, while transitions 8→9 and 9→10 favor regression. (c) Permutation test distribution vs observed mean gain (red line). The observed gain significantly exceeds the null distribution (p < 0.0001), confirming improvement is not due to random chance. (d) Effect size (Cohen's d) by cohort. Cohorts 2–9 achieve large effect sizes (d > 0.8), with cohort 4 showing the strongest effect (d = 2.75).}
+    \label{fig:placeholder}
+\end{figure}
+
+% prompts
+\subsection{Prompts for Mimosa}
+
+\subsubsection{Workflow generation system prompt}
+
+\begin{verbatim}
+You are a world-class workflow architect specializing in creating robust, multi-agent systems using LangGraph and a custom `SmolAgent` library. Your primary function is to analyze user requests and generate complete, executable Python code for a multi-agent workflow that solves the given task.
+
+## 1. Core Principles
+
+### A. Task Decomposition: The "Divide and Conquer" Mandate
+- **Atomic Agents**: You must break down complex problems into the smallest, single-purpose agents.
+- **One Agent, One Job**: Can you describe the agent's responsibility in 5 words or less?
+ Good: "Fetch web search results"
+ Bad: "Research topic and generate report"
+- **Functional Boundaries**: Decompose tasks along natural functional lines. For example, a task to "research a topic and create a chart" requires at least two agents: one for research and one for charting.
+
+### B. State-Driven, Resilient Routing
+- **Conditional Logic**: All workflow branching must be handled by external conditional routing functions that inspect the `WorkflowState`. Agents themselves are blind to the overall workflow.
+- **Bulletproof Error Handling**: Every agent node must have a plan for failure. Implement robust retry and fallback paths.
+- **Intelligent Retries**: Design routing that can backtrack to earlier agents if a downstream failure is caused by poor upstream data. For example, if a `code_executor` agent fails because a `researcher` agent provided a bad code snippet, the workflow should route back to the `researcher`.
+
+### C. Agent Design
+- **Focused Prompts**: Agent instructions must be domain-specific, detailing the task, input/output format, and mandatory completion keywords.
+- **Completion Keywords**: Agents **MUST** signal their status by ending their response with a specific keyword phrase. This is how your routing functions will determine the next step. Use keywords like `SUCCESS:`, `FAILURE:`, `RETRY:`, or `FALLBACK:`.
+
+## 2. Technical Specification
+
+### Provided Context (Do NOT redeclare these)
+The following components are pre-loaded in the execution environment. You must use them as-is.
+
+| Component             | Description                                                              |
+| --------------------- | ------------------------------------------------------------------------ |
+| `WorkflowState`       | The `TypedDict` for graph state. You cannot modify its schema.           |
+| `SmolAgentFactory`    | Class to create agent instances. `SmolAgentFactory(name, prompt, tools)` |
+| `WorkflowNodeFactory` | Class to create graph nodes. `create_agent_node(agent_instance)`         |
+| `master_router`    | Routing function that based on the agent response will either return one of `["next_node", "retry_node", "fallback_node", END]` |
+| `*_TOOLS`    | Pre-defined tool packages (e.g., `BROWSER_MCP`, `FILESYSTEM_MCP`, etc..). |
+
+### Workflow State Schema
+
+```python
+# This is the state object passed between all nodes. It is PRE-DEFINED.
+class WorkflowState(TypedDict):
+    step_name: List[str]        # History of node names visited
+    answers: List[str]          # History of raw text responses from agents
+    success: List[bool]         # History of task success flags
+```
+
+### Master router
+
+
+The master router interprets agent completion signals and determines workflow transitions. It enforces a strict contract between agents and the graph. It is already defined.
+
+**Router Signature:**
+```python
+def master_router(state: WorkflowState) -> Literal["next_node", "retry_node", "fallback_node", END]
+```
+
+**Routing Logic:**
+
+| Agent Status | Router Returns | Meaning |
+|-------------|----------------|---------|
+| SUCCESS | "next_node" | Task completed, proceed to next agent |
+| RETRY | "retry_node" | Recoverable error, re-execute current agent |
+| FALLBACK | "fallback_node" | Missing/bad input, return to previous or fallback agent |
+| FAILURE | END | Unrecoverable error, terminate workflow |
+| Invalid format | END | Protocol violation, terminate with error |
+
+**Agent Response Contract:**
+Agents MUST end their response by calling final_answer() with a JSON string containing:
+
+status: One of ["SUCCESS", "RETRY", "FALLBACK", "FAILURE"]
+message: Human-readable explanation of the outcome
+eg: `final_answer(f'{"status": "SUCCESS", "message": "..."}')`
+
+master_router take care of parsing the agent response.
+
+Implementation Note:
+The router is pre-defined in your execution environment. Reference it in conditional edges:
+
+```python
+workflow.add_conditional_edges(
+    "researcher",
+    master_router,
+    {
+        "next_node": "coder",
+        "retry_node": "researcher",
+        "fallback_node": END,  # or previous agent
+        END: END
+    }
+)
+```
+This is for reference only, do not redefine or modify the master_router.
+
+### Tools
+
+A list of tool package and their given tools will be specified, for example:
+
+Tool `MCP_5098` is a collection of tools with the following capabilities: ['extract_code_from_html', 'list_html_files']
+Tool `MCP_WEB_BROWSER` is a collection of tools with the following capabilities: ['search', 'navigate']
+
+## 4. How to Build a Workflow
+
+Your output must be a single, runnable Python script. Follow this structure precisely.
+
+### Step 1: Define Agent Instructions
+Create a unique instruction prompt for each agent. The prompt must include a `COMPLETION PROTOCOL` section that tells the agent which keyword to use for success, failure, or other states.
+
+```python
+# Good Example: Specific, contextual, with clear completion keywords.
+instruct_researcher = """
+You are a master web researcher tasked with conducting thorough online research to gather accurate, credible information on a specific topic.
+
+## GOAL
+
+You must conduct research on ...<good search keyword based on user goal>
+
+## TASK
+- Conduct comprehensive web searches to address the research objective
+- Prioritize credible sources (academic papers, government reports, reputable news outlets) over low-quality contenty
+- Cross-reference multiple sources to ensure accuracy and resolve any conflicting information
+- Present findings in a clear, structured format with proper source attribution
+
+## RECEIVED INFORMATION
+
+You will only receive a research goal from the user. Likely a research paper title.
+
+## COMPLETION PROTOCOL
+- On success, end with:
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
+
+- On failure, end with:
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
+"""
+```
+
+When signaling FALLBACK, include diagnostic info:
+
+final_answer(f'{{"status": "FALLBACK", "message": "Missing required field: publication_date in research output"}}')
+
+This helps the upstream agent correct specific issues on retry."
+
+A prompt must specify:
+- Its goal
+- Received information from previous agent (if any)
+- Full information needed (eg: full paper name from user query, full link)
+- A completion protocol
+
+### Step 2: Create Agents
+
+Instantiate each agent using `SmolAgentFactory`, assigning a name, the instruction prompt, and a single tool package.
+
+```python
+# Agent that uses a pre-defined web tool package.
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, BROWSER_MCP)
+
+# Agent that writes and executes R code and has shell.
+agent_coder = SmolAgentFactory("coder", instruct_coder, R_SCRIPT_MCP + SHELL_MCP)
+```
+
+Agent should always be provided with a tool package, If no Tool package seem to fit the task consider using a bash tool mcp.
+
+These MCP Tools are just example and might not exist, list of available tools will be provided.
+
+### Step 4: Assemble the Graph
+Put everything together into a `StateGraph`.
+Do not compile the workflow, it is already in the context.
+Be sure to name the StateGraph `workflow`.
+
+```python
+
+# --- WORKFLOW SCRIPT ---
+
+# 1. MANDATORY Workflow Initialization
+workflow = StateGraph(WorkflowState) # WorkflowState is not a string, it is a defined variable in the context, you should use WorkflowState as a variable passed as argument to the StateGraph
+
+# 2. AGENT INSTRUCTIONS (Define all prompts here)
+instruct_researcher = """
+You are a web research specialist focused on gathering comprehensive, credible information on any given topic.
+
+## GOAL
+
+You must search for the latest news on the use of entropy in AI research.
+
+## INSTRUCTION
+You must find comprehensive information on <research goal>...
+
+## RECEIVED INFORMATION
+You will receive a research topic or question from the user that needs investigation.
+
+## COMPLETION PROTOCOL
+- On success, end with:
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
+
+- On failure, end with:
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
+
+- On impossible task, end with:
+    final_answer(f'{"status": "RETRY", "message": "..."}')
+"""
+
+instruct_coder = """
+You are a Python coding specialist responsible for writing, executing, and debugging code based on research data.
+
+## INSTRUCTION
+You must implement a code for <user goal>...
+
+## RECEIVED INFORMATION
+You will receive research findings or data from previous agents that you need to process or analyze through code.
+
+## COMPLETION PROTOCOL
+
+- On success, end with:
+    final_answer(f'{"status": "SUCCESS", "message": "..."}')
+
+- On coding failure, end with:
+    final_answer(f'{"status": "RETRY", "message": "..."}')
+
+- On missing data, end with:
+    final_answer(f'{"status": "FALLBACK", "message": "..."}')
+
+- On impossible task, end with:
+    final_answer(f'{"status": "FAILURE", "message": "..."}')
+"""
+
+# 3. AGENT CREATION (Instantiate all agents here)
+agent_researcher = SmolAgentFactory("researcher", instruct_researcher, WEB_SEARCH_MCP + SHELL_MCP)
+agent_coder = SmolAgentFactory("coder", instruct_coder, PYTHON_EDITING_MCP + SHELL_MCP)
+
+# 4. NODE DEFINITION  (Add agents to the workflow here)
+workflow.add_node("researcher", WorkflowNodeFactory.create_agent_node(agent_researcher))
+workflow.add_node("coder", WorkflowNodeFactory.create_agent_node(agent_coder))
+
+# 5. EDGE DEFINITION (Wire the graph together here)
+workflow.add_edge(START, "researcher")
+
+# master_router is a method that can return one of ["next_node", "retry_node", "fallback_node", END]
+workflow.add_conditional_edges(
+    "researcher",
+    master_router, # always trust the master_router
+    {
+        "next_node": "coder",
+        "retry_node": "researcher",
+        "fallback_node": "knowledge_agent",
+        END: END
+    }
+)
+
+workflow.add_conditional_edges(
+    "coder",
+    master_router, # always trust the master_router
+    {
+        "next_node": "<next agen" or END>,
+        "retry_node": "coder",
+        "fallback_node": END,
+        END: END
+    }
+)
+# --- END OF SCRIPT ---
+```
+
+## 5. Final Checklist
+
+- [ ] **Output Format**: Your entire response is a single Python script wrapped in ```python ... ```.
+- [ ] **Final Response Format**: ensure that the final response from the last agent strictly respects the format requested by the user
+- [ ] **No Imports**: Do not import or redefine the provided context components (`SmolAgentFactory`, etc.).
+- [ ] **Guaranteed Exit**: Does the workflow have a clear start and a guaranteed path to `END`?
+- [ ] **Smart fallback**: Avoid using fallback node on the previous agent, fallback to more early agent to avoid infinite loop, you may use a judge agent to decide on routing.
+- [ ] **Validation + Cleaning**: A last agent should be a strict judge designed for minimal syconanphancy that ensure outputs of previous agents respect high-standard. It must also arange files and clean temporary one.
+- [ ] **No overkill prompt**: Prompt for agent should stay short and should not contain code example.
+
+The workflow can be composed of various conditional flows, enabling loops, branching, or complex custom logic depending on the user’s goals. To achieve robust and adaptive behaviors, it is recommended to apply established multi-agent system best practices. These include using specialized agents such as an LLM-as-a-Judge for arbitration and evaluation, introducing conditional agent loops to refine outputs iteratively, and leveraging consensus mechanisms between agents to improve reasoning quality.
+
+## 6. Rules
+
+1. All agent should be given a shell tool in addition to their primary tool.
+2. All survey/document analysis agent should have a tool to take note (such as text editing tool), in addition to their shell and document extraction tools.
+3. Document extraction such as PDF should ALWAYS use multiple-agents including judge agent should decompose the task and refine until quality is deemed sufficient.
+\end{verbatim}
+
+\subsubsection{Workflow improvement prompt}
+
+Located in \textbf{sources/core/dgm.py:150:212}.
+
+\begin{verbatim}
+    def improvement_prompt(
+        self,
+        goal: str,
+        wf_info: WorkflowInfo,
+        flow_code: str,
+        run_stderr: str,
+        iteration_count: int,
+    ) -> str:
+        exec_result = ""
+        wf_state = wf_info.state_result if wf_info else None
+        judge_eval = wf_info.judge_evaluation if wf_info else None
+
+        if judge_eval: # use judge evalu if possible
+            exec_result = judge_eval
+        elif wf_state: # alternative: use agents answer dict
+            exec_result = self.get_flow_answers(wf_state)
+            self.show_answers(exec_result)
+        else: # use stdout/stderr if execution failed
+            exec_result = run_stderr.strip()
+
+        improv_prompt = "Previous attempt failed. Learn from mistakes and improve the multi-agent workflow."
+        if flow_code is not None:
+            improv_prompt = "\n".join([
+                "## DARWIN GÖDEL MACHINE: SELF-IMPROVEMENT STEP",
+                "Your previous attempt at generating a workflow did not succeed or didn't reach success threshold.",
+                "Your goal was: ",
+                goal,
+                "\n",
+                "## Previous workflow code:",
+                "<python>",
+                flow_code,
+                "</python>",
+                "\n",
+                "## EXECUTION RESULTS::",
+                "This is the answer from each agent during the last execution.",
+                "<results>",
+                exec_result,
+                "</results>",
+                "Reflect on your previous attempt and identify what went wrong.",
+                "\n",
+                "## ANALYZE FAILURES:",
+                "1. If the workflow code execution failed, analyze the error and fix the python code. If no workflow was generated, this is most likely because prompt were too long,  invalid syntax or ``` delimitation missing (```python...```)",
+                "2. If an agent failed due to tool limitations, consider an alternative tool.",
+                "3. If an agent failed due to lack of information, add a research step.",
+                "4. If agent didn't behave as expected, refine the prompt or agent role.",
+                "5. Consider adding error handling or validation steps.",
+                "\n",
+                "## GENERATE ONE IMPROVEMENT:",
+                "Select the SINGLE most impactful change from above.",
+                "Apply ONLY that one change to the code.",
+                "Explain what will improve and why.",
+                "\n",
+                "Your improvement will be empirically validated against the baseline.",
+            ])
+
+        return "".join(
+            [
+                f"Attempt {iteration_count + 1} of workflow generation.\n",
+                improv_prompt,
+                "Target goal:\n",
+                goal,
+            ]
+        )
+\end{verbatim}
+
+\subsubsection{LLM-as-a-judge prompt for workflow scoring}
+
+Located in \textbf{sources/evaluation/evaluator.py:287-340}.
+
+\begin{verbatim}
+            prompt = f"""
+    {execution_text}
+
+    EVALUATION TASK:
+    Based on the complete execution state and workflow code above, provide a score for each category.
+    Give your score as a float on a scale of 0.0 to 1.0, where 0.0 means is a total failure, and 1.0 means a perfect execution.
+    Analyse the full JSON state and workflow implementation to make your judgement.
+    Please be objective, technical, and specific in your feedback.
+
+    CRITERIA:
+    1. GOAL ALIGNMENT
+    Did the execution achieve the defined objective?
+    Were all required steps completed?
+    Were there unexpected deviations?
+
+    2. AGENT COLLABORATION
+    Did agents pass data correctly?
+    Did agents handle failures gracefully?
+
+    3. OUTPUT QUALITY
+    Is the output complete?
+    Is the output well-formatted?
+
+    """ + (f"""4. ANSWER CORRECTNESS
+    Answer should be : {answer}
+    Is the answer factually correct?
+    Is the answer logically consistent?
+    Is the answer precise?
+    """ if answer else "") + """
+
+    Respond in this exact format:
+    [
+        {
+            "category": "goal_alignment",
+            "score": [0.0-1.0],
+            "evidence": "[Specific JSON paths/logs proving objective fulfillment]"
+        },
+        {
+            "category": "agent_collaboration", 
+            "score": [0.0-1.0],
+            "evidence": "[Message history snippets or error logs]"
+        },
+        {
+            "category": "output_quality",
+            "score": [0.0-1.0], 
+            "evidence": "[Output validation errors or missing fields]"
+        }""" + ("""
+        ,{
+            "category": "answer_correctness",
+            "score": [0.0-1.0],
+            "evidence": "[Factual accuracy verification]"
+        }""" if answer else "") + """
+    ]
+    """
+\end{verbatim}
+
+\subsubsection{GPT-4o struggle in single agent mode}
+
+GPT-4o consistently struggled to adhere to the code schema required by the HuggingFace framework, repeatedly failing to generate properly formatted code blocks.  Tried to exit, yet failed to invoke the final answer tool to properly terminate execution. 
+
+\begin{verbatim}
+- Executing parsed code: 
+  # Recommend focused platform environment review or support function for addressing dataset access
+  print("Please engage with platform support to undergo a targeted review of access permits or tool specifics relative to dataset
+  handling.")
+
+Execution logs:
+Please engage with platform support to undergo a targeted review of access permits or tool specifics relative to dataset handling.
+
+Out: None
+[Step 183: Duration 3.94 seconds| Input tokens: 5,353,139 | Output tokens: 16,486]
+
+Error in code parsing:
+Your code snippet is invalid, because the regex pattern was not found in it.
+Here is your code snippet:
+Engaging with platform support to undergo a targeted review of access permissions or tool specifics in relation to dataset handling is
+essential. This process will help identify and resolve any underlying constraints that are impacting dataset accessibility. If further
+guidance or assistance is needed, feel free to reach out!
+Make sure to include code with the correct pattern, for instance:
+Thoughts: Your thoughts
+Code:
+# Your python code here
+<end_code>
+Make sure to provide correct code blobs.
+[Step 184: Duration 3.18 seconds| Input tokens: 5,403,309 | Output tokens: 16,540]
+
+- Executing parsed code: 
+  # Final recommendation for resolution involves engaging platform support
+  print("To resolve dataset access challenges, consult platform support for a comprehensive review and necessary adjustments in
+  configuration settings.")
+ 
+Execution logs:
+To resolve dataset access challenges, consult platform support for a comprehensive review and necessary adjustments in configuration
+settings.
+
+Out: None
+[Step 185: Duration 3.29 seconds| Input tokens: 5,453,708 | Output tokens: 16,617]
+
+Error in code parsing:
+Your code snippet is invalid, because the regex pattern was not found in it.
+[Step 186: Duration 2.85 seconds| Input tokens: 5,504,290 | Output tokens: 16,669]
+
+- Executing parsed code:
+  # Suggest alternative engagement or confirmation on persistent data accessibility
+  print("Pursue alternate methodology or request platform support clarification regarding data access execution alignment.")
+ 
+Execution logs:
+Pursue alternate methodology or request platform support clarification regarding data access execution alignment.
+
+Out: None
+[Step 187: Duration 3.27 seconds| Input tokens: 5,555,097 | Output tokens: 16,759]
+
+- Executing parsed code: 
+  # Advise exploring solution-oriented pathways with platform coordination
+  print("Engage platform support for operational guidance or reassessment of compliance with dataset integration possibilities.")
+\end{verbatim}
+
+
+\end{document}
+
+

@@ -878,13 +878,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Selection: Quality-Diversity (QD)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour descriptor: failure fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#variation-stagnation-driven-mutation-scope" class="md-nav__link">
+  <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variation: stagnation-driven mutation scope
+        Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
       
     </span>
   </a>
@@ -918,6 +935,17 @@
     <span class="md-ellipsis">
       
         Visualisations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-metrics-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run metrics artifacts
       
     </span>
   </a>
@@ -2031,13 +2059,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Selection: Quality-Diversity (QD)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour descriptor: failure fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#variation-stagnation-driven-mutation-scope" class="md-nav__link">
+  <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variation: stagnation-driven mutation scope
+        Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
       
     </span>
   </a>
@@ -2071,6 +2116,17 @@
     <span class="md-ellipsis">
       
         Visualisations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-metrics-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run metrics artifacts
       
     </span>
   </a>
@@ -2170,7 +2226,7 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
     Seed -- yes --&gt; SeedPrompt[Seed genome prompt&lt;br/&gt;or template mutation]
     Seed -- no --&gt; Pick[Pick parents via QD-roulette&lt;br/&gt;fallback to disk similarity scan]
     SeedPrompt --&gt; Orch[Orchestrate workflow&lt;br/&gt;LLM → sandbox]
-    Pick --&gt; Decide{Crossover ≈ 0.3?}
+    Pick --&gt; Decide{Crossover ≈ 0.1?}
     Decide -- mutation --&gt; Mut[Mutation prompt&lt;br/&gt;stagnation-scoped]
     Decide -- crossover --&gt; Cross[Crossover prompt&lt;br/&gt;best-parent-first]
     Mut --&gt; Orch
@@ -2202,9 +2258,9 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
 </ol>
 <p>Termination:</p>
 <ul>
-<li><code>overall_score &gt; learned_score_threshold</code> (default <code>0.97</code>) in <code>--learn</code> mode, <em>or</em></li>
+<li><code>overall_score &gt;= learned_score_threshold</code> (default <code>0.9</code>) in <code>--learn</code> mode, <em>or</em></li>
 <li><code>max_depth</code> reached — <code>1</code> in single-shot mode, <code>max_learning_evolve_iterations</code>
-  (default <code>35</code>) in <code>--learn</code> mode.</li>
+  (default <code>20</code>) in <code>--learn</code> mode.</li>
 </ul>
 <h2 id="selection-quality-diversity-qd">Selection: Quality-Diversity (QD)<a class="headerlink" href="#selection-quality-diversity-qd" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py"><code>SelectionPressure</code></a>
@@ -2213,69 +2269,138 @@ implements four strategies — <code>greedy</code>, <code>tournament</code>, <co
 <ul>
 <li>A <strong>session archive</strong> holds up to <code>population_size = 50</code> members.</li>
 <li>Each member has <code>qd_score = (1−w)·quality_norm + w·novelty_norm</code>, with
-  <code>w = novelty_weight = 0.4</code>.</li>
+  <code>w = novelty_weight = 0.25</code>. Quality and novelty are <strong>additive</strong> — never
+  multiplied — so high quality cannot rescue a redundant profile and high
+  novelty cannot drag a broken run above peers.</li>
 <li>Quality is sourced from <code>reward_uncapped</code> so the hard-fail cap doesn't
   flatten rank ordering.</li>
-<li>Novelty is k-NN distance (<code>k = 25</code>) in behaviour-descriptor space, where
-  the descriptor is <code>[n_agents, n_edges, n_branches, prompt_chars]</code>
-  extracted by <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>.</li>
+<li>Novelty is k-NN distance (<code>k = 15</code>) in <strong>failure-fingerprint</strong> space.
+  The descriptor is the centered per-source pass-rate vector produced by
+  <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py"><code>failure_fingerprint.py</code></a>
+  from the verifier's per-claim verdicts (see below).</li>
 <li>Admission gate: candidate is admitted when it either improves over
   baseline by <code>min_improvement_threshold</code> or clears
   <code>qd_score &gt; admit_threshold</code>. When the archive reaches capacity, the
   lowest-<code>qd_score</code> member is evicted.</li>
 <li>Parent draw applies an inverse-child-count penalty
-  <code>÷ (1 + n_children_already)</code> to spread offspring across the archive.</li>
+  <code>÷ (1 + n_children_already)</code>, and parents are hard-capped at
+  <code>MAX_CHILDREN_PER_PARENT = 2</code> before that penalty kicks in, so the
+  offspring stream stays spread across the archive.</li>
 </ul>
 <p>When the archive is empty (cold start), <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py"><code>WorkflowSelector</code></a>
-falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥ 0.5</code> on MiniLM
-embeddings of <code>original_task</code>, <code>score ≥ 0.05</code>) — this lets useful workflows
+falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥ 0.8</code> on MiniLM
+embeddings of <code>original_task</code>, <code>score ≥ 0.1</code>) — this lets useful workflows
 transfer across tasks.</p>
-<h2 id="variation-stagnation-driven-mutation-scope">Variation: stagnation-driven mutation scope<a class="headerlink" href="#variation-stagnation-driven-mutation-scope" title="Permanent link">&para;</a></h2>
+<h3 id="behaviour-descriptor-failure-fingerprint">Behaviour descriptor: failure fingerprint<a class="headerlink" href="#behaviour-descriptor-failure-fingerprint" title="Permanent link">&para;</a></h3>
+<p>The novelty signal compares candidates in <strong>failure-fingerprint</strong> space.
+Per source A–F (literature, user goal, agent narration, math invariants,
+computational reproducibility, statistical fingerprint), the verifier
+records a pass rate. Sources with zero claims get the neutral value
+<code>0.5</code> and a presence-mask entry of <code>0</code>. The vector is then <strong>centered</strong>:
+the mean pass rate across present sources is subtracted from every entry.</p>
+<p>The centering is the <em>quality firewall</em>. Without it, an all-pass run sits
+at <code>[1,1,1,1,1,1]</code> and an all-fail run at <code>[0,0,0,0,0,0]</code> — Euclidean
+distance between them is large, and quality silently leaks into novelty.
+After centering, <strong>both</strong> runs collapse to the zero profile and novelty
+encodes only the <em>shape</em> of which sources fail relative to the others.
+Two workflows that fail in the same way are redundant regardless of how
+different their DAGs look; two that fail in different ways explore
+different basins and both deserve a seat in the archive.</p>
+<p>The fingerprint is computed at the end of <code>VerifierEvaluator.evaluate()</code>
+and persisted in <code>state_result.json</code> under
+<code>evaluation.verifier.failure_fingerprint.vector</code>. The full audit trail —
+which variable comes from where, the failure modes the descriptor must
+survive, and the centering invariant asserted by the tests — lives in
+<a href="../../info-flow/failure_fingerprint/"><code>docs/info-flow/failure_fingerprint.md</code></a>.</p>
+<p>When a run has no usable fingerprint (verifier short-circuit on a fully
+failed workflow), <code>SelectionPressure._extract_behaviour_descriptor</code>
+returns a neutral zero vector so distance lookups stay well-defined and
+the cold path doesn't artificially win or lose on novelty.</p>
+<p>The legacy structural descriptor (<code>[n_agents, n_edges, n_branches,
+prompt_chars]</code>) shipped by
+<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
+is retained for ablations and offline analysis but is <strong>no longer used</strong>
+for QD novelty — empirical work showed it barely co-varies with outcomes.</p>
+<h2 id="variation-evidence-driven-mutation-scope-rechenberg-15-rule">Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)<a class="headerlink" href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py"><code>VariationEngine</code></a>
 assembles mutation and crossover prompts. There is no fixed phase
 schedule by iteration progress; mutation boldness is a continuous
-function of how much the population is repeating itself.</p>
-<p><strong>Stagnation signal.</strong> <code>_compute_stagnation()</code> takes the last 4
-non-failure prompt gradients, computes their pairwise MiniLM cosine
-similarity, and rescales the mean (<code>0.4</code> ≈ unrelated → <code>0</code>,
-<code>0.8+</code> ≈ fully stagnated → <code>1</code>).</p>
-<p><strong>Effective boldness.</strong> <code>stagnation_effective = raw_stagnation · (1 −
-parent_score)</code>. Near-winners stay protected from disruption even when
-the population stagnates.</p>
+function of two evidence signals — how long the lineage has been
+failing to improve, <em>and</em> how often recent offspring actually beat the
+best-so-far.</p>
+<p><strong>Plateau signal.</strong> <code>_iters_since_improvement()</code> counts the run of
+trailing scored offspring (failures and unscored entries skipped) that
+did not strictly beat the best-so-far at the moment they were
+produced. It is normalised to <code>plateau = min(1, iters / _PLATEAU_PATIENCE)</code>
+with <code>_PLATEAU_PATIENCE = 6</code>.</p>
+<p><strong>Success-rate signal.</strong> <code>_compute_success_rate(window=5)</code> counts the
+fraction of the last 5 scored offspring whose <code>overall_score</code> strictly
+beat the running best at the moment they were produced. The classical
+Rechenberg &#8533; success rule (1973) is the threshold: below <code>0.20</code>
+the search is "stuck" and step size must grow; above it, real progress
+is happening and step size should be damped.</p>
+<p><strong>Effective boldness.</strong> Combining the two signals:</p>
+<ul>
+<li><strong>Cold start</strong> (fewer than two comparable scored offspring) —
+  <code>effective = 0.3 · plateau</code>. A capped cold-start ramp avoids jumping
+  straight into RE-SPECIATION before any feedback has accumulated.</li>
+<li><strong>Below &#8533;</strong> (<code>success_rate &lt; 0.20</code>) — average the deficit and the
+  plateau: <code>effective = 0.5 · deficit + 0.5 · plateau</code>, where
+  <code>deficit = (0.20 − success_rate) / 0.20</code>. A run of no-improvements
+  and a stalling success rate both push scope up.</li>
+<li><strong>Above &#8533;</strong> — damp boldness in proportion to how far above
+  threshold we are: <code>effective = plateau · (1 − progress)</code>, where
+  <code>progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))</code>. At
+  <code>success_rate ≥ 0.80</code> boldness collapses regardless of plateau.</li>
+<li><strong>Near-finish floor</strong> — only in the last 5 % of the score range,
+  <code>effective</code> is multiplied by <code>(1 − 0.5 · near_finish)</code> where
+  <code>near_finish = max(0, (parent_score − 0.95) / 0.05)</code>. This is the
+  <em>only</em> point where the parent's absolute score re-enters the boldness
+  calculation, so a 0.96 parent isn't gambled away one generation
+  before early-stop.</li>
+<li><strong>RE-SPECIATION gate.</strong> The top band is hysteresis-gated: unless
+  <code>iters_since_improvement ≥ _RESPECIATION_PATIENCE</code> (default <code>8</code>) <em>and</em>
+  <code>success_rate ∈ {None, 0.0}</code>, <code>effective</code> is clamped to
+  <code>_RESPECIATION_CLAMP = 0.89</code> — just below the EXPLORATION/RE-SPECIATION
+  boundary at <code>0.90</code>.</li>
+</ul>
+<p>Notably, <code>parent_score</code> no longer multiplies the whole signal — that
+older behaviour locked high-score lineages into "tiny tweak" mode even
+when offspring kept failing identically.</p>
 <p><strong>Agent budget.</strong> The current agent count grows toward
-<code>max_possible_agents = 7</code> proportionally to <code>stagnation_effective</code>,
-then a Beta-Binomial draw samples the actual count inside that window
-(biased upward by stagnation). The seed generation samples agents from
-<code>[1, 4]</code> with stagnation prior <code>0.5</code>.</p>
+<code>max_possible_agents = 7</code> proportionally to <code>effective</code>, then a
+Beta-Binomial draw samples the actual count inside that window
+(biased upward by <code>effective</code>). The seed generation samples agents
+from <code>[1, 4]</code> with a <code>0.5</code> boldness prior.</p>
 <p><strong>Scope band.</strong> A single advisory line is added to the mutation prompt,
-chosen by <code>stagnation_effective</code>:</p>
+chosen by <code>effective</code>:</p>
 <table>
 <thead>
 <tr>
-<th>Stagnation effective</th>
+<th>Effective boldness</th>
 <th>Mutation scope</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>&lt; 0.20</td>
-<td>prompt-only little tweak</td>
+<td>&lt; 0.35</td>
+<td><code>EXPLOITATION</code> — point mutation: minor phrasing / prompt-adjective tweaks</td>
 </tr>
 <tr>
-<td>&lt; 0.40</td>
-<td>prompt, handoff, tools — improve information flow</td>
+<td>&lt; 0.50</td>
+<td><code>ALIGNMENT</code> — interface optimization: refine handoff prompts, IO contracts</td>
 </tr>
 <tr>
-<td>&lt; 0.60</td>
-<td>significant redesign while keeping topology</td>
+<td>&lt; 0.65</td>
+<td><code>ADAPTATION</code> — component overhaul: rewrite lagging agent prompts, swap tools</td>
 </tr>
 <tr>
-<td>&lt; 0.80</td>
-<td>bold rewire — restructure or grow the agent set</td>
+<td>&lt; 0.90</td>
+<td><code>EXPLORATION</code> — macro structural mutation: add/merge agents, change routing</td>
 </tr>
 <tr>
-<td>≥ 0.80</td>
-<td>complete rethink — discard inherited topology / prompts</td>
+<td>≥ 0.90</td>
+<td><code>RE-SPECIATION</code> — clean-slate redesign of the multi-agent architecture</td>
 </tr>
 </tbody>
 </table>
@@ -2283,10 +2408,13 @@ chosen by <code>stagnation_effective</code>:</p>
 LLM can still pick any topology. The hard control is the agent-count
 budget passed in the same prompt block.</p>
 <h2 id="crossover">Crossover<a class="headerlink" href="#crossover" title="Permanent link">&para;</a></h2>
-<p>With probability ~0.3 per generation, two parents are combined instead of
-one being mutated. The crossover prompt is <strong>best-parent-first</strong>: the
-strongest parent's code structure leads, and weaker parents contribute
-specific improvements rather than competing for the skeleton.</p>
+<p>With probability <code>crossover_rate</code> per generation (default <code>0.1</code>, and only
+once at least <code>initial_population = 2</code> runs have happened), two parents
+are combined instead of one being mutated. The crossover prompt is
+<strong>best-parent-first</strong>: the strongest parent's code structure leads,
+weaker parents contribute specific improvements rather than competing
+for the skeleton, and the offspring is hard-capped at the highest
+parent agent count to prevent runaway complexity.</p>
 <h2 id="lineage-reproducibility">Lineage &amp; reproducibility<a class="headerlink" href="#lineage-reproducibility" title="Permanent link">&para;</a></h2>
 <p>After each generation, <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/lineage.py"><code>lineage.py</code></a>
 writes a sidecar record <code>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</code>
@@ -2302,6 +2430,28 @@ yields the same code.</p>
 <li><code>evolution_tree.png</code> — rendered lineage tree.</li>
 </ul>
 <p><img alt="Reward progress example" src="../../images/evolve_example.png" width="80%" /></p>
+<h2 id="run-metrics-artifacts">Run metrics artifacts<a class="headerlink" href="#run-metrics-artifacts" title="Permanent link">&para;</a></h2>
+<p>Each iteration also writes structured metrics for post-hoc analysis:</p>
+<ul>
+<li><code>sources/workflows/&lt;uuid&gt;/run_metrics.json</code> — one file per workflow.
+  Captures <code>iteration</code>, <code>evolution_kind</code>, <code>parent_uuids</code>,
+  <code>iteration_wall_time_s</code>, <code>iteration_cost_usd</code>, <code>cumulative_cost_usd</code>,
+  <code>overall_score{,_uncapped}</code>, <code>qd_descriptor</code>, <code>qd_score</code>,
+  <code>novelty_score</code>, the <code>selection_log</code>, and the
+  <code>variation_state</code> (<code>iters_since_improvement</code>, <code>plateau</code>,
+  <code>success_rate</code>, <code>effective_boldness</code>, <code>parent_score</code>,
+  <code>respeciation_gate_open</code>, <code>scope_band</code>, <code>agent_budget</code>) that produced
+  this offspring.</li>
+<li><code>sources/workflows/qd_archive.jsonl</code> — append-only, one line per
+  <code>validate_survivor</code> call. Records the candidate's descriptor,
+  <code>qd_score</code>, <code>novelty_score</code>, admission verdict, and the <code>evicted_uuid</code>
+  (if the archive was at capacity).</li>
+<li><code>sources/workflows/variation_log.jsonl</code> — append-only, one line per
+  mutation/crossover/seed prompt assembled. Lets you retrace the
+  Rechenberg &#8533; step-size schedule without rerunning the engine.</li>
+</ul>
+<p>All three are best-effort and fail-soft: an I/O error logs a warning
+but never aborts a run.</p>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../evaluation-pipeline/">Evaluation pipeline</a> — what the verifier actually returns.</li>

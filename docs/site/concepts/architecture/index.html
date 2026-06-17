@@ -2225,13 +2225,17 @@ recursively evolves workflows, with help from:</p>
 <li><strong>WorkflowSelector</strong> — picks parents from the live archive or, on a cold
   start, from previous runs on disk (filtered by task-text cosine similarity).</li>
 <li><strong>SelectionPressure</strong> — Quality-Diversity archive (<code>population_size=50</code>,
-  <code>k=25</code>, <code>novelty_weight=0.4</code>). Admission is gated by the validity check
+  <code>k=15</code>, <code>novelty_weight=0.25</code>). Admission is gated by the validity check
   (improvement over baseline or <code>qd_score &gt; admit_threshold</code>); capacity is
   curated by lowest-<code>qd_score</code> eviction.</li>
-<li><strong>VariationEngine</strong> — assembles mutation or crossover prompts, with a
-  stagnation-driven mutation scope: boldness grows as recent prompt
-  gradients converge (the offspring keep failing the same way) and is
-  damped by the parent's score so near-winners stay protected.</li>
+<li><strong>VariationEngine</strong> — assembles mutation or crossover prompts, with an
+  evidence-driven mutation scope: boldness grows with an
+  <code>iters_since_improvement</code> plateau counter (patience <code>6</code>) <em>and</em> as the
+  Rechenberg &#8533; success rate of the last 5 scored offspring drops below
+  20 %. A near-finish floor only damps boldness once the parent score is
+  above 0.95, so near-winners aren't gambled away one generation before
+  early-stop. The top <code>RE-SPECIATION</code> band is hysteresis-gated and only
+  opens after <code>iters_since_improvement ≥ 8</code> with a zero success rate.</li>
 <li><strong>WorkflowOrchestrator</strong> — wraps "grounding → factory → sandbox" into one
   callable per generation.</li>
 </ul>

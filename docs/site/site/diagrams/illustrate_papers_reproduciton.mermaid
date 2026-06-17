@@ -1,0 +1,18 @@
+graph LR
+    A[Scientific Paper] --> B[Mimosa] --> C[Reproduction Results]
+    
+    subgraph Examples
+        D[Paper 1: Gene Analysis]
+        E[Paper 2: Protein Folding] 
+        F[Paper 3: Drug Discovery]
+        G[Paper 100...]
+    end
+    
+    D --> B
+    E --> B  
+    F --> B
+    G --> B
+    
+    B --> H[✓ Reproduced Successfully]
+    B --> I[✗ Failed to Reproduce]
+    B --> J[⚠ Partial Results]
