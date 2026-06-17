@@ -423,9 +423,7 @@ Look for properties such as:
   count consistent with that type. Express each threshold explicitly
   in the claim ("standard deviation of grayscale pixel values > 5",
   "image width >= 400 px", "at least 2 horizontally-tiled subregions
-  detected by column-variance scan"). NEVER reference any reference
-  or gold image file path — judge the agent's image on its own
-  intrinsic properties, not by comparison to a target.
+  detected by column-variance scan").
 
 Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
@@ -477,13 +475,6 @@ ALLOWED claim shapes:
   produced code — i.e. the manifest is non-empty and is not missing a
   library that the workspace's `.py` files import.
 - The dependencies are pinned to specific versions (e.g. `numpy==1.25.3` rather than `numpy>=1.20` or `numpy`).
-- If the produced code uses stochastic operations (random sampling,
-  shuffling, model training, weight init, train/test split), a random
-  seed is fixed in code (`numpy.random.seed`, `random.seed`,
-  `torch.manual_seed`, `random_state=...`) so the run is reproducible.
-- A clearly identifiable runnable entrypoint exists (a single top-level
-  `.py` such as `main.py`, `run.py`, `pipeline.py`, or unambiguous from
-  the layout) so a re-runner knows what to launch.
 - The workspace is not pathologically cluttered with junk (no thousands
   of unrelated files; no obvious accumulation of failed intermediate
   dumps that would confuse a re-runner).
@@ -497,17 +488,6 @@ EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
 - Logging structure, log file presence, or log verbosity.
 This source verifies non-negotiable computer-science PRACTICE — not
 engineering aesthetics.
-
-Eachclaim MUST chain a file / structural property to a
-functional reproducibility consequence — never bare existence. Example
-WELL-FORMED claim: "the workspace declares its dependencies in a standard
-manifest covering the packages actually imported by the produced code".
-Example MALFORMED claim: "a requirements.txt file exists in the workspace".
-
-The deps-manifest, absolute-paths, and seed-on-stochastic claims genuinely
-block re-execution and matter most; entrypoint, clutter, and output-location
-claims are nice-to-have. The post-extraction importance pass will weight them
-accordingly.
 
 {_CLAIM_RULES_BLOCK}
 
