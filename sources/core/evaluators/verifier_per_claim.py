@@ -389,6 +389,16 @@ RULES FOR YOUR SCRIPT:
 - Recompute or directly check; do not trust the agent's reported numbers.
 - For property checks (symmetry, range, no duplicates, ...), assert the
   property and emit "pass"/"fail" accordingly.
+- Guard against vacuous comparisons. When a property reduces to a
+  comparison of order statistics across two groups (e.g. "all of A >
+  all of B" becoming ``min(A) > max(B)``), first check that BOTH
+  operand groups are drawn from the real data distribution: reject
+  groups where values are sentinel/masked placeholders (commonly
+  -999, -9999, 9999, NaN, None, or values equal to a constant across
+  the entire group when the data is supposed to be continuous). If
+  sentinel/masked values are present in either operand, emit
+  ``status="fail"`` with a details string naming the sentinel — the
+  check is unsound, not satisfied.
 - Catch your own exceptions and emit status="error" with the error message in
   details — never let the script raise.
 - Parse the relevant files according to the format visible in the PREVIEWS
@@ -946,6 +956,16 @@ INSTRUCTIONS:
   {{"claim_id": "{claim['id']}", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
 - Catch your own exceptions inside the script and emit status="error" — never let the script raise.
 - Read files with relative paths (cwd is the workspace).
+- Guard against vacuous comparisons. When a property reduces to a
+  comparison of order statistics across two groups (e.g. "all of A >
+  all of B" becoming ``min(A) > max(B)``), first check that BOTH
+  operand groups are drawn from the real data distribution: reject
+  groups where values are sentinel/masked placeholders (commonly
+  -999, -9999, 9999, NaN, None, or values equal to a constant across
+  the entire group when the data is supposed to be continuous). If
+  sentinel/masked values are present in either operand, emit
+  ``status="fail"`` with a details string naming the sentinel — the
+  check is unsound, not satisfied.
 - When the claim is about CODE STRUCTURE in a workflow script (imports,
   function calls, class instantiations, assignments), parse the script
   with the stdlib ``ast`` module instead of regex or substring search.
