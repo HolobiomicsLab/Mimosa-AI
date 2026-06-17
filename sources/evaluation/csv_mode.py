@@ -10,6 +10,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,35 +32,30 @@ from sources.cli.pretty_print import (
 )
 
 
-_INPUT_TIMEOUT = 30  # seconds before auto-accepting the default
-
-
-async def _input_with_timeout(prompt: str, default: str = "0", timeout: float = _INPUT_TIMEOUT) -> str:
+async def _prompt_with_default(prompt: str, default: str = "0") -> str:
     """
-    Non-blocking input prompt with a countdown timeout.
+    Prompt for input with a default. Headless-safe and recovery-correct.
 
-    Displays a prompt and waits up to *timeout* seconds for user input.
-    If no input is provided within the timeout, *default* is returned.
+    Behavior:
+      - If stdin is not a TTY (headless / cron / piped run), return *default*
+        immediately without reading.
+      - Otherwise block on stdin until the user enters a value; return
+        *default* on empty input.
 
-    Args:
-        prompt: The text shown to the user.
-        default: Value returned on timeout or empty input.
-        timeout: Seconds to wait before auto-accepting *default*.
-
-    Returns:
-        The user's input string, or *default* on timeout / empty input.
+    Why: the previous `asyncio.wait_for(loop.run_in_executor(None, input))`
+    pattern leaked the blocked reader thread on timeout. Any late keystrokes
+    were silently consumed by the orphaned thread, and back-to-back prompts
+    raced for stdin — so the recovery prompts (starting row, cache restore)
+    could be ignored without the user ever knowing. Block for a TTY, return
+    the default for non-TTY: predictable, no thread leak, no race.
     """
-    loop = asyncio.get_running_loop()
-    print(f"{prompt} (auto-accept '{default}' in {timeout:.0f}s): ", end="", flush=True)
-    try:
-        raw = await asyncio.wait_for(
-            loop.run_in_executor(None, input),
-            timeout=timeout,
-        )
-        return raw.strip() if raw.strip() else default
-    except asyncio.TimeoutError:
-        print(f"\n  ⏱  Timeout – using default: {default}")
+    if not sys.stdin.isatty():
+        print(f"{prompt} (stdin not a TTY — using default '{default}')")
         return default
+    loop = asyncio.get_running_loop()
+    print(f"{prompt} (press Enter for '{default}'): ", end="", flush=True)
+    raw = await loop.run_in_executor(None, input)
+    return raw.strip() if raw.strip() else default
 
 
 @dataclass
@@ -282,6 +278,7 @@ Provide a structured analysis with:
             "execution_time_seconds": execution_time,
             "analysis": analysis["full_analysis"],
             "total_eval": len(sab_runs),
+            "start_row": self._start_row + 1,
             "git": self._get_git_info()
         }
 
@@ -856,20 +853,21 @@ Provide your analysis following the specified output format."""
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user (with timeout)
+        # Get starting row from user
         while True:
-            user_input = await _input_with_timeout("Enter starting row", default="0")
+            user_input = await _prompt_with_default("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1 if user_input != "0" else 0
+                start_row = max(0, int(user_input) - 1)
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
+        print(f"  → starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _input_with_timeout(
+            restore_input = await _prompt_with_default(
                 "Restore previous run statistics from cache? (y/n)", default="y"
             )
             if restore_input.lower() != 'n':
@@ -964,20 +962,21 @@ Provide your analysis following the specified output format."""
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user (with timeout)
+        # Get starting row from user
         while True:
-            user_input = await _input_with_timeout("Enter starting row", default="0")
+            user_input = await _prompt_with_default("Enter starting row", default="0")
             try:
-                start_row = int(user_input) - 1 if user_input != "0" else 0
+                start_row = max(0, int(user_input) - 1)
                 break
             except ValueError:
                 print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
+        print_info(f"→ starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _input_with_timeout(
+            restore_input = await _prompt_with_default(
                 "Restore previous run statistics from cache? (y/n)", default="y"
             )
             if restore_input.lower() != 'n':
