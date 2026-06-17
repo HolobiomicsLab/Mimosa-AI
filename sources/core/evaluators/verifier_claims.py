@@ -415,6 +415,17 @@ Look for properties such as:
 - Cardinality / shape consistency (output row count matches input row
   count on a per-row task; predictions equal the test set size; feature
   counts agree across train and test).
+- Image-artefact properties (when the goal asks for a figure, plot,
+  or other rendered image — PNG/PDF/SVG): the file opens with PIL,
+  has non-zero width and height, has pixel variance above a trivial
+  threshold (i.e. not a blank canvas), and — if the goal names a
+  specific plot type or panel layout — has an aspect ratio and panel
+  count consistent with that type. Express each threshold explicitly
+  in the claim ("standard deviation of grayscale pixel values > 5",
+  "image width >= 400 px", "at least 2 horizontally-tiled subregions
+  detected by column-variance scan"). NEVER reference any reference
+  or gold image file path — judge the agent's image on its own
+  intrinsic properties, not by comparison to a target.
 
 Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just

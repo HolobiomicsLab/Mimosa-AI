@@ -33,10 +33,13 @@ from sources.core.workflow_runner import (
 _VERIFIER_BASE_PACKAGES: tuple[str, ...] = (
     "numpy", "pandas", "scipy", "scikit-learn", "pint",
     "pydantic", "pandera", "jsonschema", "sympy", "openpyxl",
+    "Pillow",
 )
 # Python module names corresponding to ``_VERIFIER_BASE_PACKAGES`` for the
 # post-install smoke check (scikit-learn → sklearn).
-_VERIFIER_BASE_IMPORTS: tuple[str, ...] = ("numpy", "pandas", "scipy", "sklearn")
+_VERIFIER_BASE_IMPORTS: tuple[str, ...] = (
+    "numpy", "pandas", "scipy", "sklearn", "PIL",
+)
 
 _VERIFIER_PACKAGES_INSTALLED = False
 _VERIFIER_INSTALL_LOCK = threading.Lock()
