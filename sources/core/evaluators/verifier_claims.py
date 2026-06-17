@@ -557,6 +557,22 @@ Look for properties such as:
 - No suspicious hard-coded or fallback patterns in outputs (predictions
   all identical, all integers when probabilities were expected, exact
   reproduction of an input column as the "prediction").
+- No dataset-sentinel leakage into the workflow's outputs. If any
+  column the workflow consumes contains values clearly outside the
+  expected scientific range for that measurement (e.g. -999, -9999,
+  -1 in a non-negative column, NaN, inf, or string markers like
+  "missing", "?", "NA", ""), the claim must verify that rows
+  carrying those sentinels were filtered BEFORE they entered
+  training, slicing (top-k / bottom-k / quantile selection),
+  thresholding, aggregation, or visualisation. A workflow that
+  feeds sentinel-bearing rows into a min / max / sort, a histogram
+  bin, a model fit, or a plot has produced a polluted result even
+  if every per-row arithmetic step "succeeded". Sentinel leakage
+  invalidates extreme-value selection in particular: the "bottom
+  10" of a column containing -999 is not the bottom 10 of the real
+  measurements. Sentinel-leakage claims target methodology
+  validity and rate importance 8-9 whenever the polluted column
+  drives a headline selection, ranking, fit, or figure.
 - Sample sizes are adequate for the test (n above a sensible floor for
   the statistic being claimed; enough samples per class for stratified
   metrics).
