@@ -311,9 +311,48 @@ Look for, in the goal:
   test split only", "use the 20-mer sequence HPHPPHHPHPPHPHHPPHPH").
 - Explicit output format constraints ("as JSON", "one row per sample",
   "rounded to 3 decimal places").
-- Input dataset's exact column names, order, and data types in your output.
-- The claims Ensure no suffixes (e.g., _prob, _score) or renamed columns unless the task explicitly specifies a different output schema.
-- Any hint, advice, recommandations, treat them as explicit user requirements that must be followed
+- Any hint, advice, recommendation: treat as an explicit user requirement.
+
+LITERAL IDENTIFIERS — MINE THEM AGGRESSIVELY. The goal may contain
+several kinds of literal identifiers the user is implicitly or explicitly
+asking the workflow to reproduce. Find every such identifier and emit
+ONE CLAIM PER IDENTIFIER, quoted verbatim in backticks. The kinds you
+must scan for, regardless of how the goal is labelled or sectioned:
+
+  * Example data (sample rows, header excerpts, JSON or YAML snippets,
+    schema previews): the column names, key names, or field names shown
+    are the EXACT identifiers the user expects in the output. Emit a
+    claim of the form:
+    "The output `<path>` has columns/keys exactly equal to
+    `[<id1>, <id2>, ...]` in that order (same names, same order, no
+    added suffixes like `_prob`/`_score`, no renames)."
+    Use the identifiers as-is from the example; do NOT paraphrase.
+  * Explicit deliverable specifications (output paths, filenames,
+    file formats stated literally): every path, filename, and "EXACT"
+    phrase becomes a claim of the form
+    "The file `<exact/path/from/goal>` exists at the workspace location
+    the goal specifies." Quote the path verbatim.
+  * Named library, class, function, model, or dataset identifier —
+    any backticked or capitalised code-identifier-shaped token in the
+    goal body, plus anything introduced by "use X" / "implement with X"
+    / "as defined by X": emit a claim
+    "The workflow uses `<Identifier>` as named in the goal."
+    One claim per distinct identifier.
+
+These exact-name claims sit ALONGSIDE concept claims, not in place of
+them. "The output includes a SMILES column" (concept) and "The output
+header equals `['smiles','FDA_APPROVED','CT_TOX']`" (exact) are
+DIFFERENT claims and you should emit BOTH when both are extractable
+from the goal.
+
+If an example is truncated (ends with `...`, contains `[truncated]`, or
+shows only a partial row), emit a weaker positional claim instead:
+"The first N columns of `<path>` are exactly `[<visible names>]`" —
+do NOT invent the omitted names.
+
+If the goal contains no example data, no deliverable specifications,
+and no named identifiers, skip this section silently. Do not fabricate
+identifiers to fill the quota.
 
 If the goal is short and contains few explicit requirements, return a
 short list — DO NOT pad with claims the user did not write. It is fine
@@ -376,6 +415,17 @@ Look for properties such as:
 - Cardinality / shape consistency (output row count matches input row
   count on a per-row task; predictions equal the test set size; feature
   counts agree across train and test).
+- Image-artefact properties (when the goal asks for a figure, plot,
+  or other rendered image — PNG/PDF/SVG): the file opens with PIL,
+  has non-zero width and height, has pixel variance above a trivial
+  threshold (i.e. not a blank canvas), and — if the goal names a
+  specific plot type or panel layout — has an aspect ratio and panel
+  count consistent with that type. Express each threshold explicitly
+  in the claim ("standard deviation of grayscale pixel values > 5",
+  "image width >= 400 px", "at least 2 horizontally-tiled subregions
+  detected by column-variance scan"). NEVER reference any reference
+  or gold image file path — judge the agent's image on its own
+  intrinsic properties, not by comparison to a target.
 
 Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
@@ -518,6 +568,22 @@ Look for properties such as:
 - No suspicious hard-coded or fallback patterns in outputs (predictions
   all identical, all integers when probabilities were expected, exact
   reproduction of an input column as the "prediction").
+- No dataset-sentinel leakage into the workflow's outputs. If any
+  column the workflow consumes contains values clearly outside the
+  expected scientific range for that measurement (e.g. -999, -9999,
+  -1 in a non-negative column, NaN, inf, or string markers like
+  "missing", "?", "NA", ""), the claim must verify that rows
+  carrying those sentinels were filtered BEFORE they entered
+  training, slicing (top-k / bottom-k / quantile selection),
+  thresholding, aggregation, or visualisation. A workflow that
+  feeds sentinel-bearing rows into a min / max / sort, a histogram
+  bin, a model fit, or a plot has produced a polluted result even
+  if every per-row arithmetic step "succeeded". Sentinel leakage
+  invalidates extreme-value selection in particular: the "bottom
+  10" of a column containing -999 is not the bottom 10 of the real
+  measurements. Sentinel-leakage claims target methodology
+  validity and rate importance 8-9 whenever the polluted column
+  drives a headline selection, ranking, fit, or figure.
 - Sample sizes are adequate for the test (n above a sensible floor for
   the statistic being claimed; enough samples per class for stratified
   metrics).
