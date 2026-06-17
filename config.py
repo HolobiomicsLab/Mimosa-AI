@@ -69,7 +69,7 @@ class Config:
 
         # learning parameters
         self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 20
+        self.max_learning_evolve_iterations = 10
 
         # QD novelty + length penalty (open-ended modes)
         #  "archive_knn" (default) or "k-NN archive"
@@ -77,7 +77,7 @@ class Config:
         self.novelty_previous_n: int = 5
         # Length penalty: genotype size at which the penalty starts to
         # grow; lambda is small so it only breaks near-ties.
-        self.length_penalty_baseline_chars: int = 5000
+        self.length_penalty_baseline_chars: int = 7000
         self.length_penalty_lambda: float = 0.05
 
         # evaluation concurrency settings
