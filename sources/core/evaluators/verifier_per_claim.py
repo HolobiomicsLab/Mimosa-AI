@@ -68,6 +68,31 @@ _STDERR_TAIL_BYTES = 400
 T = TypeVar("T")
 
 
+def _detect_language(workspace_listing: str) -> str:
+    """Heuristically classify a workspace's scripting language from a listing.
+
+    Parses each ``name<TAB>size`` row of *workspace_listing* and counts ``.py``
+    versus ``.R`` extensions. Returns one of ``"python"``, ``"r"``, ``"mixed"``,
+    or ``"unknown"`` so the verifier-gen prompt can warn the LLM not to assume
+    Python AST when the workflow scripts are in R.
+    """
+    py_count = 0
+    r_count = 0
+    for raw in (workspace_listing or "").splitlines():
+        path = raw.split("\t", 1)[0].strip().lower()
+        if path.endswith(".py"):
+            py_count += 1
+        elif path.endswith(".r"):
+            r_count += 1
+    if py_count == 0 and r_count == 0:
+        return "unknown"
+    if py_count > 0 and r_count == 0:
+        return "python"
+    if r_count > 0 and py_count == 0:
+        return "r"
+    return "mixed"
+
+
 def _run_coro_sync(
     coro_factory: Callable[[], Coroutine[Any, Any, T]],
     thread_timeout: float | None = None,
@@ -330,12 +355,21 @@ Return STRICT JSON only:
         """Build the verifier-generation prompt for one claim."""
         previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
         packages = ", ".join(_VERIFIER_BASE_PACKAGES)
+        language = _detect_language(workspace_listing)
         return f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
 
 WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
+
+WORKFLOW LANGUAGE (heuristic from file extensions): {language}
+- When ``python``: parse workflow scripts with the stdlib ``ast`` module.
+- When ``r``: the workflow scripts are R; do NOT parse them with ``ast``.
+  Verify against on-disk artefacts; if a deterministic check on artefacts is
+  not possible for a code-structure claim, return ``executable=false``.
+- When ``mixed`` or ``unknown``: scope code-structure checks to the
+  file extension that matches the claim's target.
 
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 {previews}
@@ -364,6 +398,39 @@ RULES FOR YOUR SCRIPT:
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
 - When verifying usage of a specific library method is found in a script, also ensure no cheating attempt was done, such as a try-catch branching that lead to the wrong method being used on exception.
+- When the claim is about CODE STRUCTURE in a workflow script (imports,
+  function calls, class instantiations, assignments), parse the script
+  with the stdlib ``ast`` module instead of regex or substring search.
+  Variable names are not load-bearing — never hard-code identifiers like
+  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
+  (``ast.Call.func``: e.g. node is a ``Name`` with id
+  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
+  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
+  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
+  source code is brittle to whitespace, quote style, line breaks, and
+  renames; reserve ``re`` for unstructured text (logs, READMEs).
+  When scanning for "cheating fallbacks", check only the EXECUTED path:
+  a ``try`` body whose ``except`` handler catches ``ImportError`` /
+  ``ModuleNotFoundError`` is a fallback branch. Test the corresponding
+  import in the ``try`` body with ``importlib.util.find_spec``; if it
+  resolves at verification time, treat the ``except`` body as dead code
+  and ignore its contents. The reverse holds when the import is
+  unavailable.
+- For claims that an output FILE or PATH exists (e.g. "the predictions
+  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
+  the primary check is ``pathlib.Path(target).exists()`` evaluated in
+  the workspace cwd. If the file is there and parseable, that alone is
+  sufficient to emit ``status="pass"``. Do NOT additionally require the
+  source script to contain the literal path string — quote style,
+  ``os.path.join`` splits, and variable substitution will hide it.
+  Inspect source code only when the file is ABSENT and you need to
+  attribute the failure.
+- Some claims are conditional ("if X happens, Y must hold" / "no
+  fallback to Z used instead of W"). Detect the antecedent first. If
+  it is FALSE — the guarded path is not present in the workspace —
+  emit ``status="pass"`` with ``details="vacuously satisfied:
+  <antecedent> not present"``. Do not search unrelated regions of the
+  script for the consequent's keywords.
 - On a "Used fallback claim", the score is inverted: 0 if the claim passes, 1 if it fails. This is to incentivize the verified program to not use fallback
 
 What should not be done:
@@ -879,6 +946,39 @@ INSTRUCTIONS:
   {{"claim_id": "{claim['id']}", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
 - Catch your own exceptions inside the script and emit status="error" — never let the script raise.
 - Read files with relative paths (cwd is the workspace).
+- When the claim is about CODE STRUCTURE in a workflow script (imports,
+  function calls, class instantiations, assignments), parse the script
+  with the stdlib ``ast`` module instead of regex or substring search.
+  Variable names are not load-bearing — never hard-code identifiers like
+  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
+  (``ast.Call.func``: e.g. node is a ``Name`` with id
+  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
+  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
+  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
+  source code is brittle to whitespace, quote style, line breaks, and
+  renames; reserve ``re`` for unstructured text (logs, READMEs).
+  When scanning for "cheating fallbacks", check only the EXECUTED path:
+  a ``try`` body whose ``except`` handler catches ``ImportError`` /
+  ``ModuleNotFoundError`` is a fallback branch. Test the corresponding
+  import in the ``try`` body with ``importlib.util.find_spec``; if it
+  resolves at verification time, treat the ``except`` body as dead code
+  and ignore its contents. The reverse holds when the import is
+  unavailable.
+- For claims that an output FILE or PATH exists (e.g. "the predictions
+  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
+  the primary check is ``pathlib.Path(target).exists()`` evaluated in
+  the workspace cwd. If the file is there and parseable, that alone is
+  sufficient to emit ``status="pass"``. Do NOT additionally require the
+  source script to contain the literal path string — quote style,
+  ``os.path.join`` splits, and variable substitution will hide it.
+  Inspect source code only when the file is ABSENT and you need to
+  attribute the failure.
+- Some claims are conditional ("if X happens, Y must hold" / "no
+  fallback to Z used instead of W"). Detect the antecedent first. If
+  it is FALSE — the guarded path is not present in the workspace —
+  emit ``status="pass"`` with ``details="vacuously satisfied:
+  <antecedent> not present"``. Do not search unrelated regions of the
+  script for the consequent's keywords.
 - AVAILABLE IMPORTS: {packages}. Do NOT introduce any other third-party imports.
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
 
