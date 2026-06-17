@@ -72,9 +72,7 @@ class Config:
         self.max_learning_evolve_iterations = 20
 
         # QD novelty + length penalty (open-ended modes)
-        # novelty_comparison: "archive_knn" (default) compares against the
-        # k-NN archive; "previous_n" compares only against the last N
-        # produced genotypes (lighter-weight, no archive memory).
+        #  "archive_knn" (default) or "k-NN archive"
         self.novelty_comparison: str = "archive_knn"
         self.novelty_previous_n: int = 5
         # Length penalty: genotype size at which the penalty starts to
