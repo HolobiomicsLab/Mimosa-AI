@@ -378,7 +378,7 @@ async def test_workflow_orchestrator():
     evolution_prommt = '''
 put here evolution prompt to test
 '''
-    goal = "Given the target structure of acetylcholinesterase, design a 5-amino-acid peptide sequence that would act as an irreversible inhibitor. Provide the sequence and predicted binding affinity."
+    goal = "..."
     from config import Config
     config = Config()
     orch = WorkflowOrchestrator(config)
