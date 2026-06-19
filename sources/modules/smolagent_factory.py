@@ -64,7 +64,7 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools=[],
                  temperature=0.7,
-                 max_steps=64,
+                 max_steps=128,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt

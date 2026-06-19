@@ -48,7 +48,7 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/moonshotai/kimi-k2.7-code"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
         self.judge_model = "openrouter/qwen/qwen3.7-max"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
@@ -77,7 +77,7 @@ class Config:
         self.novelty_previous_n: int = 5
         # Length penalty: genotype size at which the penalty starts to
         # grow; lambda is small so it only breaks near-ties.
-        self.length_penalty_baseline_chars: int = 7000
+        self.length_penalty_baseline_chars: int = 8000
         self.length_penalty_lambda: float = 0.05
 
         # evaluation concurrency settings
