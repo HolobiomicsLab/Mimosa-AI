@@ -373,8 +373,7 @@ WORKFLOW LANGUAGE (heuristic from file extensions): {language}
 - When ``r``: the workflow scripts are R; do NOT parse them with ``ast``.
   Verify against on-disk artefacts; if a deterministic check on artefacts is
   not possible for a code-structure claim, return ``executable=false``.
-- When ``mixed`` or ``unknown``: scope code-structure checks to the
-  file extension that matches the claim's target.
+- When ``mixed`` or ``unknown``: return ``executable=false``; the verifier cannot assume parsing strategy.
 
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 {previews}

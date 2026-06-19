@@ -42,8 +42,8 @@ from sources.core.evaluators.grounding import get_perspicacite_grounding
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
-_VERIFIER_MAX_CLAIMS = 90
-_VERIFIER_MIN_CLAIMS = 30
+_VERIFIER_MAX_CLAIMS = 100
+_VERIFIER_MIN_CLAIMS = 10
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 _VERIFIER_GEN_PARALLELISM = 16
 # Per-claim verifier execution fan-out. Capped low because executable verifier

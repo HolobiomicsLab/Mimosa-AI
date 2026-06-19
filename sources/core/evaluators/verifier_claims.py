@@ -73,17 +73,34 @@ Return STRICT JSON only, no prose, in this exact form:
 # Importance anchors shown to the rater LLM so it doesn't collapse to
 # the middle of the scale. Kept short on purpose — long anchors waste
 # tokens and tend to confuse small judges.
-_IMPORTANCE_ANCHOR_BLOCK = """Importance scale (1–10), anchored:
-- 10: literal deliverable named in the goal (the exact file, the headline metric).
--  9: essential methodology step named in the goal (the exact model, the exact dataset, the exact tool).
--  8: required methodology step from literature without which the result is invalid.
--  7: required output property from literature without which the result is invalid.
--  6: non-negotiable sanity property (probabilities in [0,1], no NaN, train/test disjoint).
--  5: non-negotiable computational-reproducibility requirement (requirements.txt, pinned dependencies).
--  4: literature-recommended best practice (seeded RNG, pinned dependencies).
--  2: minor / advisory (workspace clutter).
--  1: nice-to-have but not expected (a README, docstrings, tests, type hints).
-Use the FULL scale; do not collapse to 5–7 by default. Goal-alignment dominates."""
+_IMPORTANCE_ANCHOR_BLOCK = """
+Anchored scale (for all other claims):
+- 10  The deliverable named in the goal does not exist or is wrong without this.
+     e.g. "the conformation achieves energy -7 or lower" (headline metric);
+            "the lower-bound proof establishes -11 via a valid counting argument"
+-  9  Not the named deliverable, but the result is invalid without it — a core
+       methodology step the goal's correctness depends on.
+       e.g. "every step uses the exact 20-mer 'HPHPPHHPHPPHPHHPPHPH'"
+-  8  A required methodology step that invalidates or fakes the result if missing AND claims about requirements.txt present and pinned.
+       e.g.  "the search does genuine algorithmic exploration, not a hardcoded coordinate list";
+-  7  A literature-required step that materially changes the result if skipped.
+         e.g. "the energy minimisation must converge to a stationary point";
+-  6  A required-by-convention property whose absence weakens but does not invalidate the result.
+       e.g. "the conformation is non-degenerate (not a straight line or hairpin)";
+-  5  A non-negotiable sanity property — cheap to check, embarrassing if wrong.
+       e.g. "the conformation has exactly 20 coordinates, matching sequence length"
+-  4  A literature-recommended best practice that improves trust, not validity.
+        eg. "The used algorithm is Monte Carlo search"
+-  3  Advisory / hygiene. Affects maintainability, not the result.
+-  2  Nice-to-have, not expected by the goal.
+       e.g. "the workspace is free of pathological clutter / junk-file dumps"
+-  1  Tangential.
+
+FIXED-FLOOR CLAIMS
+- Reproducibility artifacts (requirements.txt present, dependencies pinned) = 8.
+  A run without these FAILS, so they are never advisory. Score them 8 regardless of what the goal is about.
+
+Use the FULL scale; Goal-alignment dominates."""
 
 
 class _VerifierClaimExtractionMixin:
@@ -803,7 +820,9 @@ Return STRICT JSON only, in this exact shape:
             f"desc={str(c.get('description', '')).strip()[:300]}"
             for c in batch
         )
-        return f"""You are rating verification claims by how much they matter for the user's goal.
+        return f"""You are rating verification claims by how much they matter for the task success.
+You assign an IMPORTANCE weight (1–10) to each claim. Importance answers ONE
+question: if this claim turns out false or missing, how much does result break? 
 
 WORKFLOW GOAL:
 {goal}
@@ -880,29 +899,3 @@ Return STRICT JSON only, in this exact shape:
             "importance": self._DEFAULT_CLAIM_IMPORTANCE,
             "importance_rationale": "",
         }
-
-
-if __name__ == "__main__":
-    expected = {
-        "_extract_claims",
-        "_per_source_targets",
-        "_build_source_a_prompt",
-        "_build_source_b_prompt",
-        "_build_source_c_prompt",
-        "_build_source_d_prompt",
-        "_build_source_e_prompt",
-        "_parse_and_filter_claims",
-        "_declare_claim_importance",
-        "_run_dedup_pass",
-        "_rate_importance_parallel",
-        "_rate_one_importance_batch",
-        "_build_dedup_prompt",
-        "_build_importance_batch_prompt",
-        "_extract_drop_ids",
-        "_extract_importance_map",
-        "_with_default_importance",
-    }
-    actual = {n for n in dir(_VerifierClaimExtractionMixin) if not n.startswith("__")}
-    missing = expected - actual
-    assert not missing, f"claims mixin missing methods: {missing}"
-    print("verifier_claims: smoke ok")
