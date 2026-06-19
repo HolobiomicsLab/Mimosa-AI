@@ -11,35 +11,9 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
-from sources.cli.pretty_print import (
-    GREEN,
-    YELLOW,
-    print_box,
-)
-
-from sources.core.evaluators.grounding import get_perspicacite_grounding
-
 # ----- File preview budgets ---------------------------------------------------
-_PREVIEW_HEAD_BYTES = 8 * 1024
-_PREVIEW_TAIL_BYTES = 2 * 1024
-_PREVIEW_PER_CLAIM_CAP = 24 * 1024
 _BINARY_SNIFF_BYTES = 4096
-
-# ----- Workspace preview filter -----------------------------------------------
-# Suffixes never previewed as text. Everything else is fed through
-# ``_preview_file`` which falls back to a magic-byte hex dump for binaries it
-# sniffs at read time.
-_PREVIEW_DENY_SUFFIXES = (
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp", ".ico",
-    ".pdf",
-    ".pkl", ".pickle", ".npy", ".npz", ".joblib", ".h5", ".hdf5",
-    ".bin", ".so", ".o", ".a", ".dll", ".dylib", ".exe",
-    ".pyc", ".pyo",
-    ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z",
-    ".db", ".sqlite", ".sqlite3",
-    ".mp3", ".mp4", ".wav", ".ogg", ".webm",
-)
-
+_MAX_WORKSPACE_LISTING_ENTRIES = 200
 
 class _VerifierWorkspaceMixin:
     """Workspace listing, file preview and grounding methods.
@@ -95,47 +69,6 @@ class _VerifierWorkspaceMixin:
                     truncated = True
         return "\n".join(entries) if entries else "(empty workspace)"
 
-    # ------------------------------------------------------------------
-    # Literature grounding (Perspicacite)
-    # ------------------------------------------------------------------
-
-    _GROUNDING_DISABLED = "(literature grounding disabled for this run)"
-    _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
-
-    def _get_grounding(self, uuid: str, execution_text: str, goal: str) -> str:
-        """One Perspicacite round-trip per uuid; cached + opt-out.
-
-        Args:
-            uuid: Workflow identifier used as the cache key.
-            execution_text: Agent narration / produced output text (unused but
-                kept for callers that may key on it).
-            goal: Workflow goal text submitted to the grounding service.
-
-        Returns:
-            Grounding text, the failure marker, or the disabled sentinel.
-        """
-        if not self.use_grounding:
-            return self._GROUNDING_DISABLED
-        if uuid in self._grounding_cache:
-            return self._grounding_cache[uuid]
-        try:
-            grounding = get_perspicacite_grounding(goal)
-        except Exception as e:
-            self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
-            grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"
-        self._grounding_cache[uuid] = grounding
-        is_usable = (
-            grounding
-            and self._GROUNDING_FAILED_MARKER not in grounding
-            and grounding != self._GROUNDING_DISABLED
-        )
-        print_box(
-            grounding,
-            title=f"Perspicacite grounding · {uuid}",
-            color=GREEN if is_usable else YELLOW,
-            truncate=2000,
-        )
-        return grounding
 
     # ------------------------------------------------------------------
     # File preview helpers
@@ -184,7 +117,7 @@ class _VerifierWorkspaceMixin:
         return out
 
     def _eligible_workspace_files(self) -> list[str]:
-        """Workspace files plausibly readable as text artefacts (sorted).
+        """Sort Workspace files by readability and path depth.
 
         Filters out compiled artefacts and obvious binaries by suffix; the
         deeper magic-byte check inside ``_preview_file`` still catches
@@ -196,34 +129,39 @@ class _VerifierWorkspaceMixin:
         out: list[str] = []
         for f in self._workspace_files:
             lower = f.lower()
-            if lower.endswith(_PREVIEW_DENY_SUFFIXES):
-                continue
             if any(p in lower for p in ("/__pycache__/", "/.git/", "/.venv/")):
                 continue
             out.append(f)
-        return sorted(out)
+        eligibilityness = lambda rp: self._eligibility_score(rp)
+        return sorted(out, key=eligibilityness, reverse=True)[:_MAX_WORKSPACE_LISTING_ENTRIES]
+
+    def _eligibility_score(self, rel_path: str) -> float:
+        return (
+            self._non_binaryness(self.workspace_dir / rel_path)
+            - 0.05 * rel_path.count("/")
+        )
 
     @staticmethod
-    def _looks_binary(sample: bytes) -> bool:
-        """Heuristic: NUL bytes or > 30% non-printables → treat as binary.
+    def _non_binaryness(path: Path) -> float:
+        """Return 0-1 score of how textual the sample is.
 
         Args:
-            sample: Leading byte sample read from a file.
-
+            path: Path to the file to sample.
         Returns:
-            True when the sample looks binary; False for plausibly textual data.
+            float in [0.0, 1.0] representing the fraction of bytes that are
         """
-        if not sample:
-            return False
-        if b"\x00" in sample:
-            return True
-        # Allow common whitespace + printable ASCII + UTF-8 high bytes.
+        try:
+            with open(path, "rb") as fh:
+                sample = fh.read(_BINARY_SNIFF_BYTES)
+        except OSError:
+            return 0.0
+        if not sample or b"\x00" in sample:
+            return 0.0
         printable = sum(
-            1
-            for b in sample
+            1 for b in sample
             if b in (9, 10, 13) or 32 <= b < 127 or b >= 0x80
         )
-        return printable / len(sample) < 0.7
+        return printable / len(sample)
 
     def _preview_file(self, rel_path: str) -> str:
         """Cached LLM-friendly preview: text head+tail, binary magic bytes, fenced.
@@ -277,16 +215,6 @@ class _VerifierWorkspaceMixin:
             self._preview_cache[rel_path] = rendered
             return rendered
 
-        sample = head_bytes[:_BINARY_SNIFF_BYTES]
-        if self._looks_binary(sample):
-            magic = head_bytes[:16].hex(" ")
-            rendered = (
-                f"=== {rel_path} ({size} bytes, binary) ===\n"
-                f"first 16 bytes (hex): {magic}\n"
-            )
-            self._preview_cache[rel_path] = rendered
-            return rendered
-
         try:
             head_text = head_bytes[: self.preview_head_bytes].decode("utf-8", errors="replace")
             tail_text = tail_bytes.decode("utf-8", errors="replace") if tail_bytes else ""
@@ -336,17 +264,15 @@ class _VerifierWorkspaceMixin:
 
 
 if __name__ == "__main__":
-    # Smoke check: the mixin must import + define the expected method set.
-    expected = {
-        "_list_workspace",
-        "_get_grounding",
-        "_validate_workspace_paths",
-        "_eligible_workspace_files",
-        "_looks_binary",
-        "_preview_file",
-        "_render_relevant_previews",
-    }
-    actual = {n for n in dir(_VerifierWorkspaceMixin) if not n.startswith("__")}
-    missing = expected - actual
-    assert not missing, f"workspace mixin missing methods: {missing}"
-    print("verifier_workspace: smoke ok")
+    # Quick sanity check of the workspace listing and preview methods.
+    from sources.core.evaluators.verifier import VerifierEvaluator
+    from config import Config
+
+    ws = Path(".").resolve()
+    conf = Config()
+    v = VerifierEvaluator(conf, workspace_dir=ws, use_grounding=False)
+    ws_listing = v._list_workspace(max_entries=100)
+    eligible = v._eligible_workspace_files()
+    print(f"Eligible workspace files ({len(eligible)}):")
+    print(eligible[:24])
+    print(eligible[-24:])

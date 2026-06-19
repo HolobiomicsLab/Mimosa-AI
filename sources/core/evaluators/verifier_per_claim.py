@@ -180,7 +180,7 @@ class _VerifierPerClaimMixin:
         if preloaded_spec is not None:
             return claim
         rel_files = self._llm_select_files(
-            uuid, claim, execution_text, workspace_listing
+            uuid, claim, execution_text
         )
         return {**claim, "likely_relevant_files": rel_files}
 
@@ -285,15 +285,17 @@ class _VerifierPerClaimMixin:
         uuid: str,
         claim: dict[str, Any],
         execution_text: str,
-        workspace_listing: str,
         max_files: int = 3,
     ) -> list[str]:
         """Pick workspace files most likely to hold this claim's artefact."""
         eligible = self._eligible_workspace_files()
         if not eligible:
             return []
+        eligible_str = "\n".join(
+            f"{f}\t{(self.workspace_dir / f).stat().st_size}B" for f in eligible
+        )
         prompt = self._build_select_files_prompt(
-            claim, execution_text, workspace_listing, max_files
+            claim, execution_text, eligible_str, max_files
         )
         cid = str(claim.get("id", "unknown"))
         parsed, err = self._call_judge_for_json(
@@ -509,7 +511,7 @@ Return STRICT JSON only, in one of these two shapes:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Pick relevant files then generate one claim's verifier spec."""
         rel_files = self._llm_select_files(
-            uuid, claim, execution_text, workspace_listing
+            uuid, claim, execution_text
         )
         updated = {**claim, "likely_relevant_files": rel_files}
         spec = self._generate_verifier(uuid, updated, execution_text, workspace_listing)

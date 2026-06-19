@@ -6,17 +6,9 @@ mechanical steps — extracting claims, generating and running per-claim
 scripts, listing the workspace, rendering file previews — live in sibling
 modules and are mixed in:
 
-* :mod:`.verifier_claims` — claim extraction (six sources) + importance rating.
-* :mod:`.verifier_per_claim` — verifier-script generation, sandbox execution,
-  pass/fail/error scoring.
-* :mod:`.verifier_workspace` — workspace listing, file previews, literature
-  grounding cache.
-
-What stays here is what makes the verifier ``the verifier`` rather than a
-generic LLM judge: the orchestration in :meth:`evaluate`, the
-importance-weighted aggregation, the on-disk evaluation report, the prompt
-gradient handed back to the mutator, and the lineage rubric reuse that lets
-descendants score against an ancestor's claim set for stable QD ranking.
+* .verifier_claims — claim extraction (six sources) + importance rating.
+* .verifier_per_claim — verifier-script generation, sandbox execution,pass/fail/error scoring.
+* .verifier_workspace — workspace listing, file previews, literature grounding cache.
 """
 
 import json
@@ -46,6 +38,7 @@ from .base import (
 from .verifier_claims import _VerifierClaimExtractionMixin
 from .verifier_per_claim import _VerifierPerClaimMixin
 from .verifier_workspace import _VerifierWorkspaceMixin
+from sources.core.evaluators.grounding import get_perspicacite_grounding
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
@@ -55,8 +48,7 @@ _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 _VERIFIER_GEN_PARALLELISM = 16
 # Per-claim verifier execution fan-out. Capped low because executable verifier
 # scripts can be CPU-bound (numpy/pandas on full artefacts); higher concurrency
-# starves rather than helps. Threading is enough because the slow path is
-# subprocess I/O via WorkflowRunner.
+# starves rather than helps. 
 _VERIFIER_EXEC_PARALLELISM = 4
 
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
@@ -72,13 +64,7 @@ class VerifierEvaluator(
     _VerifierPerClaimMixin,
     _VerifierWorkspaceMixin,
 ):
-    """Per-claim verifier-based evaluator.
-
-    The class itself owns the orchestration pipeline; the mechanical steps
-    are inherited from the three sibling mixins. ``BaseEvaluator`` supplies
-    the LLM judge call helpers (``_call_judge``, ``_call_judge_for_json``,
-    ``_get_judge_system_prompt``) that every stage uses.
-    """
+    """Per-claim verifier-based evaluator."""
 
     _DEFAULT_CLAIM_IMPORTANCE = 5
     _GRADIENT_MIN_IMPORTANCE = 3
@@ -174,20 +160,15 @@ class VerifierEvaluator(
         Returns:
             Short code-tagged single-sentence diagnosis usable by the mutator.
         """
-        history = "\n".join(self._textual_gradient_history[-5:])
         prompt = f"""
-        You convert the judge's report into per claim short, directional diagnosis that steers the
-        next mutation.
+        You convert the verifiers's report into per claim short, directional diagnosis.
 
         GROUND TRUTH AND TRUST ORDER (critical):
         - The verifier's deterministic checks are ground truth.
-        - The agent execution narration below is UNTRUSTED. Agents may declare success
-          while producing degenerate output. Use agent execution only to explain why and what failure happened, never as
-          evidence that the task succeeded.
-          Do not mention a failure if it was clearly corrected by agent downstream and verifier report confirm the correction
+        - The agent execution narration below is UNTRUSTED. Agents may declare success while producing degenerate output.
+        - Agent execution can however be used to explain why and what failure happened, but never as evidence that the task succeeded.
             Example: error regarding module X reported fixed and verification confirm proper behavior regarding module X).
-        - Claim programs that crashed (tracebacks, NameError, serialization errors) are verifier
-          measurement failures. Do not report them.
+        - Do not mention an agent reported failure unless it is confirmed by the verifier.
         - Sort diagnosis by importance: a failure in a high-importance claim is more actionable than a failure in a low-importance claim.
 
         Here is the agents execution text (agent narration and produced output):
@@ -208,6 +189,41 @@ class VerifierEvaluator(
         )
         self._textual_gradient_history.append(diag)
         return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
+
+    # ------------------------------------------------------------------
+    # Literature grounding (Perspicacite)
+    # ------------------------------------------------------------------
+
+    _GROUNDING_DISABLED = "(literature grounding disabled for this run)"
+    _GROUNDING_FAILED_MARKER = "Perspicacite query failed"
+
+    def _get_grounding(self, uuid: str, execution_text: str, goal: str) -> str:
+        """One Perspicacite round-trip per uuid; cached + opt-out.
+
+        Args:
+            uuid: Workflow identifier used as the cache key.
+            execution_text: Agent narration / produced output text (unused but
+                kept for callers that may key on it).
+            goal: Workflow goal text submitted to the grounding service.
+
+        Returns:
+            Grounding text, the failure marker, or the disabled sentinel.
+        """
+        if not self.use_grounding:
+            return self._GROUNDING_DISABLED
+        if uuid in self._grounding_cache:
+            return self._grounding_cache[uuid]
+        try:
+            grounding = get_perspicacite_grounding(goal)
+        except Exception as e:
+            self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
+            grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"
+        self._grounding_cache[uuid] = grounding
+        print_box(
+            grounding,
+            title=f"Perspicacite grounding · {uuid}", color=GREEN, truncate=2048,
+        )
+        return grounding
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -260,9 +276,6 @@ class VerifierEvaluator(
         phase_timings.append(("setup (exec text + workspace listing)", time.time() - t))
         print_ok(f"[verifier {uuid}] setup done in {phase_timings[-1][1]:.1f}s")
 
-        # Use explicit empty-run marker rather than the brittle ``success`` flag
-        # — ``success`` is ``not "[]" in json.dumps(answers)``, which mis-fires
-        # whenever an answer payload contains a (possibly nested) empty list.
         is_truly_empty = (
             not execution_text or _EMPTY_RUN_MARKER in execution_text
         )
