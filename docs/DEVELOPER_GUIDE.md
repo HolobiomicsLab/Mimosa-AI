@@ -471,17 +471,14 @@ For each generation:
    pre-installed (lazy one-shot install per process). Soft claims get a
    `pass/unsure/fail` LLM verdict against workspace previews + literature
    grounding (mapped to `1.0 / 0.5 / 0.0`).
-3. **Independent cheat detector**: present in the codebase but currently
-   **disabled** pending a rewrite. The aggregation path still has a slot
-   for `cheat_penalty`. Behavioral anti-cheat pressure today comes from
-   Source C's recompute-from-disk verifiers, the inverted-score "Used
-   fallback" claim type, and the anti-tautology tripwires.
+3. **Behavioral pressure against shortcut workflows** comes from Source
+   C's recompute-from-disk verifiers, the inverted-score "Used fallback"
+   claim type, and the anti-tautology tripwires.
 4. **Aggregation**:
    ```
    overall = clamp(base_mean + info_bonus, 0, 1)
    if any hard claim refuted:
        overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
-   overall = max(0, overall - cheat_penalty)  # cheat_penalty = 0.0 today
    ```
    where `info_bonus(n_hard_pass) = 0.05 · (1 - exp(-n_hard_pass / 8))`
    (saturating reward for thoroughness).
