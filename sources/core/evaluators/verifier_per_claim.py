@@ -69,7 +69,7 @@ _STDERR_TAIL_BYTES = 400
 
 VERIFIER_PROMPT_RULES = """
 - Print EXACTLY ONE JSON line to stdout, structured as:
-  {{"claim_id": "<id>", "status": "pass" | "fail" | "error",
+  {{"claim_id": "<id>", "status": "pass" | "fail",
     "actual": <observed value or null>, "details": "<short string>"}}
 - Read files with relative paths
   (cwd is the workspace).
@@ -86,8 +86,7 @@ VERIFIER_PROMPT_RULES = """
   sentinel/masked values are present in either operand, emit
   ``status="fail"`` with a details string naming the sentinel — the
   check is unsound, not satisfied.
-- Catch your own exceptions and emit status="error" with the error message in
-  details — never let the script raise.
+- Catch your own exceptions and raise with the error message details
 - Parse the relevant files according to the format visible in the PREVIEWS
   above. Do not invent a different format. If the previews include a header
   line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
@@ -152,8 +151,8 @@ You can use library from the standard library and the available imports.
 RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
-  {{"claim_id": "<id>", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
-- Catch your own exceptions inside the script and emit status="error" — never let the script raise.
+  {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
+- Catch your own exceptions and raise with the error message details
 - Read files with relative paths (cwd is the workspace).
 - Guard against vacuous comparisons. When a property reduces to a
   comparison of order statistics across two groups (e.g. "all of A >

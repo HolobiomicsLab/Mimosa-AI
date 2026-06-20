@@ -49,7 +49,7 @@ class Config:
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
-        self.judge_model = "openrouter/qwen/qwen3.7-max"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
@@ -81,7 +81,7 @@ class Config:
         self.length_penalty_lambda: float = 0.05
 
         # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 2  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"

@@ -1010,4 +1010,4 @@ if __name__ == "__main__":
     from config import Config
     config = Config()
     verifier = VerifierEvaluator(config, config.workspace_dir)
-    verifier.evaluate("20260528_090358_ff330fde")
+    verifier.evaluate("20260619_104434_4261183e")
