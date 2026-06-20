@@ -86,7 +86,7 @@ VERIFIER_PROMPT_RULES = """
   sentinel/masked values are present in either operand, emit
   ``status="fail"`` with a details string naming the sentinel — the
   check is unsound, not satisfied.
-- Catch your own exceptions and raise with the error message details
+- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 - Parse the relevant files according to the format visible in the PREVIEWS
   above. Do not invent a different format. If the previews include a header
   line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
@@ -152,7 +152,7 @@ RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- Catch your own exceptions and raise with the error message details
+- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 - Read files with relative paths (cwd is the workspace).
 - Guard against vacuous comparisons. When a property reduces to a
   comparison of order statistics across two groups (e.g. "all of A >

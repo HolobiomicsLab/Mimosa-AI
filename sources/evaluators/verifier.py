@@ -38,7 +38,7 @@ from .base import (
 from .verifier_claims import _VerifierClaimExtractionMixin
 from .verifier_per_claim import _VerifierPerClaimMixin
 from .verifier_workspace import _VerifierWorkspaceMixin
-from sources.core.evaluators.grounding import get_perspicacite_grounding
+from sources.evaluators.grounding import get_perspicacite_grounding
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180

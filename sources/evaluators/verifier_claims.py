@@ -27,8 +27,8 @@ from sources.cli.pretty_print import (
     print_ok,
     print_warn,
 )
-from sources.core.evaluators.base import LLMEvaluationError
-from sources.core.evaluators.verifier_claim_sources import ClaimContext, SOURCES
+from sources.evaluators.base import LLMEvaluationError
+from sources.evaluators.verifier_claim_sources import ClaimContext, SOURCES
 
 
 # Importance anchors shown to the rater LLM so it doesn't collapse to

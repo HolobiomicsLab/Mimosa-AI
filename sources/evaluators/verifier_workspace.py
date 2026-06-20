@@ -248,7 +248,7 @@ class _VerifierWorkspaceMixin:
 
 if __name__ == "__main__":
     # Quick sanity check of the workspace listing and preview methods.
-    from sources.core.evaluators.verifier import VerifierEvaluator
+    from sources.evaluators.verifier import VerifierEvaluator
     from config import Config
 
     ws = Path(".").resolve()

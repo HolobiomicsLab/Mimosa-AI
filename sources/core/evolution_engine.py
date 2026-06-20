@@ -25,7 +25,7 @@ from sources.cli.pretty_print import (
     print_summary,
     print_warn,
 )
-from sources.core.evaluators.evaluator import WorkflowEvaluator
+from sources.evaluators.evaluator import WorkflowEvaluator
 from sources.evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
