@@ -165,16 +165,7 @@ class WorkflowInfo:
 
     @property
     def abstracted_textual_gradient(self) -> str:
-        """Behavioral textual_gradient written by the verifier abstractor (Layer 1).
-
-        This is the ONLY evaluation signal the mutator should see; raw
-        ``judge_evaluation`` leaks rubric mechanism into the mutation prompt
-        and causes the workflow to learn the judge's epistemology instead of
-        the task. Resolution order: ``state_result.evaluation.verifier
-        .abstracted_textual_gradient`` → sidecar ``textual_gradient.txt`` → empty string
-        (callers must handle the empty case rather than fall through to the
-        raw evaluation log).
-        """
+        """Behavioral textual_gradient written by the verifier abstractor (Layer 1)."""
         state = self.load_state_result()
         if isinstance(state, dict):
             verifier = (state.get("evaluation") or {}).get("verifier") or {}
