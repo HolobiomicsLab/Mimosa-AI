@@ -263,23 +263,10 @@ class VerifierEvaluator(
         print_ok(f"[verifier {uuid}] grounding fetch done in {phase_timings[-1][1]:.1f}s")
 
         t = time.time()
-        anchored_records = (
-            self._load_anchored_claims(rubric_anchor_uuid)
-            if rubric_anchor_uuid
-            else None
+        claims, spec_reuse_records = self._resolve_anchored_claims(
+            uuid, rubric_anchor_uuid, execution_text, workspace_listing
         )
-        if anchored_records:
-            claims = self._claims_from_anchor(anchored_records)
-            self.logger.info(
-                f"Reusing rubric anchor {rubric_anchor_uuid} for {uuid}: "
-                f"{len(claims)} cached claims"
-            )
-        else:
-            if rubric_anchor_uuid:
-                self.logger.warning(
-                    f"rubric_anchor_uuid={rubric_anchor_uuid} has no readable "
-                    f"cache; falling back to LLM claim extraction"
-                )
+        if not claims:
             is_truly_empty = not execution_text or _EMPTY_RUN_MARKER in execution_text
             claims = self._extract_claims(
                 uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
@@ -298,7 +285,7 @@ class VerifierEvaluator(
         self._ensure_verifier_packages()
         claims_to_verify = claims[: self.max_claims]
         anchor_preloaded, needs_generation = self._partition_specs_by_anchor(
-            claims_to_verify, anchored_records, rubric_anchor_uuid
+            claims_to_verify, spec_reuse_records, rubric_anchor_uuid
         )
 
         st = time.time()
@@ -612,14 +599,28 @@ class VerifierEvaluator(
             claims: Raw claim list as returned by ``_extract_claims``.
             per_claim: Scored claim list; supplies the per-claim verifier spec.
         """
-        spec_by_id = {
-            (c.get("claim") or {}).get("id"): (c.get("spec") or {})
+        # Only `likely_relevant_files` is sourced from per_claim — `_llm_select_files`
+        # can shift the list away from the extraction's, and the cached script
+        # opens the post-selection set. Description/importance/rationale stay on
+        # the original claim so descendants still see the rater's metadata even
+        # when a per_claim stub omits it (tests do this).
+        per_claim_by_id = {
+            (c.get("claim") or {}).get("id"): c
             for c in per_claim
         }
-        rubric = [
-            self._rubric_record(c, spec_by_id.get(c.get("id")) or {})
-            for c in claims
-        ]
+        rubric: list[dict[str, Any]] = []
+        for c in claims:
+            entry = per_claim_by_id.get(c.get("id"))
+            if entry is None:
+                rubric.append(self._rubric_record(c, {}))
+                continue
+            updated_files = (entry.get("claim") or {}).get("likely_relevant_files")
+            persist_claim = (
+                {**c, "likely_relevant_files": updated_files}
+                if updated_files is not None
+                else c
+            )
+            rubric.append(self._rubric_record(persist_claim, entry.get("spec") or {}))
         payload = {"anchor_uuid": uuid, "claims": rubric}
         path = self._claims_cache_path(uuid)
         try:
@@ -773,6 +774,225 @@ class VerifierEvaluator(
             }
             for c in anchored
         ]
+
+    # ------------------------------------------------------------------
+    # Anchor freshness — drop or adapt claims whose cached files are gone
+    # ------------------------------------------------------------------
+
+    _STALE_ANCHOR_REASON = "regenerated from stale anchor; original files absent"
+
+    def _resolve_anchored_claims(
+        self,
+        uuid: str,
+        rubric_anchor_uuid: str | None,
+        execution_text: str,
+        workspace_listing: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | None]:
+        """Load the ancestor's rubric and refresh it against the current workspace.
+
+        Returns ``([], None)`` to signal the caller should fall back to LLM
+        claim extraction: either no anchor was specified, the cache was
+        unreadable, or every cached claim was dropped because its files are
+        missing and regeneration failed. The second return value is the
+        subset of records whose cached ``verify_<id>.py`` is still safe to
+        reuse — anything regenerated has new file targets that the cached
+        script does not know about.
+
+        Args:
+            uuid: Workflow identifier (used for the regen judge calls).
+            rubric_anchor_uuid: Ancestor whose rubric should be reused.
+            execution_text: Agent narration; helps the regen LLM name new files.
+            workspace_listing: Current workspace listing (one entry per line).
+
+        Returns:
+            ``(claims, spec_reuse_records)`` — projected claim list and the
+            records whose cached script may be reused as-is.
+        """
+        if not rubric_anchor_uuid:
+            return [], None
+        anchored_records = self._load_anchored_claims(rubric_anchor_uuid)
+        if not anchored_records:
+            self.logger.warning(
+                f"rubric_anchor_uuid={rubric_anchor_uuid} has no readable "
+                f"cache; falling back to LLM claim extraction"
+            )
+            return [], None
+        fresh, stale = self._partition_anchored_by_file_presence(anchored_records)
+        regenerated = self._regenerate_stale_anchor_claims(
+            uuid, stale, execution_text, workspace_listing
+        )
+        merged = fresh + regenerated
+        if not merged:
+            self.logger.warning(
+                f"rubric_anchor_uuid={rubric_anchor_uuid}: all "
+                f"{len(anchored_records)} cached claims dropped (files missing, "
+                f"regen failed); falling back to LLM claim extraction"
+            )
+            return [], None
+        dropped = len(stale) - len(regenerated)
+        self.logger.info(
+            f"Reusing rubric anchor {rubric_anchor_uuid} for {uuid}: "
+            f"{len(fresh)} fresh / {len(regenerated)} regenerated / "
+            f"{dropped} dropped (total {len(merged)} cached claims)"
+        )
+        return self._claims_from_anchor(merged), fresh
+
+    def _partition_anchored_by_file_presence(
+        self,
+        anchored_records: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Split anchored claims by whether their cached files still exist.
+
+        A record is fresh when every entry in its cached
+        ``likely_relevant_files`` is present in the current workspace, or when
+        the list is empty (nothing to invalidate). Stale records reference at
+        least one file the descendant workflow no longer produced; reusing
+        their cached verifier script would hit a missing path. Accuracy here
+        relies on ``_persist_claims`` storing the POST-selection file list
+        (the paths the cached script actually opens) — the
+        ``_llm_select_files`` step is the source of truth on what the script
+        targets.
+
+        Args:
+            anchored_records: Rubric entries as returned by ``_load_anchored_claims``.
+
+        Returns:
+            ``(fresh, stale)`` partition, input order preserved in both lists.
+        """
+        fresh: list[dict[str, Any]] = []
+        stale: list[dict[str, Any]] = []
+        workspace_files = self._workspace_files
+        for rec in anchored_records:
+            rel_files = rec.get("likely_relevant_files") or []
+            if not rel_files or all(rp in workspace_files for rp in rel_files):
+                fresh.append(rec)
+            else:
+                stale.append(rec)
+        return fresh, stale
+
+    def _regenerate_stale_anchor_claims(
+        self,
+        uuid: str,
+        stale_records: list[dict[str, Any]],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> list[dict[str, Any]]:
+        """Adapt stale anchored claims to the current workspace.
+
+        Each stale record is regenerated by a judge call seeded with the
+        original claim. Importance and rationale carry over verbatim — only
+        ``description`` and ``likely_relevant_files`` are refreshed so the
+        downstream spec generator can target files that actually exist.
+        Calls fan out across ``self.gen_parallelism`` threads.
+
+        Args:
+            uuid: Workflow identifier (used for the judge call).
+            stale_records: Anchored records whose cached files no longer exist.
+            execution_text: Agent narration; helps the LLM name new artefacts.
+            workspace_listing: Rendered listing of files in the current workspace.
+
+        Returns:
+            Regenerated rubric records in the cached-record shape. Records
+            whose regeneration failed are dropped — a stale reference is
+            worse than no claim.
+        """
+        if not stale_records:
+            return []
+        workers = max(1, min(len(stale_records), self.gen_parallelism))
+        regenerated: list[dict[str, Any] | None] = [None] * len(stale_records)
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {
+                ex.submit(
+                    self._regenerate_one_stale_claim,
+                    uuid, rec, execution_text, workspace_listing,
+                ): idx
+                for idx, rec in enumerate(stale_records)
+            }
+            for f in as_completed(futures):
+                idx = futures[f]
+                regenerated[idx] = f.result()
+        return [r for r in regenerated if r is not None]
+
+    def _regenerate_one_stale_claim(
+        self,
+        uuid: str,
+        rec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> dict[str, Any] | None:
+        """Single-claim regeneration; ``None`` signals the claim should be dropped."""
+        cid = str(rec.get("id") or "")
+        prompt = self._build_anchor_regen_prompt(rec, execution_text, workspace_listing)
+        data, err = self._call_judge_for_json(
+            uuid, f"verifier_regen_anchored_{cid}", prompt
+        )
+        if err is not None or not isinstance(data, dict):
+            self.logger.warning(
+                f"anchor regeneration failed for {cid}: "
+                f"{err or 'non-dict JSON'}; dropping claim"
+            )
+            return None
+        description = str(data.get("description") or rec.get("description") or "").strip()
+        new_files = self._validate_workspace_paths(
+            data.get("likely_relevant_files") or [],
+            allowed=self._workspace_files or None,
+            label=cid,
+        )
+        # Drop the cached executable script: its paths point at files that
+        # are gone. The spec generator will write a fresh script targeting
+        # the new likely_relevant_files (or fall back to a soft check when
+        # the list is empty).
+        return {
+            **rec,
+            "description": description,
+            "likely_relevant_files": new_files,
+            "executable": False,
+            "reason": self._STALE_ANCHOR_REASON,
+        }
+
+    def _build_anchor_regen_prompt(
+        self,
+        rec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+    ) -> str:
+        """Build the prompt asking the judge to adapt one stale anchored claim."""
+        missing = [
+            rp for rp in (rec.get("likely_relevant_files") or [])
+            if rp not in self._workspace_files
+        ]
+        importance = rec.get("importance", self._DEFAULT_CLAIM_IMPORTANCE)
+        rationale = str(rec.get("importance_rationale") or "")
+        return f"""You are adapting a verification claim from an ancestor workflow whose file layout has changed.
+The original claim referenced files that NO LONGER EXIST in the current workspace. Keep the
+checked property identical (same idea, same importance); only the file references should move.
+
+ORIGINAL CLAIM (from the ancestor's cached rubric):
+- id:                    {rec.get('id')}
+- importance:            {importance} (1-10; 10 = literal deliverable)
+- importance_rationale:  {rationale}
+- description:           {rec.get('description', '')}
+- previously referenced: {rec.get('likely_relevant_files') or []}
+- missing in current:    {missing}
+
+CURRENT WORKSPACE FILES (name<TAB>size, relative to workspace root):
+{workspace_listing}
+
+AGENT NARRATION (what the current run reported producing — may name the new files):
+{execution_text}
+
+TASK:
+1. Keep the same checked property — do not rewrite the claim into a different check.
+2. Reuse the original id verbatim (rubric lineage depends on it).
+3. Update the description ONLY if the new file naming/layout makes the old wording wrong.
+4. Pick up to 3 paths from the CURRENT WORKSPACE FILES listing whose contents let a
+   deterministic verifier check this claim today. Never invent paths.
+5. If no workspace file plausibly holds the artefact this claim was about, return an
+   empty list — the verifier will fall back to a soft check rather than run a stale script.
+
+Return STRICT JSON only:
+  {{"id": "<verbatim original id>", "description": "<adapted description>", "likely_relevant_files": ["<rel/path>", ...]}}
+"""
 
     # ------------------------------------------------------------------
     # Stage 5 — importance-weighted aggregation

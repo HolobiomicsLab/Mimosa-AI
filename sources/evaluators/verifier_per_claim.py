@@ -94,6 +94,12 @@ VERIFIER_PROMPT_RULES = """
   or on the attribute path. Walk with ``ast.walk(tree)``. 
 - Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs).
 - Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+- If a file the script needs to open to evaluate the claim is MISSING from the
+  workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
+  Do NOT emit ``status="fail"`` — a missing artefact means the property is
+  UNCHECKED, not refuted; the recovery flow regenerates the script when it
+  sees the error. (Exception: claims that explicitly check file existence —
+  for those, a missing file is the legitimate ``"fail"``.)
 
 What should not be done:
 - Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
@@ -115,7 +121,13 @@ RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+- If a file the script needs to open to evaluate the claim is MISSING from the
+  workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
+  Do NOT emit ``status="fail"`` — a missing artefact leaves the property
+  UNCHECKED, not refuted. (Exception: claims that explicitly check file
+  existence — for those, the file being absent IS the legitimate ``"fail"``;
+  see the rule below.)
 - Read files with relative paths (cwd is the workspace).
 - Guard against vacuous comparisons. When a property reduces to a
   comparison of order statistics across two groups (e.g. "all of A >

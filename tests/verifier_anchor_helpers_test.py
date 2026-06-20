@@ -227,8 +227,209 @@ def test_claims_from_anchor_drops_persistence_fields(tmp_path: Path) -> None:
     }]
 
 
+class _RegenStubVerifier(_StubVerifier):
+    """Stub that also stubs the LLM call used by anchor regeneration.
+
+    ``llm_responses`` is consumed in order, one tuple per ``_call_judge_for_json``
+    invocation. Each tuple is ``(parsed_json_or_None, err_or_None)`` mirroring
+    the production helper's return shape.
+    """
+
+    def __init__(
+        self,
+        tmp_root: Path,
+        workspace_files: list[str] | None = None,
+        llm_responses: list[tuple] | None = None,
+    ) -> None:
+        super().__init__(tmp_root)
+        self._workspace_files = set(workspace_files or [])
+        self._llm_responses = list(llm_responses or [])
+        self.gen_parallelism = 1  # serial so response order is deterministic
+
+    def _call_judge_for_json(self, uuid: str, agent_name: str, prompt: str):  # type: ignore[override]
+        if not self._llm_responses:
+            return None, "no stub response left"
+        return self._llm_responses.pop(0)
+
+
+def _stale_record(cid: str, files: list[str]) -> dict:
+    """One anchored record carrying the persistence fields the helpers expect."""
+    return {
+        "id": cid,
+        "description": f"claim about {cid}",
+        "importance": 7,
+        "importance_rationale": "load-bearing",
+        "source": "source_anchor",
+        "likely_relevant_files": files,
+        "executable": True,
+        "reason": "",
+    }
+
+
+def test_partition_by_file_presence_splits_fresh_vs_stale(tmp_path: Path) -> None:
+    """Records whose files are all present go fresh; any missing path is stale."""
+    v = _RegenStubVerifier(tmp_path, workspace_files=["keep.csv", "still_here.py"])
+    records = [
+        _stale_record("fresh_one", ["keep.csv"]),
+        _stale_record("stale_one", ["gone.csv"]),
+        _stale_record("partial_stale", ["keep.csv", "missing.json"]),
+        _stale_record("no_files", []),  # empty → nothing to invalidate
+    ]
+    fresh, stale = v._partition_anchored_by_file_presence(records)
+    assert [r["id"] for r in fresh] == ["fresh_one", "no_files"]
+    assert [r["id"] for r in stale] == ["stale_one", "partial_stale"]
+
+
+def test_persist_uses_post_selection_likely_relevant_files(tmp_path: Path) -> None:
+    """``_persist_claims`` must store the file list the script actually opens,
+    not the extraction's (the two diverge once ``_llm_select_files`` runs).
+    Without this, descendants see metadata that doesn't track the script's
+    real targets and the freshness check leaks stale anchors through.
+    """
+    v = _RegenStubVerifier(tmp_path)
+    # Original extraction picked "output.csv"; selection (post-_llm_select_files)
+    # ended up targeting "workflow.py" — that's what the per_claim entry carries.
+    original_claims = [{
+        "id": "runtime",
+        "description": "runtime under 100ms",
+        "importance": 8,
+        "importance_rationale": "deliverable target",
+        "source": "source_a",
+        "likely_relevant_files": ["output.csv"],
+    }]
+    per_claim = [{
+        "claim": {**original_claims[0], "likely_relevant_files": ["workflow.py"]},
+        "spec": {"executable": True, "code": "open('workflow.py')"},
+    }]
+    v._persist_claims("u1", original_claims, per_claim)
+    loaded = v._load_anchored_claims("u1")
+    assert loaded is not None
+    assert loaded[0]["likely_relevant_files"] == ["workflow.py"]
+
+
+def test_regenerate_one_stale_claim_returns_updated_record(tmp_path: Path) -> None:
+    """A successful judge call yields a record with new files + soft-spec markers."""
+    new_files = ["fresh_output.csv"]
+    v = _RegenStubVerifier(
+        tmp_path,
+        workspace_files=new_files,
+        llm_responses=[(
+            {"id": "c1", "description": "adapted", "likely_relevant_files": new_files},
+            None,
+        )],
+    )
+    rec = _stale_record("c1", ["gone.csv"])
+    regenerated = v._regenerate_one_stale_claim("u1", rec, "narration", "listing")
+    assert regenerated is not None
+    assert regenerated["id"] == "c1"
+    assert regenerated["importance"] == 7  # carried over from the original
+    assert regenerated["importance_rationale"] == "load-bearing"
+    assert regenerated["description"] == "adapted"
+    assert regenerated["likely_relevant_files"] == new_files
+    # Cached script's hard-coded paths are wrong → force soft fallback.
+    assert regenerated["executable"] is False
+    assert "stale anchor" in regenerated["reason"]
+
+
+def test_regenerate_one_stale_claim_drops_confabulated_paths(tmp_path: Path) -> None:
+    """Paths the LLM invents that aren't in the workspace are filtered out."""
+    v = _RegenStubVerifier(
+        tmp_path,
+        workspace_files=["real.csv"],
+        llm_responses=[(
+            {"id": "c2", "description": "x", "likely_relevant_files": ["real.csv", "made_up.csv"]},
+            None,
+        )],
+    )
+    regenerated = v._regenerate_one_stale_claim(
+        "u1", _stale_record("c2", ["gone.csv"]), "narration", "listing"
+    )
+    assert regenerated is not None
+    assert regenerated["likely_relevant_files"] == ["real.csv"]
+
+
+def test_regenerate_one_stale_claim_drops_on_judge_error(tmp_path: Path) -> None:
+    """A failed judge call (or non-dict JSON) drops the claim rather than keeping stale refs."""
+    v = _RegenStubVerifier(
+        tmp_path,
+        workspace_files=["real.csv"],
+        llm_responses=[(None, "judge timed out")],
+    )
+    assert v._regenerate_one_stale_claim(
+        "u1", _stale_record("c3", ["gone.csv"]), "narration", "listing"
+    ) is None
+
+
+def test_resolve_anchored_claims_returns_empty_when_no_anchor(tmp_path: Path) -> None:
+    """No anchor uuid → empty list + None so caller falls through to extraction."""
+    v = _RegenStubVerifier(tmp_path)
+    claims, spec_reuse = v._resolve_anchored_claims("u1", None, "exec", "listing")
+    assert claims == [] and spec_reuse is None
+
+
+def test_resolve_anchored_claims_returns_empty_when_cache_missing(tmp_path: Path) -> None:
+    """Anchor specified but no cache file → fall through, warning logged."""
+    v = _RegenStubVerifier(tmp_path)
+    claims, spec_reuse = v._resolve_anchored_claims("u1", "ghost_anchor", "exec", "listing")
+    assert claims == [] and spec_reuse is None
+
+
+def test_resolve_anchored_claims_falls_through_when_all_dropped(tmp_path: Path) -> None:
+    """Anchor exists but every stale claim's regen fails → caller re-extracts."""
+    # Persist a rubric whose files don't exist in the current workspace.
+    cache_dir = tmp_path / "old_anchor"
+    cache_dir.mkdir()
+    (cache_dir / "claims.json").write_text(
+        json.dumps({"anchor_uuid": "old_anchor", "claims": [
+            _stale_record("only_one", ["gone.csv"]),
+        ]}),
+        encoding="utf-8",
+    )
+    v = _RegenStubVerifier(
+        tmp_path,
+        workspace_files=["something_else.csv"],
+        llm_responses=[(None, "judge dead")],  # regen drops this single claim
+    )
+    claims, spec_reuse = v._resolve_anchored_claims("u1", "old_anchor", "exec", "listing")
+    assert claims == [] and spec_reuse is None
+
+
+def test_resolve_anchored_claims_keeps_fresh_and_regenerated(tmp_path: Path) -> None:
+    """End-to-end: fresh records reuse cached scripts; stale ones get regenerated."""
+    cache_dir = tmp_path / "anc"
+    cache_dir.mkdir()
+    (cache_dir / "claims.json").write_text(
+        json.dumps({"anchor_uuid": "anc", "claims": [
+            _stale_record("fresh_claim", ["keep.csv"]),
+            _stale_record("stale_claim", ["gone.csv"]),
+        ]}),
+        encoding="utf-8",
+    )
+    v = _RegenStubVerifier(
+        tmp_path,
+        workspace_files=["keep.csv", "new.csv"],
+        llm_responses=[(
+            {"id": "stale_claim", "description": "now points at new.csv",
+             "likely_relevant_files": ["new.csv"]},
+            None,
+        )],
+    )
+    claims, spec_reuse = v._resolve_anchored_claims("u1", "anc", "exec", "listing")
+    assert {c["id"] for c in claims} == {"fresh_claim", "stale_claim"}
+    # spec_reuse_records holds only the fresh subset — the regenerated claim's
+    # cached verify_stale_claim.py would reference gone.csv and must be redone.
+    assert spec_reuse is not None
+    assert [r["id"] for r in spec_reuse] == ["fresh_claim"]
+
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         test_persist_and_load_round_trip(Path(d))
+    with tempfile.TemporaryDirectory() as d:
+        test_partition_by_file_presence_splits_fresh_vs_stale(Path(d))
+    with tempfile.TemporaryDirectory() as d:
+        test_regenerate_one_stale_claim_returns_updated_record(Path(d))
+    with tempfile.TemporaryDirectory() as d:
+        test_resolve_anchored_claims_keeps_fresh_and_regenerated(Path(d))
     print("verifier_anchor_helpers_test: smoke ok")
