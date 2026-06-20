@@ -1,3 +1,7 @@
+"""
+Base class for workflow evaluators, providing shared setup and helper methods.
+"""
+
 import json
 import logging
 import re
@@ -289,7 +293,7 @@ class BaseEvaluator:
             reproducibility across evaluations.
         """
         # Preserving original prompt exactly
-        return """You are an expert scientific researcher and rigorous multi-agent system evaluator. Your task is to assess whether a computational workflow achieved its intended goals through coordinated agent collaboration, while ensuring scientific validity and technical correctness.
+        return """You are an expert scientific researcher and rigorous multi-agent system evaluator. Your task is to assess whether a computational workflow achieved its intended goals ensuring goal alignment, scientific validity and technical correctness.
 
     You will evaluate:
     System Description

@@ -1,3 +1,7 @@
+"""
+Top level evaluator module for the workflow evaluation system.
+"""
+
 import logging
 import os
 import sys

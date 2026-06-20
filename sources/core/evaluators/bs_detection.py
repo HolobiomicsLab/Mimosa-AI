@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
+[DEPRECATED](prototype module, now unused)
 Review agent memory for detection of fraudulent behavior (lies, placeholder values, etc..)
+Currently unused, but could be re-purposed for future penalty scoring of workflows based on memory analysis.
 """
 
 import os

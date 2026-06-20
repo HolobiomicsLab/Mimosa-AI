@@ -228,11 +228,6 @@ class _VerifierClaimExtractionMixin:
             })
         return cleaned
 
-    # Note: ``_validate_workspace_paths`` lives on the workspace mixin since
-    # its state (``self._workspace_files``) is owned there. Both the claim
-    # parser above and the file selector in the per-claim mixin call into it
-    # via MRO.
-
     # ------------------------------------------------------------------
     # Stage 1b — rate claim importance (1-10) against the goal, dedupe
     # ------------------------------------------------------------------

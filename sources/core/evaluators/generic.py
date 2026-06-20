@@ -1,3 +1,13 @@
+"""
+[DEPRECATED](V1)
+
+Generic Evaluator for evaluating workflows execution using LLM judgment along 4 axis:
+1. Goal Alignment: Does the workflow achieve its stated goal?
+2. Agent Collaboration: How well do the agents collaborate and pass information?
+3. Output Quality: Is the final output complete, well-structured, and usable?
+4. Answer Plausibility: Is the answer plausible and consistent with scientific literature grounding?
+"""
+
 import json
 import logging
 import re

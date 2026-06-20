@@ -67,6 +67,133 @@ _PIP_INSTALL_FLAGS: tuple[str, ...] = (
 _PRINT_TRUNCATE_BYTES = 256
 _STDERR_TAIL_BYTES = 400
 
+VERIFIER_PROMPT_RULES = """
+- Print EXACTLY ONE JSON line to stdout, structured as:
+  {{"claim_id": "<id>", "status": "pass" | "fail" | "error",
+    "actual": <observed value or null>, "details": "<short string>"}}
+- Read files with relative paths
+  (cwd is the workspace).
+- Recompute or directly check; do not trust the agent's reported numbers.
+- For property checks (symmetry, range, no duplicates, ...), assert the
+  property and emit "pass"/"fail" accordingly.
+- Guard against vacuous comparisons. When a property reduces to a
+  comparison of order statistics across two groups (e.g. "all of A >
+  all of B" becoming ``min(A) > max(B)``), first check that BOTH
+  operand groups are drawn from the real data distribution: reject
+  groups where values are sentinel/masked placeholders (commonly
+  -999, -9999, 9999, NaN, None, or values equal to a constant across
+  the entire group when the data is supposed to be continuous). If
+  sentinel/masked values are present in either operand, emit
+  ``status="fail"`` with a details string naming the sentinel — the
+  check is unsound, not satisfied.
+- Catch your own exceptions and emit status="error" with the error message in
+  details — never let the script raise.
+- Parse the relevant files according to the format visible in the PREVIEWS
+  above. Do not invent a different format. If the previews include a header
+  line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
+- If the previews are empty or do not show enough of the file to be sure of
+  the format, prefer permissive parsing (try several reasonable splits, skip
+  unparseable lines) over a strict format that may misjudge the file.
+- When the claim is about CODE STRUCTURE in a workflow script (imports,
+  function calls, class instantiations, assignments), parse the script
+  with the stdlib ``ast`` module instead of regex or substring search.
+  Variable names are not load-bearing — never hard-code identifiers like
+  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
+  (``ast.Call.func``: e.g. node is a ``Name`` with id
+  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
+  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
+  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
+  source code is brittle to whitespace, quote style, line breaks, and
+  renames; reserve ``re`` for unstructured text (logs, READMEs).
+- For claims that an output FILE or PATH exists (e.g. "the predictions
+  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
+  the primary check is ``pathlib.Path(target).exists()`` evaluated in
+  the workspace cwd. If the file is there and parseable, that alone is
+  sufficient to emit ``status="pass"``. Do NOT additionally require the
+  source script to contain the literal path string — quote style,
+  ``os.path.join`` splits, and variable substitution will hide it.
+  Inspect source code only when the file is ABSENT and you need to
+  attribute the failure.
+- Some claims are conditional ("if X happens, Y must hold" / "no
+  fallback to Z used instead of W"). Detect the antecedent first. If
+  it is FALSE — the guarded path is not present in the workspace —
+  emit ``status="pass"`` with ``details="vacuously satisfied:
+  <antecedent> not present"``. Do not search unrelated regions of the
+  script for the consequent's keywords.
+- On a "Used fallback claim", the score is inverted: 0 if the claim passes, 1 if it fails. This is to incentivize the verified program to not use fallback
+
+What should not be done:
+- Do not Embeds the workflow output, the agent's final answer, or any large
+  fragment thereof as a string literal and then parses that literal. This
+  is a tautology: comparing the answer to itself proves nothing.
+- Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
+  inlined JSON blob) instead of recomputing it from workspace files.
+- Do not Returns "pass" without ever opening a file or running a real computation
+  derived from on-disk state.
+- Do not Declares ``likely_relevant_files`` but performs no file I/O.
+- Do not Check against hard-coded value (string or numerical) that was not explicitly given in the claim description as the target to check against.
+
+What a legitimate verifier does:
+- Opens the file(s) in ``likely_relevant_files`` from the workspace cwd.
+- Re-derives the value the claim asserts (recompute the energy, recount the
+  contacts, re-walk the chain, re-read the metric).
+- Compares the recomputed value to the small target taken from the claim
+  description (e.g. "-6", "20 residues") — targets are short numeric/string
+  constants, not embedded answer payloads.
+
+If the claim cannot be checked deterministically with code (e.g. it concerns
+the rigor of a proof, the appropriateness of a binning choice, the
+defensibility of a conclusion), set "executable": false and explain briefly.
+
+Don't forget to include the library you need such as json, numpy, etc..
+You can use library from the standard library and the available imports.
+"""
+
+RECOVERY_PROMPT_RULES = """
+- Diagnose the failure from the traceback above and emit a corrected script.
+- Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
+  {{"claim_id": "<id>", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
+- Catch your own exceptions inside the script and emit status="error" — never let the script raise.
+- Read files with relative paths (cwd is the workspace).
+- Guard against vacuous comparisons. When a property reduces to a
+  comparison of order statistics across two groups (e.g. "all of A >
+  all of B" becoming ``min(A) > max(B)``), first check that BOTH
+  operand groups are drawn from the real data distribution: reject
+  groups where values are sentinel/masked placeholders (commonly
+  -999, -9999, 9999, NaN, None, or values equal to a constant across
+  the entire group when the data is supposed to be continuous). If
+  sentinel/masked values are present in either operand, emit
+  ``status="fail"`` with a details string naming the sentinel — the
+  check is unsound, not satisfied.
+- When the claim is about CODE STRUCTURE in a workflow script (imports,
+  function calls, class instantiations, assignments), parse the script
+  with the stdlib ``ast`` module instead of regex or substring search.
+  Variable names are not load-bearing — never hard-code identifiers like
+  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
+  (``ast.Call.func``: e.g. node is a ``Name`` with id
+  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
+  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
+  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
+  source code is brittle to whitespace, quote style, line breaks, and
+  renames; reserve ``re`` for unstructured text (logs, READMEs).
+- For claims that an output FILE or PATH exists (e.g. "the predictions
+  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
+  the primary check is ``pathlib.Path(target).exists()`` evaluated in
+  the workspace cwd. If the file is there and parseable, that alone is
+  sufficient to emit ``status="pass"``. Do NOT additionally require the
+  source script to contain the literal path string — quote style,
+  ``os.path.join`` splits, and variable substitution will hide it.
+  Inspect source code only when the file is ABSENT and you need to
+  attribute the failure.
+- Some claims are conditional ("if X happens, Y must hold" / "no
+  fallback to Z used instead of W"). Detect the antecedent first. If
+  it is FALSE — the guarded path is not present in the workspace —
+  emit ``status="pass"`` with ``details="vacuously satisfied:
+  <antecedent> not present"``. Do not search unrelated regions of the
+  script for the consequent's keywords.
+- If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
+"""
+
 
 T = TypeVar("T")
 
@@ -109,6 +236,8 @@ def _run_coro_sync(
     if not in_loop:
         return asyncio.run(coro_factory())
     return _run_coro_in_worker(coro_factory, thread_timeout)
+
+
 
 
 def _run_coro_in_worker(
@@ -385,85 +514,8 @@ CLAIM TO VERIFY:
 - likely_relevant_files: {claim.get('likely_relevant_files', [])}
 
 RULES FOR YOUR SCRIPT:
-- Print EXACTLY ONE JSON line to stdout, structured as:
-  {{"claim_id": "{claim['id']}", "status": "pass" | "fail" | "error",
-    "actual": <observed value or null>, "details": "<short string>"}}
-- Read files with relative paths
-  (cwd is the workspace).
-- Recompute or directly check; do not trust the agent's reported numbers.
-- For property checks (symmetry, range, no duplicates, ...), assert the
-  property and emit "pass"/"fail" accordingly.
-- Guard against vacuous comparisons. When a property reduces to a
-  comparison of order statistics across two groups (e.g. "all of A >
-  all of B" becoming ``min(A) > max(B)``), first check that BOTH
-  operand groups are drawn from the real data distribution: reject
-  groups where values are sentinel/masked placeholders (commonly
-  -999, -9999, 9999, NaN, None, or values equal to a constant across
-  the entire group when the data is supposed to be continuous). If
-  sentinel/masked values are present in either operand, emit
-  ``status="fail"`` with a details string naming the sentinel — the
-  check is unsound, not satisfied.
-- Catch your own exceptions and emit status="error" with the error message in
-  details — never let the script raise.
-- Parse the relevant files according to the format visible in the PREVIEWS
-  above. Do not invent a different format. If the previews include a header
-  line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
-- If the previews are empty or do not show enough of the file to be sure of
-  the format, prefer permissive parsing (try several reasonable splits, skip
-  unparseable lines) over a strict format that may misjudge the file.
-- When the claim is about CODE STRUCTURE in a workflow script (imports,
-  function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module instead of regex or substring search.
-  Variable names are not load-bearing — never hard-code identifiers like
-  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
-  (``ast.Call.func``: e.g. node is a ``Name`` with id
-  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
-  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
-  source code is brittle to whitespace, quote style, line breaks, and
-  renames; reserve ``re`` for unstructured text (logs, READMEs).
-- For claims that an output FILE or PATH exists (e.g. "the predictions
-  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
-  the primary check is ``pathlib.Path(target).exists()`` evaluated in
-  the workspace cwd. If the file is there and parseable, that alone is
-  sufficient to emit ``status="pass"``. Do NOT additionally require the
-  source script to contain the literal path string — quote style,
-  ``os.path.join`` splits, and variable substitution will hide it.
-  Inspect source code only when the file is ABSENT and you need to
-  attribute the failure.
-- Some claims are conditional ("if X happens, Y must hold" / "no
-  fallback to Z used instead of W"). Detect the antecedent first. If
-  it is FALSE — the guarded path is not present in the workspace —
-  emit ``status="pass"`` with ``details="vacuously satisfied:
-  <antecedent> not present"``. Do not search unrelated regions of the
-  script for the consequent's keywords.
-- On a "Used fallback claim", the score is inverted: 0 if the claim passes, 1 if it fails. This is to incentivize the verified program to not use fallback
+{VERIFIER_PROMPT_RULES}
 
-What should not be done:
-- Do not Embeds the workflow output, the agent's final answer, or any large
-  fragment thereof as a string literal and then parses that literal. This
-  is a tautology: comparing the answer to itself proves nothing.
-- Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
-  inlined JSON blob) instead of recomputing it from workspace files.
-- Do not Returns "pass" without ever opening a file or running a real computation
-  derived from on-disk state.
-- Do not Declares ``likely_relevant_files`` but performs no file I/O.
-- Do not Check against hard-coded value (string or numerical) that was not explicitly given in the claim description as the target to check against.
-
-What a legitimate verifier does:
-- Opens the file(s) in ``likely_relevant_files`` from the workspace cwd.
-- Re-derives the value the claim asserts (recompute the energy, recount the
-  contacts, re-walk the chain, re-read the metric).
-- Compares the recomputed value to the small target taken from the claim
-  description (e.g. "-6", "20 residues") — targets are short numeric/string
-  constants, not embedded answer payloads.
-
-If the claim cannot be checked deterministically with code (e.g. it concerns
-the rigor of a proof, the appropriateness of a binning choice, the
-defensibility of a conclusion), set "executable": false and explain briefly.
-
-Don't forget to include the library you need such as json, numpy, etc..
-You can use library from the standard library and the available imports.
 AVAILABLE IMPORTS: {packages}
 Do not use any other imports, as the verifier will fail to run.
 
@@ -946,50 +998,13 @@ RUNTIME ERROR DETAILS: {details}
 STDERR (last {_RECOVERY_STDERR_FEEDBACK_LINES} lines):
 {stderr_tail}
 
+
+AVAILABLE IMPORTS:
+{packages}.
+Do NOT introduce any other third-party imports.
+
 INSTRUCTIONS:
-- Diagnose the failure from the traceback above and emit a corrected script.
-- Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
-  {{"claim_id": "{claim['id']}", "status": "pass"|"fail"|"error", "actual": <value or null>, "details": "<short string>"}}.
-- Catch your own exceptions inside the script and emit status="error" — never let the script raise.
-- Read files with relative paths (cwd is the workspace).
-- Guard against vacuous comparisons. When a property reduces to a
-  comparison of order statistics across two groups (e.g. "all of A >
-  all of B" becoming ``min(A) > max(B)``), first check that BOTH
-  operand groups are drawn from the real data distribution: reject
-  groups where values are sentinel/masked placeholders (commonly
-  -999, -9999, 9999, NaN, None, or values equal to a constant across
-  the entire group when the data is supposed to be continuous). If
-  sentinel/masked values are present in either operand, emit
-  ``status="fail"`` with a details string naming the sentinel — the
-  check is unsound, not satisfied.
-- When the claim is about CODE STRUCTURE in a workflow script (imports,
-  function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module instead of regex or substring search.
-  Variable names are not load-bearing — never hard-code identifiers like
-  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
-  (``ast.Call.func``: e.g. node is a ``Name`` with id
-  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
-  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
-  source code is brittle to whitespace, quote style, line breaks, and
-  renames; reserve ``re`` for unstructured text (logs, READMEs).
-- For claims that an output FILE or PATH exists (e.g. "the predictions
-  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
-  the primary check is ``pathlib.Path(target).exists()`` evaluated in
-  the workspace cwd. If the file is there and parseable, that alone is
-  sufficient to emit ``status="pass"``. Do NOT additionally require the
-  source script to contain the literal path string — quote style,
-  ``os.path.join`` splits, and variable substitution will hide it.
-  Inspect source code only when the file is ABSENT and you need to
-  attribute the failure.
-- Some claims are conditional ("if X happens, Y must hold" / "no
-  fallback to Z used instead of W"). Detect the antecedent first. If
-  it is FALSE — the guarded path is not present in the workspace —
-  emit ``status="pass"`` with ``details="vacuously satisfied:
-  <antecedent> not present"``. Do not search unrelated regions of the
-  script for the consequent's keywords.
-- AVAILABLE IMPORTS: {packages}. Do NOT introduce any other third-party imports.
-- If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
+{RECOVERY_PROMPT_RULES}
 
 Return STRICT JSON only:
   {{"executable": true, "code": "<full corrected python script as one string>"}}

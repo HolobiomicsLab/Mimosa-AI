@@ -1,4 +1,8 @@
 
+"""
+Perspicacite grounding for litterature-retrieve of science goals success indicators.
+"""
+
 from sources.utils.perspicacite_client import query_perspicacite
 
 

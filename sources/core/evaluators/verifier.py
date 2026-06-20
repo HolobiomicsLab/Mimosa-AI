@@ -219,14 +219,6 @@ class VerifierEvaluator(
     ) -> dict[str, Any]:
         """Run the verifier pipeline; persists scores under ``evaluation.verifier``.
 
-        When ``rubric_anchor_uuid`` names an ancestor whose verifier cache
-        exists (a ``claims.json`` written by a previous evaluation), the claim
-        list and executable verifier scripts are reused verbatim from that
-        ancestor. This skips the LLM claim-extraction and verifier-generation
-        stages, giving identical rubrics across an evolved lineage so scores
-        are directly comparable. The anchor's scripts are executed against the
-        *current* uuid's workspace, not the anchor's.
-
         Args:
             uuid: Workflow identifier to evaluate.
             rubric_anchor_uuid: Optional ancestor whose cached rubric to reuse.
@@ -345,9 +337,6 @@ class VerifierEvaluator(
         self._write_report(uuid, claims, per_claim, scores)
         self._persist_claims(uuid, claims, per_claim)
 
-        # The gradient builder only sees the high-importance slice of the
-        # report so the mutator is not nudged by low-importance noise. The
-        # on-disk report keeps the full view for auditing.
         gradient_report = self._build_report(
             per_claim,
             scores,
@@ -386,12 +375,6 @@ class VerifierEvaluator(
         grounding: str,
     ) -> list[dict[str, Any]]:
         """Fan claim verification out across ``self.exec_parallelism`` threads.
-
-        Claim ordering is preserved so the downstream report, aggregator, and
-        rubric cache see the same order they would in the old sequential loop.
-        A per-claim exception is converted into an ``error`` result rather than
-        crashing the whole batch — mirrors the soft-fail contract of
-        ``_generate_specs_parallel``.
 
         Args:
             uuid: Workflow identifier (used for judge calls + sandbox dirs).

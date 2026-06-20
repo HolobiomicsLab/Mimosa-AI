@@ -68,11 +68,8 @@ class _VerifierWorkspaceMixin:
         label: str = "",
     ) -> list[str]:
         """Normalise, dedupe and validate a list of workspace-relative paths.
-
-        Strips leading ``./``, drops empties, duplicates and non-strings. When
-        ``allowed`` is given, paths not in that set are logged and dropped
-        (hallucination guard). When ``max_count`` is given, truncates to that
-        cap. Returns paths in input order.
+        Strips leading ./, drops empties, duplicates and non-strings
+        When ``max_count`` is given, truncates to that cap. Returns paths in input order.
 
         Args:
             raw: Candidate iterable of path strings from a model response.

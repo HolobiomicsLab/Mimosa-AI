@@ -1,3 +1,8 @@
+"""
+ScenenarioEvaluator module for evaluating workflows against scenario json rubrics.
+Not used for evaluation on ScienceAgentBench (tho made compatible), but can be used for other scenario-based evaluation tasks.
+"""
+
 import json
 import logging
 import re
