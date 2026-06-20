@@ -127,9 +127,9 @@ class WorkflowInfo:
 
     @property
     def overall_score_uncapped(self) -> float:
-        """Reward without the hard-fail cap, cheat penalty still applied.
+        """Reward without the hard-fail cap, still applied.
 
-        ``r' = max(0, base_mean + info_bonus − cheat_penalty)``. Used for
+        ``r' = max(0, base_mean + info_bonus)``. Used for
         parent-draw weighting so distinct refuted-but-improving runs
         stay rank-ordered. Falls back to ``overall_score`` when verifier
         scores are unavailable.
@@ -138,8 +138,7 @@ class WorkflowInfo:
         if "overall_score_uncapped" not in verifier:
             return self.overall_score
         uncapped = float(verifier.get("overall_score_uncapped", 0.0))
-        penalty = float(verifier.get("cheat_penalty", 0.0))
-        return max(0.0, uncapped - penalty)
+        return max(0.0, uncapped)
 
     @property
     def judge_evaluation(self) -> dict:

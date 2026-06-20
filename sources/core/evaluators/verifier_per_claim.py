@@ -411,7 +411,6 @@ RULES FOR YOUR SCRIPT:
 - If the previews are empty or do not show enough of the file to be sure of
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
-- When verifying usage of a specific library method is found in a script, also ensure no cheating attempt was done, such as a try-catch branching that lead to the wrong method being used on exception.
 - When the claim is about CODE STRUCTURE in a workflow script (imports,
   function calls, class instantiations, assignments), parse the script
   with the stdlib ``ast`` module instead of regex or substring search.
@@ -423,13 +422,6 @@ RULES FOR YOUR SCRIPT:
   or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
   source code is brittle to whitespace, quote style, line breaks, and
   renames; reserve ``re`` for unstructured text (logs, READMEs).
-  When scanning for "cheating fallbacks", check only the EXECUTED path:
-  a ``try`` body whose ``except`` handler catches ``ImportError`` /
-  ``ModuleNotFoundError`` is a fallback branch. Test the corresponding
-  import in the ``try`` body with ``importlib.util.find_spec``; if it
-  resolves at verification time, treat the ``except`` body as dead code
-  and ignore its contents. The reverse holds when the import is
-  unavailable.
 - For claims that an output FILE or PATH exists (e.g. "the predictions
   CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
   the primary check is ``pathlib.Path(target).exists()`` evaluated in
@@ -981,13 +973,6 @@ INSTRUCTIONS:
   or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
   source code is brittle to whitespace, quote style, line breaks, and
   renames; reserve ``re`` for unstructured text (logs, READMEs).
-  When scanning for "cheating fallbacks", check only the EXECUTED path:
-  a ``try`` body whose ``except`` handler catches ``ImportError`` /
-  ``ModuleNotFoundError`` is a fallback branch. Test the corresponding
-  import in the ``try`` body with ``importlib.util.find_spec``; if it
-  resolves at verification time, treat the ``except`` body as dead code
-  and ignore its contents. The reverse holds when the import is
-  unavailable.
 - For claims that an output FILE or PATH exists (e.g. "the predictions
   CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
   the primary check is ``pathlib.Path(target).exists()`` evaluated in

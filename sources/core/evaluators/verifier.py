@@ -21,6 +21,7 @@ from typing import Any
 from sources.cli.pretty_print import (
     CYAN,
     RED,
+    GREEN,
     print_box,
     print_ok,
 )
@@ -86,7 +87,6 @@ class VerifierEvaluator(
         use_grounding: bool = True,
         info_bonus_alpha: float = _INFO_BONUS_ALPHA,
         info_bonus_beta: float = _INFO_BONUS_BETA,
-        use_cheat_detector: bool = True,
         gen_parallelism: int = _VERIFIER_GEN_PARALLELISM,
         exec_parallelism: int = _VERIFIER_EXEC_PARALLELISM,
     ) -> None:
@@ -105,7 +105,6 @@ class VerifierEvaluator(
             use_grounding: When True, fetch peer-reviewed literature grounding.
             info_bonus_alpha: Asymptotic ceiling of the information bonus.
             info_bonus_beta: Saturation rate of the information bonus.
-            use_cheat_detector: Reserved; cheat detector currently disabled.
             gen_parallelism: Max concurrent LLM calls for verifier generation.
             exec_parallelism: Max concurrent claim verifications (executable
                 sandbox runs and soft-LLM checks share this pool).
@@ -126,7 +125,6 @@ class VerifierEvaluator(
         self.use_grounding = use_grounding
         self.info_bonus_alpha = max(0.0, info_bonus_alpha)
         self.info_bonus_beta = max(1e-6, info_bonus_beta)
-        self.use_cheat_detector = use_cheat_detector
         self.gen_parallelism = max(1, int(gen_parallelism))
         self.exec_parallelism = max(1, int(exec_parallelism))
         self._preview_cache: dict[str, str] = {}
@@ -365,10 +363,7 @@ class VerifierEvaluator(
         scores = self._aggregate(per_claim)
         scores["failure_fingerprint"] = compute_failure_fingerprint(per_claim)
 
-        # Layer 3: independent cheat audit over the agents' produced script.
-        cheat = None  # NOTE: cheat_detector was crap. Will need to be rethink.
-
-        self._write_report(uuid, claims, per_claim, scores, cheat=cheat)
+        self._write_report(uuid, claims, per_claim, scores)
         self._persist_claims(uuid, claims, per_claim)
 
         # The gradient builder only sees the high-importance slice of the
@@ -377,7 +372,6 @@ class VerifierEvaluator(
         gradient_report = self._build_report(
             per_claim,
             scores,
-            cheat,
             min_importance=self._GRADIENT_MIN_IMPORTANCE,
         )
         t = time.time()
@@ -564,10 +558,6 @@ class VerifierEvaluator(
             "n_unsure": 0,
             "skipped_reason": "workflow_generation_or_execution_failed",
             "abstractec_textual_gradient": "workflow code failed to generate or execute; ensure code is properly formatted and that the workflow runs without crashing",
-            "cheat_penalty": 0.0,
-            # Zero-profile fingerprint: no source emitted any claim, so the
-            # presence mask is all-zero and the centered vector is all-zero
-            # — the run is neutral relative to peers along every axis.
             "failure_fingerprint": {
                 "vector": [0.0] * _FP_DIM,
                 "presence_mask": [0.0] * _FP_DIM,
@@ -575,7 +565,7 @@ class VerifierEvaluator(
             },
         }
         try:
-            self._write_report(uuid, [], [], scores, cheat=None)
+            self._write_report(uuid, [], [], scores)
         except Exception as e:
             self.logger.error(f"Failed to write short-circuit report for {uuid}: {e}")
         self._persist_textual_gradient(uuid, "")
@@ -968,48 +958,14 @@ class VerifierEvaluator(
             result["skipped_reason"] = skipped_reason
         return result
 
-    # ------------------------------------------------------------------
-    # Cheat penalty + fallback textual gradient
-    #
-    # These two methods are reserved for the cheat-detector rewrite (see the
-    # ``cheat = None`` in ``evaluate`` and the ``_CHEAT_*`` constants at the
-    # top of the file). They are kept here, not called, so the rewrite can
-    # re-wire them without re-deriving their contracts.
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _apply_cheat_penalty(
-        scores: dict[str, Any], cheat: Any
-    ) -> dict[str, Any]:
-        """Subtract cheat penalty from the capped overall score; floor at 0.0.
-
-        Args:
-            scores: Mutable score dict from ``_aggregate`` to be amended.
-            cheat: Cheat-detector report exposing ``penalty`` and ``to_dict()``,
-                or ``None`` to apply a zero penalty.
-
-        Returns:
-            The same ``scores`` dict, updated with cheat-related fields.
-        """
-        penalty = float(cheat.penalty) if cheat is not None else 0.0
-        capped = float(scores.get("overall_score", 0.0))
-        final = max(0.0, capped - penalty)
-        scores["overall_score_before_cheat"] = round(capped, 4)
-        scores["cheat_penalty"] = round(penalty, 4)
-        scores["overall_score"] = round(final, 4)
-        if cheat is not None:
-            scores["cheat_detector"] = cheat.to_dict()
-        return scores
-
     @staticmethod
     def _fallback_textual_gradient(
-        scores: dict[str, Any], cheat: Any
+        scores: dict[str, Any]
     ) -> str:
         """Deterministic fallback when the abstractor LLM is unavailable.
 
         Args:
             scores: Aggregated score dict from ``_aggregate``.
-            cheat: Cheat-detector report with optional ``behavioral`` findings.
 
         Returns:
             Single-sentence human-readable summary of the run's outcome.
@@ -1022,17 +978,6 @@ class VerifierEvaluator(
             f"Run scored {overall:.2f}; "
             f"{n_pass}/{n_claims} checks passed, {n_fail} refuted."
         ]
-        if scores.get("hard_fail_capped"):
-            bits.append(
-                "A load-bearing requirement was not met — the next iteration "
-                "must change approach rather than refine details."
-            )
-        if cheat is not None and cheat.behavioral:
-            bits.append(
-                "An independent audit flagged shortcuts in the produced code: "
-                + "; ".join(cheat.behavioral[:3])
-                + "."
-            )
         return " ".join(bits)
 
     def _persist_textual_gradient(self, uuid: str, textual_gradient: str) -> None:
@@ -1063,7 +1008,6 @@ class VerifierEvaluator(
         self,
         per_claim: list[dict[str, Any]],
         scores: dict[str, Any],
-        cheat: Any,
         min_importance: int = 0,
     ) -> str:
         """Render a plain-text report from per-claim results and aggregate scores."""
@@ -1072,7 +1016,6 @@ class VerifierEvaluator(
             if c["status"] == "error":
                 continue # this avoid execution error of verifier passed to textual gradient
             lines.extend(self._format_claim_entry(c, min_importance))
-        lines.extend(self._format_cheat_section(cheat))
         return "\n".join(lines) + "\n"
 
     def _format_report_header(
@@ -1090,7 +1033,6 @@ class VerifierEvaluator(
             ),
             (
                 f"Overall: {scores['overall_score']:.3f}"
-                f" (pre-cheat {scores.get('overall_score_before_cheat', scores['overall_score']):.3f}, "
                 f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
                 f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
             ),
@@ -1099,7 +1041,6 @@ class VerifierEvaluator(
                 f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
                 f"n_high_importance_pass={scores.get('n_high_importance_pass', 0)}  "
                 f"high_importance_pass_mass={scores.get('high_importance_pass_mass', 0.0):.3f}  "
-                f"cheat_penalty={scores.get('cheat_penalty', 0.0):.3f}"
             ),
         ]
         if min_importance > 0:
@@ -1143,33 +1084,13 @@ class VerifierEvaluator(
             return []
         return ["  stderr (tail):", *(f"    {line}" for line in tail)]
 
-    def _format_cheat_section(self, cheat: Any) -> list[str]:
-        """Render the cheat-audit block; empty when no cheat report available."""
-        if cheat is None:
-            return []
-        lines = [
-            self._REPORT_SECTION_BAR,
-            "Independent cheat audit",
-            f"  penalty: {cheat.penalty:.3f}",
-        ]
-        if cheat.error:
-            lines.append(f"  error:   {cheat.error}")
-        if cheat.behavioral:
-            lines.append("  behavioral findings (also fed to mutator):")
-            lines.extend(f"    - {b}" for b in cheat.behavioral)
-        if cheat.mechanism:
-            lines.append("  mechanism findings (audit-only — NOT fed to mutator):")
-            lines.extend(f"    - {m}" for m in cheat.mechanism)
-        lines.append("")
-        return lines
 
     def _write_report(
         self,
         uuid: str,
         claims: list[dict[str, Any]],
         per_claim: list[dict[str, Any]],
-        scores: dict[str, Any],
-        cheat: Any,
+        scores: dict[str, Any]
     ) -> None:
         """Persist the built report under ``<workflow_dir>/<uuid>/evaluation.txt``.
 
@@ -1178,11 +1099,10 @@ class VerifierEvaluator(
             claims: Raw extracted claim list (kept for signature parity).
             per_claim: List of per-claim scored dicts to render.
             scores: Aggregated score dict from ``_aggregate``.
-            cheat: Cheat-detector report, or ``None``.
         """
         path = self.workflow_dir / uuid / "evaluation.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
-        report = self._build_report(per_claim, scores, cheat)
+        report = self._build_report(per_claim, scores)
         try:
             path.write_text(report, encoding="utf-8")
             self.logger.info(f"Verifier report written to {path}")

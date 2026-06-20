@@ -52,7 +52,7 @@ class PopulationMember:
             used for the length-penalty term in ``qd_score``.
         novelty_score: Mean cosine distance to the current comparison set.
         qd_score: Combined quality-diversity score with length penalty.
-        reward_uncapped: Base + info-bonus − cheat, with no hard-fail cap.
+        reward_uncapped: Base + info-bonus, with no hard-fail cap.
         created_at: Wall-clock timestamp of construction.
     """
     iteration: int
@@ -385,7 +385,7 @@ class SelectionPressure:
     ) -> dict[str, Any]:
         """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
 
-        QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat),
+        QD weighting uses ``reward_uncapped`` (base + info_bonus),
         then subtracts a length-penalty term so runaway code growth costs
         ranking points without overriding it on real improvements.
 
