@@ -38,8 +38,8 @@ The verifier runs four stages per workflow run:
    small Python program that recomputes the asserted value from workspace
    files (the default path), or renders a soft LLM verdict when no
    deterministic check is possible.
-3. **Aggregation** — per-claim scores combine into `overall_score` with a
-   saturating thoroughness bonus and a hard-fail cap.
+3. **Aggregation** — per-claim scores combine into `overall_score` as an
+   importance-weighted mean with a hard-fail cap.
 4. **Prompt gradient** — a plain-language summary of failure modes, the
    **only** signal that reaches the mutator. It does not name claims,
    scores, or sources, so the mutator cannot turn the verified-claim
@@ -112,16 +112,15 @@ only falls back to an LLM verdict when no executable check is possible.
 ## Aggregation
 
 ```python
-base_mean = mean(score for each non-error claim)
-bonus     = α · (1 − exp(−n_hard_pass / β))      # α=0.05, β=8
-pre_cap   = clamp(base_mean + bonus, 0, 1)
+base_mean = importance_weighted_mean(score for each non-error claim)
+pre_cap   = clamp(base_mean, 0, 1)
 
 overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_cap
 ```
 
-- `α = _INFO_BONUS_ALPHA = 0.05`, `β = _INFO_BONUS_BETA = 8.0` —
-  saturating reward for thoroughness, conditioned on *passing hard*
-  claims so trivial or failed claims contribute nothing.
+- Per-claim weights come from the rater-assigned importance (1–10), so an
+  importance-10 deliverable claim moves the score ~5× more than a
+  low-importance hygiene claim.
 - `hard_fail_cap = _HARD_FAIL_CAP = 0.99` — currently set permissively
   to keep the evolutionary signal smooth; a refuted hard claim still
   flags `hard_fail_capped = True`.

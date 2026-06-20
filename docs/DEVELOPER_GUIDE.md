@@ -476,12 +476,11 @@ For each generation:
    claim type, and the anti-tautology tripwires.
 4. **Aggregation**:
    ```
-   overall = clamp(base_mean + info_bonus, 0, 1)
+   overall = clamp(base_mean, 0, 1)
    if any hard claim refuted:
        overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
    ```
-   where `info_bonus(n_hard_pass) = 0.05 · (1 - exp(-n_hard_pass / 8))`
-   (saturating reward for thoroughness).
+   `base_mean` is the importance-weighted mean of per-claim scores.
 5. **Prompt gradient** — plain-language single-sentence diagnosis
    prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`). It
    is the **only** verifier signal the mutator sees, and recent history
