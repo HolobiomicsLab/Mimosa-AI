@@ -178,10 +178,10 @@ The intent is informational, not punitive: the mutator learns *what
 direction to push the workflow next* without being handed a vocabulary
 it can over-fit against.
 
-## Behavioral anti-cheat pressure
+## Behavioral pressure against shortcut workflows
 
-There is no standalone cheat-detector pass. Anti-cheat pressure comes
-from the verifier pipeline itself:
+Pressure against shortcut or fabricated workflows comes from the
+verifier pipeline itself:
 
 - Source C's recompute-from-disk verifiers.
 - The "Used fallback" claim type, whose score is *inverted* — a passing

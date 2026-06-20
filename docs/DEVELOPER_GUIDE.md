@@ -471,10 +471,9 @@ For each generation:
    pre-installed (lazy one-shot install per process). Soft claims get a
    `pass/unsure/fail` LLM verdict against workspace previews + literature
    grounding (mapped to `1.0 / 0.5 / 0.0`).
-3. **Behavioral anti-cheat pressure** comes from Source C's
-   recompute-from-disk verifiers, the inverted-score "Used fallback"
-   claim type, and the anti-tautology tripwires — there is no standalone
-   cheat-detector pass.
+3. **Behavioral pressure against shortcut workflows** comes from Source
+   C's recompute-from-disk verifiers, the inverted-score "Used fallback"
+   claim type, and the anti-tautology tripwires.
 4. **Aggregation**:
    ```
    overall = clamp(base_mean + info_bonus, 0, 1)
