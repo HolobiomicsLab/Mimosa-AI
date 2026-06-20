@@ -147,7 +147,7 @@ class _VerifierClaimExtractionMixin:
                 "importance_rationale": "literal deliverable; absent here",
                 "likely_relevant_files": [],
             }]
-        per_source_min, per_source_max = self._per_source_targets(n_sources=6)
+        per_source_min, per_source_max = self._per_source_targets(n_sources=5)
         sources = (
             ("a", self._build_source_a_prompt(goal, grounding, workspace_listing, per_source_min, per_source_max)),
             ("b", self._build_source_b_prompt(goal, workspace_listing, per_source_min, per_source_max)),
@@ -155,7 +155,7 @@ class _VerifierClaimExtractionMixin:
             ("d", self._build_source_d_prompt(goal, workspace_listing, per_source_min, per_source_max)),
             ("e", self._build_source_e_prompt(goal, execution_text, workspace_listing, per_source_min, per_source_max)),
         )
-
+        assert len(sources) == 5, f"expected 5 sources, got {len(sources)}"
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
         per_source_elapsed: list[tuple[str, float, int]] = []
@@ -891,11 +891,3 @@ Return STRICT JSON only, in this exact shape:
             rationale = str(entry.get("rationale") or "").strip()
             out[cid] = (imp, rationale)
         return out
-
-    def _with_default_importance(self, claim: dict[str, Any]) -> dict[str, Any]:
-        """Stamp a claim with the default importance + an empty rationale."""
-        return {
-            **claim,
-            "importance": self._DEFAULT_CLAIM_IMPORTANCE,
-            "importance_rationale": "",
-        }

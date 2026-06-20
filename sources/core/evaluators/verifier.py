@@ -274,15 +274,8 @@ class VerifierEvaluator(
         phase_timings.append(("setup (exec text + workspace listing)", time.time() - t))
         print_ok(f"[verifier {uuid}] setup done in {phase_timings[-1][1]:.1f}s")
 
-        is_truly_empty = (
-            not execution_text or _EMPTY_RUN_MARKER in execution_text
-        )
         t = time.time()
-        grounding = (
-            self._get_grounding(uuid, execution_text, wf_info.goal)
-            if not is_truly_empty
-            else self._GROUNDING_DISABLED
-        )
+        grounding = self._get_grounding(uuid, execution_text, wf_info.goal)
         phase_timings.append(("grounding fetch", time.time() - t))
         print_ok(f"[verifier {uuid}] grounding fetch done in {phase_timings[-1][1]:.1f}s")
 
@@ -304,6 +297,7 @@ class VerifierEvaluator(
                     f"rubric_anchor_uuid={rubric_anchor_uuid} has no readable "
                     f"cache; falling back to LLM claim extraction"
                 )
+            is_truly_empty = not execution_text or _EMPTY_RUN_MARKER in execution_text
             claims = self._extract_claims(
                 uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
             )
@@ -958,28 +952,6 @@ class VerifierEvaluator(
             result["skipped_reason"] = skipped_reason
         return result
 
-    @staticmethod
-    def _fallback_textual_gradient(
-        scores: dict[str, Any]
-    ) -> str:
-        """Deterministic fallback when the abstractor LLM is unavailable.
-
-        Args:
-            scores: Aggregated score dict from ``_aggregate``.
-
-        Returns:
-            Single-sentence human-readable summary of the run's outcome.
-        """
-        n_pass = scores.get("n_pass", 0)
-        n_fail = scores.get("n_fail", 0)
-        n_claims = scores.get("n_claims", 0)
-        overall = scores.get("overall_score", 0.0)
-        bits = [
-            f"Run scored {overall:.2f}; "
-            f"{n_pass}/{n_claims} checks passed, {n_fail} refuted."
-        ]
-        return " ".join(bits)
-
     def _persist_textual_gradient(self, uuid: str, textual_gradient: str) -> None:
         """Write the textual_gradient to ``textual_gradient.txt`` alongside the report.
 
@@ -1001,7 +973,6 @@ class VerifierEvaluator(
     # ------------------------------------------------------------------
 
     _REPORT_SEPARATOR_BAR = "=" * 60
-    _REPORT_SECTION_BAR = "-" * 60
     _REPORT_STDERR_TAIL_LINES = 5
 
     def _build_report(
@@ -1032,7 +1003,7 @@ class VerifierEvaluator(
                 f"scored={scores.get('n_scored', 0)}"
             ),
             (
-                f"Overall: {scores['overall_score']:.3f}"
+                f"Overall: {scores['overall_score']:.3f}, "
                 f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
                 f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
             ),

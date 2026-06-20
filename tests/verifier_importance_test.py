@@ -174,8 +174,8 @@ def test_build_report_filters_below_min_importance() -> None:
     ]
     scores = v._aggregate(per_claim)
 
-    full = v._build_report(per_claim, scores, cheat=None, min_importance=0)
-    gradient = v._build_report(per_claim, scores, cheat=None, min_importance=6)
+    full = v._build_report(per_claim, scores, min_importance=0)
+    gradient = v._build_report(per_claim, scores, min_importance=6)
 
     assert "[deliverable]" in full and "[noise]" in full
     assert "[deliverable]" in gradient
