@@ -12,7 +12,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 # ----- File preview budgets ---------------------------------------------------
-_BINARY_SNIFF_BYTES = 4096
+_BINARY_SNIFF_BYTES = 16384
 _MAX_WORKSPACE_LISTING_ENTRIES = 200
 
 class _VerifierWorkspaceMixin:

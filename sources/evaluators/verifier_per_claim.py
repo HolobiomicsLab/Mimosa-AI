@@ -68,8 +68,10 @@ _PRINT_TRUNCATE_BYTES = 256
 _STDERR_TAIL_BYTES = 400
 
 VERIFIER_PROMPT_RULES = """
+RULES:
+
 - Print EXACTLY ONE JSON line to stdout, structured as:
-  {{"claim_id": "<id>", "status": "pass" | "fail",
+  {{"claim_id": "<id>", "status": "pass" | "fail" | "error",
     "actual": <observed value or null>, "details": "<short string>"}}
 - Read files with relative paths
   (cwd is the workspace).
@@ -80,20 +82,17 @@ VERIFIER_PROMPT_RULES = """
   comparison of order statistics across two groups (e.g. "all of A >
   all of B" becoming ``min(A) > max(B)``), first check that BOTH
   operand groups are drawn from the real data distribution. No placeholder/sentinel values (commonly -999, -9999, 9999, NaN, None)
-- Parse the relevant files according to the format visible in the PREVIEWS
-  above.
 - If the previews are empty or do not show enough of the file to be sure of
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
 - When the claim is about code structure in a workflow script (imports,
   function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module instead of regex or substring search.
+  with the stdlib ``ast`` module.
 - Match on the call target (``ast.Call.func``: e.g. node is a ``Name`` with id
   ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
   on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
   or on the attribute path. Walk with ``ast.walk(tree)``. 
 - Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs).
-- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 - If a file the script needs to open to evaluate the claim is MISSING from the
   workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
   Do NOT emit ``status="fail"`` — a missing artefact means the property is
@@ -101,13 +100,16 @@ VERIFIER_PROMPT_RULES = """
   sees the error. (Exception: claims that explicitly check file existence —
   for those, a missing file is the legitimate ``"fail"``.)
 
-What should not be done:
-- Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
-  inlined JSON blob) instead of recomputing it from workspace files.
-- Do not Returns "pass" without ever opening a file or running a real computation
-  derived from on-disk state.
-- Do not Declares ``likely_relevant_files`` but performs no file I/O.
-- Do not Check against hard-coded value (string or numerical) that was not explicitly given in the claim description as the target to check against.
+ERROR HANDLING:
+
+- catch and raise ONLY for SCRIPT failures — the check could not be
+  performed, file unparseable (re-raise as RuntimeError(...) from e), import/env broken, unexpected error.
+  These trigger recovery and regenerate the script.
+- catch and emit status="fail" for PROPERTY violations — the artefact was present and
+  readable, but the claim is not satisfied (wrong value, duplicate found,
+  range exceeded, ast node not found, regex absent in a log).
+  Do NOT raise these. Do NOT use status="error" for them.
+- Mnemonic: "I could not check" → error/raise; "I checked, the answer is no" → fail. 
 
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
@@ -121,7 +123,6 @@ RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 - If a file the script needs to open to evaluate the claim is MISSING from the
   workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
   Do NOT emit ``status="fail"`` — a missing artefact leaves the property
@@ -129,42 +130,6 @@ RECOVERY_PROMPT_RULES = """
   existence — for those, the file being absent IS the legitimate ``"fail"``;
   see the rule below.)
 - Read files with relative paths (cwd is the workspace).
-- Guard against vacuous comparisons. When a property reduces to a
-  comparison of order statistics across two groups (e.g. "all of A >
-  all of B" becoming ``min(A) > max(B)``), first check that BOTH
-  operand groups are drawn from the real data distribution: reject
-  groups where values are sentinel/masked placeholders (commonly
-  -999, -9999, 9999, NaN, None, or values equal to a constant across
-  the entire group when the data is supposed to be continuous). If
-  sentinel/masked values are present in either operand, emit
-  ``status="fail"`` with a details string naming the sentinel — the
-  check is unsound, not satisfied.
-- When the claim is about CODE STRUCTURE in a workflow script (imports,
-  function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module instead of regex or substring search.
-  Variable names are not load-bearing — never hard-code identifiers like
-  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
-  (``ast.Call.func``: e.g. node is a ``Name`` with id
-  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
-  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
-  source code is brittle to whitespace, quote style, line breaks, and
-  renames; reserve ``re`` for unstructured text (logs, READMEs).
-- For claims that an output FILE or PATH exists (e.g. "the predictions
-  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
-  the primary check is ``pathlib.Path(target).exists()`` evaluated in
-  the workspace cwd. If the file is there and parseable, that alone is
-  sufficient to emit ``status="pass"``. Do NOT additionally require the
-  source script to contain the literal path string — quote style,
-  ``os.path.join`` splits, and variable substitution will hide it.
-  Inspect source code only when the file is ABSENT and you need to
-  attribute the failure.
-- Some claims are conditional ("if X happens, Y must hold" / "no
-  fallback to Z used instead of W"). Detect the antecedent first. If
-  it is FALSE — the guarded path is not present in the workspace —
-  emit ``status="pass"`` with ``details="vacuously satisfied:
-  <antecedent> not present"``. Do not search unrelated regions of the
-  script for the consequent's keywords.
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
 """
 
@@ -972,6 +937,7 @@ AVAILABLE IMPORTS:
 Do NOT introduce any other third-party imports.
 
 INSTRUCTIONS:
+{VERIFIER_PROMPT_RULES}
 {RECOVERY_PROMPT_RULES}
 
 Return STRICT JSON only:

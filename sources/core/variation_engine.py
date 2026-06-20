@@ -278,15 +278,20 @@ class VariationEngine:
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
     
-    def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str) -> str:
+    def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str, goal: str) -> str:
         sys_msg = """
 YOu are an expert at pinpointing the root cause of failures in multi-agent workflows.
 Your task is to analyze these inputs and provide a clear, concise directive for the next mutation step.
 Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
-You will be given the previous workflow's agent answers and a textual gradient block that summarizes the failure modes.
+You will be given the previous workflow's agent answers (agents_answers) and a textual gradient block (diagnosis) that summarizes the failure.
+The diagnosis is a summary of  deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong.
+The diagnosis is trusted and should be used to inform your directive.
+The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
 You will also be given a <boldness> block that indicates how much change incentive you are allowed to suggest for the next workflow iteration.
 """
         prompt = ''.join([
+            "## GOAL:",
+            goal,
             "## EXECUTION RESULTS:",
             "<agents_answers>",
             agent_answers,
@@ -362,7 +367,8 @@ You will also be given a <boldness> block that indicates how much change incenti
             directive = self.llm_think_mutation_directive(
                 agent_answers=agent_answers,
                 textual_gradient_block=textual_gradient_block,
-                step_block=step_block
+                step_block=step_block,
+                goal=goal
             )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
