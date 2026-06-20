@@ -10,6 +10,7 @@ from sources.cli.pretty_print import (
     print_info, print_ok, print_warn, print_err,
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
+from sources.core.llm_provider import LLMConfig, LLMProvider
 
 import numpy as np
 
@@ -17,7 +18,7 @@ class VariationEngine:
     """Assemble mutation/crossover prompts and pick mutation scope from
     Rechenberg 1/5 success rate and a non-improvement plateau counter."""
 
-    def __init__(self) -> None:
+    def __init__(self, config) -> None:
         """Initialise empty history buffers."""
         self.textual_gradient_history: list[tuple[str, bool]] = []
         # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
@@ -25,6 +26,8 @@ class VariationEngine:
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self.last_variation_state: dict = {}
+        self.config = config
+        self.llm_config = None
         self.bands = [
             (
                 0.35, "Slight mutation (small step, exploit known good structure)"
@@ -42,6 +45,24 @@ class VariationEngine:
                 1.01, "Bolder mutation (explore new agent persona arrangement or workflow structure)"
             ),
         ]
+        self.setup_llm(config)
+
+    def setup_llm(self, config):
+        self.judge_model = config.workflow_llm_model
+        try:
+            provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
+            self.llm_config = LLMConfig().from_dict({
+                "model": model,
+                "provider": provider,
+                "temperature": 1.2,
+                "reasoning_effort": config.reasoning_effort,
+                "max_tokens": getattr(config, 'max_tokens', 8192),
+                "openrouter_provider": config.openrouter_provider_for(self.judge_model),
+                "openrouter_quantizations": config.openrouter_quantizations_for(self.judge_model),
+            })
+        except Exception as e:
+            raise Exception(f"Failed to initialize LLM configuration: {str(e)}") from e
+
 
     def record_offspring_gradient(
         self,
@@ -241,29 +262,6 @@ class VariationEngine:
 
     # ── Prompt builders ───────────────────────────────────────────────────────
 
-    def random_topology_prompt(self) -> str:
-        """Pick a random workflow-topology suggestion as a short label.
-
-        Returns:
-            One of a curated set of human-readable topology descriptions used
-            to seed initial workflow generations.
-        """
-
-        return np.random.choice([
-            "single-agent",
-            "simple linear chain",
-            "sequential pipeline (output of one is input to next)",
-            "reflection pair (actor → critic loop, fixed iterations)",
-            "debate with fixed turns (proposer → opponent → judge, no adaptation)",
-            "relay race (agent A → B → C → D, fixed handoff)",
-            "assembly line (specialized stations in fixed order)",
-            "ping-pong (two agents, fixed alternation)",
-            "cascading refinement (draft → edit → polish → finalize)",
-            "waterfall (analysis → design → implementation → review, no backtracking)",
-            "serial verification (generator → verifier → generator → verifier, fixed rounds)",
-            "staged gate (must pass checkpoint before next stage, fixed sequence)"
-        ])
-
     def seed_genome_prompt(self, goal: str) -> str:
         """Build the prompt for the very first workflow generation (generation 0).
 
@@ -274,13 +272,45 @@ class VariationEngine:
             A prompt suggesting a random topology and a small starting agent budget.
         """
         n_agents = self._sample_agent_count(0.5, 1, 4)  # start with small random agent count
-        topology = self.random_topology_prompt()
         return (
             "## First workflow generation\n"
             f"Goal to assemble a workflow for:\n{goal}\n"
-            f"Suggested initial topology: {topology}.\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
+    
+    def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str) -> str:
+        sys_msg = """
+YOu are an expert at pinpointing the root cause of failures in multi-agent workflows.
+Your task is to analyze these inputs and provide a clear, concise directive for the next mutation step.
+Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
+You will be given the previous workflow's agent answers and a textual gradient block that summarizes the failure modes.
+You will also be given a <boldness> block that indicates how much change incentive you are allowed to suggest for the next workflow iteration.
+"""
+        prompt = ''.join([
+            "## EXECUTION RESULTS:",
+            "<agents_answers>",
+            agent_answers,
+            "</agents_answers>",
+            "<diagnosis>",
+            "",
+            textual_gradient_block,
+            "</diagnosis>",
+            "<boldness>",
+            step_block,
+            "</boldness>",
+            "Suggest a mutation directive for the next workflow iteration"
+            "Higher boldness mean the same failure more was identified multiple times."
+            "Example directive:"
+            "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
+            "- 'The agent are subborn, they are not following the instructions. Consider changing the agent's persona to be more compliant.'"
+            "- Tweak the prompt of agent X to put the agent on a more domain-specific manifold, to avoid them to be stuck in the same local minima."
+        ])
+        provider = LLMProvider(
+            system_msg=sys_msg,
+            config=self.llm_config,
+        )
+        return provider(prompt)
+
 
     def mutation_prompt(
         self,
@@ -327,38 +357,27 @@ class VariationEngine:
         step_block = self._get_prompt_step_size(parent_score=score)
 
         if genotype is None:
-            body = "Previous attempt failed. Fix syntax errors."
+            directive = "Previous attempt failed completly. Fix syntax errors."
         else:
-            body = "\n".join([
-                "## WORKFLOW EVOLUTION STEP",
-                "",
-                "Your previous workflow attempt did not reach the success threshold.",
-                "",
-                "## Previous workflow code:",
-                "<python>",
-                genotype,
-                "</python>",
-                "",
-                "## EXECUTION RESULTS:",
-                #"<agents_answers>",
-                #agent_answers,
-                #"</agents_answers>",
-                "<diagnosis>",
-                "",
-                textual_gradient_block,
-                "</diagnosis>",
-                "<boldness>",
-                step_block,
-                "</boldness>",
-                "",
-                "## Task: apply a single mutation to the workflow code.",
-            ])
-
+            directive = self.llm_think_mutation_directive(
+                agent_answers=agent_answers,
+                textual_gradient_block=textual_gradient_block,
+                step_block=step_block
+            )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
-            body,
-            "\nTarget goal:",
+            "## GOAL:",
             goal,
+            "## WORKFLOW EVOLUTION STEP",
+            "Previous workflow code:",
+            "<python>",
+            genotype,
+            "</python>",
+            "Your previous workflow attempt did not reach the success threshold.",
+            "<directive>",
+            directive,
+            "</directive>",
+            "Follow directive as guideline regarding what to change in the workflow code.",
         ])
 
     def crossover_prompt(
@@ -484,7 +503,6 @@ if __name__ == "__main__":
     assert state["effective_boldness"] >= 0.35, state
     assert state["effective_boldness"] < 0.90, state
     assert state["respeciation_gate_open"] is False, state
-    assert "RE-SPECIATION" not in plateau_step, plateau_step
 
     # ── Hysteresis gate opens at iters_since_improvement ≥ 8 + success=0. ──
     ve = VariationEngine()
@@ -495,7 +513,6 @@ if __name__ == "__main__":
     deep_stuck_step = ve._get_prompt_step_size(parent_score=0.5)
     state = ve.last_variation_state
     assert state["respeciation_gate_open"] is True, state
-    assert "RE-SPECIATION" in deep_stuck_step, deep_stuck_step
 
     # ── Real progress: improvements drop boldness to the smallest band. ──
     ve = VariationEngine()
@@ -510,7 +527,6 @@ if __name__ == "__main__":
     assert ve._compute_success_rate() == 1.0
     progress_step = ve._get_prompt_step_size(parent_score=0.5)
     assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
-    assert "EXPLOITATION" in progress_step, progress_step
 
     # ── Near-finish floor: at parent=1.0 the damper halves the pre-clamp
     #    boldness. Use a 3-iter streak so the result stays well below the

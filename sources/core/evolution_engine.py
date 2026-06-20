@@ -26,7 +26,7 @@ from sources.cli.pretty_print import (
     print_warn,
 )
 from sources.evaluators.evaluator import WorkflowEvaluator
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.run_metrics import append_jsonl, write_run_metrics
@@ -89,7 +89,7 @@ class EvolutionEngine:
         self.logger = logging.getLogger(__name__)
         self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
-        self.variation = VariationEngine()
+        self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
         self.selection = SelectionPressure(
             min_improvement_threshold=0.01,
