@@ -178,13 +178,10 @@ The intent is informational, not punitive: the mutator learns *what
 direction to push the workflow next* without being handed a vocabulary
 it can over-fit against.
 
-## Cheat detector (currently disabled)
+## Behavioral anti-cheat pressure
 
-A standalone cheat detector pass over the agents' produced source code
-existed in earlier versions and is kept in the codebase but is currently
-**disabled** (`cheat = None`) pending a rewrite. The aggregation pipeline
-still supports a `cheat_penalty` field for when it is re-enabled. The
-behavioral anti-cheat pressure today comes from:
+There is no standalone cheat-detector pass. Anti-cheat pressure comes
+from the verifier pipeline itself:
 
 - Source C's recompute-from-disk verifiers.
 - The "Used fallback" claim type, whose score is *inverted* — a passing
