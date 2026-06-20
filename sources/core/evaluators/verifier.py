@@ -47,9 +47,7 @@ _VERIFIER_MAX_CLAIMS = 100
 _VERIFIER_MIN_CLAIMS = 10
 _HARD_FAIL_CAP = 0.99  # disabled so signal stay smooth
 _VERIFIER_GEN_PARALLELISM = 16
-# Per-claim verifier execution fan-out. Capped low because executable verifier
-# scripts can be CPU-bound (numpy/pandas on full artefacts); higher concurrency
-# starves rather than helps. 
+# Per-claim verifier execution fan-out. Capped low because higher concurrency doesn't alway help
 _VERIFIER_EXEC_PARALLELISM = 4
 
 # bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
@@ -890,11 +888,9 @@ class VerifierEvaluator(
         total_w = sum(self._claim_weight(c) for c in scored)
         base_mean = sum(c["score"] * self._claim_weight(c) for c in scored) / total_w
         bonus = self._information_bonus(high_importance_pass_mass)
-        # Pre-cap: clamp to [0, 1] before applying the hard-fail cap so the
-        # bonus can never push past 1.0 nor rescue a broken run.
+        # Pre-cap: clamp to [0, 1] before applying the hard-fail cap 
         pre_cap = max(0.0, min(1.0, base_mean + bonus))
-        # Hard-fail cap fires only on a real refutation of a top-importance
-        # claim — not on errors or unsure verdicts.
+        # Hard-fail cap fires only on a real refutation of a top-importance claim
         hard_fail = any(
             self._claim_weight(c) >= self._HARD_FAIL_IMPORTANCE
             and c["status"] == "fail"

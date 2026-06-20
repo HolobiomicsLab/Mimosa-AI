@@ -131,8 +131,7 @@ class _VerifierClaimExtractionMixin:
             goal: Original workflow goal text.
             execution_text: Agent narration / produced output text.
             workspace_listing: Rendered listing of workspace files.
-            is_truly_empty: When True, returns a single sentinel "execution
-                succeeded" claim and skips extraction.
+            is_truly_empty: When True, returns a single sentinel "execution succeeded" claim and skips extraction.
             grounding: Optional peer-reviewed literature grounding block.
 
         Returns:

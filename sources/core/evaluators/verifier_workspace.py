@@ -16,21 +16,7 @@ _BINARY_SNIFF_BYTES = 4096
 _MAX_WORKSPACE_LISTING_ENTRIES = 200
 
 class _VerifierWorkspaceMixin:
-    """Workspace listing, file preview and grounding methods.
-
-    Expects the concrete class to provide:
-        - ``workspace_dir`` (Path) — root of the agents' workspace.
-        - ``preview_head_bytes`` / ``preview_tail_bytes`` /
-          ``preview_per_claim_cap`` (int) — per-instance preview budgets.
-        - ``use_grounding`` (bool) — Perspicacite opt-out flag.
-        - ``logger``.
-        - ``_preview_cache`` (dict[str, str]) — cache for ``_preview_file``.
-        - ``_grounding_cache`` (dict[str, str]) — cache for ``_get_grounding``.
-
-    Owns / initialises:
-        - ``_workspace_files`` (set[str]) — reset on every ``_list_workspace``
-          call; read by the claim parser and the per-claim file selector.
-    """
+    """Workspace listing, file preview and grounding methods."""
 
     # ------------------------------------------------------------------
     # Workspace listing

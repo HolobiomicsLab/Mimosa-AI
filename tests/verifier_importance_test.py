@@ -113,15 +113,16 @@ def test_high_importance_flip_moves_score_more_than_low_importance_flip() -> Non
 def test_hard_fail_cap_triggers_only_on_high_importance_refutation() -> None:
     """Refuting an importance≥8 claim flips ``hard_fail_capped``; lower does not."""
     v = _StubVerifier()
+    threshold = VerifierEvaluator._HARD_FAIL_IMPORTANCE
 
     capped = v._aggregate([
-        _claim("must_have", importance=8, status="fail"),
+        _claim("must_have", importance=threshold, status="fail"),
         _claim("ok", importance=5, status="pass"),
     ])
     assert capped["hard_fail_capped"] is True
 
     not_capped = v._aggregate([
-        _claim("nice_to_have", importance=7, status="fail"),
+        _claim("nice_to_have", importance=threshold-1, status="fail"),
         _claim("ok", importance=5, status="pass"),
     ])
     assert not_capped["hard_fail_capped"] is False
