@@ -16,7 +16,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sources.core.llm_provider import LLMConfig, LLMProvider
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 
 from .base import *
 

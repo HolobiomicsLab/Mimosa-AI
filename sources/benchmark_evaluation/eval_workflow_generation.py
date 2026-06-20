@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict
 
 from sources.core.orchestrator import WorkflowOrchestrator
-from sources.evaluation.csv_mode import CsvEvaluationMode
+from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
 
 
 class WorkflowEval:

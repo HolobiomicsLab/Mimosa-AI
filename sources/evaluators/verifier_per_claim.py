@@ -115,7 +115,44 @@ RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+- Read files with relative paths (cwd is the workspace).
+- Guard against vacuous comparisons. When a property reduces to a
+  comparison of order statistics across two groups (e.g. "all of A >
+  all of B" becoming ``min(A) > max(B)``), first check that BOTH
+  operand groups are drawn from the real data distribution: reject
+  groups where values are sentinel/masked placeholders (commonly
+  -999, -9999, 9999, NaN, None, or values equal to a constant across
+  the entire group when the data is supposed to be continuous). If
+  sentinel/masked values are present in either operand, emit
+  ``status="fail"`` with a details string naming the sentinel — the
+  check is unsound, not satisfied.
+- When the claim is about CODE STRUCTURE in a workflow script (imports,
+  function calls, class instantiations, assignments), parse the script
+  with the stdlib ``ast`` module instead of regex or substring search.
+  Variable names are not load-bearing — never hard-code identifiers like
+  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
+  (``ast.Call.func``: e.g. node is a ``Name`` with id
+  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
+  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
+  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
+  source code is brittle to whitespace, quote style, line breaks, and
+  renames; reserve ``re`` for unstructured text (logs, READMEs).
+- For claims that an output FILE or PATH exists (e.g. "the predictions
+  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
+  the primary check is ``pathlib.Path(target).exists()`` evaluated in
+  the workspace cwd. If the file is there and parseable, that alone is
+  sufficient to emit ``status="pass"``. Do NOT additionally require the
+  source script to contain the literal path string — quote style,
+  ``os.path.join`` splits, and variable substitution will hide it.
+  Inspect source code only when the file is ABSENT and you need to
+  attribute the failure.
+- Some claims are conditional ("if X happens, Y must hold" / "no
+  fallback to Z used instead of W"). Detect the antecedent first. If
+  it is FALSE — the guarded path is not present in the workspace —
+  emit ``status="pass"`` with ``details="vacuously satisfied:
+  <antecedent> not present"``. Do not search unrelated regions of the
+  script for the consequent's keywords.
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
 """
 

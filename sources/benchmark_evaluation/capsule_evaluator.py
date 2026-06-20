@@ -18,9 +18,9 @@ from datetime import datetime
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
-from sources.evaluation.execution_sandbox import ExecutionSandbox
-from sources.evaluation.codebert_scorer import calculate_codebert_score
+from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.benchmark_evaluation.execution_sandbox import ExecutionSandbox
+from sources.benchmark_evaluation.codebert_scorer import calculate_codebert_score
 
 class CapsuleEvaluator:
     """Evaluates Mimosa-AI execution results against ScienceAgentBench metrics."""
@@ -242,7 +242,7 @@ Task {self.instance_id} Evaluation Results:
 
 if __name__ == "__main__":
     import csv
-    from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
+    from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
 
     sab_loader = ScienceAgentBenchLoader(base_path="../../datasets/ScienceAgentBench")
     papers_csv_path = "../../datasets/ScienceAgentBench.csv"

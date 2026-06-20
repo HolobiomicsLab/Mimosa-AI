@@ -828,7 +828,7 @@ class EvaluationCLI:
 
     async def _run_single_eval(self, spec: EvalRunSpec) -> None:
         """Execute a single evaluation run from its spec."""
-        from sources.evaluation.csv_mode import CsvEvaluationMode
+        from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
 
         try:
             import psutil

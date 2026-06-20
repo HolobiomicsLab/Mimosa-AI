@@ -21,8 +21,8 @@ from sources.core.evolution_engine import EvolutionEngine
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
 from sources.core.schema import Task, IndividualRun
-from sources.evaluation.science_agent_bench import ScienceAgentBenchLoader
-from sources.evaluation.capsule_evaluator import CapsuleEvaluator
+from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.list_files import list_files
 from sources.utils.email_reporter import send_evaluation_report
