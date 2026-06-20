@@ -235,7 +235,7 @@ Each iteration also writes structured metrics for post-hoc analysis:
   `novelty_score`, the `selection_log`, and the
   `variation_state` (`iters_since_improvement`, `plateau`,
   `success_rate`, `effective_boldness`, `parent_score`,
-  `respeciation_gate_open`, `scope_band`, `agent_budget`) that produced
+  `respeciation_gate_open`, , `agent_budget`) that produced
   this offspring.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,

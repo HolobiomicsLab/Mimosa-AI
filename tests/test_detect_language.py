@@ -12,7 +12,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
 
-from sources.core.evaluators.verifier_per_claim import _detect_language  # noqa: E402
+from sources.evaluators.verifier_per_claim import _detect_language  # noqa: E402
 
 
 def test_pure_python_listing_is_python() -> None:

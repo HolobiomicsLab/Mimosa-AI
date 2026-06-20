@@ -287,35 +287,17 @@ class BaseEvaluator:
 
     def _get_judge_system_prompt(self) -> str:
         """Return the system prompt used by the LLM judge.
+        Prompt is quite generic because it is shared across verifiers evaluators call _call_judge_for_json.
+        Used to extract claims, write verifiers program, select files and any other call that requires a judge.
 
         Returns:
             The fixed judge system prompt string, kept verbatim for
             reproducibility across evaluations.
         """
         # Preserving original prompt exactly
-        return """You are an expert scientific researcher and rigorous multi-agent system evaluator. Your task is to assess whether a computational workflow achieved its intended goals ensuring goal alignment, scientific validity and technical correctness.
-
-    You will evaluate:
-    System Description
-    - The workflow's goal (scientific/research objective)
-    - The agents involved, their roles, and expected behaviors
-    - The workflow trace (inputs, outputs, execution steps)
-    - The Python workflow implementation
-
-    Multi-Agent System Evaluation Criteria
-    - Role Consistency: Does each agent behave as expected given its role?
-    - Logical Flow: Does each step follow coherently from the previous one?
-    - Output Quality: Are outputs correct, useful, and free of errors?
-    - Bottlenecks/Failures: Are there inefficiencies, misunderstandings, or failures?
-    - Collaboration Effectiveness: Do agents work together optimally?
-    - Goal Alignement: Did the execution achieve the defined objective?
-
-    Scientific Research Evaluation Criteria
-    -Result Accuracy: Were the requested scientific results/analysis produced correctly?
-    - Research Question Addressed: Was the core problem adequately solved?
-    - Tool Usage: Were tools (agents, algorithms, data) applied correctly and in sequence?
-    - Error Handling: Did the system detect and manage errors appropriately?
-    - Clarity & Professionalism: Are results presented clearly and in a usable format?"""
+        return """You are an expert scientific researcher and rigorous evaluator.
+ Your task is to assess whether a computational workflow achieved its intended goals ensuring goal alignment, scientific validity and technical correctness.
+    """
 
     # ------------------------------------------------------------------
     # Judge call helpers (shared across evaluators)

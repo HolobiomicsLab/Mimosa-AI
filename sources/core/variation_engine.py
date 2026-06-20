@@ -25,6 +25,23 @@ class VariationEngine:
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self.last_variation_state: dict = {}
+        self.bands = [
+            (
+                0.35, "Slight mutation (small step, exploit known good structure)"
+            ),
+            (
+                0.50, "Roleplay shift (moderate step, explore new persona or reasoning style)"
+            ),
+            (
+                0.65, "Prompt and roleplay shift (moderate step, more explicit instructions, more direct framing, change persona and reasoning mode)"
+            ),
+            (
+                0.90, "Topology mutation (larger step, explore new agent arrangement or workflow structure)"
+            ),
+            (
+                1.01, "Bolder mutation (explore new agent persona arrangement or workflow structure)"
+            ),
+        ]
 
     def record_offspring_gradient(
         self,
@@ -184,49 +201,8 @@ class VariationEngine:
         else:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
-        bands = [
-            (
-                0.35,
-                "EXPLOITATION (Point Mutation):\n"
-                "- Objective: Micro-tune the current high-performing lineage.\n"
-                "- Scope: Modify only minor phrasing, system instructions, or prompt adjectives.\n"
-                "- Invariance: DO NOT alter the agent graph, agent roles, tool definitions, or handoff structures.\n"
-                "- Strategy: Keep 90% of the prompt identical. Optimize for nuance and alignment."
-            ),
-            (
-                0.50,
-                "ALIGNMENT (Interface Optimization):\n"
-                "- Objective: Smooth out execution friction and coordination errors between nodes.\n"
-                "- Scope: Update agent handoff prompts, context-passing schemas, or tool usage instructions.\n"
-                "- Invariance: Keep the macro-topology and core agent identities exactly as they are.\n"
-                "- Strategy: Focus heavily on clarifying the input/output boundaries and communication contracts between agents."
-            ),
-            (
-                0.65,
-                "ADAPTATION (Component Overhaul):\n"
-                "- Objective: Major behavioral adjustment to fix localized stagnation.\n"
-                "- Scope: Completely rewrite the system prompts of lagging or failing agents. Swap, add, or deprecate specific tools.\n"
-                "- Invariance: Maintain the structural routing/topology of the multi-agent graph.\n"
-                "- Strategy: Retain the overall workflow architecture, but radically re-engineer how individual nodes think and execute."
-            ),
-            (
-                0.90,
-                "EXPLORATION (Macro Structural Mutation):\n"
-                "- Objective: Break out of a severe local minimum or chronic structural failure.\n"
-                "- Scope: Mutate the graph topology. Add a new specialized agent, merge two redundant agents, or change the routing logic.\n"
-                "- Invariance: Keep the fundamental task goal, but completely change the operational workflow.\n"
-                "- Strategy: Restructure the cognitive pipeline. Introduce parallel processing, voting consensus, or multi-step validation loops."
-            ),
-            (
-                1.01,
-                "RE-SPECIATION (Systemic Paradigm Shift):\n"
-                "- Objective: The current evolutionary branch is a dead end. Escape entirely.\n"
-                "- Scope: Clean-slate redesign of the multi-agent architecture.\n"
-                "- Invariance: None. Only the core task description and learned constraints/task specifications remain constant.\n"
-                "- Strategy: Rethink the entire approach. If it was a sequential pipeline, turn it into an autonomous swarm. If it was highly fragmented, design a single ultra-dense prompt. Radical experimentation."
-            ),
-        ]
-        scope = next(label for threshold, label in bands if effective < threshold)
+        scope = next(label for threshold, label in self.bands if effective < threshold)
+
         self.last_variation_state = {
             "iters_since_improvement": int(iters_since_improvement),
             "plateau": float(plateau),
@@ -234,7 +210,6 @@ class VariationEngine:
             "effective_boldness": float(effective),
             "parent_score": float(parent_score),
             "respeciation_gate_open": bool(respeciation_allowed),
-            "scope_band": scope,
             "agent_budget": int(n_agents),
         }
         return f"Mutation scope: {scope}. Boldness: {effective*100:.2f}%. Use at most {n_agents} agent(s).\n"

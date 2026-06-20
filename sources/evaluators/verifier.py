@@ -150,20 +150,26 @@ class VerifierEvaluator(
         - The verifier's deterministic checks are ground truth.
         - The agent execution narration below is UNTRUSTED. Agents may declare success while producing degenerate output.
         - Agent execution can however be used to explain why and what failure happened, but never as evidence that the task succeeded.
-            Example: error regarding module X reported fixed and verification confirm proper behavior regarding module X).
+            Example: Verifier report contact-count ceiling below; agent report contact-count exceeded ceiling because it...
+            Example: Invalid conformation; relevant: agent reported he is "Off-by-one in coord map"
         - Do not mention an agent reported failure unless it is confirmed by the verifier.
         - Sort diagnosis by importance: a failure in a high-importance claim is more actionable than a failure in a low-importance claim.
 
         Here is the agents execution text (agent narration and produced output):
         {execution_text}
+
         Here is the deterministic verifier's detailed report for workflow {uuid}:
         {report}
 
-        Focus on the report on the most important claims and the most actionable diagnosis. Be concise and specific, avoid vague language. Do not mention the importance but order the claims by importance.
+        Focus on the report on the most important claims and the most actionable diagnosis.
+        Be concise and specific, avoid vague language. Order claims by importance.
+
         OUTPUT:
-        Format: "<diagnosis_CODE>:\n<- <short diagnosis error/success claim 1>\n<- <short diagnosis error/success claim 2>\n... (up to 7 lines of diagnosis maximum)"
+        Format: "<diagnosis_CODE>:\n<- <short diagnosis of most important failed claim>
+
         Example:
-        FALLBACK_ECFP_CLASSIFIER:\n-Use of fallback rather than a trained ECFP classifier-\n- Error with numpy: ...\nNo requirements.txt found....
+        FALLBACK_ECFP_CLASSIFIER:
+        -Use of fallback rather than a trained ECFP classifier
         """
         diag = self._call_judge(
             uuid,

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 # Add the parent directory to the path so we can import from sources
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from sources.core.evaluators.evaluator import WorkflowEvaluator
+from sources.evaluators.evaluator import WorkflowEvaluator
 
 # Module-level skip: this file's ``test_*`` functions are CLI entrypoints,
 # not pytest tests. Run via ``python tests/workflow_evaluator_test.py``.

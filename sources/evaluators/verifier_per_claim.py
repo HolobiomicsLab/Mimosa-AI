@@ -59,7 +59,7 @@ _RECOVERY_IMPORT_MARKERS: tuple[str, ...] = (
 )
 _BASE_INSTALL_TIMEOUT_SECONDS = 600
 _RUNNER_CLEANUP_TIMEOUT = 15
-_RUNNER_SMOKE_TIMEOUT = 15.0
+_RUNNER_SMOKE_TIMEOUT = 25.0
 _RUNNER_EXTRA_TIMEOUT = 10
 _PIP_INSTALL_FLAGS: tuple[str, ...] = (
     "--quiet", "--disable-pip-version-check", "--break-system-packages",
@@ -79,52 +79,23 @@ VERIFIER_PROMPT_RULES = """
 - Guard against vacuous comparisons. When a property reduces to a
   comparison of order statistics across two groups (e.g. "all of A >
   all of B" becoming ``min(A) > max(B)``), first check that BOTH
-  operand groups are drawn from the real data distribution: reject
-  groups where values are sentinel/masked placeholders (commonly
-  -999, -9999, 9999, NaN, None, or values equal to a constant across
-  the entire group when the data is supposed to be continuous). If
-  sentinel/masked values are present in either operand, emit
-  ``status="fail"`` with a details string naming the sentinel — the
-  check is unsound, not satisfied.
-- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
+  operand groups are drawn from the real data distribution. No placeholder/sentinel values (commonly -999, -9999, 9999, NaN, None)
 - Parse the relevant files according to the format visible in the PREVIEWS
-  above. Do not invent a different format. If the previews include a header
-  line (e.g. "Minimum Energy: -6") your parser must skip it gracefully.
+  above.
 - If the previews are empty or do not show enough of the file to be sure of
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
-- When the claim is about CODE STRUCTURE in a workflow script (imports,
+- When the claim is about code structure in a workflow script (imports,
   function calls, class instantiations, assignments), parse the script
   with the stdlib ``ast`` module instead of regex or substring search.
-  Variable names are not load-bearing — never hard-code identifiers like
-  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
-  (``ast.Call.func``: e.g. node is a ``Name`` with id
+- Match on the call target (``ast.Call.func``: e.g. node is a ``Name`` with id
   ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
   on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
-  source code is brittle to whitespace, quote style, line breaks, and
-  renames; reserve ``re`` for unstructured text (logs, READMEs).
-- For claims that an output FILE or PATH exists (e.g. "the predictions
-  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
-  the primary check is ``pathlib.Path(target).exists()`` evaluated in
-  the workspace cwd. If the file is there and parseable, that alone is
-  sufficient to emit ``status="pass"``. Do NOT additionally require the
-  source script to contain the literal path string — quote style,
-  ``os.path.join`` splits, and variable substitution will hide it.
-  Inspect source code only when the file is ABSENT and you need to
-  attribute the failure.
-- Some claims are conditional ("if X happens, Y must hold" / "no
-  fallback to Z used instead of W"). Detect the antecedent first. If
-  it is FALSE — the guarded path is not present in the workspace —
-  emit ``status="pass"`` with ``details="vacuously satisfied:
-  <antecedent> not present"``. Do not search unrelated regions of the
-  script for the consequent's keywords.
-- On a "Used fallback claim", the score is inverted: 0 if the claim passes, 1 if it fails. This is to incentivize the verified program to not use fallback
+  or on the attribute path. Walk with ``ast.walk(tree)``. 
+- Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs).
+- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 
 What should not be done:
-- Do not Embeds the workflow output, the agent's final answer, or any large
-  fragment thereof as a string literal and then parses that literal. This
-  is a tautology: comparing the answer to itself proves nothing.
 - Do not Hard-codes the expected value (e.g. ``status == "SUCCESS"`` against an
   inlined JSON blob) instead of recomputing it from workspace files.
 - Do not Returns "pass" without ever opening a file or running a real computation
@@ -132,64 +103,19 @@ What should not be done:
 - Do not Declares ``likely_relevant_files`` but performs no file I/O.
 - Do not Check against hard-coded value (string or numerical) that was not explicitly given in the claim description as the target to check against.
 
-What a legitimate verifier does:
-- Opens the file(s) in ``likely_relevant_files`` from the workspace cwd.
-- Re-derives the value the claim asserts (recompute the energy, recount the
-  contacts, re-walk the chain, re-read the metric).
-- Compares the recomputed value to the small target taken from the claim
-  description (e.g. "-6", "20 residues") — targets are short numeric/string
-  constants, not embedded answer payloads.
-
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
 defensibility of a conclusion), set "executable": false and explain briefly.
 
 Don't forget to include the library you need such as json, numpy, etc..
-You can use library from the standard library and the available imports.
+You can ONLY use library from the standard library and the available imports.
 """
 
 RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- o not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
-- Read files with relative paths (cwd is the workspace).
-- Guard against vacuous comparisons. When a property reduces to a
-  comparison of order statistics across two groups (e.g. "all of A >
-  all of B" becoming ``min(A) > max(B)``), first check that BOTH
-  operand groups are drawn from the real data distribution: reject
-  groups where values are sentinel/masked placeholders (commonly
-  -999, -9999, 9999, NaN, None, or values equal to a constant across
-  the entire group when the data is supposed to be continuous). If
-  sentinel/masked values are present in either operand, emit
-  ``status="fail"`` with a details string naming the sentinel — the
-  check is unsound, not satisfied.
-- When the claim is about CODE STRUCTURE in a workflow script (imports,
-  function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module instead of regex or substring search.
-  Variable names are not load-bearing — never hard-code identifiers like
-  ``rf_full``, ``final_model``, ``train_df``. Match on the call target
-  (``ast.Call.func``: e.g. node is a ``Name`` with id
-  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
-  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. Regex on
-  source code is brittle to whitespace, quote style, line breaks, and
-  renames; reserve ``re`` for unstructured text (logs, READMEs).
-- For claims that an output FILE or PATH exists (e.g. "the predictions
-  CSV is at ``<exact path>``", "the deliverable file ``X`` exists"),
-  the primary check is ``pathlib.Path(target).exists()`` evaluated in
-  the workspace cwd. If the file is there and parseable, that alone is
-  sufficient to emit ``status="pass"``. Do NOT additionally require the
-  source script to contain the literal path string — quote style,
-  ``os.path.join`` splits, and variable substitution will hide it.
-  Inspect source code only when the file is ABSENT and you need to
-  attribute the failure.
-- Some claims are conditional ("if X happens, Y must hold" / "no
-  fallback to Z used instead of W"). Detect the antecedent first. If
-  it is FALSE — the guarded path is not present in the workspace —
-  emit ``status="pass"`` with ``details="vacuously satisfied:
-  <antecedent> not present"``. Do not search unrelated regions of the
-  script for the consequent's keywords.
+- Do not swallow exceptions. If you catch one for context, re-raise it (e.g. raise RuntimeError(f'parsing failed: {e}') from e). Never emit a pass/fail JSON line in an except branch.
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
 """
 
@@ -349,7 +275,7 @@ class _VerifierPerClaimMixin:
         """Dispatch to executable or soft branch; return ``(final_spec, scored)``."""
         if spec.get("executable") and spec.get("code"):
             spec, exec_result = self._run_verifier_with_recovery(
-                uuid, claim, spec, execution_text, workspace_listing
+                uuid, claim, spec
             )
             self._print_executable_summary(claim, exec_result)
             return spec, self._score_executable(claim, spec, exec_result)
@@ -752,9 +678,7 @@ Return STRICT JSON only, in one of these two shapes:
         self,
         uuid: str,
         claim: dict[str, Any],
-        spec: dict[str, Any],
-        execution_text: str,
-        workspace_listing: str,
+        spec: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Run the verifier with one corrective retry on verifier-side failures.
 
@@ -777,7 +701,7 @@ Return STRICT JSON only, in one of these two shapes:
             if recovered is not None:
                 return spec, recovered
         return self._regenerate_and_rerun(
-            uuid, claim, spec, exec_result, execution_text, workspace_listing
+            uuid, claim, spec, exec_result
         )
 
     def _try_install_and_rerun(
@@ -805,14 +729,12 @@ Return STRICT JSON only, in one of these two shapes:
         uuid: str,
         claim: dict[str, Any],
         spec: dict[str, Any],
-        exec_result: dict[str, Any],
-        execution_text: str,
-        workspace_listing: str,
+        exec_result: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Regenerate the script once with traceback feedback and re-run it."""
         cid = claim["id"]
         new_spec = self._regenerate_verifier_with_feedback(
-            uuid, claim, spec, exec_result, execution_text, workspace_listing
+            uuid, claim, spec, exec_result
         )
         if not (new_spec.get("executable") and new_spec.get("code")):
             reason = str(new_spec.get("reason") or "regenerated spec missing code")
@@ -954,9 +876,7 @@ Rules:
         uuid: str,
         claim: dict[str, Any],
         prev_spec: dict[str, Any],
-        exec_result: dict[str, Any],
-        execution_text: str,
-        workspace_listing: str,
+        exec_result: dict[str, Any]
     ) -> dict[str, Any]:
         """Ask the judge to fix the previous script given the traceback."""
         prompt = self._build_regen_prompt(claim, prev_spec, exec_result)
