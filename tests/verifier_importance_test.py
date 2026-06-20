@@ -5,7 +5,6 @@ These cover the post-criticality refactor:
 - ``_aggregate`` weights claims by importance so a high-importance flip moves
   the score strictly more than a low-importance one (the whole reason for the
   refactor — the old 3-vs-1 step function couldn't express that).
-- The thoroughness bonus only fires on high-importance passes.
 - The hard-fail cap triggers on refuted ``importance >= 8`` claims.
 - ``_build_report(min_importance=...)`` produces the filtered view used as the
   gradient builder's input — low-importance claims are suppressed.
@@ -41,8 +40,6 @@ class _StubVerifier(VerifierEvaluator):
     def __init__(self) -> None:  # noqa: D401
         self.logger = logging.getLogger("test_verifier_importance")
         self.hard_fail_cap = verifier_mod._HARD_FAIL_CAP
-        self.info_bonus_alpha = verifier_mod._INFO_BONUS_ALPHA
-        self.info_bonus_beta = verifier_mod._INFO_BONUS_BETA
 
 
 def _claim(cid: str, importance: int, status: str, rationale: str = "") -> dict:
@@ -138,31 +135,12 @@ def test_hard_fail_cap_does_not_fire_on_errored_claims() -> None:
     assert scores["hard_fail_capped"] is False
 
 
-def test_information_bonus_counts_only_high_importance_passes() -> None:
-    """A workspace of importance-3 passes earns no bonus; importance-9 does."""
-    v = _StubVerifier()
-
-    low_only = v._aggregate([
-        _claim("a", importance=3, status="pass"),
-        _claim("b", importance=3, status="pass"),
-        _claim("c", importance=3, status="pass"),
-    ])
-    high_only = v._aggregate([
-        _claim("a", importance=9, status="pass"),
-    ])
-
-    assert low_only["n_high_importance_pass"] == 0
-    assert low_only["information_bonus"] == 0.0
-    assert high_only["n_high_importance_pass"] == 1
-    assert high_only["information_bonus"] > 0.0
-
-
 def test_aggregate_emits_new_telemetry_keys() -> None:
     """The score dict carries the new importance-based fields, not the old ones."""
     v = _StubVerifier()
     scores = v._aggregate([_claim("x", importance=6, status="pass")])
-    assert "n_high_importance_pass" in scores
-    assert "high_importance_pass_mass" in scores
+    assert "overall_score" in scores
+    assert "base_mean" in scores
     assert "n_hard_pass" not in scores  # removed by the refactor
 
 
@@ -243,7 +221,6 @@ if __name__ == "__main__":
     test_high_importance_flip_moves_score_more_than_low_importance_flip()
     test_hard_fail_cap_triggers_only_on_high_importance_refutation()
     test_hard_fail_cap_does_not_fire_on_errored_claims()
-    test_information_bonus_counts_only_high_importance_passes()
     test_aggregate_emits_new_telemetry_keys()
     test_build_report_filters_below_min_importance()
     test_declare_claim_importance_falls_back_when_rater_unavailable()

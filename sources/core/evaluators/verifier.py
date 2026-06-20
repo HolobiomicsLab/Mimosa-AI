@@ -12,7 +12,6 @@ modules and are mixed in:
 """
 
 import json
-import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -50,10 +49,6 @@ _VERIFIER_GEN_PARALLELISM = 16
 # Per-claim verifier execution fan-out. Capped low because higher concurrency doesn't alway help
 _VERIFIER_EXEC_PARALLELISM = 4
 
-# bonus(m) = alpha * (1 - exp(-importance_pass_mass / beta)); see _aggregate.
-_INFO_BONUS_ALPHA = 0.05
-_INFO_BONUS_BETA = 8.0
-
 # ----- Empty-run marker -------------------------------------------------------
 _EMPTY_RUN_MARKER = "workflow execution fully failed"
 
@@ -67,7 +62,6 @@ class VerifierEvaluator(
 
     _DEFAULT_CLAIM_IMPORTANCE = 5
     _GRADIENT_MIN_IMPORTANCE = 3
-    _INFO_BONUS_MIN_IMPORTANCE = 6
     _HARD_FAIL_IMPORTANCE = 10
     _LEGACY_CRITICALITY_TO_IMPORTANCE = {"hard": 8, "soft": 3}
 
@@ -83,8 +77,6 @@ class VerifierEvaluator(
         preview_tail_bytes: int = 2 * 1024,
         preview_per_claim_cap: int = 24 * 1024,
         use_grounding: bool = True,
-        info_bonus_alpha: float = _INFO_BONUS_ALPHA,
-        info_bonus_beta: float = _INFO_BONUS_BETA,
         gen_parallelism: int = _VERIFIER_GEN_PARALLELISM,
         exec_parallelism: int = _VERIFIER_EXEC_PARALLELISM,
     ) -> None:
@@ -101,8 +93,6 @@ class VerifierEvaluator(
             preview_tail_bytes: Bytes of file tail to render in previews.
             preview_per_claim_cap: Total preview budget allowed per claim.
             use_grounding: When True, fetch peer-reviewed literature grounding.
-            info_bonus_alpha: Asymptotic ceiling of the information bonus.
-            info_bonus_beta: Saturation rate of the information bonus.
             gen_parallelism: Max concurrent LLM calls for verifier generation.
             exec_parallelism: Max concurrent claim verifications (executable
                 sandbox runs and soft-LLM checks share this pool).
@@ -121,8 +111,6 @@ class VerifierEvaluator(
         self.preview_tail_bytes = preview_tail_bytes
         self.preview_per_claim_cap = preview_per_claim_cap
         self.use_grounding = use_grounding
-        self.info_bonus_alpha = max(0.0, info_bonus_alpha)
-        self.info_bonus_beta = max(1e-6, info_bonus_beta)
         self.gen_parallelism = max(1, int(gen_parallelism))
         self.exec_parallelism = max(1, int(exec_parallelism))
         self._preview_cache: dict[str, str] = {}
@@ -135,8 +123,7 @@ class VerifierEvaluator(
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
             f"timeout={verifier_timeout}s, claims={self.min_claims}–{max_claims}, "
-            f"use_grounding={use_grounding}, "
-            f"info_bonus(α={self.info_bonus_alpha}, β={self.info_bonus_beta}))"
+            f"use_grounding={use_grounding})"
         )
         self._textual_gradient_history: list[str] = []
 
@@ -802,27 +789,6 @@ class VerifierEvaluator(
     # Stage 5 — importance-weighted aggregation
     # ------------------------------------------------------------------
 
-    def _information_bonus(self, importance_pass_mass: float) -> float:
-        """Saturating reward for thoroughness; gameable spam yields no extra credit.
-
-        bonus(m) = α · (1 − exp(−m / β)). Bounded above by α, monotonic in m,
-        and conditional on the *passing high-importance mass* so trivial or
-        failed claims contribute nothing. ``m`` is the sum of importance
-        (capped at 10 per claim) for passes with importance ≥ 6, divided by 10
-        — units are roughly "equivalent number of importance-10 passes".
-
-        Args:
-            importance_pass_mass: Importance-weighted pass mass (see above).
-
-        Returns:
-            Non-negative bonus value, asymptotically bounded by ``info_bonus_alpha``.
-        """
-        if importance_pass_mass <= 0.0 or self.info_bonus_alpha <= 0.0:
-            return 0.0
-        return self.info_bonus_alpha * (
-            1.0 - math.exp(-importance_pass_mass / self.info_bonus_beta)
-        )
-
     def _claim_weight(self, c: dict[str, Any]) -> float:
         """Aggregator weight = self-reported importance (1–10).
 
@@ -843,7 +809,7 @@ class VerifierEvaluator(
             return float(self._DEFAULT_CLAIM_IMPORTANCE)
 
     def _aggregate(self, per_claim: list[dict[str, Any]]) -> dict[str, Any]:
-        """Importance-weighted mean + thoroughness bonus; capped on top-tier fail.
+        """Importance-weighted mean; capped on top-tier fail.
 
         Each claim is weighted by its rater-assigned importance (1-10) rather
         than the old hard=3/soft=1 step function. This gives the optimizer a
@@ -854,7 +820,7 @@ class VerifierEvaluator(
             per_claim: List of per-claim scored dicts from ``_verify_claim``.
 
         Returns:
-            Aggregate score dict with overall/base/bonus/cap and per-status counts.
+            Aggregate score dict with overall/base/cap and per-status counts.
         """
         if not per_claim:
             return self._empty_aggregate_result(n_claims=0)
@@ -864,16 +830,6 @@ class VerifierEvaluator(
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
-        # High-importance passes drive the thoroughness bonus.
-        high_imp_passes = [
-            c for c in scored
-            if c["status"] == "pass"
-            and self._claim_weight(c) >= self._INFO_BONUS_MIN_IMPORTANCE
-        ]
-        n_high_importance_pass = len(high_imp_passes)
-        high_importance_pass_mass = (
-            sum(self._claim_weight(c) for c in high_imp_passes) / 10.0
-        )
 
         if not scored:
             return self._empty_aggregate_result(
@@ -887,9 +843,8 @@ class VerifierEvaluator(
 
         total_w = sum(self._claim_weight(c) for c in scored)
         base_mean = sum(c["score"] * self._claim_weight(c) for c in scored) / total_w
-        bonus = self._information_bonus(high_importance_pass_mass)
-        # Pre-cap: clamp to [0, 1] before applying the hard-fail cap 
-        pre_cap = max(0.0, min(1.0, base_mean + bonus))
+        # Pre-cap: clamp to [0, 1] before applying the hard-fail cap
+        pre_cap = max(0.0, min(1.0, base_mean))
         # Hard-fail cap fires only on a real refutation of a top-importance claim
         hard_fail = any(
             self._claim_weight(c) >= self._HARD_FAIL_IMPORTANCE
@@ -902,9 +857,6 @@ class VerifierEvaluator(
             "overall_score": round(overall, 4),
             "overall_score_uncapped": round(pre_cap, 4),
             "base_mean": round(base_mean, 4),
-            "information_bonus": round(bonus, 4),
-            "n_high_importance_pass": n_high_importance_pass,
-            "high_importance_pass_mass": round(high_importance_pass_mass, 4),
             "hard_fail_capped": hard_fail,
             "n_claims": len(per_claim),
             "n_pass": n_pass,
@@ -933,9 +885,6 @@ class VerifierEvaluator(
             "overall_score": 0.0,
             "overall_score_uncapped": 0.0,
             "base_mean": 0.0,
-            "information_bonus": 0.0,
-            "n_high_importance_pass": 0,
-            "high_importance_pass_mass": 0.0,
             "hard_fail_capped": False,
             "n_claims": n_claims,
             "n_pass": n_pass,
@@ -1003,12 +952,7 @@ class VerifierEvaluator(
                 f"uncapped {scores.get('overall_score_uncapped', 0.0):.3f}, "
                 f"hard_fail_capped={scores.get('hard_fail_capped', False)})"
             ),
-            (
-                f"  base_mean={scores.get('base_mean', 0.0):.3f}  "
-                f"information_bonus={scores.get('information_bonus', 0.0):.3f}  "
-                f"n_high_importance_pass={scores.get('n_high_importance_pass', 0)}  "
-                f"high_importance_pass_mass={scores.get('high_importance_pass_mass', 0.0):.3f}  "
-            ),
+            f"  base_mean={scores.get('base_mean', 0.0):.3f}",
         ]
         if min_importance > 0:
             lines.append(f"(filtered view: importance ≥ {min_importance})")

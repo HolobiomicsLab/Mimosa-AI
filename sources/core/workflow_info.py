@@ -129,10 +129,9 @@ class WorkflowInfo:
     def overall_score_uncapped(self) -> float:
         """Reward without the hard-fail cap, still applied.
 
-        ``r' = max(0, base_mean + info_bonus)``. Used for
-        parent-draw weighting so distinct refuted-but-improving runs
-        stay rank-ordered. Falls back to ``overall_score`` when verifier
-        scores are unavailable.
+        Equals ``max(0, base_mean)``. Used for parent-draw weighting so
+        distinct refuted-but-improving runs stay rank-ordered. Falls back
+        to ``overall_score`` when verifier scores are unavailable.
         """
         verifier = (self.state_result.get("evaluation") or {}).get("verifier") or {}
         if "overall_score_uncapped" not in verifier:

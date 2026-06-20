@@ -116,11 +116,9 @@ The verifier writes summary scores plus the workflow's final state to
 | ----- | ----------------- |
 | `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.99`) when a hard claim is refuted. |
 | `overall_score_uncapped` | Same score pre-cap — used as `reward_uncapped` for QD ranking. |
-| `base_mean` | Mean over non-error per-claim scores. |
-| `information_bonus` | Saturating thoroughness bonus, `α·(1 − exp(−n_hard_pass / β))`. |
+| `base_mean` | Importance-weighted mean over non-error per-claim scores. |
 | `hard_fail_capped` | `true` when a hard claim was refuted (cap fired). |
 | `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |
-| `n_hard_pass` | Count of `hard` claims that passed (drives `information_bonus`). |
 | `abstracted_prompt_gradient` | Code-named diagnostic summary — the only signal the mutator sees. Does not name the verified claims back. |
 
 The full per-claim detail (status, rationale, stderr tail, recomputed
