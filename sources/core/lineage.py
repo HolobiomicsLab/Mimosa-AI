@@ -109,53 +109,6 @@ def load_lineage(workflow_dir: str | Path, uuid: str) -> dict | None:
         return None
 
 
-def find_oldest_rubric_anchor(
-    workflow_dir: str | Path,
-    verifier_tmp_dir: str | Path,
-    uuid: str,
-    anchor_filename: str = "claims.json",
-    max_depth: int = 64,
-) -> str | None:
-    """Walk parents and return the earliest ancestor whose verifier cache exists.
-
-    Used to anchor every descendant in an evolved lineage on the SAME rubric
-    set so verifier scores stay comparable across generations. The walk
-    follows ``parents[0]`` upward and only records ancestors whose
-    ``<verifier_tmp_dir>/<id>/<anchor_filename>`` is present on disk.
-
-    Args:
-        workflow_dir: Project's workflow directory (parent of ``<uuid>/``).
-        verifier_tmp_dir: Root of the verifier scratch tree (typically
-            ``<workflow_dir>/_verifier_tmp``).
-        uuid: Workflow whose ancestors are walked. The uuid itself is NOT
-            considered — only ancestors.
-        anchor_filename: Cache filename to check inside each ancestor's folder.
-        max_depth: Safety bound on chain depth (cycle / runaway guard).
-
-    Returns:
-        UUID of the earliest ancestor with a cache, or ``None`` when no such
-        ancestor exists or the chain breaks (missing lineage, cycle).
-    """
-    tmp_root = Path(verifier_tmp_dir)
-    candidate: str | None = None
-    seen: set[str] = set()
-    current = uuid
-    for _ in range(max_depth):
-        if current in seen:
-            break
-        seen.add(current)
-        rec = load_lineage(workflow_dir, current)
-        if rec is None:
-            break
-        parents = rec.get("parents") or []
-        if not parents:
-            break
-        parent = parents[0]
-        if (tmp_root / parent / anchor_filename).exists():
-            candidate = parent
-        current = parent
-    return candidate
-
 
 def _read_workflow_goal(folder: Path, uuid: str) -> str | None:
     """Return the trimmed contents of ``goal_<uuid>.txt``, or None if absent/unreadable."""

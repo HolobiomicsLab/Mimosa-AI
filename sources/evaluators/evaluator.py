@@ -77,7 +77,6 @@ class WorkflowEvaluator:
         agent_answers: str | None = None,
         evaluator_type: str = "verifier",
         scenario_rubric: str | None = None,
-        rubric_anchor_uuid: str | None = None,
     ) -> dict[str, Any]:
         """Route to the requested evaluator.
 
@@ -89,10 +88,6 @@ class WorkflowEvaluator:
                 - "scenario": rubric-based scoring; requires `scenario_rubric`.
                 - "verifier": atomic-claim verification pipeline.
             scenario_rubric: Scenario ID, required when `evaluator_type="scenario"`.
-            rubric_anchor_uuid: Optional ancestor UUID whose verifier cache
-                (``_verifier_tmp/<id>/claims.json`` + ``verify_*.py``) should
-                be reused for stable cross-generation scoring. Forwarded only
-                to the verifier evaluator; ignored for generic/scenario.
 
         Returns:
             Dictionary containing evaluation results.
@@ -127,9 +122,7 @@ class WorkflowEvaluator:
                     return {"evaluation_type": "generic", "uuid": uuid}
 
             if evaluator_type == "verifier":
-                result = self.verifier_evaluator.evaluate(
-                    uuid, rubric_anchor_uuid=rubric_anchor_uuid
-                )
+                result = self.verifier_evaluator.evaluate(uuid)
                 return {"evaluation_type": "verifier", "uuid": uuid, **result}
 
             # Default: generic

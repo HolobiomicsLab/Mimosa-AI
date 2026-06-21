@@ -33,7 +33,7 @@ from sources.utils.run_metrics import append_jsonl, write_run_metrics
 from sources.utils.visualization import VisualizationUtils
 from sources.utils.workspace_management import WorkspaceManager
 
-from .lineage import find_oldest_rubric_anchor, record_lineage
+from .lineage import record_lineage
 from .orchestrator import WorkflowOrchestrator
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
@@ -753,14 +753,10 @@ class EvolutionEngine:
         logger = logging.getLogger(__name__)
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
-        anchor_uuid = self._resolve_rubric_anchor(uuid)
-        if anchor_uuid:
-            print_info(f"Verifier reusing rubric anchor {anchor_uuid} for {uuid}")
         eval_result = self.judge.evaluate(uuid=uuid,
                                           agent_answers=agent_answers,
                                           evaluator_type="verifier",
-                                          scenario_rubric=scenario_rubric,
-                                          rubric_anchor_uuid=anchor_uuid)
+                                          scenario_rubric=scenario_rubric)
         eval_type = eval_result['evaluation_type']
         eval_time = time.time() - eval_start
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
@@ -769,25 +765,6 @@ class EvolutionEngine:
         if scenario_rubric and isinstance(eval_result, dict) and assertion_history is not None:
             self._update_assertion_history(eval_result, assertion_history)
         return eval_type
-
-    def _resolve_rubric_anchor(self, uuid: str) -> str | None:
-        """Find the lineage ancestor whose verifier cache should anchor *uuid*.
-
-        Returns the topmost ancestor with a ``claims.json`` cache so every
-        descendant in the lineage is scored against the same rubric. Returns
-        ``None`` when the feature is disabled in config or no ancestor has a
-        usable cache (root run, or the chain breaks before any cache is found).
-
-        Args:
-            uuid: Workflow being evaluated.
-
-        Returns:
-            Anchor UUID or ``None``.
-        """
-        if not getattr(self.config, "reuse_lineage_rubric", False):
-            return None
-        verifier_tmp = self.judge.verifier_evaluator.verifier_temp_root
-        return find_oldest_rubric_anchor(self.workflow_dir, verifier_tmp, uuid)
 
     def _update_assertion_history(self, eval_result: dict, assertion_history: list) -> None:
         """Update assertion history with evaluation results.

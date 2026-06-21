@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
 from typing import Any
 
 
@@ -108,7 +109,7 @@ class _VerifierClaimExtractionMixin:
                 "likely_relevant_files": [],
             }]
         per_source_min, per_source_max = self._per_source_targets(n_sources=len(SOURCES))
-        ctx = ClaimContext(
+        base_ctx = ClaimContext(
             goal=goal,
             workspace_listing=workspace_listing,
             target_min=per_source_min,
@@ -116,13 +117,16 @@ class _VerifierClaimExtractionMixin:
             grounding=grounding,
             execution_text=execution_text,
         )
+        task_key = self._task_cache_key(goal)
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
         per_source_elapsed: list[tuple[str, float, int]] = []
         t_sources = time.time()
         for source in SOURCES:
             label = source.label
-            prompt = source.build(ctx)
+            prior_text = self._load_prior_claims_text(task_key, label)
+            source_ctx = replace(base_ctx, prior_claims=prior_text)
+            prompt = source.build(source_ctx)
             t_src = time.time()
             data, err = self._call_judge_for_json(
                 uuid, f"verifier_extract_claims_{label}", prompt
@@ -134,6 +138,11 @@ class _VerifierClaimExtractionMixin:
                 per_source_elapsed.append((label, time.time() - t_src, 0))
                 continue
             new_claims = self._parse_and_filter_claims(uuid, data)
+            # Seed the cache from the FIRST workflow that produces a non-empty
+            # claim list for this source. Subsequent extractions (cache file
+            # already exists) read the seed via _load_prior_claims_text above;
+            # _persist_claims_for_source is then a no-op.
+            self._persist_claims_for_source(task_key, label, new_claims)
             for claim in new_claims:
                 print_info(f"Extracted claim {claim['id']} from source {label} for {uuid}")
                 claim_id = claim["id"]
