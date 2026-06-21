@@ -240,7 +240,7 @@ class SelectionPressure:
         self,
         candidates: list[Any],
         n_parents: int = 2,
-        crossover_rate: float = 0.1,
+        crossover_rate: float = 0.4,
         child_counts: dict[str, int] | None = None,
     ) -> tuple[list[Any], bool]:
         """Select one or more parents from a candidate pool.

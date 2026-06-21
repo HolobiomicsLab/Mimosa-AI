@@ -363,8 +363,6 @@ def format_scientific_context(
     """
     return (
         f"# SCIENTIFIC LITERATURE CONTEXT  (retrieved from Perspicacite-AI)\n"
-        f"The following scientific knowledge was retrieved for the task:\n\n"
-        f"\"{task[:200].strip()}\"\n"
         f"Scientific Knowledge:\n\n"
         f"{scientific_context.strip()}\n"
     )

@@ -277,7 +277,7 @@ class VariationEngine:
             f"Goal to assemble a workflow for:\n{goal}\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
-    
+
     def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str, goal: str) -> str:
         sys_msg = """
 YOu are an expert at pinpointing the root cause of failures in multi-agent workflows.
@@ -288,6 +288,9 @@ The diagnosis is a summary of  deterministic ground truth verification using rub
 The diagnosis is trusted and should be used to inform your directive.
 The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
 You will also be given a <boldness> block that indicates how much change incentive you are allowed to suggest for the next workflow iteration.
+Do not suggest changes that exceed the boldness level indicated in the <boldness> block.
+Do not add or remove more than 1 agent at a time, and do not suggest more agent than the maximum allowed by the boldness level.
+Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis+boldness indicates that the current approach is fundamentally flawed.
 """
         prompt = ''.join([
             "## GOAL:",
@@ -309,6 +312,8 @@ You will also be given a <boldness> block that indicates how much change incenti
             "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
             "- 'The agent are subborn, they are not following the instructions. Consider changing the agent's persona to be more compliant.'"
             "- Tweak the prompt of agent X to put the agent on a more domain-specific manifold, to avoid them to be stuck in the same local minima."
+            "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive."
+            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change) and the rationale behind it."
         ])
         provider = LLMProvider(
             system_msg=sys_msg,
@@ -383,7 +388,12 @@ You will also be given a <boldness> block that indicates how much change incenti
             "<directive>",
             directive,
             "</directive>",
-            "Follow directive as guideline regarding what to change in the workflow code.",
+            "## MUTATION INSTRUCTIONS:",
+            "- Follow exactly the directive as guideline regarding what to change in the workflow code.",
+            "- Do not add or remove more than 1 agent at a time, and do not add more agent than suggested.",
+            "- Do not change the workflow's overall topology unless the directive explicitly suggests it.",
+            "- Do not change prompt instructions outside the scope of the directive.",
+            "- You must keep 90% of the previous workflow prompts and code unchanged, only modify the parts that are relevant to the directive.",
         ])
 
     def crossover_prompt(

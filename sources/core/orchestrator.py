@@ -156,7 +156,7 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         print_info(
             f"\033[94m[Perspicacite] Scientific context:\n{scientific_context[:2048]}...\033[0m"
         )
-        return format_scientific_context(task, scientific_context) + craft_instructions
+        return format_scientific_context(task, scientific_context) + '\n' + craft_instructions
 
     async def _generate_workflow_code(
         self,
