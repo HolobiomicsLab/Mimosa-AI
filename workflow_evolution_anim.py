@@ -534,8 +534,21 @@ def draw_tree(
 # ---------------------------------------------------------------------------
 # Memory timelapse panel
 # ---------------------------------------------------------------------------
+SUB_PANEL_SPECS = (
+    ("THOUGHT", ACCENT, "thought_preview", TEXT, False),
+    ("CODE", SUCCESS, "code_preview", (180, 220, 250), True),
+    ("OBSERVATION", AMBER, "observation_preview", (200, 230, 200), False),
+)
+
+
 def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
-                    step: Optional[StepInfo], step_idx: int):
+                    step: Optional[StepInfo], step_idx: int, sub_idx: int):
+    """Render the memory-timelapse panel for one (step, sub_idx) frame.
+
+    Shows the agent badge, stat strip, a breadcrumb of THOUGHT/CODE/OBSERVATION
+    with the active one highlighted, and a single full-size sub-panel for the
+    chosen ``sub_idx`` (0=thought, 1=code, 2=observation).
+    """
     inner = area
     line_h = 20
 
@@ -586,31 +599,46 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
                          border_radius=4)
         surf.blit(text, (inner.right - 84 + 18, inner.y + 11))
 
-    # Three sub-panels: thought / code / observation
-    top = inner.y + 50
-    h_total = inner.bottom - top
-    thought_h = int(h_total * 0.26)
-    obs_h = int(h_total * 0.18)
-    code_h = h_total - thought_h - obs_h - 18
+    # Breadcrumb: THOUGHT → CODE → OBSERVATION, the active one highlighted.
+    crumb_top = inner.y + 50
+    crumb_h = 26
+    _draw_sub_breadcrumb(surf, fonts, inner.x, crumb_top,
+                         inner.width, crumb_h, sub_idx)
 
-    _sub_panel(surf, fonts,
-               pygame.Rect(inner.x, top, inner.width, thought_h),
-               "▌ THOUGHT", ACCENT, step.thought_preview, line_h,
-               TEXT, mono=False)
-    _sub_panel(surf, fonts,
-               pygame.Rect(inner.x, top + thought_h + 9, inner.width, code_h),
-               "▌ CODE", SUCCESS, step.code_preview, line_h,
-               (180, 220, 250), mono=True)
-    _sub_panel(surf, fonts,
-               pygame.Rect(inner.x, top + thought_h + code_h + 18,
-                           inner.width, obs_h),
-               "▌ OBSERVATION", AMBER, step.observation_preview, line_h,
-               (200, 230, 200), mono=False)
+    # One full-size sub-panel chosen by sub_idx.
+    sub_idx = max(0, min(len(SUB_PANEL_SPECS) - 1, sub_idx))
+    label, accent, attr, body_color, mono = SUB_PANEL_SPECS[sub_idx]
+    body = getattr(step, attr, "") or ""
+    panel_top = crumb_top + crumb_h + 8
+    panel_rect = pygame.Rect(inner.x, panel_top, inner.width,
+                             inner.bottom - panel_top - 12)
+    _sub_panel(surf, fonts, panel_rect, f"▌ {label}", accent, body, line_h,
+               body_color, mono)
 
     # step progress strip at the very bottom of the inner area
     n = max(len(wf.steps), 1)
     _mini_strip(surf, fonts, inner.x, inner.bottom - 6,
                 inner.width, step_idx, n)
+
+
+def _draw_sub_breadcrumb(surf, fonts, x, y, w, h, sub_idx):
+    """Three pills, the one matching ``sub_idx`` highlighted in its accent."""
+    n = len(SUB_PANEL_SPECS)
+    gap = 10
+    pill_w = (w - gap * (n - 1)) // n
+    for i, (label, accent, _attr, _body_color, _mono) in enumerate(SUB_PANEL_SPECS):
+        px = x + i * (pill_w + gap)
+        active = i == sub_idx
+        pygame.draw.rect(surf, BG_PANEL_LIGHT, (px, y, pill_w, h),
+                         border_radius=4)
+        if active:
+            pygame.draw.rect(surf, accent, (px, y, 4, h), border_radius=2)
+            pygame.draw.rect(surf, accent, (px, y, pill_w, h), width=1,
+                             border_radius=4)
+        text_color = accent if active else TEXT_FAINT
+        t = fonts["small"].render(label, True, text_color)
+        surf.blit(t, (px + (pill_w - t.get_width()) // 2,
+                      y + (h - t.get_height()) // 2))
 
 
 def _sub_panel(surf, fonts, rect, label, accent, body, line_h, body_color,
@@ -915,16 +943,20 @@ class App:
         self.clock = pygame.time.Clock()
         self.fonts = self._load_fonts()
 
-        # flatten to (workflow_idx, step_idx) frames; workflows with no
-        # memory still get a single "intro" frame so they appear in the timeline
-        self.frames: List[Tuple[int, int]] = []
+        # flatten to (workflow_idx, step_idx, sub_idx) frames. Each step
+        # expands into one frame per sub-panel (thought/code/observation) so
+        # they play one-at-a-time. Workflows with no memory still get a single
+        # "intro" frame so they appear in the timeline.
+        self.frames: List[Tuple[int, int, int]] = []
+        n_sub = len(SUB_PANEL_SPECS)
         for wi, wf in enumerate(workflows):
             if not wf.steps:
-                self.frames.append((wi, -1))
+                self.frames.append((wi, -1, 0))
             else:
                 for si in range(len(wf.steps)):
-                    self.frames.append((wi, si))
-        self.frame_to_wf = [wi for (wi, _) in self.frames]
+                    for sub in range(n_sub):
+                        self.frames.append((wi, si, sub))
+        self.frame_to_wf = [wi for (wi, _, _) in self.frames]
 
         self.cur = 0
         self.playing = True
@@ -953,29 +985,31 @@ class App:
     # ----- state helpers -------------------------------------------------
     @property
     def current_workflow(self) -> Workflow:
-        wi, _ = self.frames[self.cur]
+        wi, _, _ = self.frames[self.cur]
         return self.workflows[wi]
 
     @property
     def current_step(self) -> Optional[StepInfo]:
-        wi, si = self.frames[self.cur]
+        wi, si, _ = self.frames[self.cur]
         wf = self.workflows[wi]
         return wf.steps[si] if si >= 0 and si < len(wf.steps) else None
 
     def step_index_in_wf(self) -> int:
-        _, si = self.frames[self.cur]
-        return max(si, 0)
+        return max(self.frames[self.cur][1], 0)
+
+    def current_sub_index(self) -> int:
+        return self.frames[self.cur][2]
 
     def jump_workflow(self, delta: int):
         wi = self.frames[self.cur][0]
         new_wi = max(0, min(len(self.workflows) - 1, wi + delta))
-        for i, (w, _) in enumerate(self.frames):
+        for i, (w, _, _) in enumerate(self.frames):
             if w == new_wi:
                 self.cur = i
                 return
 
     def jump_to_workflow_uuid(self, uuid: str):
-        for i, (wi, _) in enumerate(self.frames):
+        for i, (wi, _, _) in enumerate(self.frames):
             if self.workflows[wi].uuid == uuid:
                 self.cur = i
                 return
@@ -1103,7 +1137,8 @@ class App:
         inner = draw_panel(self.screen, rects["timelapse"],
                            "▌ MEMORY TIMELAPSE", self.fonts["header"], AMBER)
         draw_step_panel(self.screen, inner, self.fonts,
-                        wf, self.current_step, self.step_index_in_wf())
+                        wf, self.current_step, self.step_index_in_wf(),
+                        self.current_sub_index())
 
         # rubric
         inner = draw_panel(self.screen, rects["rubric"],
