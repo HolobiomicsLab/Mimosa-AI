@@ -222,10 +222,18 @@ class PreCheck:
             # Discovery failed; fall back to configured names with unknown quant.
             return [(p, "unknown") for p in sorted(configured_norm)]
 
-        # Drop endpoints below fp8 — runtime's quantizations filter would
-        # reject them anyway, no point burning probes.
+        # Drop community endpoints below fp8 (runtime would reject them anyway).
+        # First-party endpoints are kept at any quant: when the model creator
+        # only self-hosts at int4/fp4 (e.g. moonshotai/kimi-k2.7-code), that's
+        # still the authoritative serving of those weights, and for benchmark
+        # reproducibility a pinned first-party endpoint beats a community
+        # requantization. The probe below still gates them on JSON-validity +
+        # determinism, so a misbehaving int4 endpoint is dropped on its merits.
         accepted = set(ALL_ACCEPTED_QUANTS) | {"unknown"}
-        discovered = {p: q for p, q in discovered.items() if q in accepted}
+        discovered = {
+            p: q for p, q in discovered.items()
+            if q in accepted or is_model_creator(p, slug)
+        }
 
         if configured_norm:
             return [(p, q) for p, q in discovered.items() if p in configured_norm]
@@ -332,17 +340,18 @@ class PreCheck:
 
             if new_list:
                 self.config.openrouter_provider_by_model[model_id] = new_list
-                # If any selected provider is untagged (first-party endpoint),
-                # the runtime must omit the `quantizations` filter — otherwise
-                # OpenRouter excludes that endpoint and the request 404s.
-                # When all selected providers carry a known quant, keep the
-                # safety filter so unsafe (int4/fp4) routing stays blocked.
+                # Runtime `quantizations` is an exclusion filter — a provider
+                # whose quant isn't in the list gets dropped even when pinned
+                # by `order`. So the filter must include every quant the
+                # precheck actually approved, plus the default-safe set as a
+                # baseline. If any approved provider was untagged ("unknown",
+                # typical for first-party endpoints that don't advertise a
+                # tag), omit the filter entirely.
                 if "unknown" in selected_quants:
                     self.config.openrouter_quantizations_by_model[model_id] = None
                 else:
-                    self.config.openrouter_quantizations_by_model[model_id] = list(
-                        ALL_ACCEPTED_QUANTS
-                    )
+                    allowed = set(ALL_ACCEPTED_QUANTS) | selected_quants
+                    self.config.openrouter_quantizations_by_model[model_id] = sorted(allowed)
                 print(f"   {model_id}")
                 print(f"     -> {new_list}")
             else:
