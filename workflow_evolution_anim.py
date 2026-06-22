@@ -550,7 +550,6 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
     amber=observation). The agent name sits as a thin line at the top.
     """
     inner = area
-    line_h = 20
 
     if step is None:
         msg = fonts["body"].render("No memory trace for this workflow.",
@@ -576,7 +575,8 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
                      (body_rect.x, body_rect.y, 3, body_rect.height),
                      border_radius=2)
 
-    font = fonts["mono"] if mono else fonts["small"]
+    font = fonts["step_mono"] if mono else fonts["step_text"]
+    line_h = font.get_height() + 4
     text_x = body_rect.x + 14
     if not body:
         surf.blit(font.render("—", True, TEXT_FAINT),
@@ -904,6 +904,8 @@ class App:
             "small": f("Inter,Helvetica,Arial", 13),
             "tiny": f("Inter,Helvetica,Arial", 11),
             "mono": f("Menlo,Consolas,DejaVu Sans Mono,monospace", 12),
+            "step_text": f("Inter,Helvetica,Arial", 18),
+            "step_mono": f("Menlo,Consolas,DejaVu Sans Mono,monospace", 15),
         }
 
     # ----- state helpers -------------------------------------------------
@@ -1018,7 +1020,7 @@ class App:
         wfpng = pygame.Rect(pad, tree.bottom + pad, left_w,
                             body_bottom - tree.bottom - pad)
 
-        timelapse_h = int((body_bottom - body_top) * 0.50) - pad // 2
+        timelapse_h = int((body_bottom - body_top) * 0.72) - pad // 2
         timelapse = pygame.Rect(right_x, body_top, right_w, timelapse_h)
         rubric = pygame.Rect(right_x, timelapse.bottom + pad, right_w,
                              body_bottom - timelapse.bottom - pad)
