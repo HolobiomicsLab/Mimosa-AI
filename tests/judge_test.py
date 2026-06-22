@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from config import Config
 
 # ``sources.core.judge`` / ``WorkflowJudge`` were removed during the
-# refactor that moved the judging logic into ``sources.core.evaluators``.
+# refactor that moved the judging logic into ``sources.evaluators``.
 # This file was left behind; skip collection cleanly until the user decides
 # whether to rewrite it against the current evaluator API or delete it.
 pytest.importorskip(

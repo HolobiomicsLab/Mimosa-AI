@@ -141,25 +141,18 @@ class WorkflowRunner:
         """
         Find a working Python executable for the configured version.
 
-        When ``config.python_executable`` is set, it short-circuits this
-        resolution: the caller has deliberately chosen an interpreter (e.g.
-        ``sys.executable``, where verifier helper packages were installed), so
-        it is used directly after a ``--version`` smoke check, bypassing the
-        ``PATH``/version search entirely. This is what lets verifiers run on a
-        host that has no ``pythonX.Y`` matching ``python_version`` on ``PATH``.
-
         Versioned candidates are always tried first and accepted as-is because
         they target the exact version by construction:
-        - Unix/macOS: ``python3.10`` (versioned binary)
-        - Windows:    ``py -3.10``   (Windows Python Launcher with version flag)
+        - Unix/macOS: ``python3.12`` (versioned binary)
+        - Windows:    ``py -3.12``   (Windows Python Launcher with version flag)
 
         Generic fallbacks (``python3``, ``python``) are also tried but are only
         accepted when their ``--version`` output actually matches the configured
         version, so the runner never silently runs the wrong Python.
 
         Returns:
-            list[str]: Command prefix to invoke Python (e.g. ``["python3.10"]``
-                       or ``["py", "-3.10"]``), or ``None`` if no candidate works.
+            list[str]: Command prefix to invoke Python (e.g. ``["python3.12"]``
+                       or ``["py", "-3.12"]``), or ``None`` if no candidate works.
         """
         import subprocess
         import sys
@@ -179,7 +172,7 @@ class WorkflowRunner:
                 pass
             return None
 
-        version = self.config.python_version  # e.g. "3.10"
+        version = self.config.python_version  # e.g. "3.12"
 
         if sys.platform == "win32":
             candidates: list[tuple[bool, list[str]]] = [
@@ -227,6 +220,28 @@ class WorkflowRunner:
             self._python_cmd = resolved
             return True
         return False
+
+    def _ensure_venv(self) -> None:
+        """Create a managed venv under ``temp_dir`` and use it for installs/execs.
+
+        No-op when the caller pinned ``python_executable`` (the verifier path
+        depends on running under ``sys.executable``). Idempotent — reuses an
+        existing venv at the same path. After this call ``self._python_cmd``
+        points at the venv's interpreter.
+        """
+        import subprocess
+        if self.config.python_executable:
+            return
+        venv_dir = Path(self.config.temp_dir) / "mimosa_venv"
+        bin_dir = "Scripts" if sys.platform == "win32" else "bin"
+        venv_python = venv_dir / bin_dir / ("python.exe" if sys.platform == "win32" else "python")
+        if not venv_python.exists():
+            subprocess.run(
+                [*self._python_cmd, "-m", "venv", str(venv_dir)],
+                check=True, capture_output=True, timeout=120,
+            )
+            self.logger.info(f"Created venv at {venv_dir}")
+        self._python_cmd = [str(venv_python)]
 
     async def ensure_pip(self) -> None:
         """Ensure pip is installed and up-to-date."""
@@ -277,6 +292,7 @@ class WorkflowRunner:
         if not requirements and not self.config.requirements_file:
             return ExecutionResult(ExecutionStatus.COMPLETED, 0, "", "", 0.0)
 
+        self._ensure_venv()
         await self.ensure_pip()
 
         cmd = [*self._python_cmd, "-m", "pip", "install"]
@@ -610,7 +626,7 @@ class WorkflowRunner:
 
 async def main() -> None:
     """Example usage of the WorkflowRunner."""
-    config = RuntimeConfig(python_version="3.10", timeout=60, max_memory_mb=256)
+    config = RuntimeConfig(python_version="3.12", timeout=60, max_memory_mb=256)
     runner = WorkflowRunner(config)
     await runner.install_dependencies(["requests", "numpy"])
     code = """

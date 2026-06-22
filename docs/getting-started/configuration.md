@@ -22,8 +22,8 @@ field with defaults and types, see the [Configuration reference](../reference/co
 | `smolagent_model_id` | LLM used by execution agents inside each workflow. |
 | `judge_model` | LLM that scores soft claims in the verifier. |
 | `planner_llm_model` | LLM that decomposes goals into tasks (`--goal` mode only). |
-| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.97`). |
-| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `35`). |
+| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.9`). |
+| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `20`). |
 
 ## Choosing models
 
@@ -78,7 +78,7 @@ The sandbox enforces resource caps per generated workflow:
 
 | Field | Default | Purpose |
 | ----- | ------- | ------- |
-| `runner_default_python_version` | `3.10` | Python version inside the sandbox. |
+| `runner_default_python_version` | `3.12` | Python version inside the sandbox. |
 | `runner_default_timeout` | `3600` | Per-run timeout (seconds). |
 | `runner_default_max_memory_mb` | `1024` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `100` | CPU cap (%). |
@@ -95,8 +95,8 @@ uv run main.py --task "…" \
 
 | Field | Default | Meaning |
 | ----- | ------- | ------- |
-| `learned_score_threshold` | `0.97` | Stop evolving when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `35` | Max generations before giving up. |
+| `learned_score_threshold` | `0.9` | Stop evolving when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `20` | Max generations before giving up. |
 
 See [Iterative learning](../usage/learning.md) for the full evolution machinery.
 

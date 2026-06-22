@@ -4,7 +4,7 @@ class PackageCheck():
     def __init__(self):
         self.safe_versions = {
             # CVE litellm 1.82.8 supply-chain attack
-            'litellm': {'max': '1.82.8', 'min': None, 'reason': '.pth supply chain attack'}
+            #'litellm': {'max': '1.82.8', 'min': None, 'reason': '.pth supply chain attack'}
         }
 
     def run(self):

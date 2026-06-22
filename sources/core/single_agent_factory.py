@@ -174,7 +174,7 @@ agent = CodeAgent(
     name="single_agent",
     max_steps=256,
     additional_authorized_imports = [
-        'requests', 'bs4', 'json', 'requests.exceptions',
+        'requests', 'json', 'requests.exceptions',
         'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
         'configparser', 'logging',
         'collections', 'itertools', 'functools', 'heapq', 'bisect', 'queue',

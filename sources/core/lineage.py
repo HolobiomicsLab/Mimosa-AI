@@ -109,55 +109,19 @@ def load_lineage(workflow_dir: str | Path, uuid: str) -> dict | None:
         return None
 
 
-def find_oldest_rubric_anchor(
-    workflow_dir: str | Path,
-    verifier_tmp_dir: str | Path,
-    uuid: str,
-    anchor_filename: str = "claims.json",
-    max_depth: int = 64,
-) -> str | None:
-    """Walk parents and return the earliest ancestor whose verifier cache exists.
 
-    Used to anchor every descendant in an evolved lineage on the SAME rubric
-    set so verifier scores stay comparable across generations. The walk
-    follows ``parents[0]`` upward and only records ancestors whose
-    ``<verifier_tmp_dir>/<id>/<anchor_filename>`` is present on disk.
-
-    Args:
-        workflow_dir: Project's workflow directory (parent of ``<uuid>/``).
-        verifier_tmp_dir: Root of the verifier scratch tree (typically
-            ``<workflow_dir>/_verifier_tmp``).
-        uuid: Workflow whose ancestors are walked. The uuid itself is NOT
-            considered — only ancestors.
-        anchor_filename: Cache filename to check inside each ancestor's folder.
-        max_depth: Safety bound on chain depth (cycle / runaway guard).
-
-    Returns:
-        UUID of the earliest ancestor with a cache, or ``None`` when no such
-        ancestor exists or the chain breaks (missing lineage, cycle).
-    """
-    tmp_root = Path(verifier_tmp_dir)
-    candidate: str | None = None
-    seen: set[str] = set()
-    current = uuid
-    for _ in range(max_depth):
-        if current in seen:
-            break
-        seen.add(current)
-        rec = load_lineage(workflow_dir, current)
-        if rec is None:
-            break
-        parents = rec.get("parents") or []
-        if not parents:
-            break
-        parent = parents[0]
-        if (tmp_root / parent / anchor_filename).exists():
-            candidate = parent
-        current = parent
-    return candidate
+def _read_workflow_goal(folder: Path, uuid: str) -> str | None:
+    """Return the trimmed contents of ``goal_<uuid>.txt``, or None if absent/unreadable."""
+    target = folder / f"goal_{uuid}.txt"
+    try:
+        return target.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
-def scan_all(workflow_dir: str | Path) -> dict[str, dict]:
+def scan_all(
+    workflow_dir: str | Path, goal: str | None = None
+) -> dict[str, dict]:
     """Enumerate every workflow folder and return ``{uuid: lineage_or_synthetic}``.
 
     Workflows without a ``lineage_*.json`` are synthesised as orphan seeds so
@@ -167,6 +131,10 @@ def scan_all(workflow_dir: str | Path) -> dict[str, dict]:
 
     Args:
         workflow_dir: Project's workflow directory to scan.
+        goal: When provided, only workflows whose ``goal_<uuid>.txt`` matches
+            this text (after trimming) are returned. Folders missing the goal
+            file are excluded. This keeps a single run's tree from mixing with
+            other goals' workflows. ``None`` scans everything.
 
     Returns:
         Dictionary mapping each workflow UUID to its lineage record. Records
@@ -177,10 +145,13 @@ def scan_all(workflow_dir: str | Path) -> dict[str, dict]:
     if not root.is_dir():
         return {}
 
+    goal_filter = goal.strip() if goal is not None else None
     records: dict[str, dict] = {}
     for entry in sorted(os.listdir(root)):
         folder = root / entry
         if not folder.is_dir() or entry.startswith("_") or entry.startswith("."):
+            continue
+        if goal_filter is not None and _read_workflow_goal(folder, entry) != goal_filter:
             continue
         rec = load_lineage(root, entry)
         if rec is None:

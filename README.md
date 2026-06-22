@@ -104,10 +104,10 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 
 Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
 
-- **Selection: Quality-Diversity archive** (**MAP-Elites**-style) — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.4`). **Novelty search** uses k-NN distance (`k=25`) over a **behaviour descriptor** `[n_agents, n_edges, n_branches, prompt_chars]`. Parents drawn by inverse-child-count roulette so the archive spreads.
-- **Variation: stagnation-driven scope** — mutation boldness is a continuous function of how much the last 4 prompt gradients repeat themselves. Near-winners stay protected. Scope bands run from "prompt-only tweak" to "complete topology rethink."
-- **Crossover** — ~30 % of generations combine two parents, strongest-first.
-- **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.5) seeds the search. Useful workflows transfer across tasks.
+- **Selection: Quality-Diversity archive** (**MAP-Elites**-style) — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w = novelty_weight = 0.25`). **Novelty search** uses k-NN distance (`k = 15`) over the **failure-fingerprint** behaviour descriptor — a 6-D vector of centered per-source pass rates from the verifier (sources A–F). Parents drawn by inverse-child-count roulette so the archive spreads (`MAX_CHILDREN_PER_PARENT = 2`).
+- **Variation: Rechenberg-1/5 + plateau-driven scope** — mutation boldness blends the success rate of the last 5 scored offspring (Rechenberg 1/5 rule, threshold `0.20`) with an `iters_since_improvement` plateau counter (patience `6`). Near-winners (parent score > 0.95) get a damper. Scope bands run from `EXPLOITATION` (point mutation) to `RE-SPECIATION` (clean-slate redesign), gated by an effective-boldness threshold (`< 0.35 / 0.50 / 0.65 / 0.90 / 1.01`).
+- **Crossover** — by default ~10 % of generations combine two parents, strongest-first, with offspring hard-capped at the highest parent agent count.
+- **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.8) seeds the search. Useful workflows transfer across tasks.
 
 Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md).
 

@@ -1,53 +1,37 @@
-"""AST-derived behavioural features for the QD descriptor.
+"""Genotype-embedding behaviour descriptor for the QD archive.
 
-The descriptor must be orthogonal to fitness so the archive can
-separate "different ways of being good" from "different ways of being
-mediocre". These features read the workflow genotype source only —
-never reward, cost, or iteration count.
+Backend selection lives in :mod:`sources.core.genotype_embedding`; this
+file is only the QD-facing shim.
 """
 
-import ast
-
-_AGENT_CTORS: frozenset[str] = frozenset(
-    {"SmolAgentFactory", "CodeAgent", "ToolCallingAgent", "MultiStepAgent"}
-)
-_EDGE_METHODS: frozenset[str] = frozenset({"add_edge", "add_conditional_edges"})
-
-_SCALES: tuple[float, float, float, float] = (10.0, 10.0, 10.0, 5000.0)
-DESCRIPTOR_DIM: int = 4
+from .genotype_embedding import embed_genotype
 
 
-def extract_code_features(code: str | None) -> list[float]:
-    """Return a normalised 4-vector parsed from the workflow source.
+def genotype_embedding_descriptor(code: str | None) -> list[float] | None:
+    """Return the unit-norm genotype embedding for QD novelty.
 
-    Axes: ``[n_agents, n_edges, n_branches, prompt_chars]`` each
-    divided by a fixed scale so contributions to k-NN Euclidean
-    distance are comparable. Missing or unparseable code yields a
-    zero vector (treated by the gate as low-novelty).
+    Args:
+        code: Workflow source code as a string.
+
+    Returns:
+        L2-normalised embedding as a plain ``list[float]``. ``None`` for
+        degenerate inputs (missing source, empty string, or backend
+        failure) so the selection layer can fall through to a neutral
+        novelty signal — never to max-novel.
     """
-    if not code:
-        return [0.0] * DESCRIPTOR_DIM
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return [0.0] * DESCRIPTOR_DIM
+    vec = embed_genotype(code)
+    if vec is None:
+        return None
+    return [float(x) for x in vec.tolist()]
 
-    n_agents = 0
-    n_edges = 0
-    n_branches = 0
-    prompt_chars = 0
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            fn = node.func
-            if isinstance(fn, ast.Name) and fn.id in _AGENT_CTORS:
-                n_agents += 1
-            elif isinstance(fn, ast.Attribute) and fn.attr in _EDGE_METHODS:
-                n_edges += 1
-        elif isinstance(node, (ast.If, ast.For, ast.While)):
-            n_branches += 1
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            prompt_chars += len(node.value)
-
-    raw = (n_agents, n_edges, n_branches, prompt_chars)
-    return [r / s for r, s in zip(raw, _SCALES)]
+if __name__ == "__main__":
+    assert genotype_embedding_descriptor(None) is None
+    assert genotype_embedding_descriptor("") is None
+    out = genotype_embedding_descriptor("def workflow(state): return state")
+    if out is not None:
+        norm = sum(x * x for x in out) ** 0.5
+        assert abs(norm - 1.0) < 1e-4, f"expected unit norm, got {norm}"
+        print(f"smoke OK: unit-norm descriptor of dim {len(out)}")
+    else:
+        print("smoke OK: degenerate path (backend unavailable)")

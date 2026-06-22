@@ -4,36 +4,65 @@ VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evo
 """
 
 import math
-from sentence_transformers import SentenceTransformer
-import torch.nn.functional as F
 from .workflow_info import WorkflowInfo
 
 from sources.cli.pretty_print import (
     print_info, print_ok, print_warn, print_err,
     CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
 )
+from sources.core.llm_provider import LLMConfig, LLMProvider
 
 import numpy as np
 
 class VariationEngine:
-    """
-    Orchestrates iterative LLM-driven workflow search via structured prompt mutation.
-    Each call to mutation_prompt() or crossover_prompt() produces a prompt that:
-      - Anchors the LLM on concrete execution feedback (agent answers, judge eval).
-      - Applies a stagnation-driven mutation scope that widens exploration
-        breadth and grows the agent budget as recent offspring keep failing
-        the same way, damped by parent score so near-winners stay protected.
-    """
+    """Assemble mutation/crossover prompts and pick mutation scope from
+    Rechenberg 1/5 success rate and a non-improvement plateau counter."""
 
-    def __init__(self) -> None:
-        """Initialise empty history buffers and lazy embedder state."""
+    def __init__(self, config) -> None:
+        """Initialise empty history buffers."""
         self.textual_gradient_history: list[tuple[str, bool]] = []
         # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
-        self._embedder: SentenceTransformer | None = None
         self.last_variation_state: dict = {}
+        self.config = config
+        self.llm_config = None
+        self.bands = [
+            (
+                0.35, "Slight mutation (small step, exploit known good structure)"
+            ),
+            (
+                0.50, "Roleplay shift (moderate step, explore new persona or reasoning style)"
+            ),
+            (
+                0.65, "Prompt and roleplay shift (moderate step, more explicit instructions, more direct framing, change persona and reasoning mode)"
+            ),
+            (
+                0.90, "Topology mutation (larger step, explore new agent arrangement or workflow structure)"
+            ),
+            (
+                1.01, "Bolder mutation (explore new agent persona arrangement or workflow structure)"
+            ),
+        ]
+        self.setup_llm(config)
+
+    def setup_llm(self, config):
+        self.judge_model = config.workflow_llm_model
+        try:
+            provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
+            self.llm_config = LLMConfig().from_dict({
+                "model": model,
+                "provider": provider,
+                "temperature": 1.2,
+                "reasoning_effort": config.reasoning_effort,
+                "max_tokens": getattr(config, 'max_tokens', 8192),
+                "openrouter_provider": config.openrouter_provider_for(self.judge_model),
+                "openrouter_quantizations": config.openrouter_quantizations_for(self.judge_model),
+            })
+        except Exception as e:
+            raise Exception(f"Failed to initialize LLM configuration: {str(e)}") from e
+
 
     def record_offspring_gradient(
         self,
@@ -49,7 +78,7 @@ class VariationEngine:
             gradient: Free-text diagnosis of the offspring's failure mode.
                 Empty values are replaced with a sentinel placeholder.
             is_failure: Whether the offspring failed to execute at all
-                (excluded from semantic stagnation and success-rate stats).
+                (excluded from plateau-counter and success-rate stats).
             child_score: Overall score of the produced offspring, in ``[0, 1]``.
                 ``None`` when unavailable; such entries do not contribute to
                 the success-rate signal.
@@ -62,12 +91,11 @@ class VariationEngine:
         self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
-    def _sample_agent_count(self, stagnation: float, lo: int, hi: int, concentration: float = 4.0) -> int:
-        """Sample a random agent count within ``[lo, hi]``, biased upward by stagnation.
+    def _sample_agent_count(self, boldness: float, lo: int, hi: int, concentration: float = 4.0) -> int:
+        """Sample a random agent count within ``[lo, hi]``, biased upward by boldness.
 
         Args:
-            stagnation: Stagnation level in ``[0, 1]`` pulling the mean toward
-                ``hi``.
+            boldness: Boldness level in ``[0, 1]`` pulling the mean toward ``hi``.
             lo: Inclusive lower bound on the agent count.
             hi: Inclusive upper bound on the agent count.
             concentration: Beta concentration parameter; higher values
@@ -78,59 +106,32 @@ class VariationEngine:
         """
         if lo == hi:
             return lo
-        target_mean = lo + stagnation * (hi - lo)
+        target_mean = lo + boldness * (hi - lo)
         p = np.clip((target_mean - lo) / (hi - lo), 0.05, 0.95)
         alpha = p * concentration
         beta = (1 - p) * concentration
         prob = np.random.beta(alpha, beta)
         return lo + int(np.random.binomial(hi - lo, prob))
 
-    def _textual_gradient_similarity(self, a: str, b: str) -> float:
-        """Cosine similarity over MiniLM-encoded diagnoses.
+    def _iters_since_improvement(self) -> int:
+        """Length of the current run of scored offspring that did not beat best-so-far.
 
-        Args:
-            a: First diagnosis text.
-            b: Second diagnosis text.
-
-        Returns:
-            Cosine similarity in ``[-1, 1]``, or ``0.0`` when either text is empty.
+        Failures and ``None``-scored entries are skipped (no count, no break).
+        Returns ``0`` when the most recent scored offspring improved.
         """
-        if not a or not b:
-            return 0.0
-        if self._embedder is None:
-            self._embedder = SentenceTransformer("all-MiniLM-L6-v2", token=False)
-        emb_a = self._embedder.encode(a, convert_to_tensor=True, show_progress_bar=False)
-        emb_b = self._embedder.encode(b, convert_to_tensor=True, show_progress_bar=False)
-        return F.cosine_similarity(emb_a, emb_b, dim=0).item()
+        count = 0
+        for c, b, is_failure in reversed(self.score_history):
+            if is_failure or c is None or b is None:
+                continue
+            if c > b + 1e-6:
+                break
+            count += 1
+        return count
 
-    def _compute_stagnation(self, window: int = 10) -> float:
-        """Mean pairwise cosine over recent non-failure offspring gradients, ∈ [0, 1].
-
-        Args:
-            window: How many recent semantic gradients to consider.
-
-        Returns:
-            Stagnation in ``[0, 1]``; ``0.0`` when fewer than two non-failure
-            gradients are available.
-        """
-        semantic = [g for g, is_failure in self.textual_gradient_history if not is_failure]
-        recent = semantic[-window:]
-        if len(recent) < 2:
-            return 0.0
-        sims = [
-            self._textual_gradient_similarity(recent[i], recent[j])
-            for i in range(len(recent))
-            for j in range(i + 1, len(recent))
-        ]
-        raw = sum(sims) / len(sims) if sims else 0.0
-        # MiniLM unrelated baseline ≈ 0.4; treat 0.8+ as fully stagnated.
-        return float(np.clip((raw - 0.4) / 0.4, 0, 1))
-
-    # The Rechenberg success threshold — fraction of recent offspring that
-    # must improve on the best-so-far for the search to be considered
-    # "making progress". Below this, step size is grown; above, damped.
-    # 0.20 is the classical 1/5 success rule (Rechenberg 1973).
-    _SUCCESS_RULE_THRESHOLD = 0.20
+    _SUCCESS_RULE_THRESHOLD = 0.20   # Classical Rechenberg 1/5 rule.
+    _PLATEAU_PATIENCE = 6
+    _RESPECIATION_PATIENCE = 8
+    _RESPECIATION_CLAMP = 0.89       # Just below the 0.90 RE-SPECIATION band.
 
     def _compute_success_rate(self, window: int = 5) -> float | None:
         """Fraction of recent scored offspring that improved on best-so-far.
@@ -162,62 +163,48 @@ class VariationEngine:
         return sum(1 for c, b in recent if c > b + 1e-6) / len(recent)
 
     def _get_prompt_step_size(self, parent_score: float = 0.0) -> str:
-        """Evidence-based mutation scope (Rechenberg 1/5 success rule, 1973).
+        """Pick a boldness level and matching scope band for the next mutation.
 
-        Boldness is driven by two evidence signals, not by the parent's
-        absolute score:
+        Blends two fitness-grounded signals: ``success_rate`` (Rechenberg 1/5)
+        and ``plateau`` (``iters_since_improvement`` over ``_PLATEAU_PATIENCE``).
+        ``parent_score`` enters only as a near-finish damper in the last 5 %
+        of range. The top RE-SPECIATION band is hysteresis-gated: both
+        ``iters_since_improvement >= _RESPECIATION_PATIENCE`` and
+        ``success_rate in {None, 0.0}`` must hold.
 
-        - ``raw_stagnation`` — cosine similarity of recent textual gradients.
-          High → the search keeps diagnosing the same failure.
-        - ``success_rate`` — fraction of recent offspring that beat the
-          running best. Below the Rechenberg 1/5 threshold → step size is
-          too small / search is stuck → grow scope. Above → damp scope.
-
-        ``parent_score`` no longer multiplies the whole signal (that was a
-        state-based damper that locked high-score lineages into "tiny
-        tweak" mode even when the gradient repeated identically). It only
-        re-enters as a *near-finish* soft floor in the last 5 % of score
-        range, where a single regression could blow up a workflow about to
-        hit the early-stop threshold.
-
-        Updates ``self.agent_count_history`` as a side effect.
+        Updates ``self.agent_count_history`` and ``self.last_variation_state``.
 
         Args:
             parent_score: Parent reward in ``[0, 1]``.
 
         Returns:
-            A one-line human-readable mutation-scope directive embeddable in
-            the LLM prompt.
+            One-line mutation-scope directive embeddable in the LLM prompt.
         """
-        raw_stagnation = self._compute_stagnation()
+        iters_since_improvement = self._iters_since_improvement()
+        plateau = min(1.0, iters_since_improvement / self._PLATEAU_PATIENCE)
         success_rate = self._compute_success_rate()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
 
-        # ── Rechenberg 1/5 rule, projected onto a [0, 1] boldness scalar ──
         thr = self._SUCCESS_RULE_THRESHOLD
         if success_rate is None:
-            # Cold start — no improvement evidence yet. Trust gradient
-            # repetition alone; also the back-compat path when the caller
-            # does not pass scores.
-            effective = raw_stagnation
-        elif success_rate < thr:
-            # Search is stuck (or has never improved). Below 1/5, escalate
-            # at least up to the deficit even when gradient repetition is mild.
-            deficit = (thr - success_rate) / thr  # ∈ [0, 1]
-            effective = max(raw_stagnation, deficit)
-        else:
-            # Above 1/5 — real progress. Damp boldness in proportion to
-            # how far above threshold we are; at success_rate ≥ 0.80
-            # boldness collapses regardless of stagnation.
+            effective = 0.3 * plateau                            # cold start cap
+        elif success_rate >= thr:
             progress = min(1.0, (success_rate - thr) / (0.80 - thr))
-            effective = raw_stagnation * (1.0 - progress)
+            effective = plateau * (1.0 - progress)
+        else:
+            deficit = (thr - success_rate) / thr
+            effective = 0.5 * deficit + 0.5 * plateau
 
-        # Near-finish floor: only in the last 5 % of the score range do we
-        # re-introduce a mild parent_score damper, so the optimiser does
-        # not gamble away a 0.96 parent one generation before early-stop.
         near_finish = max(0.0, (parent_score - 0.95) / 0.05)
         effective *= (1.0 - 0.5 * near_finish)
         effective = float(np.clip(effective, 0.0, 1.0))
+
+        respeciation_allowed = (
+            iters_since_improvement >= self._RESPECIATION_PATIENCE
+            and (success_rate is None or success_rate == 0.0)
+        )
+        if not respeciation_allowed:
+            effective = min(effective, self._RESPECIATION_CLAMP)
 
         curr = self.agent_count_history[-1] if self.agent_count_history else 1
         budget = curr + round(effective * (self.max_possible_agents - curr))
@@ -227,7 +214,7 @@ class VariationEngine:
         sr_repr = "n/a" if success_rate is None else f"{success_rate:.2f}"
         msg = (
             f"Boldness effective={effective:.2f} "
-            f"(raw_stagnation={raw_stagnation:.2f}, "
+            f"(plateau={plateau:.2f}, iters_no_improve={iters_since_improvement}, "
             f"success_rate={sr_repr}, parent_score={parent_score:.2f})."
         )
         if effective > 0.5:
@@ -235,55 +222,15 @@ class VariationEngine:
         else:
             print_info(f"{msg} Mutation scope and agent budget remain moderate.")
 
-        bands = [
-            (
-                0.35,
-                "EXPLOITATION (Point Mutation):\n"
-                "- Objective: Micro-tune the current high-performing lineage.\n"
-                "- Scope: Modify only minor phrasing, system instructions, or prompt adjectives.\n"
-                "- Invariance: DO NOT alter the agent graph, agent roles, tool definitions, or handoff structures.\n"
-                "- Strategy: Keep 90% of the prompt identical. Optimize for nuance and alignment."
-            ),
-            (
-                0.50,
-                "ALIGNMENT (Interface Optimization):\n"
-                "- Objective: Smooth out execution friction and coordination errors between nodes.\n"
-                "- Scope: Update agent handoff prompts, context-passing schemas, or tool usage instructions.\n"
-                "- Invariance: Keep the macro-topology and core agent identities exactly as they are.\n"
-                "- Strategy: Focus heavily on clarifying the input/output boundaries and communication contracts between agents."
-            ),
-            (
-                0.65,
-                "ADAPTATION (Component Overhaul):\n"
-                "- Objective: Major behavioral adjustment to fix localized stagnation.\n"
-                "- Scope: Completely rewrite the system prompts of lagging or failing agents. Swap, add, or deprecate specific tools.\n"
-                "- Invariance: Maintain the structural routing/topology of the multi-agent graph.\n"
-                "- Strategy: Retain the overall workflow architecture, but radically re-engineer how individual nodes think and execute."
-            ),
-            (
-                0.90,
-                "EXPLORATION (Macro Structural Mutation):\n"
-                "- Objective: Break out of a severe local minimum or chronic structural failure.\n"
-                "- Scope: Mutate the graph topology. Add a new specialized agent, merge two redundant agents, or change the routing logic.\n"
-                "- Invariance: Keep the fundamental task goal, but completely change the operational workflow.\n"
-                "- Strategy: Restructure the cognitive pipeline. Introduce parallel processing, voting consensus, or multi-step validation loops."
-            ),
-            (
-                1.01,
-                "RE-SPECIATION (Systemic Paradigm Shift):\n"
-                "- Objective: The current evolutionary branch is a dead end. Escape entirely.\n"
-                "- Scope: Clean-slate redesign of the multi-agent architecture.\n"
-                "- Invariance: None. Only the core task description and learned constraints/task specifications remain constant.\n"
-                "- Strategy: Rethink the entire approach. If it was a sequential pipeline, turn it into an autonomous swarm. If it was highly fragmented, design a single ultra-dense prompt. Radical experimentation."
-            ),
-        ]
-        scope = next(label for threshold, label in bands if effective < threshold)
+        scope = next(label for threshold, label in self.bands if effective < threshold)
+
         self.last_variation_state = {
-            "stagnation": float(raw_stagnation),
+            "iters_since_improvement": int(iters_since_improvement),
+            "plateau": float(plateau),
             "success_rate": None if success_rate is None else float(success_rate),
             "effective_boldness": float(effective),
             "parent_score": float(parent_score),
-            "scope_band": scope,
+            "respeciation_gate_open": bool(respeciation_allowed),
             "agent_budget": int(n_agents),
         }
         return f"Mutation scope: {scope}. Boldness: {effective*100:.2f}%. Use at most {n_agents} agent(s).\n"
@@ -315,29 +262,6 @@ class VariationEngine:
 
     # ── Prompt builders ───────────────────────────────────────────────────────
 
-    def random_topology_prompt(self) -> str:
-        """Pick a random workflow-topology suggestion as a short label.
-
-        Returns:
-            One of a curated set of human-readable topology descriptions used
-            to seed initial workflow generations.
-        """
-
-        return np.random.choice([
-            "single-agent",
-            "simple linear chain",
-            "sequential pipeline (output of one is input to next)",
-            "reflection pair (actor → critic loop, fixed iterations)",
-            "debate with fixed turns (proposer → opponent → judge, no adaptation)",
-            "relay race (agent A → B → C → D, fixed handoff)",
-            "assembly line (specialized stations in fixed order)",
-            "ping-pong (two agents, fixed alternation)",
-            "cascading refinement (draft → edit → polish → finalize)",
-            "waterfall (analysis → design → implementation → review, no backtracking)",
-            "serial verification (generator → verifier → generator → verifier, fixed rounds)",
-            "staged gate (must pass checkpoint before next stage, fixed sequence)"
-        ])
-
     def seed_genome_prompt(self, goal: str) -> str:
         """Build the prompt for the very first workflow generation (generation 0).
 
@@ -348,13 +272,55 @@ class VariationEngine:
             A prompt suggesting a random topology and a small starting agent budget.
         """
         n_agents = self._sample_agent_count(0.5, 1, 4)  # start with small random agent count
-        topology = self.random_topology_prompt()
         return (
             "## First workflow generation\n"
             f"Goal to assemble a workflow for:\n{goal}\n"
-            f"Suggested initial topology: {topology}.\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
+
+    def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str, goal: str) -> str:
+        sys_msg = """
+YOu are an expert at pinpointing the root cause of failures in multi-agent workflows.
+Your task is to analyze these inputs and provide a clear, concise directive for the next mutation step.
+Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
+You will be given the previous workflow's agent answers (agents_answers) and a textual gradient block (diagnosis) that summarizes the failure.
+The diagnosis is a summary of  deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong.
+The diagnosis is trusted and should be used to inform your directive.
+The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
+You will also be given a <boldness> block that indicates how much change incentive you are allowed to suggest for the next workflow iteration.
+Do not suggest changes that exceed the boldness level indicated in the <boldness> block.
+Do not add or remove more than 1 agent at a time, and do not suggest more agent than the maximum allowed by the boldness level.
+Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis+boldness indicates that the current approach is fundamentally flawed.
+"""
+        prompt = ''.join([
+            "## GOAL:",
+            goal,
+            "## EXECUTION RESULTS:",
+            "<agents_answers>",
+            agent_answers,
+            "</agents_answers>",
+            "<diagnosis>",
+            "",
+            textual_gradient_block,
+            "</diagnosis>",
+            "<boldness>",
+            step_block,
+            "</boldness>",
+            "Suggest a mutation directive for the next workflow iteration"
+            "Higher boldness mean the same failure more was identified multiple times."
+            "Example directive:"
+            "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
+            "- 'The agent are subborn, they are not following the instructions. Consider changing the agent's persona to be more compliant.'"
+            "- Tweak the prompt of agent X to put the agent on a more domain-specific manifold, to avoid them to be stuck in the same local minima."
+            "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive."
+            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change) and the rationale behind it."
+        ])
+        provider = LLMProvider(
+            system_msg=sys_msg,
+            config=self.llm_config,
+        )
+        return provider(prompt)
+
 
     def mutation_prompt(
         self,
@@ -401,38 +367,33 @@ class VariationEngine:
         step_block = self._get_prompt_step_size(parent_score=score)
 
         if genotype is None:
-            body = "Previous attempt failed. Fix syntax errors."
+            directive = "Previous attempt failed completly. Fix syntax errors."
         else:
-            body = "\n".join([
-                "## WORKFLOW EVOLUTION STEP",
-                "",
-                "Your previous workflow attempt did not reach the success threshold.",
-                "",
-                "## Previous workflow code:",
-                "<python>",
-                genotype,
-                "</python>",
-                "",
-                "## EXECUTION RESULTS:",
-                #"<agents_answers>",
-                #agent_answers,
-                #"</agents_answers>",
-                "<diagnosis>",
-                "",
-                textual_gradient_block,
-                "</diagnosis>",
-                "<boldness>",
-                step_block,
-                "</boldness>",
-                "",
-                "## Task: apply a single mutation to the workflow code.",
-            ])
-
+            directive = self.llm_think_mutation_directive(
+                agent_answers=agent_answers,
+                textual_gradient_block=textual_gradient_block,
+                step_block=step_block,
+                goal=goal
+            )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
-            body,
-            "\nTarget goal:",
+            "## GOAL:",
             goal,
+            "## WORKFLOW EVOLUTION STEP",
+            "Previous workflow code:",
+            "<python>",
+            genotype,
+            "</python>",
+            "Your previous workflow attempt did not reach the success threshold.",
+            "<directive>",
+            directive,
+            "</directive>",
+            "## MUTATION INSTRUCTIONS:",
+            "- Follow exactly the directive as guideline regarding what to change in the workflow code.",
+            "- Do not add or remove more than 1 agent at a time, and do not add more agent than suggested.",
+            "- Do not change the workflow's overall topology unless the directive explicitly suggests it.",
+            "- Do not change prompt instructions outside the scope of the directive.",
+            "- You must keep 90% of the previous workflow prompts and code unchanged, only modify the parts that are relevant to the directive.",
         ])
 
     def crossover_prompt(
@@ -513,37 +474,63 @@ class VariationEngine:
 if __name__ == "__main__":
     np.random.seed(0)
 
-    # ── _compute_stagnation: failures are excluded ────────────────────────
+    # ── _iters_since_improvement: empty history ──────────────────────────
+    ve = VariationEngine()
+    assert ve._iters_since_improvement() == 0
+    assert ve._compute_success_rate() is None
+
+    # ── _iters_since_improvement: failures and unscored entries skipped ──
     ve = VariationEngine()
     for _ in range(4):
         ve.record_offspring_gradient("anything", is_failure=True)
-    assert ve._compute_stagnation() == 0.0
-    assert ve._compute_success_rate() is None  # no scored offspring
+    ve.record_offspring_gradient("no scores attached")  # child_score=None
+    assert ve._iters_since_improvement() == 0
+    assert ve._compute_success_rate() is None
 
-    # ── _compute_stagnation: repeated gradient ⇒ high cosine ──────────────
+    # ── _iters_since_improvement: counts only consecutive non-improvers ──
+    ve = VariationEngine()
+    ve.record_offspring_gradient("improve", child_score=0.30, best_before=0.20)
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    ve.record_offspring_gradient("crash",   is_failure=True)  # transparent
+    ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
+    assert ve._iters_since_improvement() == 3, ve._iters_since_improvement()
+
+    # ── _iters_since_improvement: latest improvement resets streak to 0 ──
     ve = VariationEngine()
     for _ in range(4):
-        ve.record_offspring_gradient("INCONSISTENT_MULTITASK_SPLIT repeating")
-    assert ve._compute_stagnation() > 0.8
+        ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
+    ve.record_offspring_gradient("up", child_score=0.6, best_before=0.5)
+    assert ve._iters_since_improvement() == 0
 
-    # ── Plateau case: same gradient, zero improvement, high parent_score.
-    #    Old behaviour (state-based damping) wrongly returned "tiny tweak".
-    #    New behaviour (1/5 rule) must escalate scope.
+    # ── Plateau case: 5 non-improving offspring at 0.92.
+    #    Hysteresis gate keeps us out of RE-SPECIATION (iters=5 < 8) but
+    #    boldness must clear the smallest band.
     ve = VariationEngine()
     for _ in range(5):
         ve.record_offspring_gradient(
             "DATA_LEAKAGE: same diagnosis again",
             child_score=0.92,
-            best_before=0.92,  # no improvement
+            best_before=0.92,
         )
-    assert ve._compute_success_rate() == 0.0, "5/5 non-improving offspring"
+    assert ve._compute_success_rate() == 0.0
     plateau_step = ve._get_prompt_step_size(parent_score=0.92)
-    assert "tweak" not in plateau_step, (
-        "1/5 rule must lift scope past the smallest band when stuck:\n"
-        + plateau_step
-    )
+    state = ve.last_variation_state
+    assert state["effective_boldness"] >= 0.35, state
+    assert state["effective_boldness"] < 0.90, state
+    assert state["respeciation_gate_open"] is False, state
 
-    # ── Real progress: every offspring beats best_before ⇒ damp boldness ──
+    # ── Hysteresis gate opens at iters_since_improvement ≥ 8 + success=0. ──
+    ve = VariationEngine()
+    for _ in range(8):
+        ve.record_offspring_gradient(
+            "stuck", child_score=0.5, best_before=0.5,
+        )
+    deep_stuck_step = ve._get_prompt_step_size(parent_score=0.5)
+    state = ve.last_variation_state
+    assert state["respeciation_gate_open"] is True, state
+
+    # ── Real progress: improvements drop boldness to the smallest band. ──
     ve = VariationEngine()
     prev_best = 0.5
     for inc in (0.05, 0.07, 0.09, 0.11, 0.13):
@@ -555,32 +542,29 @@ if __name__ == "__main__":
         prev_best += inc
     assert ve._compute_success_rate() == 1.0
     progress_step = ve._get_prompt_step_size(parent_score=0.5)
-    assert "tweak" in progress_step or "information flow" in progress_step, (
-        "When the search is improving steadily, scope should stay small:\n"
-        + progress_step
-    )
+    assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
 
-    # ── Near-finish floor: at parent_score≥0.95 we damp by 50 %  ──────────
+    # ── Near-finish floor: at parent=1.0 the damper halves the pre-clamp
+    #    boldness. Use a 3-iter streak so the result stays well below the
+    #    hysteresis clamp at both parent scores — otherwise the clamp
+    #    masks the comparison.
     ve = VariationEngine()
-    for _ in range(5):
+    for _ in range(3):
         ve.record_offspring_gradient(
-            "stuck near finish",
-            child_score=0.96,
-            best_before=0.96,
+            "stuck near finish", child_score=0.5, best_before=0.5,
         )
-    near_finish_step = ve._get_prompt_step_size(parent_score=0.96)
-    # Boldness should still be > 0 (we are stuck), but capped.
-    print("near-finish step:", near_finish_step)
+    ve._get_prompt_step_size(parent_score=0.50)
+    bold_low_val = ve.last_variation_state["effective_boldness"]
+    ve._get_prompt_step_size(parent_score=1.00)
+    bold_high_val = ve.last_variation_state["effective_boldness"]
+    assert bold_low_val < 0.89 and bold_high_val < 0.89, (bold_low_val, bold_high_val)
+    assert abs(bold_high_val - 0.5 * bold_low_val) < 1e-6, (bold_high_val, bold_low_val)
 
-    # ── Cold start (no scores supplied): fall back to gradient-only ───────
+    # ── Cold start (no scores supplied): boldness stays ≤ 0.30. ───────────
     ve = VariationEngine()
-    for g in (
-        "DEEPCHEM_API_MISMATCH:The workflow produced a usable two-task probability prediction table, but the final training script is not reliably runnable because it calls an unavailable DeepChem model API, and it also lacks a clear held-out classification metric report.",
-        "INCONSISTENT_MULTITASK_SPLIT:The workflow generated plausible probability predictions, but its script and outputs were internally inconsistent, with duplicate molecule rows and weak evidence that the provided train/test split, ECFP features, and both ClinTox endpoints were actually used in a true two-output multitask classifier.",
-        "INCONSISTENT_MULTITASK_SPLIT:The workflow produced a plausible multitask ClinTox prediction table, but it showed serious integrity issues around endpoint/positive-class mapping, possible train-test contamination, and unclear alignment between molecules and their predicted probabilities.",
-    ):
+    for g in ("alpha", "beta", "gamma"):
         ve.record_offspring_gradient(g)
-        stag = ve._compute_stagnation()
         step = ve._get_prompt_step_size(parent_score=0.5)
-        print(f"Gradient prompt: {g}\nStagnation: {stag:.2f}\nPrompt step:\n{step}\n{'-'*40}")
+        assert ve.last_variation_state["effective_boldness"] <= 0.3 + 1e-9, ve.last_variation_state
+        print(f"Cold-start gradient '{g}': {step}")
     print("smoke OK")

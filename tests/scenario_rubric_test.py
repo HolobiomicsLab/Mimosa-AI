@@ -10,8 +10,8 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sources.evaluation.scenario_loader import ScenarioLoader
-from sources.core.evaluators.evaluator import ScenarioEvaluator
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
+from sources.evaluators.evaluator import ScenarioEvaluator
 from config import Config
 import dotenv
 

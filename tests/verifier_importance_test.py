@@ -5,7 +5,6 @@ These cover the post-criticality refactor:
 - ``_aggregate`` weights claims by importance so a high-importance flip moves
   the score strictly more than a low-importance one (the whole reason for the
   refactor — the old 3-vs-1 step function couldn't express that).
-- The thoroughness bonus only fires on high-importance passes.
 - The hard-fail cap triggers on refuted ``importance >= 8`` claims.
 - ``_build_report(min_importance=...)`` produces the filtered view used as the
   gradient builder's input — low-importance claims are suppressed.
@@ -26,8 +25,8 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
 
-from sources.core.evaluators import verifier as verifier_mod  # noqa: E402
-from sources.core.evaluators.verifier import VerifierEvaluator  # noqa: E402
+from sources.evaluators import verifier as verifier_mod  # noqa: E402
+from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
 
 
 class _StubVerifier(VerifierEvaluator):
@@ -41,8 +40,6 @@ class _StubVerifier(VerifierEvaluator):
     def __init__(self) -> None:  # noqa: D401
         self.logger = logging.getLogger("test_verifier_importance")
         self.hard_fail_cap = verifier_mod._HARD_FAIL_CAP
-        self.info_bonus_alpha = verifier_mod._INFO_BONUS_ALPHA
-        self.info_bonus_beta = verifier_mod._INFO_BONUS_BETA
 
 
 def _claim(cid: str, importance: int, status: str, rationale: str = "") -> dict:
@@ -113,15 +110,16 @@ def test_high_importance_flip_moves_score_more_than_low_importance_flip() -> Non
 def test_hard_fail_cap_triggers_only_on_high_importance_refutation() -> None:
     """Refuting an importance≥8 claim flips ``hard_fail_capped``; lower does not."""
     v = _StubVerifier()
+    threshold = VerifierEvaluator._HARD_FAIL_IMPORTANCE
 
     capped = v._aggregate([
-        _claim("must_have", importance=8, status="fail"),
+        _claim("must_have", importance=threshold, status="fail"),
         _claim("ok", importance=5, status="pass"),
     ])
     assert capped["hard_fail_capped"] is True
 
     not_capped = v._aggregate([
-        _claim("nice_to_have", importance=7, status="fail"),
+        _claim("nice_to_have", importance=threshold-1, status="fail"),
         _claim("ok", importance=5, status="pass"),
     ])
     assert not_capped["hard_fail_capped"] is False
@@ -137,31 +135,12 @@ def test_hard_fail_cap_does_not_fire_on_errored_claims() -> None:
     assert scores["hard_fail_capped"] is False
 
 
-def test_information_bonus_counts_only_high_importance_passes() -> None:
-    """A workspace of importance-3 passes earns no bonus; importance-9 does."""
-    v = _StubVerifier()
-
-    low_only = v._aggregate([
-        _claim("a", importance=3, status="pass"),
-        _claim("b", importance=3, status="pass"),
-        _claim("c", importance=3, status="pass"),
-    ])
-    high_only = v._aggregate([
-        _claim("a", importance=9, status="pass"),
-    ])
-
-    assert low_only["n_high_importance_pass"] == 0
-    assert low_only["information_bonus"] == 0.0
-    assert high_only["n_high_importance_pass"] == 1
-    assert high_only["information_bonus"] > 0.0
-
-
 def test_aggregate_emits_new_telemetry_keys() -> None:
     """The score dict carries the new importance-based fields, not the old ones."""
     v = _StubVerifier()
     scores = v._aggregate([_claim("x", importance=6, status="pass")])
-    assert "n_high_importance_pass" in scores
-    assert "high_importance_pass_mass" in scores
+    assert "overall_score" in scores
+    assert "base_mean" in scores
     assert "n_hard_pass" not in scores  # removed by the refactor
 
 
@@ -174,8 +153,8 @@ def test_build_report_filters_below_min_importance() -> None:
     ]
     scores = v._aggregate(per_claim)
 
-    full = v._build_report(per_claim, scores, cheat=None, min_importance=0)
-    gradient = v._build_report(per_claim, scores, cheat=None, min_importance=6)
+    full = v._build_report(per_claim, scores, min_importance=0)
+    gradient = v._build_report(per_claim, scores, min_importance=6)
 
     assert "[deliverable]" in full and "[noise]" in full
     assert "[deliverable]" in gradient
@@ -242,7 +221,6 @@ if __name__ == "__main__":
     test_high_importance_flip_moves_score_more_than_low_importance_flip()
     test_hard_fail_cap_triggers_only_on_high_importance_refutation()
     test_hard_fail_cap_does_not_fire_on_errored_claims()
-    test_information_bonus_counts_only_high_importance_passes()
     test_aggregate_emits_new_telemetry_keys()
     test_build_report_filters_below_min_importance()
     test_declare_claim_importance_falls_back_when_rater_unavailable()

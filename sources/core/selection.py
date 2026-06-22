@@ -3,6 +3,12 @@ Evolution Strategy
 Supports two modes:
   1. Greedy : validates that the latest run improved over recent history.
   2. Open-ended : maintains a population archive, uses novelty + quality to decide which individuals survive
+
+Novelty uses the genotype embedding from :mod:`sources.core.code_features`:
+two workflows whose generated code is semantically close collapse onto
+the same point and are redundant; ones that explored different
+approaches land far apart and both survive. A length-penalty term in
+``qd_score`` discourages runaway code growth without overriding ranking.
 """
 
 import logging
@@ -13,9 +19,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from .code_features import extract_code_features
+from .code_features import genotype_embedding_descriptor
 
 MAX_CHILDREN_PER_PARENT = 2
+
+# Comparison-set modes for novelty.
+NOVELTY_ARCHIVE_KNN = "archive_knn"
+NOVELTY_PREVIOUS_N = "previous_n"
+
 
 class SelectionStrategy(Enum):
     """Available selection strategies for the evolution loop."""
@@ -34,11 +45,14 @@ class PopulationMember:
         reward: Capped reward used for greedy comparisons.
         cost: Monetary or compute cost spent to produce this member.
         uuid: Workflow UUID; ``None`` for members without on-disk artifacts.
-        behaviour_descriptor: Fixed-length structural feature vector used
-            for novelty distance.
-        novelty_score: k-NN novelty against the rest of the archive.
-        qd_score: Combined quality-diversity score.
-        reward_uncapped: Base + info-bonus − cheat, with no hard-fail cap.
+        behaviour_descriptor: Unit-norm genotype embedding used for the
+            cosine-distance novelty signal. Empty list when no embedding
+            could be produced (treated as neutral by the selection layer).
+        genotype_chars: Raw character length of the workflow source —
+            used for the length-penalty term in ``qd_score``.
+        novelty_score: Mean cosine distance to the current comparison set.
+        qd_score: Combined quality-diversity score with length penalty.
+        reward_uncapped: Base reward with no hard-fail cap.
         created_at: Wall-clock timestamp of construction.
     """
     iteration: int
@@ -46,9 +60,10 @@ class PopulationMember:
     cost: float
     uuid: str | None = None
     behaviour_descriptor: list[float] = field(default_factory=list)
+    genotype_chars: int = 0
     novelty_score: float = 0.0
-    qd_score: float = 0.0        # combined quality-diversity score
-    reward_uncapped: float = 0.0  # base+info-bonus−cheat, no hard-fail cap
+    qd_score: float = 0.0
+    reward_uncapped: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -62,7 +77,8 @@ class SelectionPressure:
     In **open-ended** modes it maintains a population archive and uses
     novelty / quality-diversity scoring so that low-performing but
     behaviourally novel runs can survive and potentially lead to better
-    solutions later.
+    solutions later. Novelty is ``1 − cosine_similarity`` between unit-norm
+    genotype embeddings.
     """
 
     def __init__(
@@ -71,9 +87,13 @@ class SelectionPressure:
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
         novelty_k_neighbours: int = 10,
-        novelty_weight: float = 0.4,
+        novelty_weight: float = 0.25,
         admit_threshold: float = 0.3,
         max_children: int = MAX_CHILDREN_PER_PARENT,
+        novelty_comparison: str = NOVELTY_ARCHIVE_KNN,
+        previous_n: int = 5,
+        length_penalty_baseline_chars: int = 5000,
+        length_penalty_lambda: float = 0.05,
     ) -> None:
         """Configure thresholds and the active selection strategy.
 
@@ -81,11 +101,20 @@ class SelectionPressure:
             min_improvement_threshold: Minimum relative improvement for greedy mode (5% default).
             strategy: Selection strategy (greedy | tournament | novelty | qd).
             population_size: Max individuals kept in the archive (for open-ended modes).
-            novelty_k_neighbours: k for k-nearest novelty calculation.
+            novelty_k_neighbours: k for k-nearest novelty calculation (archive_knn mode).
             novelty_weight: Weight of novelty vs quality in QD score (0 = pure quality, 1 = pure novelty).
             admit_threshold: Minimum qd_score for admission when greedy validity fails.
             max_children: Maximum offspring drawn from a single parent before
                 its inverse-child-count weight pushes it below peers.
+            novelty_comparison: Comparison-set mode — ``"archive_knn"`` (k-NN
+                against the archive, default) or ``"previous_n"`` (mean
+                distance to the N most recently produced genotypes).
+            previous_n: Window size for ``"previous_n"`` mode.
+            length_penalty_baseline_chars: Genotype size at which the length
+                penalty starts to grow above zero.
+            length_penalty_lambda: Strength of the length penalty term
+                subtracted from ``qd_score``. Kept conservative so it only
+                breaks near-ties.
         """
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
@@ -99,14 +128,19 @@ class SelectionPressure:
         self.novelty_weight = novelty_weight
         self.admit_threshold = admit_threshold
         self.max_children = max_children
+        self.novelty_comparison = (
+            novelty_comparison if novelty_comparison in (NOVELTY_ARCHIVE_KNN, NOVELTY_PREVIOUS_N)
+            else NOVELTY_ARCHIVE_KNN
+        )
+        self.previous_n = max(1, int(previous_n))
+        self.length_baseline_chars = max(1, int(length_penalty_baseline_chars))
+        self.length_lambda = float(length_penalty_lambda)
 
-        # Population archive for open-ended modes
         self._archive: list[PopulationMember] = []
-        # Count of offspring rejected by the admit gate (S2 telemetry)
+        self._previous_descriptors: list[list[float]] = []
         self._n_admit_rejected: int = 0
-        # UUID evicted by the most recent admission, or ``None``. Cleared
-        # at the start of each ``_validate_open_ended`` call so callers
-        # can surface it in their archive log without stale carryover.
+        # Reset each call to _validate_open_ended so log lines surface the
+        # eviction from *that* admission only, not a stale carryover.
         self._last_evicted_uuid: str | None = None
 
     def validate_survivor(
@@ -157,19 +191,13 @@ class SelectionPressure:
 
         In greedy mode: always returns the best-scoring run from `runs`.
         In tournament mode: probabilistic tournament among a random subset of `runs`.
-        In novelty/QD mode: samples a `PopulationMember` from `_archive`
-            biased toward high QD-score, falling back to greedy over `runs`
-            when the archive is empty (cold start).
-        Callers driving from archive must rehydrate the chosen member's
-        UUID into their domain object (e.g., WorkflowInfo).
+        In novelty/QD mode: samples a `PopulationMember` from `_archive` biased toward high QD-score
 
         Args:
             runs: Candidate pool. May be a list of `PopulationMember` (archive
                 draw) or any object with a `reward` attribute (greedy/tournament).
             child_counts: Optional ``{uuid: n_children_already}`` map used in
-                QD/novelty mode to apply a ``1/(1+n_children)`` penalty so
-                already-mined parents don't keep dominating the offspring stream.
-                v2_evolution §7 leveraged-move #4.
+                QD/novelty mode to apply a ``1/(1+n_children)`` penalty
 
         Returns:
             The chosen parent (a run object or a ``PopulationMember``), or
@@ -212,7 +240,7 @@ class SelectionPressure:
         self,
         candidates: list[Any],
         n_parents: int = 2,
-        crossover_rate: float = 0.3,
+        crossover_rate: float = 0.4,
         child_counts: dict[str, int] | None = None,
     ) -> tuple[list[Any], bool]:
         """Select one or more parents from a candidate pool.
@@ -233,7 +261,6 @@ class SelectionPressure:
             return [], False
 
         n_parents = max(n_parents, 2)
-        # Decide crossover vs mutation
         do_crossover = (
             len(candidates) >= 2
             and random.random() < crossover_rate
@@ -242,7 +269,7 @@ class SelectionPressure:
             parent = self.select_parent(candidates, child_counts=child_counts)
             return [parent], False
         selected: list[Any] = []
-        pool = list(candidates)  # shallow copy so we can remove picked items
+        pool = list(candidates)
 
         for _ in range(min(n_parents, len(pool))):
             parent = self.select_parent(pool, child_counts=child_counts)
@@ -250,7 +277,6 @@ class SelectionPressure:
                 break
             selected.append(parent)
             pool = [c for c in pool if c is not parent]
-        # Safety: if we ended up with < 2, fall back to mutation
         if len(selected) < 2:
             return (
                 selected or [self.select_parent(candidates, child_counts=child_counts)],
@@ -359,7 +385,9 @@ class SelectionPressure:
     ) -> dict[str, Any]:
         """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
 
-        QD weighting uses ``reward_uncapped`` (base + info_bonus − cheat).
+        QD weighting uses ``reward_uncapped`` (uncapped base reward),
+        then subtracts a length-penalty term so runaway code growth costs
+        ranking points without overriding it on real improvements.
 
         Args:
             baseline_list: Previous runs whose mean reward forms the bar.
@@ -368,10 +396,9 @@ class SelectionPressure:
 
         Returns:
             Validation result dict from :meth:`_build_result`, extended with
-            ``novelty_score``, ``qd_score``, ``archive_size``,
-            ``admit_rejected`` and ``admit_rejected_total``.
+            ``novelty_score``, ``qd_score``, ``length_penalty``,
+            ``archive_size``, ``admit_rejected`` and ``admit_rejected_total``.
         """
-        # Reset the per-call eviction slot before _try_admit may set it.
         self._last_evicted_uuid = None
 
         baseline_reward = _mean_reward(baseline_list)
@@ -380,11 +407,16 @@ class SelectionPressure:
         new_reward_uncapped = _safe_attr(best_new, "reward_uncapped", 0.0) or new_reward
 
         descriptor = self._extract_behaviour_descriptor(best_new)
+        genotype_chars = _genotype_chars(best_new)
         novelty = self._compute_novelty(descriptor)
 
-        quality_norm = min(new_reward_uncapped, 1.0)
-        novelty_norm = min(novelty / max(self._novelty_range(), 1e-6), 1.0)
-        qd_score = (1 - self.novelty_weight) * quality_norm + self.novelty_weight * novelty_norm
+        novelty_range = self._novelty_range()
+        quality_norm = min(max(new_reward_uncapped, 0.0), 1.0)
+        novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
+        length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
+        qd_score = self._compose_qd_score(
+            new_reward_uncapped, novelty, genotype_chars, novelty_range,
+        )
 
         absolute_improvement = new_reward - baseline_reward
         relative_improvement = absolute_improvement / max(abs(baseline_reward), 1e-6)
@@ -395,12 +427,14 @@ class SelectionPressure:
             reward=new_reward,
             cost=_safe_attr(best_new, "cost", 0.0),
             uuid=_safe_attr(best_new, "current_uuid", None),
-            behaviour_descriptor=descriptor,
+            behaviour_descriptor=descriptor or [],
+            genotype_chars=genotype_chars,
             novelty_score=novelty,
             qd_score=qd_score,
             reward_uncapped=new_reward_uncapped,
         )
         admit_rejected = not self._try_admit(member, is_valid)
+        self._record_previous(descriptor)
 
         confidence = min(1.0, qd_score / max(self.admit_threshold, 1e-6))
 
@@ -412,7 +446,8 @@ class SelectionPressure:
         result["qd_score"] = qd_score
         result["quality_norm"] = quality_norm
         result["novelty_norm"] = novelty_norm
-        result["behaviour_descriptor"] = descriptor
+        result["length_penalty"] = length_penalty
+        result["behaviour_descriptor"] = descriptor or []
         result["archive_size"] = len(self._archive)
         result["admit_rejected"] = admit_rejected
         result["admit_rejected_total"] = self._n_admit_rejected
@@ -422,51 +457,92 @@ class SelectionPressure:
         if self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
             self.logger.info(
                 f"Open-ended: novelty={novelty:.3f}, qd={qd_score:.3f}, "
+                f"len_pen={length_penalty:.3f}, "
                 f"archive={len(self._archive)}/{self.population_size}"
             )
         return result
 
-    def _extract_behaviour_descriptor(self, run: Any) -> list[float]:
-        """Topology-based descriptor parsed from the workflow source.
+    def _extract_behaviour_descriptor(self, run: Any) -> list[float] | None:
+        """Unit-norm genotype embedding used as the QD behaviour descriptor.
 
-        Reads ``run.code`` and returns a fixed-length vector of structural features.
-
-        Args:
-            run: Object exposing a ``code`` attribute with workflow source.
-
-        Returns:
-            Fixed-length feature vector used as a behaviour descriptor.
-        """
-        return extract_code_features(_safe_attr(run, "code", None))
-
-    def _compute_novelty(self, descriptor: list[float]) -> float:
-        """Compute novelty as mean distance to k-nearest archive members.
+        Reads a pre-computed ``run.behaviour_descriptor`` first (used by
+        tests injecting stub vectors); otherwise embeds ``run.code`` via
+        the configured genotype embedder.
 
         Args:
-            descriptor: Behaviour descriptor of the candidate.
+            run: Object exposing ``code`` (workflow source) and optionally
+                a pre-computed ``behaviour_descriptor``.
 
         Returns:
-            Mean Euclidean distance to the k nearest archive members; ``1.0``
-            when the archive is empty (first individual is maximally novel).
+            Unit-norm descriptor as ``list[float]``, or ``None`` when no
+            usable genotype was available — callers must treat the missing
+            signal as neutral, never as max-novel.
         """
-        if not self._archive:
-            return 1.0  # First individual is maximally novel
+        precomputed = _safe_attr(run, "behaviour_descriptor", None)
+        if isinstance(precomputed, list) and precomputed:
+            return [float(x) for x in precomputed]
+        code = _safe_attr(run, "code", None)
+        return genotype_embedding_descriptor(code)
 
-        distances = [
-            _euclidean(descriptor, m.behaviour_descriptor)
-            for m in self._archive
-        ]
-        distances.sort()
+    def _compute_novelty(self, descriptor: list[float] | None) -> float:
+        """Mean cosine distance to the active comparison set.
+
+        ``archive_knn`` (default) uses the mean distance to the k-nearest
+        archive members — the existing behaviour, generalised to cosine
+        distance. ``previous_n`` uses the mean distance to the N most
+        recently produced genotypes (lighter-weight mode that ignores
+        eviction).
+
+        Args:
+            descriptor: Candidate descriptor; ``None`` / empty yields ``0.0``
+                so a missing embedding contributes nothing to QD score.
+
+        Returns:
+            Non-negative novelty value in ``[0, 2]`` (cosine distance range
+            for unit vectors). ``0.0`` for empty comparison sets so the
+            cold start is neither novel nor stale.
+        """
+        if not descriptor:
+            return 0.0
+        peers = self._comparison_peers()
+        if not peers:
+            return 0.0
+        distances = sorted(_cosine_distance(descriptor, p) for p in peers)
+        if self.novelty_comparison == NOVELTY_PREVIOUS_N:
+            return sum(distances) / len(distances)
         k = min(self.novelty_k, len(distances))
         return sum(distances[:k]) / k if k > 0 else 0.0
 
+    def _comparison_peers(self) -> list[list[float]]:
+        """Descriptors of the active comparison set, filtered to non-empty."""
+        if self.novelty_comparison == NOVELTY_PREVIOUS_N:
+            return [p for p in self._previous_descriptors if p]
+        return [m.behaviour_descriptor for m in self._archive if m.behaviour_descriptor]
+
+    def _record_previous(self, descriptor: list[float] | None) -> None:
+        """Push ``descriptor`` onto the previous-N sliding window."""
+        if not descriptor:
+            return
+        self._previous_descriptors.append(list(descriptor))
+        if len(self._previous_descriptors) > self.previous_n:
+            self._previous_descriptors.pop(0)
+
     def _novelty_range(self) -> float:
-        """Estimate the typical novelty scale from the archive.
+        """Estimate the typical novelty scale from the active comparison set.
 
         Returns:
-            Maximum positive ``novelty_score`` across the archive, or ``1.0``
-            when the archive has fewer than two members.
+            Maximum positive novelty seen across the current comparison
+            members, or ``1.0`` when too small to estimate.
         """
+        if self.novelty_comparison == NOVELTY_PREVIOUS_N:
+            peers = self._comparison_peers()
+            if len(peers) < 2:
+                return 1.0
+            pair_max = max(
+                _cosine_distance(peers[i], peers[j])
+                for i in range(len(peers)) for j in range(i + 1, len(peers))
+            )
+            return pair_max if pair_max > 0 else 1.0
         if len(self._archive) < 2:
             return 1.0
         novelties = [m.novelty_score for m in self._archive if m.novelty_score > 0]
@@ -515,30 +591,45 @@ class SelectionPressure:
 
     def _refresh_member_metrics(self) -> None:
         """Recompute stored novelty + qd_score for every archive member."""
-        n = len(self._archive)
-        if n < 2:
+        if len(self._archive) < 2:
             return
-        # Pass 1: k-NN novelty against current archive peers.
         for m in self._archive:
-            distances = sorted(
-                _euclidean(m.behaviour_descriptor, o.behaviour_descriptor)
-                for o in self._archive
-                if o is not m
-            )
-            k = min(self.novelty_k, len(distances))
-            m.novelty_score = sum(distances[:k]) / k if k > 0 else 0.0
-        # Pass 2: renormalise qd_score against the current novelty range.
+            m.novelty_score = self._knn_novelty_against_peers(m)
         novelty_range = max(
             (m.novelty_score for m in self._archive if m.novelty_score > 0),
             default=1.0,
         )
         for m in self._archive:
-            quality_norm = min(max(m.reward_uncapped, 0.0), 1.0)
-            novelty_norm = min(m.novelty_score / max(novelty_range, 1e-6), 1.0)
-            m.qd_score = (
-                (1 - self.novelty_weight) * quality_norm
-                + self.novelty_weight * novelty_norm
+            m.qd_score = self._compose_qd_score(
+                m.reward_uncapped, m.novelty_score, m.genotype_chars, novelty_range,
             )
+
+    def _knn_novelty_against_peers(self, m: PopulationMember) -> float:
+        """k-NN cosine-distance novelty for ``m`` against the rest of the archive."""
+        distances = sorted(
+            _cosine_distance(m.behaviour_descriptor, o.behaviour_descriptor)
+            for o in self._archive
+            if o is not m and o.behaviour_descriptor
+        )
+        k = min(self.novelty_k, len(distances))
+        return sum(distances[:k]) / k if k > 0 else 0.0
+
+    def _compose_qd_score(
+        self,
+        reward_uncapped: float,
+        novelty: float,
+        genotype_chars: int,
+        novelty_range: float,
+    ) -> float:
+        """``(1-w)·quality + w·novelty − λ·length_penalty`` in one place."""
+        quality_norm = min(max(reward_uncapped, 0.0), 1.0)
+        novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
+        length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
+        return (
+            (1 - self.novelty_weight) * quality_norm
+            + self.novelty_weight * novelty_norm
+            - self.length_lambda * length_penalty
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -657,40 +748,92 @@ def _best_reward(runs: list[Any]) -> float:
     return max(rewards) if rewards else 0.0
 
 
-def _euclidean(a: list[float], b: list[float]) -> float:
-    """Euclidean distance between two vectors of equal length.
+def _cosine_distance(a: list[float], b: list[float]) -> float:
+    """Cosine distance between two vectors of equal length.
 
     Args:
         a: First vector.
         b: Second vector.
 
     Returns:
-        Euclidean distance, or ``float("inf")`` when the vectors differ in
-        length (used as a sentinel for incomparable descriptors).
+        ``1 − cosine_similarity`` in ``[0, 2]``; ``1.0`` (neutral) when the
+        vectors are empty or have mismatching shapes.
     """
-    if len(a) != len(b):
-        return float("inf")
-    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+    if not a or not b or len(a) != len(b):
+        return 1.0
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 1.0
+    cos = dot / (norm_a * norm_b)
+    return 1.0 - max(min(cos, 1.0), -1.0)
+
+
+def _length_penalty(chars: int, baseline_chars: int) -> float:
+    """Clipped relative excess over the baseline genotype length.
+
+    Args:
+        chars: Genotype character count for the run.
+        baseline_chars: Configured baseline above which the penalty grows.
+
+    Returns:
+        ``clip((chars − baseline) / baseline, 0, 1)``.
+    """
+    if baseline_chars <= 0:
+        return 0.0
+    raw = (chars - baseline_chars) / baseline_chars
+    return max(0.0, min(1.0, raw))
+
+
+def _genotype_chars(run: Any) -> int:
+    """Character length of the run's workflow source code, ``0`` when missing."""
+    code = _safe_attr(run, "code", None)
+    return len(code) if isinstance(code, str) else 0
 
 
 if __name__ == "__main__":
     from types import SimpleNamespace
 
-    sp = SelectionPressure(strategy="qd", population_size=50, novelty_k_neighbours=25, novelty_weight=0.4)
+    def _run(reward: float, descriptor: list[float], uuid: str, *, code_len: int = 100) -> SimpleNamespace:
+        return SimpleNamespace(
+            reward=reward, reward_uncapped=reward, current_uuid=uuid,
+            iteration_count=1, cost=0.0,
+            code="x" * code_len,
+            behaviour_descriptor=descriptor,
+        )
 
-    seed = SimpleNamespace(
-        reward=0.97, reward_uncapped=1.05, current_uuid="seed",
-        iteration_count=1, cost=0.0, code="x=1",
+    sp = SelectionPressure(
+        strategy="qd", population_size=50, novelty_k_neighbours=25,
+        novelty_weight=0.4, length_penalty_baseline_chars=5000,
+        length_penalty_lambda=0.05,
     )
+
+    seed = _run(0.97, [0.6, 0.0, 0.0, 0.8], "seed")
     sp._validate_open_ended([seed], [seed], threshold=0.01)
     assert len(sp._archive) == 1, sp._archive
 
-    distinct = SimpleNamespace(
-        reward=0.91, reward_uncapped=0.91, current_uuid="distinct",
-        iteration_count=5, cost=0.0,
-        code="\n".join(["def f():"] + ["    x = 'y' * 800"] * 6),
-    )
+    # Distinct genotype embedding → admitted despite lower reward.
+    distinct = _run(0.91, [0.0, 1.0, 0.0, 0.0], "distinct")
     sp._validate_open_ended([seed], [distinct], threshold=0.01)
-    assert len(sp._archive) == 2, f"distinct sibling rejected; archive={[m.uuid for m in sp._archive]}"
+    assert len(sp._archive) == 2, [m.uuid for m in sp._archive]
 
-    print("smoke OK: distinct sibling admitted alongside higher-reward seed")
+    # Length penalty discourages an oversized genotype: a 10x-longer
+    # neutral candidate should land but with qd_score reduced.
+    bloated = _run(0.85, [0.7, 0.7, 0.0, 0.0], "bloated", code_len=60000)
+    sp._validate_open_ended([seed], [bloated], threshold=0.01)
+    bloated_member = next((m for m in sp._archive if m.uuid == "bloated"), None)
+    assert bloated_member is not None
+    assert _length_penalty(60000, 5000) == 1.0
+
+    # previous_n mode: cosine distance against the recent window.
+    sp_pn = SelectionPressure(
+        strategy="qd", population_size=50, novelty_weight=0.4,
+        novelty_comparison="previous_n", previous_n=4,
+    )
+    sp_pn._validate_open_ended([seed], [seed], threshold=0.01)
+    sp_pn._validate_open_ended([seed], [distinct], threshold=0.01)
+    assert len(sp_pn._previous_descriptors) == 2
+    assert sp_pn._comparison_peers(), "previous_n peers should be populated"
+
+    print("smoke OK: cosine novelty + length penalty + previous_n mode")

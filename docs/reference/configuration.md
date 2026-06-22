@@ -34,15 +34,15 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `prompt_planner` | `str` | `sources/prompts/planner_reproduction.md` | Planner system prompt. |
-| `prompt_workflow_creator` | `str` | `sources/prompts/workflow_v10.md` | Workflow-generation prompt. |
+| `prompt_workflow_creator` | `str` | `sources/prompts/workflow_v11.md` | Workflow-generation prompt. |
 | `prompt_smolagent` | `str` | `sources/prompts/smolagent_sys_prompt.md` | SmolAgent system prompt. |
 
 ## Learning
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `learned_score_threshold` | `float` | `0.97` | `--learn` stops when `overall_score` exceeds this. |
-| `max_learning_evolve_iterations` | `int` | `35` | Hard cap on evolve iterations. |
+| `learned_score_threshold` | `float` | `0.9` | `--learn` stops when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `int` | `20` | Hard cap on evolve iterations. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
 
 ## OpenRouter routing
@@ -70,7 +70,7 @@ See [Troubleshooting → OpenRouter quantization](troubleshooting.md#openrouter-
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `runner_default_python_version` | `str` | `3.10` | Python in the sandbox. |
+| `runner_default_python_version` | `str` | `3.12` | Python in the sandbox. |
 | `runner_default_timeout` | `int` | `3600` | Per-run timeout (s). |
 | `runner_default_max_memory_mb` | `int` | `1024` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `int` | `100` | CPU cap (%). |

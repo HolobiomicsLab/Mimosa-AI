@@ -24,7 +24,7 @@ pytest.importorskip(
     reason="sources.core.dgm no longer exists; legacy test file kept for review",
 )
 from sources.core.dgm import DarwinMachine  # noqa: E402  pragma: no cover
-from sources.core.evaluators.evaluator import WorkflowEvaluator  # noqa: E402
+from sources.evaluators.evaluator import WorkflowEvaluator  # noqa: E402
 
 load_dotenv()
 

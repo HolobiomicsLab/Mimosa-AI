@@ -263,7 +263,7 @@ class WorkflowSelector:
         goal: str,
         selection_pressure: SelectionPressure,
         n_parents: int = 2,
-        crossover_rate: float = 0.3,
+        crossover_rate: float = 0.1,
         threshold_similarity: float = 0.8,
         threshold_score: float = 0.1,
     ) -> tuple[list[WorkflowInfo], bool]:
@@ -296,7 +296,7 @@ class WorkflowSelector:
                 scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
                 mode = "CROSSOVER" if use_crossover else "MUTATION"
                 logger.info(
-                    f"🧬 Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
+                    f"Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
                     f"{len(selected_workflows)} parent(s) from archive size={len(selection_pressure._archive)} "
                     f"— UUIDs={uuids}, scores={scores}"
                 )
@@ -326,7 +326,7 @@ class WorkflowSelector:
         scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
         mode = "CROSSOVER" if use_crossover else "MUTATION"
         logger.info(
-            f"🧬 Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
+            f"Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
             f"{len(selected_workflows)} parent(s) from {len(candidates)} disk candidates "
             f"— UUIDs={uuids}, scores={scores}"
         )
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         goal=goal,
         selection_pressure=sp,
         n_parents=2,
-        crossover_rate=0.5,
+        crossover_rate=0.1,
     )
     mode = "CROSSOVER" if crossover else "MUTATION"
     print(f"  Mode: {mode}, Parents: {len(selected)}")

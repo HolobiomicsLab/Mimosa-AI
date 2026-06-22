@@ -244,27 +244,44 @@ class EvaluationCLI:
         else:
             _warn("No matching API key found – enter a model ID manually.")
 
-        choice = _ask(
-            "Select number, 'c' for custom, or Enter to keep current",
-            default="",
-        )
+        while True:
+            choice = _ask(
+                "Select number, 'c' for custom, or Enter to keep current",
+                default="",
+            )
 
-        if not choice and suggested:
-            model = suggested
-        elif choice.lower() == "c" or not available:
-            custom = _ask("Enter model ID (e.g. anthropic/claude-sonnet-4-5)")
-            model = custom.strip() if custom.strip() else suggested
-        else:
+            if not choice and suggested:
+                model = suggested
+                break
+            if choice.lower() == "c" or not available:
+                custom = _ask(
+                    "Enter model ID (e.g. anthropic/claude-sonnet-4-5)"
+                ).strip()
+                if custom:
+                    model = custom
+                    break
+                if suggested:
+                    _warn("No model ID entered — keeping current.")
+                    model = suggested
+                    break
+                _warn("No model ID entered — please try again.")
+                continue
             try:
                 idx = int(choice) - 1
                 if 0 <= idx < len(available):
                     model = available[idx][1]
-                else:
-                    _warn(f"Invalid selection '{choice}'. Using default.")
-                    model = suggested
+                    break
+                _warn(
+                    f"Number out of range: {choice}. "
+                    f"Please pick 1-{len(available)} or 'c'."
+                )
+                continue
             except ValueError:
-                _warn(f"Unrecognised input '{choice}'. Using default.")
-                model = suggested
+                _warn(
+                    f"Unrecognised input '{choice}'. "
+                    "Please pick a number, 'c', or press Enter to keep current."
+                )
+                continue
 
         run_config.smolagent_model_id = model
         _ok(f"Agent model: {model}")
@@ -415,19 +432,40 @@ class EvaluationCLI:
         # ---- Discover MCPs ---------------------------------------------
         tool_manager = ToolManager(config=run_config)
         mcp_list: list[str] = []
-        try:
-            mcps = await tool_manager.discover_mcp_servers()
-        except Exception as exc:
-            _warn(f"Discovery error: {exc}")
-            mcps = []
+        while True:
+            try:
+                mcps = await tool_manager.discover_mcp_servers()
+            except Exception as exc:
+                _warn(f"Discovery error: {exc}")
+                mcps = []
 
-        if mcps:
-            tool_manager.mcps = mcps
-            mcp_list = [str(m) for m in mcps]
-            for m in mcps:
-                _ok(f"MCP online: {m}")
-        else:
-            _err("No MCP servers found. Evaluation may fail at runtime.")
+            if mcps:
+                tool_manager.mcps = mcps
+                mcp_list = [str(m) for m in mcps]
+                for m in mcps:
+                    _ok(f"MCP online: {m}")
+                break
+
+            _err("No MCP servers found.")
+            addrs = run_config.discovery_addresses
+            addr_str = ", ".join(
+                f"{a.ip}:{a.port_min}-{a.port_max}" for a in addrs
+            )
+            print(_wrap(
+                f"Please start Toolomics on the configured port range ({addr_str}).",
+                width=70, indent=2,
+            ))
+            print(f"\n  {BOLD}Options:{RESET}")
+            print(f"    {CYAN}Enter{RESET}   – retry scan")
+            print(f"    {CYAN}skip{RESET}    – queue this run anyway "
+                  "(will fail at launch)")
+            choice = _ask("Retry or skip?").strip().lower()
+            if choice == "skip":
+                _warn(
+                    "Queuing run with no MCPs detected. "
+                    "Evaluation may fail at runtime."
+                )
+                break
 
         # ---- Workspace -------------------------------------------------
         suggested_ws = self._suggest_workspace(run_config, run_id)
@@ -494,16 +532,21 @@ class EvaluationCLI:
         print(f"  {CYAN}[3]{RESET}  Iterative learning  – multi-agent with evolution loop")
         print()
 
-        choice = _ask("Select mode", default="2")
-        if choice == "1":
-            _ok("Mode: Single-agent")
-            return "single_agent"
-        elif choice == "3":
-            _ok("Mode: Iterative learning")
-            return "iterative"
-        else:
-            _ok("Mode: One-shot (no learning)")
-            return "one_shot"
+        while True:
+            choice = _ask("Select mode (1/2/3)", default="2").strip().lower()
+            if choice in ("1", "single", "single_agent", "single-agent"):
+                _ok("Mode: Single-agent")
+                return "single_agent"
+            if choice in ("2", "one_shot", "one-shot", "oneshot"):
+                _ok("Mode: One-shot (no learning)")
+                return "one_shot"
+            if choice in ("3", "iterative", "learning"):
+                _ok("Mode: Iterative learning")
+                return "iterative"
+            _warn(
+                f"Unrecognised choice '{choice}'. "
+                "Please enter 1, 2, or 3 (or the mode name)."
+            )
 
     # ------------------------------------------------------------------
     # Step 5 – csv_runs_limit
@@ -620,14 +663,18 @@ class EvaluationCLI:
     # ------------------------------------------------------------------
 
     def _save_start_notes(self, spec: EvalRunSpec) -> None:
-        """Write initial run metadata to run_notes/evaluations/."""
-        eval_dir = Path("run_notes") / "evaluations"
-        eval_dir.mkdir(parents=True, exist_ok=True)
+        """Write initial run metadata to run_notes/evaluations/.
 
+        Best-effort: if note creation fails (read-only fs, permissions, disk
+        full, …) we warn and clear ``spec.notes_path`` so subsequent
+        ``_update_notes`` calls are skipped — execution should not abort just
+        because we cannot save run notes.
+        """
+        eval_dir = Path("run_notes") / "evaluations"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         model_tag = spec.config.smolagent_model_id.replace("/", "_")
         filename = f"{ts}_run{spec.run_id}_{model_tag}_{spec.eval_mode}.json"
-        spec.notes_path = eval_dir / filename
+        notes_path = eval_dir / filename
 
         notes = {
             "started_at": datetime.now().isoformat(),
@@ -648,10 +695,20 @@ class EvaluationCLI:
             "queue_size": len(self._queue),
         }
 
-        with open(spec.notes_path, "w", encoding="utf-8") as fh:
-            json.dump(notes, fh, indent=2)
-            fh.write("\n")
+        try:
+            eval_dir.mkdir(parents=True, exist_ok=True)
+            with open(notes_path, "w", encoding="utf-8") as fh:
+                json.dump(notes, fh, indent=2)
+                fh.write("\n")
+        except OSError as exc:
+            _warn(
+                f"Could not write notes for Run #{spec.run_id} "
+                f"({notes_path}): {exc}. Continuing without note tracking."
+            )
+            spec.notes_path = None
+            return
 
+        spec.notes_path = notes_path
         _ok(f"Run #{spec.run_id} notes → {spec.notes_path}")
 
     @staticmethod
@@ -771,7 +828,7 @@ class EvaluationCLI:
 
     async def _run_single_eval(self, spec: EvalRunSpec) -> None:
         """Execute a single evaluation run from its spec."""
-        from sources.evaluation.csv_mode import CsvEvaluationMode
+        from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
 
         try:
             import psutil

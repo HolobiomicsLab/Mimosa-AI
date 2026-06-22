@@ -18,7 +18,8 @@ mimosa-ai/
 │   │   ├── selection.py                   # QD archive + admission gate
 │   │   ├── variation_engine.py            # Mutation / crossover prompt assembly
 │   │   ├── workflow_selection.py          # Parent retrieval (archive / disk)
-│   │   ├── code_features.py               # AST → behaviour descriptor
+│   │   ├── failure_fingerprint.py         # Verifier verdicts → QD behaviour descriptor (6-D, centered)
+│   │   ├── code_features.py               # Legacy structural descriptor (offline analysis only)
 │   │   ├── lineage.py                     # Parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis

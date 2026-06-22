@@ -26,9 +26,9 @@ from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.cli import OnboardCLI, EvaluationCLI, MemoryChatCLI
-from sources.evaluation.csv_mode import CsvEvaluationMode
-from sources.evaluation.scenario_loader import ScenarioLoader
-from sources.evaluation.eval_workflow_generation import WorkflowEval
+from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
+from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck

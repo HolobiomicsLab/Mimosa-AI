@@ -708,16 +708,32 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
         return
 
     # Reserve room for the line chart at the bottom.
-    line_panel_h = min(max(70, area.height // 3), 110)
+    line_panel_h = min(max(45, area.height // 5), 60)
     grid_top = area.y
     grid_bottom = area.bottom - line_panel_h
     grid_h = grid_bottom - grid_top
 
-    # Pick the most-important claims that fit (≥14 px per row).
+    # Pick the most-important claims that fit (≥12 px per row).
     label_font = fonts["tiny"]
-    row_h_min = max(label_font.get_height() + 2, 14)
+    row_h_min = max(label_font.get_height(), 12)
     max_rows = max(1, grid_h // row_h_min)
-    claims = sorted(all_claims, key=lambda kv: -kv[1])[:max_rows]
+
+    # Prioritise claims that exist in the *current* workflow so the
+    # heatmap is relevant to what the user is actually looking at.
+    current_wf = (
+        workflows[current_idx]
+        if 0 <= current_idx < len(workflows)
+        else None
+    )
+    current_names: set = set()
+    if current_wf and current_wf.evaluation:
+        current_names = {c.name for c in current_wf.evaluation.claims}
+
+    current_claims = [c for c in all_claims if c[0] in current_names]
+    other_claims = [c for c in all_claims if c[0] not in current_names]
+    claims = current_claims[:max_rows]
+    if len(claims) < max_rows:
+        claims.extend(other_claims[: max_rows - len(claims)])
     # Keep original first-seen order so the heatmap reads top-down.
     name_order = {n: i for i, (n, _) in enumerate(all_claims)}
     claims.sort(key=lambda kv: name_order[kv[0]])
@@ -791,6 +807,21 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
         )
         t = fonts["small"].render(info, True, TEXT)
         surf.blit(t, (area.x, line_y1 - t.get_height() - 2))
+    # claim count indicator
+    total_current = len(current_names)
+    total_all = len(all_claims)
+    if total_current > 0:
+        count_txt = (
+            f"showing {len(claims)}/{total_current} current claims"
+            f"  ({total_all} total)"
+        )
+    else:
+        count_txt = f"showing {len(claims)}/{total_all} claims"
+    count_surf = label_font.render(count_txt, True, TEXT_FAINT)
+    # place at the right edge of the line-chart area
+    cx = grid_x + grid_w - count_surf.get_width()
+    cy = line_y1 - count_surf.get_height() - 2
+    surf.blit(count_surf, (cx, cy))
 
 
 # ---------------------------------------------------------------------------
@@ -1029,7 +1060,7 @@ class App:
         wfpng = pygame.Rect(pad, tree.bottom + pad, left_w,
                             body_bottom - tree.bottom - pad)
 
-        timelapse_h = int((body_bottom - body_top) * 0.66) - pad // 2
+        timelapse_h = int((body_bottom - body_top) * 0.50) - pad // 2
         timelapse = pygame.Rect(right_x, body_top, right_w, timelapse_h)
         rubric = pygame.Rect(right_x, timelapse.bottom + pad, right_w,
                              body_bottom - timelapse.bottom - pad)

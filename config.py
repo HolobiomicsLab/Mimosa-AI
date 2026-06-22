@@ -38,18 +38,18 @@ class Config:
     def __init__(self):
 
         # workspace configuration
-        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
+        self.workspace_dir = "/Users/mlg/Documents/CNRS/toolomics/workspace"
 
         # MCPs server discovery
         self.discovery_addresses: list[AddressMCP] = [
-            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5100)
+            AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
 
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
-        self.judge_model = "openrouter/minimax/minimax-m3"
+        self.smolagent_model_id: str = "openrouter/qwen/qwen3.5-122b-a10b"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
@@ -69,10 +69,19 @@ class Config:
 
         # learning parameters
         self.learned_score_threshold = 0.94
-        self.max_learning_evolve_iterations = 35
+        self.max_learning_evolve_iterations = 10
+
+        # QD novelty + length penalty (open-ended modes)
+        #  "archive_knn" (default) or "k-NN archive"
+        self.novelty_comparison: str = "archive_knn"
+        self.novelty_previous_n: int = 5
+        # Length penalty: genotype size at which the penalty starts to
+        # grow; lambda is small so it only breaks near-ties.
+        self.length_penalty_baseline_chars: int = 8000
+        self.length_penalty_lambda: float = 0.05
 
         # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 2  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
@@ -97,7 +106,7 @@ class Config:
         self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
         self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
         # runner settings
-        self.runner_default_python_version: str = "3.10"
+        self.runner_default_python_version: str = "3.12"
         self.runner_default_timeout: int = 10800
         # Per-agent (SmolAgentFactory) execution timeout in seconds. Injected into
         # the generated workflow as AGENT_EXECUTION_TIMEOUT. 3600 = 1 hour.
@@ -215,6 +224,10 @@ class Config:
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "novelty_comparison": self.novelty_comparison,
+            "novelty_previous_n": self.novelty_previous_n,
+            "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
+            "length_penalty_lambda": self.length_penalty_lambda,
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "runs_capsule_dir": self.runs_capsule_dir,
@@ -256,6 +269,16 @@ class Config:
         )
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
+        )
+        self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
+        self.novelty_previous_n = int(
+            data.get("novelty_previous_n", self.novelty_previous_n)
+        )
+        self.length_penalty_baseline_chars = int(
+            data.get("length_penalty_baseline_chars", self.length_penalty_baseline_chars)
+        )
+        self.length_penalty_lambda = float(
+            data.get("length_penalty_lambda", self.length_penalty_lambda)
         )
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get(
@@ -319,6 +342,10 @@ class Config:
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
+        lines.append(f"  novelty_comparison={self.novelty_comparison}")
+        lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
+        lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
+        lines.append(f"  length_penalty_lambda={self.length_penalty_lambda}")
         lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
         lines.append(f"  schema_code_path={self.schema_code_path}")
         lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")

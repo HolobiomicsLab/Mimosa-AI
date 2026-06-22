@@ -62,8 +62,8 @@ uv run main.py \
 ```
 
 In learning mode, Mimosa evolves up to `max_learning_evolve_iterations`
-generations or stops as soon as `overall_score > learned_score_threshold`
-(default `0.95`). See [Iterative learning](../usage/learning.md).
+generations or stops as soon as `overall_score >= learned_score_threshold`
+(default `0.9`). See [Iterative learning](../usage/learning.md).
 
 ## 4. Try goal mode
 

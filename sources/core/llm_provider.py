@@ -315,6 +315,11 @@ class LLMProvider:
 
         return True
 
+    @staticmethod
+    def _is_temperature_error(error: Exception) -> bool:
+        """True when the API rejected ``temperature``, read from ``error.param``."""
+        return getattr(error, "param", None) == "temperature"
+
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
 
@@ -399,15 +404,17 @@ class LLMProvider:
         attempt = 0
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
+        effective_temperature = self.config.temperature
 
         while True:  # Infinite retry loop
             try:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": message,
-                    "temperature": self.config.temperature,
+                    "temperature": effective_temperature,
                     "timeout": timeout,
                     "max_tokens": self.config.max_tokens,
+                    "drop_params": True,
                 }
                 completion_params["api_key"] = self.config.key
                 # Add reasoning effort if supported (not for Claude models)
@@ -447,6 +454,14 @@ class LLMProvider:
                 attempt += 1
 
             except Exception as e:
+                if self._is_temperature_error(e) and effective_temperature != 1.0:
+                    self.logger.warning(
+                        f"Provider rejected temperature={effective_temperature:.2f}; "
+                        f"falling back to 1.0 and retrying."
+                    )
+                    effective_temperature = 1.0
+                    continue
+
                 # Check if this is a retryable error
                 if self._is_retryable_error(e):
                     error_type = type(e).__name__.lower()
@@ -506,7 +521,7 @@ class LLMProvider:
             **response.json(),
             "response": res,
             "message": message,
-            "temperature": self.config.temperature,
+            "temperature": effective_temperature,
             "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
             "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
         }

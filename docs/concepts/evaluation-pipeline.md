@@ -20,6 +20,12 @@ fingerprint). The single signal that flows back to the mutator is a short
 **prompt gradient** that summarizes failure modes without leaking the
 verified claims themselves.
 
+The same per-claim verdicts are projected into a 6-dim **failure
+fingerprint** that the [evolution engine](evolution-engine.md#behaviour-descriptor-failure-fingerprint)
+uses as the behaviour descriptor for QD novelty. The descriptor is
+centered so overall quality cannot leak into novelty — see the firewall
+section below.
+
 ![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
 
 ## The pipeline
@@ -32,8 +38,8 @@ The verifier runs four stages per workflow run:
    small Python program that recomputes the asserted value from workspace
    files (the default path), or renders a soft LLM verdict when no
    deterministic check is possible.
-3. **Aggregation** — per-claim scores combine into `overall_score` with a
-   saturating thoroughness bonus and a hard-fail cap.
+3. **Aggregation** — per-claim scores combine into `overall_score` as an
+   importance-weighted mean with a hard-fail cap.
 4. **Prompt gradient** — a plain-language summary of failure modes, the
    **only** signal that reaches the mutator. It does not name claims,
    scores, or sources, so the mutator cannot turn the verified-claim
@@ -106,21 +112,53 @@ only falls back to an LLM verdict when no executable check is possible.
 ## Aggregation
 
 ```python
-base_mean = mean(score for each non-error claim)
-bonus     = α · (1 − exp(−n_hard_pass / β))      # α=0.05, β=8
-pre_cap   = clamp(base_mean + bonus, 0, 1)
+base_mean = importance_weighted_mean(score for each non-error claim)
+pre_cap   = clamp(base_mean, 0, 1)
 
 overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_cap
 ```
 
-- `α = _INFO_BONUS_ALPHA = 0.05`, `β = _INFO_BONUS_BETA = 8.0` —
-  saturating reward for thoroughness, conditioned on *passing hard*
-  claims so trivial or failed claims contribute nothing.
+- Per-claim weights come from the rater-assigned importance (1–10), so an
+  importance-10 deliverable claim moves the score ~5× more than a
+  low-importance hygiene claim.
 - `hard_fail_cap = _HARD_FAIL_CAP = 0.99` — currently set permissively
   to keep the evolutionary signal smooth; a refuted hard claim still
   flags `hard_fail_capped = True`.
 - The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.
+
+## Failure fingerprint (QD behaviour descriptor)
+
+The verifier doesn't just emit a score — the same per-claim verdicts feed
+the QD novelty signal as a **failure fingerprint**: a centered vector
+of per-source pass rates that tells the archive *how* a candidate fails,
+not *whether* it failed.
+
+```python
+# Per source A..F (six entries, always — absent sources get a neutral value).
+pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
+presence[s]  = 1.0                                if total[s] > 0  else 0.0
+# Center so the descriptor encodes profile shape, not quality level.
+mean_present = mean(pass_rate[s] for s where presence[s] == 1)
+vector[s]    = pass_rate[s] - mean_present       if presence[s] == 1
+             = 0                                  otherwise
+```
+
+**The quality firewall.** An all-pass run and an all-fail run both yield
+the zero profile. This is intended and asserted in the tests
+(`test_all_pass_yields_zero_profile`,
+`test_all_fail_yields_zero_profile`). The QD score combines quality and
+novelty *additively* — `(1 − w)·quality_norm + w·novelty_norm` — so
+quality already drives `quality_norm`. If quality also leaked into
+novelty, QD would collapse back into greedy search. The centering step
+is what keeps these two terms separable.
+
+The fingerprint is persisted under
+`state_result.json` → `evaluation.verifier.failure_fingerprint.vector`
+and consumed by
+[`SelectionPressure._extract_behaviour_descriptor`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py).
+Full info-flow audit:
+[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
 
 ## Prompt gradient
 
@@ -139,13 +177,10 @@ The intent is informational, not punitive: the mutator learns *what
 direction to push the workflow next* without being handed a vocabulary
 it can over-fit against.
 
-## Cheat detector (currently disabled)
+## Behavioral pressure against shortcut workflows
 
-A standalone cheat detector pass over the agents' produced source code
-existed in earlier versions and is kept in the codebase but is currently
-**disabled** (`cheat = None`) pending a rewrite. The aggregation pipeline
-still supports a `cheat_penalty` field for when it is re-enabled. The
-behavioral anti-cheat pressure today comes from:
+Pressure against shortcut or fabricated workflows comes from the
+verifier pipeline itself:
 
 - Source C's recompute-from-disk verifiers.
 - The "Used fallback" claim type, whose score is *inverted* — a passing

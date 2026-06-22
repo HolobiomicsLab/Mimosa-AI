@@ -1,5 +1,5 @@
 """
-Darwinian Evolution of multi-agent workflows.
+Neuroevolution-inspired, LLM driven evolution of Multi-Agents workflows.
 """
 
 import json
@@ -25,15 +25,15 @@ from sources.cli.pretty_print import (
     print_summary,
     print_warn,
 )
-from sources.core.evaluators.evaluator import WorkflowEvaluator
-from sources.evaluation.scenario_loader import ScenarioLoader
+from sources.evaluators.evaluator import WorkflowEvaluator
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.run_metrics import append_jsonl, write_run_metrics
 from sources.utils.visualization import VisualizationUtils
 from sources.utils.workspace_management import WorkspaceManager
 
-from .lineage import find_oldest_rubric_anchor, record_lineage
+from .lineage import record_lineage
 from .orchestrator import WorkflowOrchestrator
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
@@ -63,7 +63,7 @@ def _to_jsonable(obj: Any) -> Any:
 
 
 class EvolutionEngine:
-    """Darwin Machine for evolution of workflow workflows."""
+    """Evolution Engine: Handle the evolution of Multi-agents workflows."""
     def __init__(
         self,
         config: "Config",
@@ -89,14 +89,18 @@ class EvolutionEngine:
         self.logger = logging.getLogger(__name__)
         self.workflow_selector = WorkflowSelector(config)
         self.orchestrator = WorkflowOrchestrator(config)
-        self.variation = VariationEngine()
+        self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
         self.selection = SelectionPressure(
             min_improvement_threshold=0.01,
             strategy="qd", # quality-diversity selection
             population_size=50, # max individuals to keep in the selection pool
             novelty_k_neighbours=15,
-            novelty_weight=0.25
+            novelty_weight=0.25,
+            novelty_comparison=getattr(config, "novelty_comparison", "archive_knn"),
+            previous_n=getattr(config, "novelty_previous_n", 5),
+            length_penalty_baseline_chars=getattr(config, "length_penalty_baseline_chars", 5000),
+            length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
         self.initial_population = 2 # number of initial random workflows before enabling mutation
 
@@ -158,7 +162,6 @@ class EvolutionEngine:
             with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
                 return json.loads(f.read().strip())
         except FileNotFoundError:
-            print(f"Workflow state for UUID {uuid} not found in {self.workflow_dir}.")
             return None
         except Exception as e:
             raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
@@ -263,7 +266,6 @@ class EvolutionEngine:
             a flag telling the caller whether to apply crossover or mutation.
         """
         if not os.path.exists(self.workflow_dir):
-            print(f"Workflow directory {self.workflow_dir} does not exist.")
             return [], False
 
         workflows = [
@@ -271,7 +273,6 @@ class EvolutionEngine:
             if os.path.isfile(os.path.join(self.workflow_dir, f, "state_result.json"))
         ]
         if not workflows:
-            print(f"No workflows found in {self.workflow_dir}.")
             return [], False
 
         # Explicit template → single parent, mutation only
@@ -350,9 +351,7 @@ class EvolutionEngine:
             The list of :class:`IndividualRun` produced across the evolution.
         """
         wf = None
-        max_iteration = 1
-        if enable_evolution:
-            max_iteration = self.config.max_learning_evolve_iterations
+        max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
 
         # Reset archive at session start
         self.selection._archive = []
@@ -547,7 +546,7 @@ class EvolutionEngine:
             rewards_history, assertion_history,
             runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
-        self._refresh_evolution_tree()
+        self._refresh_evolution_tree(runs[-1].goal, uuid)
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
@@ -686,7 +685,6 @@ class EvolutionEngine:
         """
         human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
         if human_validation not in ["yes", "y"]:
-            print("Exiting evolution loop.")
             return False
         return True
 
@@ -726,7 +724,7 @@ class EvolutionEngine:
         eval_type = None
         exec_cost = 0.0
 
-        if judge and uuid:
+        if judge and uuid and executed:
             agent_answers = agent_answers if executed else "workflow failed to execute."
             eval_type = await self._evaluate_workflow_phenotype(uuid, agent_answers, scenario_rubric, assertion_history)
         # Calculate cost regardless of execution success
@@ -755,14 +753,10 @@ class EvolutionEngine:
         logger = logging.getLogger(__name__)
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
-        anchor_uuid = self._resolve_rubric_anchor(uuid)
-        if anchor_uuid:
-            print_info(f"Verifier reusing rubric anchor {anchor_uuid} for {uuid}")
         eval_result = self.judge.evaluate(uuid=uuid,
                                           agent_answers=agent_answers,
                                           evaluator_type="verifier",
-                                          scenario_rubric=scenario_rubric,
-                                          rubric_anchor_uuid=anchor_uuid)
+                                          scenario_rubric=scenario_rubric)
         eval_type = eval_result['evaluation_type']
         eval_time = time.time() - eval_start
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")
@@ -771,25 +765,6 @@ class EvolutionEngine:
         if scenario_rubric and isinstance(eval_result, dict) and assertion_history is not None:
             self._update_assertion_history(eval_result, assertion_history)
         return eval_type
-
-    def _resolve_rubric_anchor(self, uuid: str) -> str | None:
-        """Find the lineage ancestor whose verifier cache should anchor *uuid*.
-
-        Returns the topmost ancestor with a ``claims.json`` cache so every
-        descendant in the lineage is scored against the same rubric. Returns
-        ``None`` when the feature is disabled in config or no ancestor has a
-        usable cache (root run, or the chain breaks before any cache is found).
-
-        Args:
-            uuid: Workflow being evaluated.
-
-        Returns:
-            Anchor UUID or ``None``.
-        """
-        if not getattr(self.config, "reuse_lineage_rubric", False):
-            return None
-        verifier_tmp = self.judge.verifier_evaluator.verifier_temp_root
-        return find_oldest_rubric_anchor(self.workflow_dir, verifier_tmp, uuid)
 
     def _update_assertion_history(self, eval_result: dict, assertion_history: list) -> None:
         """Update assertion history with evaluation results.
@@ -889,16 +864,31 @@ class EvolutionEngine:
             title=f"Workflow {uuid} completed.",
         )
 
-    def _refresh_evolution_tree(self) -> None:
-        """Re-render the evolution-tree PNG after each iteration.
+    def _refresh_evolution_tree(
+        self, goal: str | None = None, uuid: str | None = None
+    ) -> None:
+        """Re-render the goal-specific evolution-tree PNG after each iteration.
+
+        Scans only workflows whose ``goal_<uuid>.txt`` matches *goal* so trees
+        from different runs no longer pile into one root-level image, and writes
+        the result to ``<workflow_dir>/<uuid>/evolution_tree.png``.
 
         Best-effort: scanning failures are logged and swallowed so an issue
         rendering the tree never aborts an evolution run. The visualizer is
         imported lazily to avoid a circular import via ``sources.core``.
         """
+        if not uuid:
+            return
+        workflow_path = Path(self.workflow_dir) / uuid
+        if not workflow_path.is_dir():
+            return
         try:
             from sources.utils.evolution_tree import render_evolution_tree
-            output = render_evolution_tree(self.workflow_dir)
+            output = render_evolution_tree(
+                self.workflow_dir,
+                output_path=workflow_path / "evolution_tree.png",
+                goal=goal,
+            )
             if output is not None:
                 self.logger.info(f"Evolution tree refreshed: {output}")
         except Exception as e:

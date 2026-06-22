@@ -127,19 +127,17 @@ class WorkflowInfo:
 
     @property
     def overall_score_uncapped(self) -> float:
-        """Reward without the hard-fail cap, cheat penalty still applied.
+        """Reward without the hard-fail cap, still applied.
 
-        ``r' = max(0, base_mean + info_bonus − cheat_penalty)``. Used for
-        parent-draw weighting so distinct refuted-but-improving runs
-        stay rank-ordered. Falls back to ``overall_score`` when verifier
-        scores are unavailable.
+        Equals ``max(0, base_mean)``. Used for parent-draw weighting so
+        distinct refuted-but-improving runs stay rank-ordered. Falls back
+        to ``overall_score`` when verifier scores are unavailable.
         """
         verifier = (self.state_result.get("evaluation") or {}).get("verifier") or {}
         if "overall_score_uncapped" not in verifier:
             return self.overall_score
         uncapped = float(verifier.get("overall_score_uncapped", 0.0))
-        penalty = float(verifier.get("cheat_penalty", 0.0))
-        return max(0.0, uncapped - penalty)
+        return max(0.0, uncapped)
 
     @property
     def judge_evaluation(self) -> dict:
@@ -166,16 +164,7 @@ class WorkflowInfo:
 
     @property
     def abstracted_textual_gradient(self) -> str:
-        """Behavioral textual_gradient written by the verifier abstractor (Layer 1).
-
-        This is the ONLY evaluation signal the mutator should see; raw
-        ``judge_evaluation`` leaks rubric mechanism into the mutation prompt
-        and causes the workflow to learn the judge's epistemology instead of
-        the task. Resolution order: ``state_result.evaluation.verifier
-        .abstracted_textual_gradient`` → sidecar ``textual_gradient.txt`` → empty string
-        (callers must handle the empty case rather than fall through to the
-        raw evaluation log).
-        """
+        """Behavioral textual_gradient written by the verifier abstractor (Layer 1)."""
         state = self.load_state_result()
         if isinstance(state, dict):
             verifier = (state.get("evaluation") or {}).get("verifier") or {}

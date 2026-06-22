@@ -45,12 +45,13 @@ recursively evolves workflows, with help from:
   (improvement over baseline or `qd_score > admit_threshold`); capacity is
   curated by lowest-`qd_score` eviction.
 - **VariationEngine** — assembles mutation or crossover prompts, with an
-  evidence-driven mutation scope: boldness grows as recent prompt
-  gradients converge (the offspring keep failing the same way) *and* as
-  the Rechenberg 1/5 success rate of recent scored offspring drops
-  below 20 %. A near-finish floor only damps boldness once the parent
-  score is above 0.95, so near-winners aren't gambled away one
-  generation before early-stop.
+  evidence-driven mutation scope: boldness grows with an
+  `iters_since_improvement` plateau counter (patience `6`) *and* as the
+  Rechenberg 1/5 success rate of the last 5 scored offspring drops below
+  20 %. A near-finish floor only damps boldness once the parent score is
+  above 0.95, so near-winners aren't gambled away one generation before
+  early-stop. The top `RE-SPECIATION` band is hysteresis-gated and only
+  opens after `iters_since_improvement ≥ 8` with a zero success rate.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
   callable per generation.
 
