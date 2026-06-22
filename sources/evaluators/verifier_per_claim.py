@@ -417,13 +417,14 @@ Return STRICT JSON only:
         claim: dict[str, Any],
         execution_text: str,
         workspace_listing: str,
+        goal: str = "",
     ) -> dict[str, Any]:
         """Ask the judge for a verifier script (or a non-executable rationale)."""
-        prompt = self._build_verifier_prompt(claim, workspace_listing)
+        prompt = self._build_verifier_prompt(claim, workspace_listing, goal)
         return self._call_and_parse_verifier(uuid, claim, prompt, attempt=1)
 
     def _build_verifier_prompt(
-        self, claim: dict[str, Any], workspace_listing: str
+        self, claim: dict[str, Any], workspace_listing: str, goal: str = ""
     ) -> str:
         """Build the verifier-generation prompt for one claim."""
         previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
@@ -432,6 +433,10 @@ Return STRICT JSON only:
         return f"""
 You are writing a tiny verifier program for ONE atomic claim from a multi-agent
 workflow. The verifier will run inside the same workspace the agents used.
+
+GOAL:
+{goal or '(none provided)'}
+The goal help you know the broader context and sometimes a preview of the datasets format.
 
 WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
@@ -490,17 +495,19 @@ Return STRICT JSON only, in one of these two shapes:
         claim: dict[str, Any],
         execution_text: str,
         workspace_listing: str,
+        goal: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Pick relevant files then generate one claim's verifier spec."""
         rel_files = self._llm_select_files(
             uuid, claim, execution_text
         )
         updated = {**claim, "likely_relevant_files": rel_files}
-        spec = self._generate_verifier(uuid, updated, execution_text, workspace_listing)
+        spec = self._generate_verifier(uuid, updated, execution_text, workspace_listing, goal=goal)
         return updated, spec
 
     def _generate_specs_parallel(
         self,
+        goal: str,
         uuid: str,
         claims: list[dict[str, Any]],
         execution_text: str,
@@ -516,7 +523,7 @@ Return STRICT JSON only, in one of these two shapes:
             futures = {
                 ex.submit(
                     self._select_files_and_generate_spec,
-                    uuid, c, execution_text, workspace_listing,
+                    uuid, c, execution_text, workspace_listing, goal
                 ): c["id"]
                 for c in claims
             }

@@ -283,6 +283,7 @@ class VerifierEvaluator(
 
         st = time.time()
         generated = self._generate_specs_parallel(
+            wf_info.goal,
             uuid,
             claims_to_verify,
             execution_text,
