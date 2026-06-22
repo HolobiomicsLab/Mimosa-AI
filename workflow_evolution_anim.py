@@ -670,8 +670,14 @@ def _truncate_to_width(text: str, font, max_w: int) -> str:
 
 
 def draw_rubric(surf, area, fonts, workflows: List[Workflow],
-                current_idx: int):
-    """Heatmap of per-claim pass/fail per generation + overall-score line."""
+                current_idx: int,
+                completed_mask: Optional[List[bool]] = None):
+    """Heatmap of per-claim pass/fail per generation + overall-score line.
+
+    Cells for workflows whose sub-animation has not yet played stay grey
+    (``completed_mask[j]`` False) — they reveal pass/fail only after the
+    user has scrubbed past their last frame.
+    """
     all_claims = _claim_summary(workflows)
     if not all_claims or not workflows:
         msg = fonts["small"].render("No evaluation data.", True, TEXT_DIM)
@@ -679,14 +685,14 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
         return
 
     # Reserve room for the line chart at the bottom.
-    line_panel_h = min(max(45, area.height // 5), 60)
+    line_panel_h = min(max(40, area.height // 5), 50)
     grid_top = area.y
     grid_bottom = area.bottom - line_panel_h
     grid_h = grid_bottom - grid_top
 
-    # Bigger labels, capped row count so cells stay readable.
-    label_font = fonts["small"]
-    row_h_min = max(label_font.get_height() + 4, 18)
+    # Tighter rows so the panel can be short without dropping rubric rows.
+    label_font = fonts["tiny"]
+    row_h_min = max(label_font.get_height(), 14)
     max_rows = max(1, grid_h // row_h_min)
     max_rows = min(max_rows, 10)
 
@@ -724,13 +730,17 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
         surf.blit(t, (area.x, y))
 
     # status grid
+    pending_color = (78, 86, 100)
     for j, wf in enumerate(workflows):
         if not wf.evaluation:
             continue
+        is_done = completed_mask[j] if completed_mask else True
         by_name = {c.name: c for c in wf.evaluation.claims}
         for i, (name, _imp) in enumerate(claims):
             c = by_name.get(name)
-            if c is None:
+            if not is_done:
+                color = pending_color
+            elif c is None:
                 color = (28, 36, 50)
             elif c.status == "pass":
                 color = SUCCESS
@@ -901,6 +911,12 @@ class App:
                     for sub in range(n_sub):
                         self.frames.append((wi, si, sub))
         self.frame_to_wf = [wi for (wi, _, _) in self.frames]
+        # Last frame index for each workflow — used by the rubric panel to
+        # decide which columns are "complete" (cells colored) vs still
+        # pending (cells grey).
+        self._last_frame_of_wf: List[int] = [-1] * len(workflows)
+        for fi, (wi, _, _) in enumerate(self.frames):
+            self._last_frame_of_wf[wi] = fi
 
         self.cur = 0
         self.playing = True
@@ -1065,7 +1081,7 @@ class App:
                             body_bottom - tree.bottom - pad)
 
         right_h = body_bottom - body_top
-        rubric_h = max(330, int(right_h * 0.36))
+        rubric_h = max(232, int(right_h * 0.24))
         timelapse_h = right_h - rubric_h - pad
         timelapse = pygame.Rect(right_x, body_top, right_w, timelapse_h)
         rubric = pygame.Rect(right_x, timelapse.bottom + pad, right_w,
@@ -1121,8 +1137,12 @@ class App:
         # rubric
         inner = draw_panel(self.screen, rects["rubric"],
                            "▌ RUBRIC EVOLUTION", self.fonts["header"], SUCCESS)
+        completed_mask = [
+            last >= 0 and self.cur >= last
+            for last in self._last_frame_of_wf
+        ]
         draw_rubric(self.screen, inner, self.fonts, self.workflows,
-                    self.frames[self.cur][0])
+                    self.frames[self.cur][0], completed_mask)
 
         # bottom timeline
         self._timeline_rect = rects["timeline"]
