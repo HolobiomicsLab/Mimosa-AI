@@ -143,6 +143,8 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
         temperature = random.uniform(0.7, 1.3) # enhance workflow diversity and avoid error repetition.
+        if provider == "anthropic" or "claude" in model.lower():
+            temperature = min(temperature, 1.0)
         self.logger.info(f"Workflow LLM temperature: {temperature:.2f}")
         llm_config = LLMConfig(
             model=model,
