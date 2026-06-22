@@ -150,7 +150,7 @@ def parse_step(step_data: Dict) -> StepInfo:
     if model_output:
         lines = model_output.split('\n')
         for i, line in enumerate(lines):
-            if 'Thought:' in line:
+            if 'Thought:' in line and i + 1 < len(lines):
                 thought_preview = lines[i + 1][:256]
                 thought_default = thought_preview
             if '```py' in line or '```python' in line:
