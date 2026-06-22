@@ -684,10 +684,11 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
     grid_bottom = area.bottom - line_panel_h
     grid_h = grid_bottom - grid_top
 
-    # Pick the most-important claims that fit (≥12 px per row).
-    label_font = fonts["tiny"]
-    row_h_min = max(label_font.get_height(), 12)
+    # Bigger labels, capped row count so cells stay readable.
+    label_font = fonts["small"]
+    row_h_min = max(label_font.get_height() + 4, 18)
     max_rows = max(1, grid_h // row_h_min)
+    max_rows = min(max_rows, 10)
 
     # Prioritise claims that exist in the *current* workflow so the
     # heatmap is relevant to what the user is actually looking at.
@@ -1063,7 +1064,9 @@ class App:
         wfpng = pygame.Rect(pad, tree.bottom + pad, left_w,
                             body_bottom - tree.bottom - pad)
 
-        timelapse_h = int((body_bottom - body_top) * 0.72) - pad // 2
+        right_h = body_bottom - body_top
+        rubric_h = max(330, int(right_h * 0.36))
+        timelapse_h = right_h - rubric_h - pad
         timelapse = pygame.Rect(right_x, body_top, right_w, timelapse_h)
         rubric = pygame.Rect(right_x, timelapse.bottom + pad, right_w,
                              body_bottom - timelapse.bottom - pad)
