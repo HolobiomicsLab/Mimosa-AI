@@ -30,6 +30,7 @@ import argparse
 import math
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1002,6 +1003,75 @@ class App:
             self._draw()
             pygame.display.flip()
 
+    def record(self, out_path: Path, fps: int = 30, hold_seconds: float = 1.0):
+        """Render the full animation deterministically into an .mp4 via ffmpeg.
+
+        Drives the same draw loop as ``run`` but at a fixed ``dt = 1/fps``
+        instead of real wall-clock time, so the resulting video plays back
+        at ``self.speed`` steps per second exactly. Requires ``ffmpeg`` on PATH.
+        """
+        w, h = self.screen.get_size()
+        if w % 2 or h % 2:
+            sys.exit(
+                f"--record needs even width/height for H.264; got {w}x{h}."
+            )
+        cmd = [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "rawvideo", "-vcodec", "rawvideo",
+            "-pix_fmt", "rgb24",
+            "-s", f"{w}x{h}", "-r", str(fps),
+            "-i", "-",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-preset", "medium", "-crf", "20",
+            str(out_path),
+        ]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        except FileNotFoundError:
+            sys.exit(
+                "ffmpeg not found on PATH — install ffmpeg to use --record."
+            )
+
+        dt = 1.0 / fps
+        hold_frames = max(int(hold_seconds * fps), 0)
+        held = 0
+        n_video_frames = 0
+        self.cur = 0
+        self._acc = 0.0
+        self.playing = True
+        while True:
+            if self.playing:
+                self._acc += dt * self.speed
+                while self._acc >= 1.0 and self.cur < len(self.frames) - 1:
+                    self._acc -= 1.0
+                    self.cur += 1
+                if self.cur >= len(self.frames) - 1:
+                    self.playing = False
+            cur_wi = self.frames[self.cur][0]
+            if cur_wi != self._prev_wi:
+                self._start_transition(cur_wi)
+                self._prev_wi = cur_wi
+            if self.transition is not None:
+                self.transition.elapsed += dt
+                if self.transition.elapsed >= self.transition.duration:
+                    self.transition = None
+            self._draw()
+            proc.stdin.write(pygame.image.tostring(self.screen, "RGB"))
+            n_video_frames += 1
+            if not self.playing and self.transition is None:
+                held += 1
+                if held >= hold_frames:
+                    break
+        proc.stdin.close()
+        rc = proc.wait()
+        if rc != 0:
+            sys.exit(f"ffmpeg exited with code {rc}")
+        dur = n_video_frames / fps
+        print(
+            f"Wrote {out_path}  ({n_video_frames} frames, {dur:.1f}s @ "
+            f"{fps} fps, playback speed x{self.speed:.2f})"
+        )
+
     def _start_transition(self, new_wi: int):
         """Kick off the evolve animation from the parent (or prev wf) → new."""
         new_wf = self.workflows[new_wi]
@@ -1220,6 +1290,19 @@ def main():
                         default=Path("sources/memory"))
     parser.add_argument("--width", type=int, default=1600)
     parser.add_argument("--height", type=int, default=1000)
+    parser.add_argument("--record", type=Path, default=None,
+                        help="Render the full animation to this .mp4 path "
+                             "instead of opening the GUI (requires ffmpeg).")
+    parser.add_argument("--speed", type=float, default=2.0,
+                        help="Playback speed in steps per second "
+                             "(default 2.0). Applies in both GUI and record "
+                             "modes.")
+    parser.add_argument("--fps", type=int, default=30,
+                        help="Output video frame rate (record mode only, "
+                             "default 30).")
+    parser.add_argument("--hold-seconds", type=float, default=1.0,
+                        help="How long to hold on the final frame at the "
+                             "end of the recorded video (default 1.0).")
     args = parser.parse_args()
 
     if not args.workflows_dir.exists():
@@ -1229,7 +1312,17 @@ def main():
         sys.exit("No workflows with lineage_<uuid>.json found.")
     print(f"Loaded {len(workflows)} workflows "
           f"({sum(len(w.steps) for w in workflows)} memory steps).")
-    App(workflows, size=(args.width, args.height)).run()
+
+    if args.record is not None:
+        # Headless render: keep SDL from opening a real window.
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        app = App(workflows, size=(args.width, args.height))
+        app.speed = args.speed
+        app.record(args.record, fps=args.fps, hold_seconds=args.hold_seconds)
+    else:
+        app = App(workflows, size=(args.width, args.height))
+        app.speed = args.speed
+        app.run()
 
 
 # ---------------------------------------------------------------------------
