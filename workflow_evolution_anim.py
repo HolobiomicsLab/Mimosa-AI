@@ -84,6 +84,25 @@ EVO_COLORS = {
 }
 
 
+@dataclass
+class Transition:
+    """One-shot animation played when the active workflow changes."""
+    from_uuid: str       # source node — genetic parent if known, else prev wf
+    to_uuid: str         # destination — the newly active workflow
+    from_wi: int         # previous workflow index (for the PNG cross-fade)
+    elapsed: float = 0.0
+    duration: float = 0.55
+
+    @property
+    def t(self) -> float:
+        return min(1.0, self.elapsed / self.duration)
+
+    @property
+    def ease(self) -> float:
+        t = self.t
+        return t * t * (3 - 2 * t)
+
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
@@ -889,6 +908,8 @@ class App:
         self.show_help = False
         self._tree_nodes: Dict[str, TreeNode] = {}
         self._timeline_rect: Optional[pygame.Rect] = None
+        self._prev_wi: int = self.frames[0][0] if self.frames else 0
+        self.transition: Optional[Transition] = None
 
     @staticmethod
     def _load_fonts() -> Dict[str, pygame.font.Font]:
@@ -953,8 +974,30 @@ class App:
                     self.cur += 1
                 if self.cur >= len(self.frames) - 1:
                     self.playing = False
+            cur_wi = self.frames[self.cur][0]
+            if cur_wi != self._prev_wi:
+                self._start_transition(cur_wi)
+                self._prev_wi = cur_wi
+            if self.transition is not None:
+                self.transition.elapsed += dt
+                if self.transition.elapsed >= self.transition.duration:
+                    self.transition = None
             self._draw()
             pygame.display.flip()
+
+    def _start_transition(self, new_wi: int):
+        """Kick off the evolve animation from the parent (or prev wf) → new."""
+        new_wf = self.workflows[new_wi]
+        known = {w.uuid for w in self.workflows}
+        parents = [p for p in new_wf.parents if p in known]
+        from_uuid = parents[0] if parents else self.workflows[self._prev_wi].uuid
+        if from_uuid == new_wf.uuid:
+            return
+        self.transition = Transition(
+            from_uuid=from_uuid,
+            to_uuid=new_wf.uuid,
+            from_wi=self._prev_wi,
+        )
 
     # ----- input ---------------------------------------------------------
     def _handle_events(self) -> bool:
@@ -1053,11 +1096,17 @@ class App:
                            self.fonts["header"])
         self._tree_nodes = draw_tree(self.screen, inner, self.fonts,
                                      self.workflows, wf.uuid)
+        if self.transition is not None:
+            self._draw_transition_overlay(self._tree_nodes)
 
         # workflow png
         inner = draw_panel(self.screen, rects["wfpng"],
                            "▌ WORKFLOW GRAPH", self.fonts["header"], INFO)
-        draw_workflow_png(self.screen, inner, self.fonts, wf)
+        if self.transition is not None and self.transition.from_wi != \
+                self.frames[self.cur][0]:
+            self._draw_png_crossfade(inner, wf, self.transition)
+        else:
+            draw_workflow_png(self.screen, inner, self.fonts, wf)
 
         # memory timelapse
         inner = draw_panel(self.screen, rects["timelapse"],
@@ -1080,6 +1129,60 @@ class App:
 
         if self.show_help:
             draw_help(self.screen, self.fonts)
+
+    # ----- transition rendering -----------------------------------------
+    def _draw_png_crossfade(self, inner: pygame.Rect, new_wf: Workflow,
+                            tr: Transition):
+        """Fade the previous workflow's PNG out while the new one fades in."""
+        ease = tr.ease
+        old_wf = self.workflows[tr.from_wi]
+        for w, alpha in ((old_wf, 1.0 - ease), (new_wf, ease)):
+            if w.png_path is None:
+                continue
+            src = get_workflow_png(w.png_path)
+            if src is None:
+                continue
+            fitted = fit_surface(src, inner.width - 12, inner.height - 12)
+            fitted.set_alpha(int(255 * alpha))
+            ox = inner.x + (inner.width - fitted.get_width()) // 2
+            oy = inner.y + (inner.height - fitted.get_height()) // 2
+            self.screen.blit(fitted, (ox, oy))
+
+    def _draw_transition_overlay(self, tree_nodes: Dict[str, TreeNode]):
+        """Glowing pulse traveling parent → child, then a ring burst on arrival."""
+        tr = self.transition
+        if tr is None:
+            return
+        a = tree_nodes.get(tr.from_uuid)
+        b = tree_nodes.get(tr.to_uuid)
+        if a is None or b is None or a is b:
+            return
+        to_wf = next((w for w in self.workflows if w.uuid == tr.to_uuid), None)
+        color = EVO_COLORS.get(to_wf.kind if to_wf else "mutation", ACCENT)
+        ease = tr.ease
+        px = a.x + (b.x - a.x) * ease
+        py = a.y + (b.y - a.y) * ease
+        # Bright trail from source up to current position.
+        pygame.draw.line(self.screen, color, (a.x, a.y), (px, py), 2)
+        # Layered additive glow around the pulse head.
+        for r in (16, 11, 6):
+            glow = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (*color, 55), (r, r), r)
+            self.screen.blit(glow, (px - r, py - r),
+                             special_flags=pygame.BLEND_ADD)
+        pygame.draw.circle(self.screen, color, (int(px), int(py)), 4)
+        pygame.draw.circle(self.screen, (255, 255, 255), (int(px), int(py)), 2)
+        # Ring burst at destination in the final 40 %.
+        if tr.t > 0.6:
+            bt = (tr.t - 0.6) / 0.4
+            rad = int(b.radius + 22 * bt)
+            alpha = int(200 * (1 - bt))
+            if alpha > 0:
+                d = rad * 2 + 4
+                ring = pygame.Surface((d, d), pygame.SRCALPHA)
+                pygame.draw.circle(ring, (*color, alpha), (d // 2, d // 2),
+                                   rad, 3)
+                self.screen.blit(ring, (b.x - d // 2, b.y - d // 2))
 
 
 # ---------------------------------------------------------------------------
