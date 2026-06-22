@@ -545,9 +545,9 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
                     step: Optional[StepInfo], step_idx: int, sub_idx: int):
     """Render the memory-timelapse panel for one (step, sub_idx) frame.
 
-    Shows the agent badge, stat strip, a breadcrumb of THOUGHT/CODE/OBSERVATION
-    with the active one highlighted, and a single full-size sub-panel for the
-    chosen ``sub_idx`` (0=thought, 1=code, 2=observation).
+    Minimal: body of the active sub-panel only. A thin left-edge accent
+    stripe colors which sub-panel is showing (cyan=thought, green=code,
+    amber=observation). The agent name sits as a thin line at the top.
     """
     inner = area
     line_h = 20
@@ -558,114 +558,38 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
         surf.blit(msg, (inner.x + 12, inner.y + 12))
         return
 
-    # Agent badge row
-    stage_color = STAGE_COLORS.get(step.stage, ACCENT)
-    badge_w = 240
-    pygame.draw.rect(surf, BG_PANEL_LIGHT,
-                     (inner.x, inner.y, badge_w, 38), border_radius=8)
-    pygame.draw.rect(surf, stage_color,
-                     (inner.x, inner.y, 4, 38), border_radius=2)
-    surf.blit(fonts["body"].render(step.agent[:22], True, stage_color),
-              (inner.x + 14, inner.y + 4))
-    surf.blit(fonts["tiny"].render(step.stage, True, TEXT_DIM),
-              (inner.x + 14, inner.y + 22))
-
-    # right-of-badge stat strip
-    stats = [
-        ("step", f"#{step.step}"),
-        ("dur", f"{step.duration:.2f}s"),
-        ("tok", f"{step.input_tokens}/{step.output_tokens}"),
-        ("tools", str(len(step.tool_calls)) if step.tool_calls else "-"),
-        ("status", step.action_status or "—"),
-    ]
-    sx = inner.x + badge_w + 16
-    for label, value in stats:
-        v_surf = fonts["body"].render(value, True, TEXT)
-        l_surf = fonts["tiny"].render(label.upper(), True, TEXT_FAINT)
-        surf.blit(l_surf, (sx, inner.y + 2))
-        surf.blit(v_surf, (sx, inner.y + 16))
-        sx += max(v_surf.get_width(), l_surf.get_width()) + 26
-        if sx > inner.right - 80:
-            break
-
-    # error pill
-    if step.has_error:
-        text = fonts["tiny"].render("ERROR", True, ERROR)
-        pygame.draw.rect(surf, (40, 16, 22),
-                         (inner.right - 84, inner.y + 8, 70, 22),
-                         border_radius=4)
-        pygame.draw.rect(surf, ERROR,
-                         (inner.right - 84, inner.y + 8, 70, 22), width=1,
-                         border_radius=4)
-        surf.blit(text, (inner.right - 84 + 18, inner.y + 11))
-
-    # Breadcrumb: THOUGHT → CODE → OBSERVATION, the active one highlighted.
-    crumb_top = inner.y + 50
-    crumb_h = 26
-    _draw_sub_breadcrumb(surf, fonts, inner.x, crumb_top,
-                         inner.width, crumb_h, sub_idx)
-
-    # One full-size sub-panel chosen by sub_idx.
     sub_idx = max(0, min(len(SUB_PANEL_SPECS) - 1, sub_idx))
-    label, accent, attr, body_color, mono = SUB_PANEL_SPECS[sub_idx]
+    _label, accent, attr, body_color, mono = SUB_PANEL_SPECS[sub_idx]
     body = getattr(step, attr, "") or ""
-    panel_top = crumb_top + crumb_h + 8
-    panel_rect = pygame.Rect(inner.x, panel_top, inner.width,
-                             inner.bottom - panel_top - 12)
-    _sub_panel(surf, fonts, panel_rect, f"▌ {label}", accent, body, line_h,
-               body_color, mono)
 
-    # step progress strip at the very bottom of the inner area
-    n = max(len(wf.steps), 1)
-    _mini_strip(surf, fonts, inner.x, inner.bottom - 6,
-                inner.width, step_idx, n)
+    stage_color = STAGE_COLORS.get(step.stage, ACCENT)
+    surf.blit(fonts["small"].render(step.agent[:48], True, stage_color),
+              (inner.x + 8, inner.y))
+    if step.has_error:
+        t = fonts["tiny"].render("ERROR", True, ERROR)
+        surf.blit(t, (inner.right - t.get_width() - 8, inner.y + 4))
 
+    body_top = inner.y + 24
+    body_rect = pygame.Rect(inner.x, body_top, inner.width,
+                            inner.bottom - body_top)
+    pygame.draw.rect(surf, accent,
+                     (body_rect.x, body_rect.y, 3, body_rect.height),
+                     border_radius=2)
 
-def _draw_sub_breadcrumb(surf, fonts, x, y, w, h, sub_idx):
-    """Three pills, the one matching ``sub_idx`` highlighted in its accent."""
-    n = len(SUB_PANEL_SPECS)
-    gap = 10
-    pill_w = (w - gap * (n - 1)) // n
-    for i, (label, accent, _attr, _body_color, _mono) in enumerate(SUB_PANEL_SPECS):
-        px = x + i * (pill_w + gap)
-        active = i == sub_idx
-        pygame.draw.rect(surf, BG_PANEL_LIGHT, (px, y, pill_w, h),
-                         border_radius=4)
-        if active:
-            pygame.draw.rect(surf, accent, (px, y, 4, h), border_radius=2)
-            pygame.draw.rect(surf, accent, (px, y, pill_w, h), width=1,
-                             border_radius=4)
-        text_color = accent if active else TEXT_FAINT
-        t = fonts["small"].render(label, True, text_color)
-        surf.blit(t, (px + (pill_w - t.get_width()) // 2,
-                      y + (h - t.get_height()) // 2))
-
-
-def _sub_panel(surf, fonts, rect, label, accent, body, line_h, body_color,
-               mono):
-    pygame.draw.rect(surf, BG_PANEL_LIGHT, rect, border_radius=6)
-    pygame.draw.rect(surf, BORDER, rect, width=1, border_radius=6)
-    surf.blit(fonts["body"].render(label, True, accent),
-              (rect.x + 10, rect.y + 6))
     font = fonts["mono"] if mono else fonts["small"]
+    text_x = body_rect.x + 14
     if not body:
         surf.blit(font.render("—", True, TEXT_FAINT),
-                  (rect.x + 14, rect.y + 32))
+                  (text_x, body_rect.y + 4))
         return
-    max_w = rect.width - 28
+    max_w = body_rect.width - 18
     if mono:
         lines = [ln[:200] for ln in body.split("\n")]
     else:
         lines = wrap_text(body, font, max_w)
-    max_lines = max((rect.height - 36) // line_h, 1)
-    text_lines(surf, font, lines, (rect.x + 14, rect.y + 32),
+    max_lines = max(body_rect.height // line_h, 1)
+    text_lines(surf, font, lines, (text_x, body_rect.y + 4),
                body_color, line_h, max_lines)
-
-
-def _mini_strip(surf, fonts, x, y, w, idx, n):
-    pygame.draw.rect(surf, BG_PANEL_LIGHT, (x, y, w, 3), border_radius=2)
-    fill = int(w * (idx + 1) / n)
-    pygame.draw.rect(surf, ACCENT, (x, y, fill, 3), border_radius=2)
 
 
 # ---------------------------------------------------------------------------
