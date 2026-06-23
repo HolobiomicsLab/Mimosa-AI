@@ -19,7 +19,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # Ensure the default memory directory exists before local imports that may read it.
 os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
 
-from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
+from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info, print_phase
 
 from config import Config
 from sources.core.evolution_engine import EvolutionEngine
@@ -32,6 +32,7 @@ from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
 from sources.utils.logging import setup_logging
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
+from sources.utils.ensure_env import ensure_environment
 from sources.security.check_package import PackageCheck
 
 dotenv.load_dotenv()
@@ -267,6 +268,15 @@ async def main():
     # security check
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
+
+    # ── Environment precheck phase ────────────────────────────────────────
+    # Ensure the host has Python 3.12 + pip available for Mimosa, auto-installing
+    # them when missing. Abort early if the environment cannot be provisioned.
+    print_phase("ENVIRONMENT PRECHECK")
+    if not ensure_environment(auto_install=True):
+        print_err("Environment precheck failed: Python 3.12 / pip could not be ensured.")
+        sys.exit(1)
+
 
     # Detect interactive (no-argument) mode early so we can skip pre-checks
     no_mode_selected = not any([
