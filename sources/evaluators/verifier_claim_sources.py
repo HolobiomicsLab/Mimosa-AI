@@ -157,6 +157,7 @@ correct solution:
   "the conformation is a valid self-avoiding walk").
 - Do not extract claims that conflict with the goal requirements or aren't possible per goal requirements
   (e.g. if the goal explicitly relaxes a standard or dataset preview imply that a method cann't be used, don't extract claims that would require it.)
+- When the literature grounding lists multiple co-equal preprocessing steps in one bullet (e.g. "normalization, handling missing values, dimensionality reduction"), emit one claim per named step rather than a single composite claim.
 
 MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
 produced the specific scientific deliverable the task requested AND that
