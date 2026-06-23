@@ -91,7 +91,7 @@ RULES:
 - Match on the call target (``ast.Call.func``: e.g. node is a ``Name`` with id
   ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
   on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``. 
+  or on the attribute path. Walk with ``ast.walk(tree)``.
 - Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs).
 - If a file the script needs to open to evaluate the claim is MISSING from the
   workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
@@ -99,6 +99,9 @@ RULES:
   UNCHECKED, not refuted; the recovery flow regenerates the script when it
   sees the error. (Exception: claims that explicitly check file existence —
   for those, a missing file is the legitimate ``"fail"``.)
+- When the goal text names an output path with a column or key schema (dataset preview, EXPECTED OUTPUT: block, or explicit 'columns exactly equal to …'), use the goal's schema as the source of truth for column/key literals.
+  The file preview shows what the workflow actually produced — which may be wrong. If the preview's schema differs from the goal's, the check must use the goal's schema; the workflow's deviation is exactly what fails the claim
+  (eg: Never check AF_TOX_prob when the goal show that AF_TOX is used for columns format)
 
 ERROR HANDLING:
 
@@ -109,7 +112,7 @@ ERROR HANDLING:
   readable, but the claim is not satisfied (wrong value, duplicate found,
   range exceeded, ast node not found, regex absent in a log).
   Do NOT raise these. Do NOT use status="error" for them.
-- Mnemonic: "I could not check" → error/raise; "I checked, the answer is no" → fail. 
+- Mnemonic: "I could not check" → error/raise; "I checked, the answer is no" → fail.
 
 If the claim cannot be checked deterministically with code (e.g. it concerns
 the rigor of a proof, the appropriateness of a binning choice, the
@@ -436,7 +439,9 @@ workflow. The verifier will run inside the same workspace the agents used.
 
 GOAL:
 {goal or '(none provided)'}
-The goal help you know the broader context and sometimes a preview of the datasets format.
+
+The goal contains the user's specification: deliverables, paths, column names,
+methodology requirements. Treat any literal identifiers in the goal as the GROUND-TRUTH SCHEMA.
 
 WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
@@ -450,6 +455,7 @@ WORKFLOW LANGUAGE (heuristic from file extensions): {language}
 
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 {previews}
+FILE PREVIEWS have no authority over data schema to check when the goal specify expected input/output columns name.
 
 CLAIM TO VERIFY:
 - id: {claim['id']}

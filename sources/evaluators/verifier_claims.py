@@ -390,6 +390,7 @@ cluster. Do NOT drop claims that check different facets — only true duplicates
 If nothing is duplicated, return an empty list.
 Also remove any claim that's only about the sources dataset files. (eg: the file data/train.csv has duplicate rows)
 Do not remove claims about the output artefacts, even if they mention input files, as long as they check a property of the output (eg: the output predictions.csv has duplicate rows)
+Also drop any claim that in it's claims assume a "_prob"  at the end of a prediction data column.
 
 Return STRICT JSON only, in this exact shape:
 {{"drop_ids": ["<id>", ...]}}
@@ -412,7 +413,7 @@ Return STRICT JSON only, in this exact shape:
         )
         return f"""You are rating verification claims by how much they matter for the task success.
 You assign an IMPORTANCE weight (1–10) to each claim. Importance answers ONE
-question: if this claim turns out false or missing, how much does result break? 
+question: if this claim turns out false or missing, how much does result break?
 
 WORKFLOW GOAL:
 {goal}
