@@ -134,12 +134,17 @@ def is_python312_installed() -> bool:
 
 
 def is_venv_available(python_exe: str | None = None) -> bool:
-    """True if ``python3.12 -m venv`` can actually create a venv.
+    """True if ``python3.12 -m venv`` can create a venv **with a working pip**.
 
-    This is the capability the WorkflowRunner relies on (it builds a managed
-    venv and bootstraps pip inside it). On Debian/Ubuntu the ``venv`` module is
-    split into the separate ``python3.12-venv`` package, so importing it is not
-    enough — we create a throwaway venv to be sure pip can be seeded.
+    This is the capability the WorkflowRunner actually relies on: it builds a
+    managed venv and then runs ``<venv>/bin/python -m pip install`` inside it.
+
+    Checking only that ``venv`` creation returns 0 is NOT enough. On
+    Debian/Ubuntu the ``ensurepip`` module ships inside the separate
+    ``python3.12-venv`` package; when it's missing, ``venv`` still produces a
+    directory tree but **without pip**, and the runner later dies with
+    "No module named pip". So we create a throwaway venv and confirm that
+    ``<venv>/bin/python -m pip --version`` succeeds before declaring success.
     """
     exe = python_exe or _which_python312()
     if not exe:
@@ -148,7 +153,17 @@ def is_venv_available(python_exe: str | None = None) -> bool:
         with tempfile.TemporaryDirectory() as tmp:
             probe = os.path.join(tmp, "venv_probe")
             proc = _run([exe, "-m", "venv", probe], capture=True)
-            return proc.returncode == 0
+            if proc.returncode != 0:
+                return False
+            # Verify pip was actually seeded inside the venv.
+            bin_dir = "Scripts" if os.name == "nt" else "bin"
+            venv_python = os.path.join(
+                probe, bin_dir, "python.exe" if os.name == "nt" else "python"
+            )
+            if not os.path.exists(venv_python):
+                return False
+            pip_check = _run([venv_python, "-m", "pip", "--version"], capture=True)
+            return pip_check.returncode == 0
     except Exception:
         return False
 
