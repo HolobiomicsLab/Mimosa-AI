@@ -21,13 +21,6 @@
 </p>
 
 <p align="center">
-  🧬 Quality-Diversity workflow evolution &nbsp;·&nbsp;
-  🔍 MCP-based tool auto-discovery &nbsp;·&nbsp;
-  🧪 Multi-source per-claim verification &nbsp;·&nbsp;
-  📦 Full audit trail & reproducibility
-</p>
-
-<p align="center">
     <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv Preprint"></a>
     <a href="https://doi.org/10.48550/arXiv.2603.28986"><img src="https://img.shields.io/badge/DOI-10.48550%2FarXiv.2603.28986-blue?style=flat-square" alt="DOI"></a>
     <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/website-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="website"></a>
@@ -37,6 +30,10 @@
     <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers"><img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars"></a>&nbsp;
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
 </p>
+
+---
+
+https://github.com/user-attachments/assets/18a29198-59f0-4d87-a966-15210d822e0d
 
 ---
 
@@ -52,7 +49,9 @@ uv sync && uv run main.py        # interactive onboarding
 
 ---
 
-## Demo
+## Demo on Metabolomics (V1)
+
+This demo was done with the V1 and will be updated.
 
 <p align="center">
     <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering).</em>
