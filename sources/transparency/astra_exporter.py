@@ -132,7 +132,7 @@ if __name__ == "__main__":
             memory_dir=str(memory_dir),
             workspace_dir=str(workspace_dir),
             runs_capsule_dir=str(capsule_dir),
-            judge_model="anthropic/claude-sonnet-4-5",
+            judge_model="openrouter/deepseek/deepseek-v4-flash",
             openrouter_provider_for=lambda _m: None,
         )
         exporter = AstraExporter(config)
