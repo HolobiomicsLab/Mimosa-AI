@@ -110,7 +110,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
         memory_dir = Path(tmp) / "memory"
         workspace_dir = Path(tmp) / "workspace"
-        run_uuid = "smoke-uuid"
+        run_uuid = "20260620_145324_82ef4d9c"
         (memory_dir / run_uuid).mkdir(parents=True)
         workspace_dir.mkdir()
         (workspace_dir / "model.pkl").write_text("fake")
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         config = SimpleNamespace(
             memory_dir=str(memory_dir),
             workspace_dir=str(workspace_dir),
-            judge_model="anthropic/claude-sonnet-4-5",
+            judge_model="openrouter/deepseek/deepseek-v4-flash",
             openrouter_provider_for=lambda _m: None,
         )
         exporter = AstraExporter(config)
@@ -133,6 +133,7 @@ if __name__ == "__main__":
         analysis = build_analysis("smoke goal", run_uuid, ["model.pkl"], [])
         universe = build_universe([], run_uuid)
         out = write_export(workspace_dir, analysis, universe)
+        print(out)
         assert out.exists()
         print("[OK] astra_exporter smoke check passed")
     sys.exit(0)
