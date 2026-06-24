@@ -3065,6 +3065,32 @@ success rate of recent offspring — not a fixed phase schedule.</p>
 <p>Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
 budget carried in the same block.</p>
+<p><code>llm_think_mutation_directive(agent_answers, textual_gradient_block,
+step_block, goal)</code> runs a dedicated LLM call between
+<code>_get_prompt_step_size</code> and the orchestrator. It consumes the
+parent's per-agent answers, the rubric-blind verifier diagnosis, and
+the boldness/scope block, and emits a <strong>≤ 3-sentence directive</strong>
+naming exactly one issue, the kind of mutation it implies (prompt
+tweak, persona change, agent add/remove, topology change), and the
+rationale. The system prompt fixes trust ranks (verifier diagnosis
+trusted, agent self-reports not), and hard limits (one agent
+add/remove per step, never above the boldness band, default to small
+incremental changes).</p>
+<p><code>mutation_prompt(...)</code> is therefore now a thin wrapper: it passes the
+parent code plus that one directive to the orchestrator inside a
+<code>&lt;directive&gt;...&lt;/directive&gt;</code> block, with explicit instructions to
+<strong>follow the directive exactly</strong>, <strong>add/remove at most one agent per
+step</strong>, <strong>not change topology</strong> unless the directive says so, <strong>not
+edit prompts outside the directive's scope</strong>, and <strong>keep ≥ 90 % of the
+previous code and prompts unchanged</strong>. The verifier diagnosis and raw
+agent answers are no longer injected into the orchestrator's
+context — they were only ever needed to <em>decide</em> the change, and that
+decision is now made upstream. This split keeps orchestrator
+cognitive load on synthesis (write valid LangGraph + agent code), not
+on diagnosis. If the previous attempt failed to produce code at all
+(<code>genotype is None</code>), the directive-LLM is skipped and a fixed
+"Previous attempt failed completely. Fix syntax errors." directive is
+substituted.</p>
 <h3 id="4-workflowselector-sourcescoreworkflow_selectionpy">4. <code>WorkflowSelector</code> — <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py"><code>sources/core/workflow_selection.py</code></a><a class="headerlink" href="#4-workflowselector-sourcescoreworkflow_selectionpy" title="Permanent link">&para;</a></h3>
 <p>Two-mode parent retrieval:</p>
 <ul>

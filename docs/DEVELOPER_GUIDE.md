@@ -322,6 +322,34 @@ Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
 budget carried in the same block.
 
+`llm_think_mutation_directive(agent_answers, textual_gradient_block,
+step_block, goal)` runs a dedicated LLM call between
+`_get_prompt_step_size` and the orchestrator. It consumes the
+parent's per-agent answers, the rubric-blind verifier diagnosis, and
+the boldness/scope block, and emits a **≤ 3-sentence directive**
+naming exactly one issue, the kind of mutation it implies (prompt
+tweak, persona change, agent add/remove, topology change), and the
+rationale. The system prompt fixes trust ranks (verifier diagnosis
+trusted, agent self-reports not), and hard limits (one agent
+add/remove per step, never above the boldness band, default to small
+incremental changes).
+
+`mutation_prompt(...)` is therefore now a thin wrapper: it passes the
+parent code plus that one directive to the orchestrator inside a
+`<directive>...</directive>` block, with explicit instructions to
+**follow the directive exactly**, **add/remove at most one agent per
+step**, **not change topology** unless the directive says so, **not
+edit prompts outside the directive's scope**, and **keep ≥ 90 % of the
+previous code and prompts unchanged**. The verifier diagnosis and raw
+agent answers are no longer injected into the orchestrator's
+context — they were only ever needed to *decide* the change, and that
+decision is now made upstream. This split keeps orchestrator
+cognitive load on synthesis (write valid LangGraph + agent code), not
+on diagnosis. If the previous attempt failed to produce code at all
+(`genotype is None`), the directive-LLM is skipped and a fixed
+"Previous attempt failed completely. Fix syntax errors." directive is
+substituted.
+
 ### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 
 Two-mode parent retrieval:

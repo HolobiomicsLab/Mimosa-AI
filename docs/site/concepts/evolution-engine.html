@@ -900,14 +900,31 @@
         <li class="md-nav__item">
   <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
-      
+
         Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
-      
+
     </span>
   </a>
-  
+
+    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Mutation directive: offloading reasoning from the orchestrator
+
+    </span>
+  </a>
+
 </li>
-      
+
+      </ul>
+    </nav>
+
+</li>
+
         <li class="md-nav__item">
   <a href="#crossover" class="md-nav__link">
     <span class="md-ellipsis">
@@ -2081,14 +2098,31 @@
         <li class="md-nav__item">
   <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
-      
+
         Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
-      
+
     </span>
   </a>
-  
+
+    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+      <ul class="md-nav__list">
+
+          <li class="md-nav__item">
+  <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+
+        Mutation directive: offloading reasoning from the orchestrator
+
+    </span>
+  </a>
+
 </li>
-      
+
+      </ul>
+    </nav>
+
+</li>
+
         <li class="md-nav__item">
   <a href="#crossover" class="md-nav__link">
     <span class="md-ellipsis">
@@ -2227,8 +2261,9 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
     Seed -- no --&gt; Pick[Pick parents via QD-roulette&lt;br/&gt;fallback to disk similarity scan]
     SeedPrompt --&gt; Orch[Orchestrate workflow&lt;br/&gt;LLM → sandbox]
     Pick --&gt; Decide{Crossover ≈ 0.1?}
-    Decide -- mutation --&gt; Mut[Mutation prompt&lt;br/&gt;stagnation-scoped]
+    Decide -- mutation --&gt; Think[Directive LLM&lt;br/&gt;diagnosis + boldness&lt;br/&gt;→ 3-sentence directive]
     Decide -- crossover --&gt; Cross[Crossover prompt&lt;br/&gt;best-parent-first]
+    Think --&gt; Mut[Mutation prompt&lt;br/&gt;parent code + directive]
     Mut --&gt; Orch
     Cross --&gt; Orch
     Orch --&gt; Eval[multi-source per-claim verifier&lt;br/&gt;reward + prompt gradient]
@@ -2407,6 +2442,54 @@ chosen by <code>effective</code>:</p>
 <p>The bands are advisory text steered to the LLM, not hard gates: the
 LLM can still pick any topology. The hard control is the agent-count
 budget passed in the same prompt block.</p>
+<h3 id="mutation-directive-offloading-reasoning-from-the-orchestrator">Mutation directive: offloading reasoning from the orchestrator<a class="headerlink" href="#mutation-directive-offloading-reasoning-from-the-orchestrator" title="Permanent link">&para;</a></h3>
+<p>The orchestrator LLM has one job: write the next workflow's Python
+code. Earlier revisions dumped the raw diagnosis, the per-agent
+answers, <em>and</em> the boldness/scope band into the orchestrator prompt and
+asked it to figure out the right intervention while also coding it.
+That mixed two very different kinds of reasoning into one call —
+diagnosis ("what went wrong, and what kind of change does that imply?")
+and synthesis ("emit valid LangGraph + agent code") — and the
+orchestrator routinely either over-edited (rewriting unrelated agents
+because it re-litigated the diagnosis) or under-edited (touching only
+phrasing while the diagnosis pointed at a missing agent).</p>
+<p><code>VariationEngine.llm_think_mutation_directive()</code> splits these two
+reasoning steps. Before the orchestrator is invoked, a dedicated LLM
+call reads:</p>
+<ul>
+<li>the parent's per-agent answers (<code>&lt;agents_answers&gt;</code>),</li>
+<li>the rubric-blind textual gradient from the verifier
+  (<code>&lt;diagnosis&gt;</code> — trusted as ground truth),</li>
+<li>the boldness/scope block produced by <code>_get_prompt_step_size</code>
+  (<code>&lt;boldness&gt;</code> — caps how big a change is allowed),</li>
+<li>and the goal,</li>
+</ul>
+<p>and emits a <strong>≤ 3-sentence directive</strong> that names exactly one issue,
+the kind of mutation it implies (prompt tweak, persona change, agent
+add/remove, topology change), and the rationale. The system prompt is
+explicit about trust ranks — the verifier diagnosis is trusted; agent
+self-reports may mislead — and about action limits — add or remove at
+most one agent per step, do not exceed the boldness band, and prefer
+small incremental changes unless the diagnosis says the approach is
+fundamentally flawed.</p>
+<p>The orchestrator then receives only the parent code and that single
+directive, wrapped in <code>&lt;directive&gt;...&lt;/directive&gt;</code> with hard
+instructions:</p>
+<ul>
+<li><strong>follow the directive exactly</strong> as the only change-guideline,</li>
+<li><strong>do not add or remove more than 1 agent at a time</strong> and never beyond
+  the budget,</li>
+<li><strong>do not change topology</strong> unless the directive says so,</li>
+<li><strong>do not edit prompt instructions outside the directive's scope</strong>,</li>
+<li><strong>keep ≥ 90 % of the previous workflow code and prompts unchanged</strong>.</li>
+</ul>
+<p>The pre-digested directive is grounded — every claim it makes is
+sourced from the boldness signals and the verifier diagnosis, never
+from the orchestrator's own re-reading of the rubric — and precise —
+the orchestrator is no longer asked to weigh evidence, only to
+implement one named change. This consistently reduces drift between
+generations and prevents the boldness budget from leaking into
+unintended structural rewrites.</p>
 <h2 id="crossover">Crossover<a class="headerlink" href="#crossover" title="Permanent link">&para;</a></h2>
 <p>With probability <code>crossover_rate</code> per generation (default <code>0.1</code>, and only
 once at least <code>initial_population = 2</code> runs have happened), two parents

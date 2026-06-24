@@ -2235,7 +2235,12 @@ recursively evolves workflows, with help from:</p>
   20 %. A near-finish floor only damps boldness once the parent score is
   above 0.95, so near-winners aren't gambled away one generation before
   early-stop. The top <code>RE-SPECIATION</code> band is hysteresis-gated and only
-  opens after <code>iters_since_improvement ≥ 8</code> with a zero success rate.</li>
+  opens after <code>iters_since_improvement ≥ 8</code> with a zero success rate.
+  An intermediate <code>llm_think_mutation_directive</code> call pre-digests the
+  verifier diagnosis, agent answers, and boldness band into a single
+  ≤ 3-sentence directive, so the orchestrator LLM only synthesises code
+  against one named, bounded change instead of re-reasoning over the
+  raw evidence.</li>
 <li><strong>WorkflowOrchestrator</strong> — wraps "grounding → factory → sandbox" into one
   callable per generation.</li>
 </ul>

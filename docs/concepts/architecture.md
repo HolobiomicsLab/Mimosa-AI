@@ -52,6 +52,11 @@ recursively evolves workflows, with help from:
   above 0.95, so near-winners aren't gambled away one generation before
   early-stop. The top `RE-SPECIATION` band is hysteresis-gated and only
   opens after `iters_since_improvement ≥ 8` with a zero success rate.
+  An intermediate `llm_think_mutation_directive` call pre-digests the
+  verifier diagnosis, agent answers, and boldness band into a single
+  ≤ 3-sentence directive, so the orchestrator LLM only synthesises code
+  against one named, bounded change instead of re-reasoning over the
+  raw evidence.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
   callable per generation.
 

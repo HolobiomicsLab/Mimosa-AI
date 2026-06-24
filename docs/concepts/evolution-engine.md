@@ -18,8 +18,9 @@ flowchart TB
     Seed -- no --> Pick[Pick parents via QD-roulette<br/>fallback to disk similarity scan]
     SeedPrompt --> Orch[Orchestrate workflow<br/>LLM → sandbox]
     Pick --> Decide{Crossover ≈ 0.1?}
-    Decide -- mutation --> Mut[Mutation prompt<br/>stagnation-scoped]
+    Decide -- mutation --> Think[Directive LLM<br/>diagnosis + boldness<br/>→ 3-sentence directive]
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
+    Think --> Mut[Mutation prompt<br/>parent code + directive]
     Mut --> Orch
     Cross --> Orch
     Orch --> Eval[multi-source per-claim verifier<br/>reward + prompt gradient]
@@ -194,6 +195,58 @@ chosen by `effective`:
 The bands are advisory text steered to the LLM, not hard gates: the
 LLM can still pick any topology. The hard control is the agent-count
 budget passed in the same prompt block.
+
+### Mutation directive: offloading reasoning from the orchestrator
+
+The orchestrator LLM has one job: write the next workflow's Python
+code. Earlier revisions dumped the raw diagnosis, the per-agent
+answers, *and* the boldness/scope band into the orchestrator prompt and
+asked it to figure out the right intervention while also coding it.
+That mixed two very different kinds of reasoning into one call —
+diagnosis ("what went wrong, and what kind of change does that imply?")
+and synthesis ("emit valid LangGraph + agent code") — and the
+orchestrator routinely either over-edited (rewriting unrelated agents
+because it re-litigated the diagnosis) or under-edited (touching only
+phrasing while the diagnosis pointed at a missing agent).
+
+`VariationEngine.llm_think_mutation_directive()` splits these two
+reasoning steps. Before the orchestrator is invoked, a dedicated LLM
+call reads:
+
+- the parent's per-agent answers (`<agents_answers>`),
+- the rubric-blind textual gradient from the verifier
+  (`<diagnosis>` — trusted as ground truth),
+- the boldness/scope block produced by `_get_prompt_step_size`
+  (`<boldness>` — caps how big a change is allowed),
+- and the goal,
+
+and emits a **≤ 3-sentence directive** that names exactly one issue,
+the kind of mutation it implies (prompt tweak, persona change, agent
+add/remove, topology change), and the rationale. The system prompt is
+explicit about trust ranks — the verifier diagnosis is trusted; agent
+self-reports may mislead — and about action limits — add or remove at
+most one agent per step, do not exceed the boldness band, and prefer
+small incremental changes unless the diagnosis says the approach is
+fundamentally flawed.
+
+The orchestrator then receives only the parent code and that single
+directive, wrapped in `<directive>...</directive>` with hard
+instructions:
+
+- **follow the directive exactly** as the only change-guideline,
+- **do not add or remove more than 1 agent at a time** and never beyond
+  the budget,
+- **do not change topology** unless the directive says so,
+- **do not edit prompt instructions outside the directive's scope**,
+- **keep ≥ 90 % of the previous workflow code and prompts unchanged**.
+
+The pre-digested directive is grounded — every claim it makes is
+sourced from the boldness signals and the verifier diagnosis, never
+from the orchestrator's own re-reading of the rubric — and precise —
+the orchestrator is no longer asked to weigh evidence, only to
+implement one named change. This consistently reduces drift between
+generations and prevents the boldness budget from leaking into
+unintended structural rewrites.
 
 ## Crossover
 
