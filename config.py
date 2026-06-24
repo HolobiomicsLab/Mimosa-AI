@@ -48,8 +48,8 @@ class Config:
         # LLMs choices
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "openrouter/qwen/qwen3.5-122b-a10b"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
+        self.smolagent_model_id: str = "deepseek/deepseek-v4-flash"
+        self.judge_model = "openrouter/qwen/qwen3.7-max"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
@@ -68,7 +68,7 @@ class Config:
         self._model_pricing_cache = None
 
         # learning parameters
-        self.learned_score_threshold = 0.94
+        self.learned_score_threshold = 0.9
         self.max_learning_evolve_iterations = 10
 
         # QD novelty + length penalty (open-ended modes)
