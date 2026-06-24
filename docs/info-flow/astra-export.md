@@ -48,9 +48,16 @@ variables — and nothing else:
 | ---           | ---                                                       | ---                                                            |
 | `goal`        | `start_workflow_evolution(goal)` argument                 | Lets the LLM tell methodology from goal-irrelevant scaffolding |
 | `step_index`  | Position of the step in the compacted trace               | Provenance — surfaces in `Decision.source_step`                 |
-| `reasoning`   | `step.model_output_message.content` (str or text chunks)  | The agent's natural-language justification, where the decision is voiced |
-| `code`        | `step.action_output` (fallback: code block in reasoning)  | The concrete chosen option as executed                          |
+| `reasoning`   | `memory_trace.extract_output_text` — `model_output_message.content`, else `model_output` | The agent's natural-language justification, where the decision is voiced |
+| `code`        | `memory_trace.extract_code` — `code_action`, else `tool_calls[*].function.arguments`, else a fenced block in the output | The concrete chosen option as executed |
 | `observation` | `step.observations` truncated to 1200 chars               | Disambiguates whether the step succeeded or recovered           |
+
+> **Shared extraction.** Code/reasoning extraction lives in
+> [`sources/transparency/memory_trace.py`](../../sources/transparency/memory_trace.py),
+> reused by both the exporter and the interactive memory chat
+> (`sources/cli/memory_chat_cli.py`) so the two never disagree on "the code
+> the agent ran". Note `code` reads `code_action` — **not** `action_output`,
+> which is the step's *result*, not its source.
 
 Variables that are deliberately **not** passed:
 
@@ -81,9 +88,9 @@ analysis dict:
 | `name`                  | `"Mimosa best run <best_uuid>"`                       |
 | `description`           | Constant, indicates the post-run extraction provenance |
 | `inputs[0]`             | `task_description` derived from the user `goal`       |
-| `outputs[i]`            | Each top-level file in the artefacts directory — prefers `/tmp/mimosa_run_<session>_<uuid>` (the canonical snapshot), falls back to `config.workspace_dir`. See `AstraExporter._resolve_artefacts_dir`. |
+| `outputs[i]`            | Each top-level file in the artefacts directory — prefers `/tmp/mimosa_run_<session>_<uuid>` (the canonical snapshot), falls back to `config.workspace_dir`. See `AstraExporter._resolve_artefacts_dir`. OS junk (`.DS_Store`, `Thumbs.db`, `.gitkeep`), dotfiles, and our own `recipe.py` are dropped. |
 | `outputs[i].decisions`  | All decision IDs surfaced from the trace               |
-| `outputs[i].recipe.command` | Pointer to the memory trace (Mimosa does not run as a single CLI command) |
+| `outputs[i].recipe.command` | `python recipe.py`. The run's executed code is reconstructed by `memory_trace.reconstruct_recipe` (ordered `code_action` of every step) and written to `runs_capsule/<uuid>/recipe.py`. ASTRA's `recipe.command` is a single shell command, so the multi-step transcript lives in the script and the command points at it. Falls back to a memory-trace pointer string when no code was recovered. |
 | `decisions[d.id]`       | One entry per deduped surfaced decision               |
 | `decisions[d.id].rationale` | LLM-extracted from the step's reasoning            |
 | `decisions[d.id].options` | Single-option map keyed by `d.option_id` (Mimosa picks one option, doesn't enumerate alternatives) |

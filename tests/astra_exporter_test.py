@@ -24,6 +24,11 @@ from sources.transparency.decision_extractor import (
     _parse_response,
     extract_decisions,
 )
+from sources.transparency.memory_trace import (
+    extract_code,
+    extract_output_text,
+    reconstruct_recipe,
+)
 from sources.transparency.trace_compaction import (
     _MECHANICAL_CODE_PATTERNS,
     compact_step,
@@ -39,17 +44,19 @@ from sources.transparency.yaml_writer import (
 
 
 _METHODOLOGICAL_STEP = {
+    "step_number": 1,
     "model_output_message": {
         "content": "Variance is unequal so I use Welch's t-test instead of Student's."
     },
-    "action_output": "from scipy import stats\nresult = stats.ttest_ind(a, b, equal_var=False)",
+    "code_action": "from scipy import stats\nresult = stats.ttest_ind(a, b, equal_var=False)",
     "observations": "Ttest_indResult(statistic=2.31, pvalue=0.022)",
     "model_input_messages": [{"role": "system", "content": "x" * 50_000}],
 }
 
 _MECHANICAL_STEP = {
+    "step_number": 2,
     "model_output_message": {"content": "List the workspace."},
-    "action_output": "import os\nos.listdir('.')",
+    "code_action": "import os\nos.listdir('.')",
     "observations": "['a.csv', 'b.csv']",
 }
 
@@ -65,6 +72,46 @@ def test_prefilter_drops_mechanical_steps() -> None:
     kept = compact_trace([_METHODOLOGICAL_STEP, _MECHANICAL_STEP])
     assert len(kept) == 1
     assert "ttest_ind" in kept[0]["code"]
+
+
+def test_extract_code_prefers_code_action() -> None:
+    step = {"code_action": "model.fit(X, y)", "action_output": "0.91"}
+    assert extract_code(step) == "model.fit(X, y)"
+
+
+def test_extract_code_falls_back_to_tool_calls() -> None:
+    step = {"tool_calls": [{"function": {"name": "python_interpreter",
+                                         "arguments": "df.dropna()"}}]}
+    assert extract_code(step) == "df.dropna()"
+
+
+def test_extract_code_ignores_action_output_as_code() -> None:
+    # action_output is the step's RESULT, never the code — must not leak in.
+    step = {"action_output": "Accuracy: 0.91", "model_output": "no code here"}
+    assert extract_code(step) == ""
+
+
+def test_extract_output_text_reads_message_content() -> None:
+    step = {"model_output_message": {"content": "reasoning here"}}
+    assert extract_output_text(step) == "reasoning here"
+
+
+def test_reconstruct_recipe_orders_real_code(tmp_path: Path) -> None:
+    (tmp_path / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "code_action": "X = load()"},
+        {"step_number": 2, "code_action": "model.fit(X)"},
+    ]))
+    recipe = reconstruct_recipe(tmp_path)
+    assert "X = load()" in recipe and "model.fit(X)" in recipe
+    assert recipe.index("X = load()") < recipe.index("model.fit(X)")
+    assert "step 1 · single_agent" in recipe
+
+
+def test_reconstruct_recipe_empty_when_no_code(tmp_path: Path) -> None:
+    (tmp_path / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "model_output": "just thinking, no code"},
+    ]))
+    assert reconstruct_recipe(tmp_path) == ""
 
 
 def test_mechanical_patterns_match_common_io() -> None:
@@ -161,6 +208,17 @@ def test_build_analysis_emits_required_astra_fields() -> None:
     assert analysis["decisions"]["fit_method"]["options"]["ols"]["label"] == "OLS"
 
 
+def test_recipe_command_threads_into_every_output() -> None:
+    analysis = build_analysis("g", "abc", ["a.csv", "b.csv"], [], "python recipe.py")
+    commands = [o["recipe"]["command"] for o in analysis["outputs"]]
+    assert commands == ["python recipe.py", "python recipe.py"]
+
+
+def test_recipe_command_defaults_to_pointer_when_no_code() -> None:
+    analysis = build_analysis("g", "abc", ["a.csv"], [])
+    assert "sources/memory" in analysis["outputs"][0]["recipe"]["command"]
+
+
 def test_universe_pins_every_decision_to_its_chosen_option() -> None:
     decisions = [
         Decision(
@@ -199,7 +257,6 @@ def test_write_export_writes_both_files(tmp_path: Path) -> None:
 
 def test_resolve_artefacts_dir_prefers_tmp_snapshot(tmp_path: Path) -> None:
     # Both a /tmp snapshot and the live workspace exist; the snapshot wins.
-    pytest.importorskip("litellm")
     from sources.transparency.astra_exporter import AstraExporter
 
     snapshot = tmp_path / "mimosa_run_abcdef123456_run-xyz"
@@ -216,7 +273,6 @@ def test_resolve_artefacts_dir_prefers_tmp_snapshot(tmp_path: Path) -> None:
 
 def test_resolve_artefacts_dir_falls_back_to_workspace(tmp_path: Path) -> None:
     # No snapshot for this uuid → fall back to workspace_dir.
-    pytest.importorskip("litellm")
     from sources.transparency.astra_exporter import AstraExporter
 
     workspace = tmp_path / "workspace"
@@ -224,6 +280,45 @@ def test_resolve_artefacts_dir_falls_back_to_workspace(tmp_path: Path) -> None:
     exporter = AstraExporter(SimpleNamespace())
     exporter._SNAPSHOT_ROOT = tmp_path
     assert exporter._resolve_artefacts_dir("orphan-uuid", workspace) == workspace
+
+
+def test_list_workspace_files_drops_junk_and_dotfiles(tmp_path: Path) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    for name in ("model.pkl", "report.md", ".DS_Store", ".hidden", "recipe.py"):
+        (tmp_path / name).write_text("x")
+    exporter = AstraExporter(SimpleNamespace())
+    assert exporter._list_workspace_files(tmp_path) == ["model.pkl", "report.md"]
+
+
+def test_write_recipe_creates_script_and_returns_command(tmp_path: Path) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    (memory / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "code_action": "result = train(model)"},
+    ]))
+    capsule = tmp_path / "capsule"
+    exporter = AstraExporter(SimpleNamespace())
+    command = exporter._write_recipe(capsule, memory)
+    assert command == "python recipe.py"
+    assert "result = train(model)" in (capsule / "recipe.py").read_text()
+
+
+def test_write_recipe_falls_back_when_no_code(tmp_path: Path) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    (memory / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "model_output": "no code"},
+    ]))
+    capsule = tmp_path / "capsule"
+    exporter = AstraExporter(SimpleNamespace())
+    command = exporter._write_recipe(capsule, memory)
+    assert "sources/memory" in command
+    assert not (capsule / "recipe.py").exists()
 
 
 def test_engine_gate_skips_export_when_flag_off(monkeypatch) -> None:
