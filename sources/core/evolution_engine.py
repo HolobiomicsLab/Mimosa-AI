@@ -412,6 +412,7 @@ class EvolutionEngine:
                     f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
                 workspace_mgr.restore_best(best_run.current_uuid)
+                self._export_astra(best_run.current_uuid, goal)
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
                 workspace_mgr.restore_best("")  # triggers fallback inside WorkspaceManager
@@ -676,6 +677,23 @@ class EvolutionEngine:
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
         return runs
+
+    def _export_astra(self, best_uuid: str, goal: str) -> None:
+        """Best-effort post-run ASTRA export of the best workflow's trace.
+
+        Gated on ``config.export_astra`` (opt-in, off by default). Failure is
+        non-fatal: a missing memory directory, an LLM hiccup, or a YAML write
+        error must not break the evolution loop. See
+        :class:`sources.transparency.AstraExporter` for the pipeline.
+        """
+        if not getattr(self.config, "export_astra", False):
+            return
+        try:
+            from sources.transparency import AstraExporter
+            AstraExporter(self.config, self.logger).export(best_uuid, goal)
+        except Exception as exc:
+            self.logger.warning(f"[ASTRA] export skipped: {exc}")
+            print_warn(f"ASTRA export failed (non-fatal): {exc}")
 
     def _get_human_validation(self) -> bool:
         """Get human validation for continuing the workflow.

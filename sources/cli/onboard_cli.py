@@ -1244,6 +1244,22 @@ class OnboardCLI:
         else:
             _info("Learning mode disabled (single-pass execution).")
 
+        # ASTRA export — opt-in, off by default. Adds an LLM decision-
+        # extraction pass over the best run's memory trace at the end.
+        print()
+        print(_wrap(
+            "ASTRA export writes a standards-compliant YAML "
+            "(https://astra-spec.org) describing the scientific decisions "
+            "the best run made — useful for audit and reproducibility.",
+            width=70, indent=2,
+        ))
+        _warn("This adds an extra LLM pass after evolution and takes a bit more time.")
+        self.config.export_astra = _ask_yn("Save the best run as ASTRA?", default=False)
+        if self.config.export_astra:
+            _ok("ASTRA export enabled.")
+        else:
+            _info("ASTRA export disabled.")
+
         # Summary
         print()
         print(f"  {BOLD}{'─'*54}{RESET}")
@@ -1251,6 +1267,7 @@ class OnboardCLI:
         print(f"  {'─'*54}")
         print(f"  Mode:      {CYAN}{self._mode.upper()}{RESET}")
         print(f"  Learning:  {'Yes' if self._learn else 'No'}")
+        print(f"  ASTRA:     {'Yes' if self.config.export_astra else 'No'}")
         print(f"  Objective: {self._objective[:60]}{'…' if len(self._objective) > 60 else ''}")
         print(f"  {'─'*54}")
         print()
