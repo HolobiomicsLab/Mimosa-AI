@@ -7,12 +7,16 @@ Pipeline
    :mod:`sources.transparency.trace_compaction`.
 3. Run a per-step decision-extraction LLM pass — see
    :mod:`sources.transparency.decision_extractor`.
-4. Assemble the analysis + universe dicts and write them under the restored
-   workspace as ``astra.yaml`` and ``universes/best.yaml``.
+4. Assemble the analysis + universe dicts and write them into the run's
+   capsule subfolder as ``astra.yaml`` and ``universes/best.yaml``.
+
+Output target: ``<config.runs_capsule_dir>/<best_uuid>/``. The best run's
+UUID is used as the capsule subfolder name (stable, deterministic, mirrors
+the ``sources/memory/<uuid>`` convention) — it does NOT depend on the
+LLM-named goal capsule produced later by ``LocalTransfer``.
 
 The exporter is wired into :func:`start_workflow_evolution` immediately
-after ``workspace_mgr.restore_best`` so the YAML lands next to the
-artefacts of the same best run.
+after ``workspace_mgr.restore_best`` and is gated on ``config.export_astra``.
 """
 
 from __future__ import annotations
@@ -58,6 +62,7 @@ class AstraExporter:
         print_section("ASTRA EXPORT")
         memory_path = Path(self.config.memory_dir) / best_uuid
         workspace_dir = Path(self.config.workspace_dir)
+        capsule_dir = Path(self.config.runs_capsule_dir) / best_uuid
         if not memory_path.is_dir():
             print_warn(f"Memory directory missing: {memory_path}; export skipped.")
             return None
@@ -75,7 +80,7 @@ class AstraExporter:
         workspace_files = self._list_workspace_files(workspace_dir)
         analysis = build_analysis(goal, best_uuid, workspace_files, decisions)
         universe = build_universe(decisions, best_uuid)
-        path = write_export(workspace_dir, analysis, universe)
+        path = write_export(capsule_dir, analysis, universe)
         print_ok(f"ASTRA analysis written to {path}")
         return path
 
@@ -110,9 +115,11 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
         memory_dir = Path(tmp) / "memory"
         workspace_dir = Path(tmp) / "workspace"
-        run_uuid = "20260620_145324_82ef4d9c"
+        capsule_dir = Path(tmp) / "runs_capsule"
+        run_uuid = "smoke-uuid"
         (memory_dir / run_uuid).mkdir(parents=True)
         workspace_dir.mkdir()
+        capsule_dir.mkdir()
         (workspace_dir / "model.pkl").write_text("fake")
         (memory_dir / run_uuid / "task_single_agent.json").write_text(json.dumps([
             {
@@ -124,7 +131,8 @@ if __name__ == "__main__":
         config = SimpleNamespace(
             memory_dir=str(memory_dir),
             workspace_dir=str(workspace_dir),
-            judge_model="openrouter/deepseek/deepseek-v4-flash",
+            runs_capsule_dir=str(capsule_dir),
+            judge_model="anthropic/claude-sonnet-4-5",
             openrouter_provider_for=lambda _m: None,
         )
         exporter = AstraExporter(config)
@@ -132,8 +140,7 @@ if __name__ == "__main__":
         assert compact == [], f"Mechanical step should be filtered, got {compact}"
         analysis = build_analysis("smoke goal", run_uuid, ["model.pkl"], [])
         universe = build_universe([], run_uuid)
-        out = write_export(workspace_dir, analysis, universe)
-        print(out)
-        assert out.exists()
-        print("[OK] astra_exporter smoke check passed")
+        out = write_export(capsule_dir / run_uuid, analysis, universe)
+        assert out.exists() and out.parent == capsule_dir / run_uuid, out
+        print(f"[OK] astra_exporter smoke check passed (wrote {out})")
     sys.exit(0)
