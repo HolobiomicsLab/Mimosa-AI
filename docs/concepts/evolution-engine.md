@@ -270,46 +270,31 @@ yields the same code.
 ## Watching evolution happen
 
 The Rechenberg schedule, the directive-LLM, the QD archive, the
-crossover roll — none of it is visible inside a single generation. The
-shape of the search only emerges when you step back across a whole
-run, which is what the two end-of-run PNGs in
-`sources/workflows/<best_uuid>/` are for. They tell the same story
-twice — once as time series, once as topology — and that's the
-clearest way to confirm the mechanics on this page are doing
+crossover roll — none of it is visible inside a single generation.
+The shape of the search only emerges when you step back across a
+whole run, and that's what the lineage tree in
+`sources/workflows/<best_uuid>/evolution_tree.png` is for: it lays
+every workflow the engine produced on the same canvas, with the
+operator that linked each pair drawn explicitly. It's the most
+direct way to confirm that the mechanics on this page are doing
 something on your task.
-
-The reward curve is the schedule's footprint over time. Below is a
-real Clintox toxicity-prediction run: the first three generations sit
-near zero (the verifier rejects the workflow's outputs) and the
-plateau counter ratchets up; `_get_prompt_step_size` widens the agent
-budget and pushes the directive-LLM out of "tweak phrasing" into
-component-overhaul scope; iteration 5 lands a workflow that clears the
-verifier and the score jumps from ~0.30 to ~0.97 in a single step.
-That breakthrough is exactly the Rechenberg case the schedule is
-designed for — sustained `success_rate = 0` triggering an
-EXPLORATION-band mutation that finally escapes the basin.
-
-![Reward progress example](../images/evolve_example.png){ width="80%" }
-
-The same story rearranged by parentage is the lineage tree.
-Generation depth runs down the y-axis, each node is a workflow
-coloured by its `overall_score` (red → green), solid edges are
-mutation parents and dashed edges are crossover parents. Failed runs
-appear as labelled red nodes off the main trunk, kept in the picture
-so you can see *where* a branch died, not just that it did. Read
-top-down to follow the ratchet — a 0.48 seed branching into 0.64 and
-0.62 children, those crossing over into the 0.67/0.69 generation,
-then a 0.73 mutation finally bridging into a 0.74 leaf — and watch
-for the dashed edges that span the tree horizontally: those are the
-recombinations that pulled in a structural idea the local mutation
-chain wouldn't have reached on its own.
 
 ![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 
-Together the two views give you the diagnostic loop most often
-needed: the curve tells you *whether* the schedule found a
-breakthrough, the tree tells you *which* operator and which lineage
-produced it.
+Generation depth runs down the y-axis, each node is a workflow
+coloured by its `overall_score` (red → green), solid edges are
+mutation parents and dashed edges are crossover parents. Failed runs
+stay in the picture as labelled red nodes off the main trunk so you
+can see *where* a branch died, not just that it did. Read top-down
+to follow the ratchet — a 0.48 seed branching into 0.64 and 0.62
+children, those crossing over into the 0.67/0.69 generation, then a
+0.73 mutation finally bridging into a 0.74 leaf — and watch for the
+dashed edges that span the tree horizontally: those are the
+recombinations that pulled in a structural idea the local mutation
+chain wouldn't have reached on its own. Long mutation runs at the
+same colour are the plateau signal feeding back into the boldness
+schedule; the colour jump that follows them is what an unstuck
+EXPLORATION-band mutation actually looks like.
 
 ## Run metrics artifacts
 

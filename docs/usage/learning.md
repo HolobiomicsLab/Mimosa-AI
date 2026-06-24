@@ -91,7 +91,7 @@ the end. Across the run you'll also get:
   node a workflow, edges showing mutation/crossover).
 - `runs_capsule/<capsule_name>/` — archived snapshot of the best run.
 
-![Reward progress example](../images/evolve_example.png){ width="70%" }
+![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 
 ## Mid-run interruption
 
