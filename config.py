@@ -95,6 +95,11 @@ class Config:
         # are comparable across an evolved lineage. Disable for ablation.
         self.reuse_lineage_rubric: bool = True
 
+        # When True, the evolution loop writes an ASTRA spec YAML for the
+        # best run after workspace restore. Off by default — adds an LLM
+        # decision-extraction pass per surviving trace step.
+        self.export_astra: bool = False
+
         # openrouter providers
         self.openrouter_provider: list[str] | None = [
             "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
@@ -234,6 +239,7 @@ class Config:
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
             "reuse_lineage_rubric": self.reuse_lineage_rubric,
+            "export_astra": self.export_astra,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "agent_execution_timeout": self.agent_execution_timeout,
@@ -289,6 +295,9 @@ class Config:
         self.memory_dir = data.get("memory_dir", self.memory_dir)
         self.reuse_lineage_rubric = bool(
             data.get("reuse_lineage_rubric", self.reuse_lineage_rubric)
+        )
+        self.export_astra = bool(
+            data.get("export_astra", self.export_astra)
         )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
