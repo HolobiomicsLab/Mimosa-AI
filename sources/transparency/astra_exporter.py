@@ -44,6 +44,11 @@ from sources.transparency.yaml_writer import (
 class AstraExporter:
     """Build an ASTRA-spec YAML pair from the best run's saved memory."""
 
+    # WorkspaceManager snapshots best-run artefacts under this root with the
+    # naming pattern ``mimosa_run_<session_id>_<run_uuid>``. Overridable for
+    # tests so the lookup can target a sandbox rather than the real ``/tmp``.
+    _SNAPSHOT_ROOT: Path = Path("/tmp")
+
     def __init__(self, config, logger: logging.Logger | None = None) -> None:
         """Bind to the running :class:`config.Config` and the engine's logger."""
         self.config = config
@@ -77,7 +82,10 @@ class AstraExporter:
         decisions = extract_decisions(compact, goal, memory_path, llm_config)
         print_info(f"Decisions extracted: {len(decisions)}.")
 
-        workspace_files = self._list_workspace_files(workspace_dir)
+        artefacts_dir = self._resolve_artefacts_dir(best_uuid, workspace_dir)
+        if artefacts_dir != workspace_dir:
+            print_info(f"Reading artefacts from /tmp snapshot: {artefacts_dir}")
+        workspace_files = self._list_workspace_files(artefacts_dir)
         analysis = build_analysis(goal, best_uuid, workspace_files, decisions)
         universe = build_universe(decisions, best_uuid)
         path = write_export(capsule_dir, analysis, universe)
@@ -95,6 +103,20 @@ class AstraExporter:
             temperature=0.0,
             openrouter_provider=self.config.openrouter_provider_for(model),
         )
+
+    def _resolve_artefacts_dir(self, best_uuid: str, workspace_dir: Path) -> Path:
+        """Prefer the run's saved /tmp snapshot, fall back to the live workspace.
+
+        The snapshot is the canonical source — ``WorkspaceManager.restore_best``
+        copies it into ``workspace_dir`` just before the export runs. Falling
+        back keeps standalone mode functional after ``cleanup()`` has wiped
+        ``/tmp``.
+        """
+        pattern = f"mimosa_run_*_{best_uuid}"
+        for snapshot in self._SNAPSHOT_ROOT.glob(pattern):
+            if snapshot.is_dir():
+                return snapshot
+        return workspace_dir
 
     def _list_workspace_files(self, workspace_dir: Path) -> list[str]:
         """Top-level files in the restored workspace, sorted, excluding our own output."""

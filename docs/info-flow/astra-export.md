@@ -81,7 +81,7 @@ analysis dict:
 | `name`                  | `"Mimosa best run <best_uuid>"`                       |
 | `description`           | Constant, indicates the post-run extraction provenance |
 | `inputs[0]`             | `task_description` derived from the user `goal`       |
-| `outputs[i]`            | Each top-level file in the restored workspace (excluding `astra.yaml`/`universes`) |
+| `outputs[i]`            | Each top-level file in the artefacts directory — prefers `/tmp/mimosa_run_<session>_<uuid>` (the canonical snapshot), falls back to `config.workspace_dir`. See `AstraExporter._resolve_artefacts_dir`. |
 | `outputs[i].decisions`  | All decision IDs surfaced from the trace               |
 | `outputs[i].recipe.command` | Pointer to the memory trace (Mimosa does not run as a single CLI command) |
 | `decisions[d.id]`       | One entry per deduped surfaced decision               |

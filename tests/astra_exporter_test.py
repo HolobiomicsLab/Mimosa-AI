@@ -197,6 +197,35 @@ def test_write_export_writes_both_files(tmp_path: Path) -> None:
     assert universe_loaded["decisions"]["fit_method"] == "ols"
 
 
+def test_resolve_artefacts_dir_prefers_tmp_snapshot(tmp_path: Path) -> None:
+    # Both a /tmp snapshot and the live workspace exist; the snapshot wins.
+    pytest.importorskip("litellm")
+    from sources.transparency.astra_exporter import AstraExporter
+
+    snapshot = tmp_path / "mimosa_run_abcdef123456_run-xyz"
+    snapshot.mkdir()
+    (snapshot / "model.pkl").write_text("snap")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "model.pkl").write_text("live")
+
+    exporter = AstraExporter(SimpleNamespace())
+    exporter._SNAPSHOT_ROOT = tmp_path  # divert glob away from real /tmp
+    assert exporter._resolve_artefacts_dir("run-xyz", workspace) == snapshot
+
+
+def test_resolve_artefacts_dir_falls_back_to_workspace(tmp_path: Path) -> None:
+    # No snapshot for this uuid → fall back to workspace_dir.
+    pytest.importorskip("litellm")
+    from sources.transparency.astra_exporter import AstraExporter
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    exporter = AstraExporter(SimpleNamespace())
+    exporter._SNAPSHOT_ROOT = tmp_path
+    assert exporter._resolve_artefacts_dir("orphan-uuid", workspace) == workspace
+
+
 def test_engine_gate_skips_export_when_flag_off(monkeypatch) -> None:
     # The engine's _export_astra must early-return when config.export_astra
     # is False; AstraExporter must NEVER be imported in that path.
