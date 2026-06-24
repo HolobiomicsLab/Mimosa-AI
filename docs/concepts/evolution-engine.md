@@ -277,6 +277,17 @@ When the loop finishes, Mimosa emits two artifacts in
 
 ![Reward progress example](../images/evolve_example.png){ width="80%" }
 
+![Evolution tree example](../images/evolution_tree.png){ width="60%" }
+
+The lineage tree plots one node per workflow, depth on the y-axis,
+node colour by `overall_score` (red → green), solid edges for mutation
+parents and dashed edges for crossover parents. Failed runs appear as
+labelled red nodes off the main trunk. Read top-down to follow how the
+search ratcheted from a mediocre seed to a higher-scoring descendant,
+and look for crossover edges joining two distant branches — those are
+the recombinations that pulled in a structural idea the mutation
+chain wouldn't have reached on its own.
+
 ## Run metrics artifacts
 
 Each iteration also writes structured metrics for post-hoc analysis:
