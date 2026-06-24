@@ -158,6 +158,9 @@ correct solution:
 - Do not extract claims that conflict with the goal requirements or aren't possible per goal requirements
   (e.g. if the goal explicitly relaxes a standard or dataset preview imply that a method cann't be used, don't extract claims that would require it.)
 - When the literature grounding lists multiple co-equal preprocessing steps in one bullet (e.g. "normalization, handling missing values, dimensionality reduction"), emit one claim per named step rather than a single composite claim.
+- Do NOT emit hyperparameter-value claims (`n_estimators`, `max_depth`, `learning_rate`, `batch_size`, `n_layers`, `dropout`, `epochs`, `kernel_size`, `n_folds`) unless the goal text literally pins that value.
+- When the goal cites a package or repo, prefer claims that the workflow uses that package's documented API rather than re-implementing the method by hand.
+- On visual deliverables (output is `.png` / `.pdf` / `.svg`): do not prescribe panel count, named plotting methods, or specific overlay types unless the goal literally names them.
 
 MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
 produced the specific scientific deliverable the task requested AND that
@@ -229,11 +232,9 @@ must scan for, regardless of how the goal is labelled or sectioned:
     "The workflow uses `<Identifier>` as named in the goal."
     One claim per distinct identifier.
 
-These exact-name claims sit ALONGSIDE concept claims, not in place of
-them. "The output includes a SMILES column" (concept) and "The output
-header equals `['smiles','FDA_APPROVED','CT_TOX']`" (exact) are
-DIFFERENT claims and you should emit BOTH when both are extractable
-from the goal.
+When DATASET PREVIEW or an explicit output path is present, emit the exact-name and exact-path claims FIRST, before any concept paraphrases.
+Numeric thresholds or cut-offs in the goal (e.g. `>= 0.6`, `top-10`, `5.5km`, `>280K`) are also literal identifiers — emit one claim per value, quoted verbatim, before any paraphrase.
+"The output includes a SMILES column" (concept) and "The output header equals `['smiles','FDA_APPROVED','CT_TOX']`" (exact) are DIFFERENT claims and you should emit BOTH when both are extractable from the goal.
 
 If an example is truncated (ends with `...`, contains `[truncated]`, or
 shows only a partial row), emit a weaker positional claim instead:
@@ -300,6 +301,7 @@ Look for properties such as:
   in the claim ("standard deviation of grayscale pixel values > 5",
   "image width >= 400 px", "at least 2 horizontally-tiled subregions
   detected by column-variance scan").
+  Default to single-panel claims; emit multi-panel claims ONLY when the goal literally names a multi-panel helper (e.g. `bio_ecg_plot`, `subplots(N,M)`) or a panel count.
 
 Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
@@ -325,12 +327,13 @@ WORKSPACE FILES (relative to workspace root):
 {ctx.workspace_listing}
 
 TASK:
+If the goal's deliverable is an image (`.png` / `.pdf` / `.svg`), emit no claims — the visual grader cannot see manifests or pinning.
 Extract claims that capture essential computational-reproducibility
 requirements. The scope is intentionally narrow: only things without
 which a second party CANNOT re-run this work on a fresh machine. The
 bar is "can it be re-run", NOT "is it nicely engineered".
 
-ALLOWED claim shapes:
+ALLOWED claim shapes (only emit when the workspace listing already contains a manifest file — never emit a manifest-presence claim that would deterministically fail a workspace that has none):
 - The workspace declares its dependencies in a standard manifest
   (`requirements.txt`, `pyproject.toml`, or `environment.yml`) AND the
   declared packages cover the third-party imports actually used by the
@@ -373,6 +376,7 @@ WORKSPACE FILES (relative to workspace root):
 {ctx.workspace_listing}
 
 TASK:
+If the goal's deliverable is an image (`.png` / `.pdf` / `.svg`), emit no claims — statistical fingerprints do not contribute to a visual resemblance judge.
 Create a list of check that the produced result is
 NON-TRIVIAL and STATISTICALLY REAL — i.e. that it could not have been
 achieved by a degenerate, leaking, or hard-coded "solution".
@@ -384,6 +388,7 @@ Look for properties such as:
   (random / majority-class / mean predictor / shuffled-label baseline);
   on a balanced binary task, accuracy is above 0.55; on a regression
   task, the model beats the mean predictor in R² or RMSE.
+  If any class proportion is ≥ 0.80, do NOT emit a majority-baseline accuracy claim — emit `AUC-ROC ≥ 0.6 on a separated test split` instead.
 - The prediction distribution is not degenerate: not constant, not all
   one class, not a single value repeated, not uniformly 0.5, with non-zero
   variance across rows in continuous outputs.
