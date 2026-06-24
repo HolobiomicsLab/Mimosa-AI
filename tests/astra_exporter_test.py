@@ -235,6 +235,7 @@ def test_exporter_skips_when_memory_dir_missing(tmp_path: Path) -> None:
     config = SimpleNamespace(
         memory_dir=str(tmp_path / "memory"),
         workspace_dir=str(tmp_path / "workspace"),
+        runs_capsule_dir=str(tmp_path / "runs_capsule"),
         judge_model="anthropic/claude-sonnet-4-5",
         openrouter_provider_for=lambda _m: None,
     )

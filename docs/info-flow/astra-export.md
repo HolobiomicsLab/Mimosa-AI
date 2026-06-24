@@ -25,9 +25,15 @@ non-fatal: a failed export must never break the evolution loop.
 The exporter is invoked from
 [`sources/core/evolution_engine.py`](../../sources/core/evolution_engine.py)
 in `start_workflow_evolution`, immediately after
-`workspace_mgr.restore_best(best_run.current_uuid)`. Workspace state is
-already restored to the best run's snapshot, so the YAML files land
-alongside the artefacts they describe.
+`workspace_mgr.restore_best(best_run.current_uuid)`. The call is gated on
+`config.export_astra` (opt-in, off by default).
+
+Output target: `<config.runs_capsule_dir>/<best_uuid>/astra.yaml` plus
+`<config.runs_capsule_dir>/<best_uuid>/universes/best.yaml`. The best
+run's UUID is used as the capsule subfolder name — stable, deterministic,
+matches the `sources/memory/<uuid>` convention — and intentionally
+independent of the LLM-named goal capsule that `LocalTransfer` produces
+later.
 
 Failure of the export is logged via `print_warn` and the engine continues.
 
