@@ -920,10 +920,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#failure-fingerprint-qd-behaviour-descriptor" class="md-nav__link">
+  <a href="#failure-fingerprint-diagnostic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failure fingerprint (QD behaviour descriptor)
+        Failure fingerprint (diagnostic)
       
     </span>
   </a>
@@ -942,10 +942,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cheat-detector-currently-disabled" class="md-nav__link">
+  <a href="#behavioral-pressure-against-shortcut-workflows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cheat detector (currently disabled)
+        Behavioral pressure against shortcut workflows
       
     </span>
   </a>
@@ -2067,10 +2067,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#failure-fingerprint-qd-behaviour-descriptor" class="md-nav__link">
+  <a href="#failure-fingerprint-diagnostic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failure fingerprint (QD behaviour descriptor)
+        Failure fingerprint (diagnostic)
       
     </span>
   </a>
@@ -2089,10 +2089,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cheat-detector-currently-disabled" class="md-nav__link">
+  <a href="#behavioral-pressure-against-shortcut-workflows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cheat detector (currently disabled)
+        Behavioral pressure against shortcut workflows
       
     </span>
   </a>
@@ -2220,11 +2220,11 @@ narration, math invariants, computational reproducibility, statistical
 fingerprint). The single signal that flows back to the mutator is a short
 <strong>prompt gradient</strong> that summarizes failure modes without leaking the
 verified claims themselves.</p>
-<p>The same per-claim verdicts are projected into a 6-dim <strong>failure
-fingerprint</strong> that the <a href="evolution-engine.html#behaviour-descriptor-failure-fingerprint">evolution engine</a>
-uses as the behaviour descriptor for QD novelty. The descriptor is
-centered so overall quality cannot leak into novelty — see the firewall
-section below.</p>
+<p>The same per-claim verdicts are also projected into a 6-dim <strong>failure
+fingerprint</strong> — a centered vector of per-source pass rates that records
+<em>how</em> a run failed. It is persisted as a diagnostic but is <strong>not</strong> the QD
+behaviour descriptor: novelty is measured in genotype-embedding space
+(see <a href="evolution-engine.html#behaviour-descriptor-genotype-embedding">Selection</a>).</p>
 <p><img alt="Evaluation pipeline" src="../images/evaluation_pipeline.png" width="100%" /></p>
 <h2 id="the-pipeline">The pipeline<a class="headerlink" href="#the-pipeline" title="Permanent link">&para;</a></h2>
 <p>The verifier runs four stages per workflow run:</p>
@@ -2235,8 +2235,8 @@ section below.</p>
    small Python program that recomputes the asserted value from workspace
    files (the default path), or renders a soft LLM verdict when no
    deterministic check is possible.</li>
-<li><strong>Aggregation</strong> — per-claim scores combine into <code>overall_score</code> with a
-   saturating thoroughness bonus and a hard-fail cap.</li>
+<li><strong>Aggregation</strong> — per-claim scores combine into <code>overall_score</code> as an
+   importance-weighted mean with a hard-fail cap.</li>
 <li><strong>Prompt gradient</strong> — a plain-language summary of failure modes, the
    <strong>only</strong> signal that reaches the mutator. It does not name claims,
    scores, or sources, so the mutator cannot turn the verified-claim
@@ -2336,49 +2336,51 @@ previews and literature grounding, with three outcomes:</p>
 </div>
 </div>
 <h2 id="aggregation">Aggregation<a class="headerlink" href="#aggregation" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">base_mean</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">score</span> <span class="k">for</span> <span class="n">each</span> <span class="n">non</span><span class="o">-</span><span class="n">error</span> <span class="n">claim</span><span class="p">)</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">bonus</span>     <span class="o">=</span> <span class="n">α</span> <span class="err">·</span> <span class="p">(</span><span class="mi">1</span> <span class="err">−</span> <span class="n">exp</span><span class="p">(</span><span class="err">−</span><span class="n">n_hard_pass</span> <span class="o">/</span> <span class="n">β</span><span class="p">))</span>      <span class="c1"># α=0.05, β=8</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">pre_cap</span>   <span class="o">=</span> <span class="n">clamp</span><span class="p">(</span><span class="n">base_mean</span> <span class="o">+</span> <span class="n">bonus</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">overall_score</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">pre_cap</span><span class="p">,</span> <span class="n">hard_fail_cap</span><span class="p">)</span> <span class="k">if</span> <span class="n">any_hard_claim_refuted</span> <span class="k">else</span> <span class="n">pre_cap</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">base_mean</span> <span class="o">=</span> <span class="n">importance_weighted_mean</span><span class="p">(</span><span class="n">score</span> <span class="k">for</span> <span class="n">each</span> <span class="n">non</span><span class="o">-</span><span class="n">error</span> <span class="n">claim</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">pre_cap</span>   <span class="o">=</span> <span class="n">clamp</span><span class="p">(</span><span class="n">base_mean</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">overall_score</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">pre_cap</span><span class="p">,</span> <span class="n">hard_fail_cap</span><span class="p">)</span> <span class="k">if</span> <span class="n">any_hard_claim_refuted</span> <span class="k">else</span> <span class="n">pre_cap</span>
 </span></code></pre></div>
 <ul>
-<li><code>α = _INFO_BONUS_ALPHA = 0.05</code>, <code>β = _INFO_BONUS_BETA = 8.0</code> —
-  saturating reward for thoroughness, conditioned on <em>passing hard</em>
-  claims so trivial or failed claims contribute nothing.</li>
+<li>Per-claim weights come from the rater-assigned importance (1–10), so an
+  importance-10 deliverable claim moves the score ~5× more than a
+  low-importance hygiene claim.</li>
 <li><code>hard_fail_cap = _HARD_FAIL_CAP = 0.99</code> — currently set permissively
   to keep the evolutionary signal smooth; a refuted hard claim still
   flags <code>hard_fail_capped = True</code>.</li>
 <li>The engine separately keeps <code>overall_score_uncapped</code> (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.</li>
 </ul>
-<h2 id="failure-fingerprint-qd-behaviour-descriptor">Failure fingerprint (QD behaviour descriptor)<a class="headerlink" href="#failure-fingerprint-qd-behaviour-descriptor" title="Permanent link">&para;</a></h2>
-<p>The verifier doesn't just emit a score — the same per-claim verdicts feed
-the QD novelty signal as a <strong>failure fingerprint</strong>: a centered vector
-of per-source pass rates that tells the archive <em>how</em> a candidate fails,
-not <em>whether</em> it failed.</p>
+<h2 id="failure-fingerprint-diagnostic">Failure fingerprint (diagnostic)<a class="headerlink" href="#failure-fingerprint-diagnostic" title="Permanent link">&para;</a></h2>
+<p>The verifier also projects the same per-claim verdicts into a <strong>failure
+fingerprint</strong>: a centered vector of per-source pass rates that records
+<em>how</em> a candidate fails, not <em>whether</em> it failed.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Per source A..F (six entries, always — absent sources get a neutral value).</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">=</span> <span class="n">passes</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">/</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>              <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.5</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>  <span class="o">=</span> <span class="mf">1.0</span>                                <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.0</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Center so the descriptor encodes profile shape, not quality level.</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Center so the vector encodes profile shape, not quality level.</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">mean_present</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="n">where</span> <span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">vector</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>    <span class="o">=</span> <span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">-</span> <span class="n">mean_present</span>       <span class="k">if</span> <span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>             <span class="o">=</span> <span class="mi">0</span>                                  <span class="n">otherwise</span>
 </span></code></pre></div>
-<p><strong>The quality firewall.</strong> An all-pass run and an all-fail run both yield
-the zero profile. This is intended and asserted in the tests
-(<code>test_all_pass_yields_zero_profile</code>,
-<code>test_all_fail_yields_zero_profile</code>). The QD score combines quality and
-novelty <em>additively</em> — <code>(1 − w)·quality_norm + w·novelty_norm</code> — so
-quality already drives <code>quality_norm</code>. If quality also leaked into
-novelty, QD would collapse back into greedy search. The centering step
-is what keeps these two terms separable.</p>
-<p>The fingerprint is persisted under
-<code>state_result.json</code> → <code>evaluation.verifier.failure_fingerprint.vector</code>
-and consumed by
-<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py"><code>SelectionPressure._extract_behaviour_descriptor</code></a>.
-Full info-flow audit:
-<a href="../info-flow/failure_fingerprint.html"><code>docs/info-flow/failure_fingerprint.md</code></a>.</p>
+<p>Centering means an all-pass run and an all-fail run both collapse to the
+zero profile (asserted by <code>test_all_pass_yields_zero_profile</code> and
+<code>test_all_fail_yields_zero_profile</code>), so the vector captures the <em>shape</em>
+of which sources fail rather than the overall quality level.</p>
+<p>The fingerprint is computed by
+<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py"><code>compute_failure_fingerprint</code></a>
+at the end of <code>VerifierEvaluator.evaluate()</code> and persisted under
+<code>state_result.json</code> → <code>evaluation.verifier.failure_fingerprint</code>.</p>
+<blockquote>
+<p><strong>Diagnostic only — not the novelty descriptor.</strong> The QD behaviour
+descriptor is the <strong>genotype embedding</strong> of the workflow's source code,
+and novelty is cosine distance in that space (see
+<a href="evolution-engine.html#behaviour-descriptor-genotype-embedding">Selection</a>).
+<code>SelectionPressure</code> no longer reads the failure fingerprint; it remains
+persisted so failure profiles can be inspected offline.
+Full info-flow audit of the QD behaviour descriptor:
+<a href="../info-flow/genotype_embedding.html"><code>docs/info-flow/genotype_embedding.md</code></a>.</p>
+</blockquote>
 <h2 id="prompt-gradient">Prompt gradient<a class="headerlink" href="#prompt-gradient" title="Permanent link">&para;</a></h2>
 <p>After aggregation the verifier composes a single-sentence diagnosis (the
 <strong>prompt gradient</strong>) from the per-claim report and recent history of
@@ -2394,12 +2396,9 @@ mutator, and it is written so it does not leak the verified claims back:</p>
 <p>The intent is informational, not punitive: the mutator learns <em>what
 direction to push the workflow next</em> without being handed a vocabulary
 it can over-fit against.</p>
-<h2 id="cheat-detector-currently-disabled">Cheat detector (currently disabled)<a class="headerlink" href="#cheat-detector-currently-disabled" title="Permanent link">&para;</a></h2>
-<p>A standalone cheat detector pass over the agents' produced source code
-existed in earlier versions and is kept in the codebase but is currently
-<strong>disabled</strong> (<code>cheat = None</code>) pending a rewrite. The aggregation pipeline
-still supports a <code>cheat_penalty</code> field for when it is re-enabled. The
-behavioral anti-cheat pressure today comes from:</p>
+<h2 id="behavioral-pressure-against-shortcut-workflows">Behavioral pressure against shortcut workflows<a class="headerlink" href="#behavioral-pressure-against-shortcut-workflows" title="Permanent link">&para;</a></h2>
+<p>Pressure against shortcut or fabricated workflows comes from the
+verifier pipeline itself:</p>
 <ul>
 <li>Source C's recompute-from-disk verifiers.</li>
 <li>The "Used fallback" claim type, whose score is <em>inverted</em> — a passing

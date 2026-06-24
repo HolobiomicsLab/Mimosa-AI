@@ -58,21 +58,16 @@ flowchart TB
 
     %% ===== Stage 3: aggregation =====
     subgraph Aggregate["Stage 3 — aggregation"]
-        Mean["base_mean = mean(non-error claims)"]
-        Bonus["info_bonus = α·(1 − exp(−n_hard_pass / β))<br/>α=0.05, β=8 — saturates"]
+        Mean["base_mean = importance-weighted mean(non-error claims)"]
         Cap["hard-fail cap (0.99, soft):<br/>any refuted hard claim flags hard_fail_capped"]
-        Cheat["cheat_penalty<br/>(currently disabled — pending rewrite)"]
     end
 
     ScoreClaim --> Mean
-    ScoreClaim --> Bonus
     Mean --> Cap
-    Bonus --> Cap
-    Cap --> Cheat
 
     %% ===== Stage 4: abstracted prompt gradient =====
-    Cheat --> Overall["overall_score ∈ [0, 1]<br/>+ overall_score_uncapped<br/>(pre-cap, drives QD ranking)"]
-    Cheat --> Diag["Stage 4 — abstracted_prompt_gradient<br/>(rubric-blind code-name + sentence)<br/>→ only signal fed back to mutator"]
+    Cap --> Overall["overall_score ∈ [0, 1]<br/>+ overall_score_uncapped<br/>(pre-cap, drives QD ranking)"]
+    Cap --> Diag["Stage 4 — abstracted_prompt_gradient<br/>(rubric-blind code-name + sentence)<br/>→ only signal fed back to mutator"]
     Overall -. drives .-> Loop[/"EvolutionEngine.evolve_generation()"/]
     Diag -. drives .-> Loop
 

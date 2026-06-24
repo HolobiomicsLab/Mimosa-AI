@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://holobiomicslab.github.io/Mimosa-AI/info-flow/failure_fingerprint.html">
+        <link rel="canonical" href="https://holobiomicslab.github.io/Mimosa-AI/info-flow/astra-export.html">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Failure-fingerprint descriptor — info flow - Mimosa-AI</title>
+        <title>ASTRA post-run export — info flow - Mimosa-AI</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#failure-fingerprint-descriptor-info-flow" class="md-skip">
+        <a href="#astra-post-run-export-info-flow" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Failure-fingerprint descriptor — info flow
+              ASTRA post-run export — info flow
             
           </span>
         </div>
@@ -1857,10 +1857,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-a-separate-descriptor" class="md-nav__link">
+  <a href="#why-a-post-run-export" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why a separate descriptor
+        Why a post-run export
       
     </span>
   </a>
@@ -1868,10 +1868,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-signal-per-source-pass-rates" class="md-nav__link">
+  <a href="#entry-point" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The signal: per-source pass rates
+        Entry point
       
     </span>
   </a>
@@ -1879,10 +1879,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#centering-the-quality-firewall" class="md-nav__link">
+  <a href="#variables-that-reach-the-llm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Centering: the quality firewall
+        Variables that reach the LLM
       
     </span>
   </a>
@@ -1890,10 +1890,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sources-of-variables" class="md-nav__link">
+  <a href="#heuristic-prefilter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sources of variables
+        Heuristic prefilter
       
     </span>
   </a>
@@ -1901,10 +1901,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#variable-inventory-audit-table" class="md-nav__link">
+  <a href="#output-construction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variable inventory (audit table)
+        Output construction
       
     </span>
   </a>
@@ -1912,10 +1912,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#failure-modes-the-audit-checks" class="md-nav__link">
+  <a href="#deduplication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failure modes the audit checks
+        Deduplication
       
     </span>
   </a>
@@ -1923,10 +1923,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#invariants-asserted" class="md-nav__link">
+  <a href="#caching" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Invariants (asserted)
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-captured-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is NOT captured (yet)
       
     </span>
   </a>
@@ -1961,245 +1972,171 @@
   
 
 
-<h1 id="failure-fingerprint-descriptor-info-flow">Failure-fingerprint descriptor — info flow<a class="headerlink" href="#failure-fingerprint-descriptor-info-flow" title="Permanent link">&para;</a></h1>
+<h1 id="astra-post-run-export-info-flow">ASTRA post-run export — info flow<a class="headerlink" href="#astra-post-run-export-info-flow" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Reader's note.</strong> This page is an info-flow audit, not a user-facing
-tutorial. It traces every variable that feeds the QD behaviour descriptor
-from its source to the point where novelty distance is computed.
-If you want to <em>understand</em> the descriptor, start with
-<a href="../concepts/evolution-engine.html"><code>concepts/evolution-engine.md</code></a> and
-<a href="../concepts/evaluation-pipeline.html"><code>concepts/evaluation-pipeline.md</code></a>.</p>
+tutorial. It traces every variable that reaches the decision-extraction
+LLM and every variable that ends up in the emitted ASTRA YAML.
+For the spec itself, see <a href="https://astra-spec.org/latest/specification/">https://astra-spec.org/latest/specification/</a>.</p>
 </blockquote>
-<h2 id="why-a-separate-descriptor">Why a separate descriptor<a class="headerlink" href="#why-a-separate-descriptor" title="Permanent link">&para;</a></h2>
-<p>QD selection compares candidates with two scalars:</p>
-<ul>
-<li><strong>quality</strong> — <code>reward_uncapped</code>, i.e. how well the workflow scored.</li>
-<li><strong>novelty</strong> — k-NN distance in <em>behaviour-descriptor space</em> to the
-  rest of the archive.</li>
-</ul>
-<p>The descriptor must be <strong>orthogonal to quality</strong>. If it isn't, novelty
-becomes a noisy restatement of quality and QD collapses back into greedy
-search. The previous structural descriptor
-(<code>[n_agents, n_edges, n_branches, prompt_chars]</code>) was nominally
-orthogonal but barely co-varied with outcomes — different DAG shapes did
-not predict different basins. The failure fingerprint replaces it.</p>
-<h2 id="the-signal-per-source-pass-rates">The signal: per-source pass rates<a class="headerlink" href="#the-signal-per-source-pass-rates" title="Permanent link">&para;</a></h2>
-<p>The verifier extracts claims from six independent vantage points:</p>
+<h2 id="why-a-post-run-export">Why a post-run export<a class="headerlink" href="#why-a-post-run-export" title="Permanent link">&para;</a></h2>
+<p>ASTRA captures <em>why</em> a scientific analysis is the way it is — the
+methodological choices a reviewer would scrutinize. Mimosa's evolution loop
+produces a single best workflow and runs an agent over it; the reasoning
+behind each step lives in the smolagents memory trace, not in any declared
+schema. The exporter walks the best run's memory after the evolution loop
+finishes and surfaces those decisions into a standards-compliant YAML pair
+written next to the analysis artefacts.</p>
+<p>The export is <strong>post-run only</strong> — wiring decision tracking into the
+evolution loop itself would touch every agent, prompt, and runner. After
+the fact, with the trace already on disk, the operation is local and
+non-fatal: a failed export must never break the evolution loop.</p>
+<h2 id="entry-point">Entry point<a class="headerlink" href="#entry-point" title="Permanent link">&para;</a></h2>
+<p>The exporter is invoked from
+<a href="../../sources/core/evolution_engine.py"><code>sources/core/evolution_engine.py</code></a>
+in <code>start_workflow_evolution</code>, immediately after
+<code>workspace_mgr.restore_best(best_run.current_uuid)</code>. The call is gated on
+<code>config.export_astra</code> (opt-in, off by default).</p>
+<p>Output target: <code>&lt;config.runs_capsule_dir&gt;/&lt;best_uuid&gt;/astra.yaml</code> plus
+<code>&lt;config.runs_capsule_dir&gt;/&lt;best_uuid&gt;/universes/best.yaml</code>. The best
+run's UUID is used as the capsule subfolder name — stable, deterministic,
+matches the <code>sources/memory/&lt;uuid&gt;</code> convention — and intentionally
+independent of the LLM-named goal capsule that <code>LocalTransfer</code> produces
+later.</p>
+<p>Failure of the export is logged via <code>print_warn</code> and the engine continues.</p>
+<h2 id="variables-that-reach-the-llm">Variables that reach the LLM<a class="headerlink" href="#variables-that-reach-the-llm" title="Permanent link">&para;</a></h2>
+<p>The extraction prompt template lives at
+<a href="../../sources/transparency/prompts/decision_extraction.md"><code>sources/transparency/prompts/decision_extraction.md</code></a>.
+For each surviving (post-prefilter) step, the prompt receives these
+variables — and nothing else:</p>
 <table>
 <thead>
 <tr>
-<th>Letter</th>
-<th>Vantage</th>
+<th>Variable</th>
+<th>Source</th>
+<th>Why it's needed</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>A</td>
-<td>Literature / methodology bar</td>
+<td><code>goal</code></td>
+<td><code>start_workflow_evolution(goal)</code> argument</td>
+<td>Lets the LLM tell methodology from goal-irrelevant scaffolding</td>
 </tr>
 <tr>
-<td>B</td>
-<td>User goal / deliverable fidelity</td>
+<td><code>step_index</code></td>
+<td>Position of the step in the compacted trace</td>
+<td>Provenance — surfaces in <code>Decision.source_step</code></td>
 </tr>
 <tr>
-<td>C</td>
-<td>Agent narration truthfulness (recompute-from-disk)</td>
+<td><code>reasoning</code></td>
+<td><code>step.model_output_message.content</code> (str or text chunks)</td>
+<td>The agent's natural-language justification, where the decision is voiced</td>
 </tr>
 <tr>
-<td>D</td>
-<td>Math invariants</td>
+<td><code>code</code></td>
+<td><code>step.action_output</code> (fallback: code block in reasoning)</td>
+<td>The concrete chosen option as executed</td>
 </tr>
 <tr>
-<td>E</td>
-<td>Computational reproducibility / CS practice</td>
-</tr>
-<tr>
-<td>F</td>
-<td>Statistical fingerprint</td>
+<td><code>observation</code></td>
+<td><code>step.observations</code> truncated to 1200 chars</td>
+<td>Disambiguates whether the step succeeded or recovered</td>
 </tr>
 </tbody>
 </table>
-<p>Each claim is verified to one of <code>pass</code>, <code>fail</code>, <code>error</code>, <code>unsure</code>.</p>
-<p><strong>Per source</strong>, the fingerprint takes the pass rate:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pass_rate[s] = (# claims with status == &quot;pass&quot; and source == s) / (# claims with source == s)
-</span></code></pre></div>
-<p><code>fail</code>, <code>error</code>, and <code>unsure</code> all count as non-passes — a measurement
-error is still a non-pass from the optimiser's perspective, and quality
-already penalises errors via <code>quality_norm</code>.</p>
-<h2 id="centering-the-quality-firewall">Centering: the quality firewall<a class="headerlink" href="#centering-the-quality-firewall" title="Permanent link">&para;</a></h2>
-<p>Per source pass rates <strong>alone</strong> would leak quality into novelty (an
-all-pass run would sit at <code>[1,1,1,1,1,1]</code>, an all-fail one at
-<code>[0,0,0,0,0,0]</code>, and their Euclidean distance would be large). To strip
-quality out, we subtract the mean pass rate across present sources from
-every entry:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mean_present = mean(pass_rate[s] for s in SOURCES if presence_mask[s])
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>vector[s]    = pass_rate[s] - mean_present     if presence_mask[s]
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>             = 0                               otherwise
-</span></code></pre></div>
-<p>The descriptor now encodes the <em>profile shape</em> of which sources fail
-relative to the others — NOT the overall quality level. An all-pass run
-and an all-fail run <strong>both</strong> yield the zero profile. This is the
-<em>quality firewall</em> — and it is asserted in
-<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/tests/failure_fingerprint_test.py"><code>tests/failure_fingerprint_test.py</code></a>
-by <code>test_all_pass_yields_zero_profile</code> and <code>test_all_fail_yields_zero_profile</code>.</p>
-<p>A run that fails source A but passes the others looks <em>very different</em>
-from a run that fails source D but passes the others. Both might be
-mediocre on quality, and both deserve a seat in the archive because each
-one explores a different basin of failure modes.</p>
-<h2 id="sources-of-variables">Sources of variables<a class="headerlink" href="#sources-of-variables" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>   workflow run               │ VerifierEvaluator.evaluate()       │
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>   ──────────────►            │   per_claim = list of:             │
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>   uuid, code,                │     {&quot;claim&quot;: {&quot;source&quot;: &quot;source_X&quot;},
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>   execution_text             │      &quot;status&quot;: &quot;pass&quot; | &quot;fail&quot; | ..}
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                              └─────────────┬──────────────────────┘
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                                            │
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                                            ▼
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>                              │ failure_fingerprint                │
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>                              │   .compute_failure_fingerprint     │
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>                              │     -&gt; {vector, presence_mask,     │
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>                              │         pass_rates}                │
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>                              └─────────────┬──────────────────────┘
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                                            │
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>                                            │ persisted in scores dict
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                                            ▼
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>                              │ state_result.json                  │
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>                              │   evaluation.verifier              │
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>                              │     .failure_fingerprint           │
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>                              │       .vector       (list[float], len 6)
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>                              │       .presence_mask (list[float], len 6)
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>                              │       .pass_rates    (list[float], len 6)
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>                              └─────────────┬──────────────────────┘
-</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>                                            │
-</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>                                            │ EvolutionEngine reads via
-</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>                                            │ WorkflowInfo.state_result
-</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>                                            ▼
-</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>                              │ IndividualRun.state_result         │
-</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>                              └─────────────┬──────────────────────┘
-</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>                                            │
-</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>                                            ▼
-</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>                              │ SelectionPressure                  │
-</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>                              │   ._extract_behaviour_descriptor   │
-</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>                              │     → failure_fingerprint_from_    │
-</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>                              │        state_result(run.state_result)
-</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>                              │     → falls back to                │
-</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>                              │        neutral_fingerprint() when  │
-</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>                              │        verifier hasn&#39;t written one │
-</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>                              └─────────────┬──────────────────────┘
-</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>                                            │
-</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>                                            ▼
-</span><span id="__span-2-46"><a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>                              ┌────────────────────────────────────┐
-</span><span id="__span-2-47"><a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a>                              │ k-NN novelty in 6-D space          │
-</span><span id="__span-2-48"><a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a>                              │   PopulationMember.behaviour_      │
-</span><span id="__span-2-49"><a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a>                              │   descriptor                       │
-</span><span id="__span-2-50"><a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a>                              └────────────────────────────────────┘
-</span></code></pre></div>
-<h2 id="variable-inventory-audit-table">Variable inventory (audit table)<a class="headerlink" href="#variable-inventory-audit-table" title="Permanent link">&para;</a></h2>
+<p>Variables that are deliberately <strong>not</strong> passed:</p>
+<ul>
+<li><code>model_input_messages</code> — re-serialises the entire prior conversation on
+  every step. Stripped in <a href="../../sources/transparency/trace_compaction.py"><code>trace_compaction.compact_step</code></a>.
+  This is the dominant token-cost saving, usually ≥80% of the raw file.</li>
+<li>Workspace file contents — the <em>names</em> of output files reach the YAML
+  builder, but never the LLM. Decisions live in the reasoning, not the
+  artefacts.</li>
+<li>Other runs from the evolution — only the best run's memory is read.</li>
+</ul>
+<h2 id="heuristic-prefilter">Heuristic prefilter<a class="headerlink" href="#heuristic-prefilter" title="Permanent link">&para;</a></h2>
+<p><code>is_methodological_candidate</code> in <code>trace_compaction.py</code> drops steps whose
+code is entirely matched by mechanical patterns: <code>import</code>, <code>pd.read_*</code>,
+<code>open()</code>, <code>plt.*</code>, <code>subprocess.*</code>, <code>pip install</code>, <code>print(...)</code>. A step
+survives if at least one non-mechanical line of code or non-empty
+reasoning is present. This typically halves what reaches the LLM.</p>
+<h2 id="output-construction">Output construction<a class="headerlink" href="#output-construction" title="Permanent link">&para;</a></h2>
+<p>After extraction, <code>yaml_writer.build_analysis</code> populates the ASTRA
+analysis dict:</p>
 <table>
 <thead>
 <tr>
-<th>Symbol</th>
-<th>Type</th>
-<th>Set by</th>
-<th>Read by</th>
-<th>Notes</th>
+<th>ASTRA field</th>
+<th>Source</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>per_claim[i]["claim"]["source"]</code></td>
-<td>str</td>
-<td><code>verifier_claims._extract_claims</code></td>
-<td><code>compute_failure_fingerprint</code></td>
-<td>Normalised to <code>a</code>..<code>f</code> via <code>_source_letter</code>.</td>
+<td><code>version</code></td>
+<td>Constant <code>0.1</code></td>
 </tr>
 <tr>
-<td><code>per_claim[i]["status"]</code></td>
-<td>str</td>
-<td><code>verifier_per_claim._verify_claim</code></td>
-<td><code>compute_failure_fingerprint</code></td>
-<td>One of <code>pass</code>/<code>fail</code>/<code>error</code>/<code>unsure</code>.</td>
+<td><code>name</code></td>
+<td><code>"Mimosa best run &lt;best_uuid&gt;"</code></td>
 </tr>
 <tr>
-<td><code>pass_rates</code></td>
-<td><code>list[float]</code> (len 6)</td>
-<td><code>compute_failure_fingerprint</code></td>
-<td>Persisted; debugging only.</td>
-<td>Neutral 0.5 when source absent.</td>
+<td><code>description</code></td>
+<td>Constant, indicates the post-run extraction provenance</td>
 </tr>
 <tr>
-<td><code>presence_mask</code></td>
-<td><code>list[float]</code> (len 6)</td>
-<td><code>compute_failure_fingerprint</code></td>
-<td>Persisted; debugging only.</td>
-<td><code>1.0</code> iff source emitted ≥1 claim.</td>
+<td><code>inputs[0]</code></td>
+<td><code>task_description</code> derived from the user <code>goal</code></td>
 </tr>
 <tr>
-<td><code>vector</code></td>
-<td><code>list[float]</code> (len 6)</td>
-<td><code>compute_failure_fingerprint</code></td>
-<td><code>_extract_behaviour_descriptor</code> → k-NN</td>
-<td>The centered descriptor; <strong>the QD signal</strong>.</td>
+<td><code>outputs[i]</code></td>
+<td>Each top-level file in the artefacts directory — prefers <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code> (the canonical snapshot), falls back to <code>config.workspace_dir</code>. See <code>AstraExporter._resolve_artefacts_dir</code>.</td>
 </tr>
 <tr>
-<td><code>state_result.evaluation.verifier.failure_fingerprint</code></td>
-<td>dict</td>
-<td><code>VerifierEvaluator.evaluate</code> / <code>_short_circuit_failed_run</code></td>
-<td><code>failure_fingerprint_from_state_result</code></td>
-<td>Persisted in <code>state_result.json</code>.</td>
+<td><code>outputs[i].decisions</code></td>
+<td>All decision IDs surfaced from the trace</td>
 </tr>
 <tr>
-<td><code>IndividualRun.state_result</code></td>
-<td>dict</td>
-<td><code>EvolutionEngine._evaluate_and_calculate_cost</code></td>
-<td><code>SelectionPressure._extract_behaviour_descriptor</code></td>
-<td>Carries the fingerprint into selection.</td>
+<td><code>outputs[i].recipe.command</code></td>
+<td>Pointer to the memory trace (Mimosa does not run as a single CLI command)</td>
 </tr>
 <tr>
-<td><code>PopulationMember.behaviour_descriptor</code></td>
-<td><code>list[float]</code> (len 6)</td>
-<td><code>SelectionPressure._validate_open_ended</code></td>
-<td><code>_compute_novelty</code></td>
-<td>Snapshot of the fingerprint at admission time.</td>
+<td><code>decisions[d.id]</code></td>
+<td>One entry per deduped surfaced decision</td>
 </tr>
 <tr>
-<td><code>qd_score</code></td>
-<td>float</td>
-<td><code>SelectionPressure._validate_open_ended</code> and <code>_refresh_member_metrics</code></td>
-<td>parent draw, archive eviction</td>
-<td><code>(1 − w)·quality_norm + w·novelty_norm</code>; quality and novelty are <em>additive</em>, never multiplied.</td>
+<td><code>decisions[d.id].rationale</code></td>
+<td>LLM-extracted from the step's reasoning</td>
+</tr>
+<tr>
+<td><code>decisions[d.id].options</code></td>
+<td>Single-option map keyed by <code>d.option_id</code> (Mimosa picks one option, doesn't enumerate alternatives)</td>
 </tr>
 </tbody>
 </table>
-<h2 id="failure-modes-the-audit-checks">Failure modes the audit checks<a class="headerlink" href="#failure-modes-the-audit-checks" title="Permanent link">&para;</a></h2>
+<p>The companion universe file
+(<code>universes/best.yaml</code>) is a flat <code>{decision_id: option_id}</code> map matching
+the realised configuration.</p>
+<h2 id="deduplication">Deduplication<a class="headerlink" href="#deduplication" title="Permanent link">&para;</a></h2>
+<p>Decisions are keyed by <code>Decision.id</code>. If two steps surface the same
+decision (e.g. the agent re-justifies a choice late in the trace), the
+first occurrence wins and <code>source_step</code> records which step it came from.
+This is a deliberate v1 simplification — multi-option enumeration is
+deferred until reviewers actually ask for it.</p>
+<h2 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h2>
+<p>Each per-step LLM call uses <code>LLMProvider</code> with <code>agent_name =
+f"astra_decision_step_{i}"</code> and <code>memory_path = sources/memory/&lt;best_uuid&gt;</code>.
+Cache hits are deterministic on the prompt content, so re-running the
+export on the same best run incurs zero new LLM cost.</p>
+<h2 id="what-is-not-captured-yet">What is NOT captured (yet)<a class="headerlink" href="#what-is-not-captured-yet" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>No claims at all</strong> (verifier short-circuit): the run gets the zero
-  vector and zero presence mask. Distance to peers stays finite; the
-  cold run isn't pushed to admit or reject solely on novelty.</li>
-<li><strong>Source F absent in practice</strong> (the current code wires sources A–E):
-  <code>presence_mask[5]</code> stays <code>0.0</code>; the centering step ignores that axis;
-  distance lookups remain well-defined.</li>
-<li><strong>Unknown source label</strong>: dropped silently by <code>_source_letter</code>. No
-  out-of-band claim can pollute a bucket.</li>
-<li><strong>Mismatched descriptor length across archive members</strong>: only happens
-  during a schema upgrade; <code>_euclidean</code> returns <code>+inf</code> as a sentinel and
-  <code>_novelty_range</code> clamps the normalisation. We recommend draining the
-  archive when the dim changes — the descriptor dim is now a stable 6.</li>
-</ul>
-<h2 id="invariants-asserted">Invariants (asserted)<a class="headerlink" href="#invariants-asserted" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>len(vector) == DESCRIPTOR_DIM == 6</code>.</li>
-<li>All-pass and all-fail yield <code>[0]*6</code> (<code>test_all_pass_yields_zero_profile</code>, <code>test_all_fail_yields_zero_profile</code>).</li>
-<li>Two runs with the same per-source pass rates yield the <strong>same</strong> vector,
-  regardless of overall reward — distance is <code>0</code>, so the second is treated
-  as redundant.</li>
-<li>Two runs with opposite shape (a-pass-b-fail vs a-fail-b-pass) yield
-  vectors that mirror each other through the origin
-  (<code>test_distinct_profiles_yield_nonzero_distance</code>).</li>
+<li><strong>Cross-decision dependencies</strong> (<code>requires</code>, <code>incompatible_with</code>) —
+  the trace doesn't encode them; would need a second LLM pass.</li>
+<li><strong>Alternatives considered</strong> (multi-option <code>options</code>) — the agent
+  usually picks one; back-filling alternatives is honest only if grounded
+  in the trace.</li>
+<li><strong><code>tags</code>, <code>when</code>, <code>from</code></strong> — ASTRA optional fields; not used in v1.</li>
+<li><strong><code>insights</code></strong> — ASTRA's prior-insight links; out of scope.</li>
 </ul>
 
 
