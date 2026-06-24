@@ -234,7 +234,7 @@ must scan for, regardless of how the goal is labelled or sectioned:
 
 When DATASET PREVIEW or an explicit output path is present, emit the exact-name and exact-path claims FIRST, before any concept paraphrases.
 Numeric thresholds or cut-offs in the goal (e.g. `>= 0.6`, `top-10`, `5.5km`, `>280K`) are also literal identifiers — emit one claim per value, quoted verbatim, before any paraphrase.
-"The output includes a SMILES column" (concept) and "The output header equals `['smiles','FDA_APPROVED','CT_TOX']`" (exact) are DIFFERENT claims and you should emit BOTH when both are extractable from the goal.
+"The output includes a primary-key column" (concept) and "The output header equals `['record_id','value_a','value_b']`" (exact) are DIFFERENT claims and you should emit BOTH when both are extractable from the goal.
 
 If an example is truncated (ends with `...`, contains `[truncated]`, or
 shows only a partial row), emit a weaker positional claim instead:
