@@ -267,26 +267,49 @@ Combined with `evolution_prompt_<uuid>.md` (the exact LLM prompt used),
 runs are fully reproducible — same prompt, same code path, same seed
 yields the same code.
 
-## Visualisations
+## Watching evolution happen
 
-When the loop finishes, Mimosa emits two artifacts in
-`sources/workflows/<uuid>/`:
+The Rechenberg schedule, the directive-LLM, the QD archive, the
+crossover roll — none of it is visible inside a single generation. The
+shape of the search only emerges when you step back across a whole
+run, which is what the two end-of-run PNGs in
+`sources/workflows/<best_uuid>/` are for. They tell the same story
+twice — once as time series, once as topology — and that's the
+clearest way to confirm the mechanics on this page are doing
+something on your task.
 
-- `reward_progress.png` — reward over iterations.
-- `evolution_tree.png` — rendered lineage tree.
+The reward curve is the schedule's footprint over time. Below is a
+real Clintox toxicity-prediction run: the first three generations sit
+near zero (the verifier rejects the workflow's outputs) and the
+plateau counter ratchets up; `_get_prompt_step_size` widens the agent
+budget and pushes the directive-LLM out of "tweak phrasing" into
+component-overhaul scope; iteration 5 lands a workflow that clears the
+verifier and the score jumps from ~0.30 to ~0.97 in a single step.
+That breakthrough is exactly the Rechenberg case the schedule is
+designed for — sustained `success_rate = 0` triggering an
+EXPLORATION-band mutation that finally escapes the basin.
 
 ![Reward progress example](../images/evolve_example.png){ width="80%" }
 
+The same story rearranged by parentage is the lineage tree.
+Generation depth runs down the y-axis, each node is a workflow
+coloured by its `overall_score` (red → green), solid edges are
+mutation parents and dashed edges are crossover parents. Failed runs
+appear as labelled red nodes off the main trunk, kept in the picture
+so you can see *where* a branch died, not just that it did. Read
+top-down to follow the ratchet — a 0.48 seed branching into 0.64 and
+0.62 children, those crossing over into the 0.67/0.69 generation,
+then a 0.73 mutation finally bridging into a 0.74 leaf — and watch
+for the dashed edges that span the tree horizontally: those are the
+recombinations that pulled in a structural idea the local mutation
+chain wouldn't have reached on its own.
+
 ![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 
-The lineage tree plots one node per workflow, depth on the y-axis,
-node colour by `overall_score` (red → green), solid edges for mutation
-parents and dashed edges for crossover parents. Failed runs appear as
-labelled red nodes off the main trunk. Read top-down to follow how the
-search ratcheted from a mediocre seed to a higher-scoring descendant,
-and look for crossover edges joining two distant branches — those are
-the recombinations that pulled in a structural idea the mutation
-chain wouldn't have reached on its own.
+Together the two views give you the diagnostic loop most often
+needed: the curve tells you *whether* the schedule found a
+breakthrough, the tree tells you *which* operator and which lineage
+produced it.
 
 ## Run metrics artifacts
 

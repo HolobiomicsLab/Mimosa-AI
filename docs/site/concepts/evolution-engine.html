@@ -948,10 +948,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#visualisations" class="md-nav__link">
+  <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
-      
-        Visualisations
+
+        Watching evolution happen
       
     </span>
   </a>
@@ -2146,10 +2146,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#visualisations" class="md-nav__link">
+  <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
-      
-        Visualisations
+
+        Watching evolution happen
       
     </span>
   </a>
@@ -2505,23 +2505,43 @@ with the parents and the operator used (<code>seed | mutation | crossover</code>
 Combined with <code>evolution_prompt_&lt;uuid&gt;.md</code> (the exact LLM prompt used),
 runs are fully reproducible — same prompt, same code path, same seed
 yields the same code.</p>
-<h2 id="visualisations">Visualisations<a class="headerlink" href="#visualisations" title="Permanent link">&para;</a></h2>
-<p>When the loop finishes, Mimosa emits two artifacts in
-<code>sources/workflows/&lt;uuid&gt;/</code>:</p>
-<ul>
-<li><code>reward_progress.png</code> — reward over iterations.</li>
-<li><code>evolution_tree.png</code> — rendered lineage tree.</li>
-</ul>
+<h2 id="watching-evolution-happen">Watching evolution happen<a class="headerlink" href="#watching-evolution-happen" title="Permanent link">&para;</a></h2>
+<p>The Rechenberg schedule, the directive-LLM, the QD archive, the
+crossover roll — none of it is visible inside a single generation. The
+shape of the search only emerges when you step back across a whole
+run, which is what the two end-of-run PNGs in
+<code>sources/workflows/&lt;best_uuid&gt;/</code> are for. They tell the same story
+twice — once as time series, once as topology — and that's the
+clearest way to confirm the mechanics on this page are doing
+something on your task.</p>
+<p>The reward curve is the schedule's footprint over time. Below is a
+real Clintox toxicity-prediction run: the first three generations sit
+near zero (the verifier rejects the workflow's outputs) and the
+plateau counter ratchets up; <code>_get_prompt_step_size</code> widens the agent
+budget and pushes the directive-LLM out of "tweak phrasing" into
+component-overhaul scope; iteration 5 lands a workflow that clears the
+verifier and the score jumps from ~0.30 to ~0.97 in a single step.
+That breakthrough is exactly the Rechenberg case the schedule is
+designed for — sustained <code>success_rate = 0</code> triggering an
+EXPLORATION-band mutation that finally escapes the basin.</p>
 <p><img alt="Reward progress example" src="../images/evolve_example.png" width="80%" /></p>
-<p><img alt="Evolution tree example" src="../images/evolution_tree.png" width="60%" /></p>
-<p>The lineage tree plots one node per workflow, depth on the y-axis,
-node colour by <code>overall_score</code> (red → green), solid edges for mutation
-parents and dashed edges for crossover parents. Failed runs appear as
-labelled red nodes off the main trunk. Read top-down to follow how the
-search ratcheted from a mediocre seed to a higher-scoring descendant,
-and look for crossover edges joining two distant branches — those are
-the recombinations that pulled in a structural idea the mutation
+<p>The same story rearranged by parentage is the lineage tree.
+Generation depth runs down the y-axis, each node is a workflow
+coloured by its <code>overall_score</code> (red → green), solid edges are
+mutation parents and dashed edges are crossover parents. Failed runs
+appear as labelled red nodes off the main trunk, kept in the picture
+so you can see <em>where</em> a branch died, not just that it did. Read
+top-down to follow the ratchet — a 0.48 seed branching into 0.64 and
+0.62 children, those crossing over into the 0.67/0.69 generation,
+then a 0.73 mutation finally bridging into a 0.74 leaf — and watch
+for the dashed edges that span the tree horizontally: those are the
+recombinations that pulled in a structural idea the local mutation
 chain wouldn't have reached on its own.</p>
+<p><img alt="Evolution tree example" src="../images/evolution_tree.png" width="60%" /></p>
+<p>Together the two views give you the diagnostic loop most often
+needed: the curve tells you <em>whether</em> the schedule found a
+breakthrough, the tree tells you <em>which</em> operator and which lineage
+produced it.</p>
 <h2 id="run-metrics-artifacts">Run metrics artifacts<a class="headerlink" href="#run-metrics-artifacts" title="Permanent link">&para;</a></h2>
 <p>Each iteration also writes structured metrics for post-hoc analysis:</p>
 <ul>
