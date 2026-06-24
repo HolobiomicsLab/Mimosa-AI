@@ -33,12 +33,17 @@ if __name__ == "__main__":
     )
 
 from sources.transparency.decision_extractor import extract_decisions
+from sources.transparency.memory_trace import RECIPE_FILENAME, reconstruct_recipe
 from sources.transparency.trace_compaction import compact_trace, load_trace
 from sources.transparency.yaml_writer import (
     build_analysis,
     build_universe,
     write_export,
 )
+
+
+# Names never worth listing as scientific outputs.
+_ARTEFACT_IGNORE = {".DS_Store", "Thumbs.db", ".gitkeep", RECIPE_FILENAME}
 
 
 class AstraExporter:
@@ -86,11 +91,29 @@ class AstraExporter:
         if artefacts_dir != workspace_dir:
             print_info(f"Reading artefacts from /tmp snapshot: {artefacts_dir}")
         workspace_files = self._list_workspace_files(artefacts_dir)
-        analysis = build_analysis(goal, best_uuid, workspace_files, decisions)
+
+        recipe_command = self._write_recipe(capsule_dir, memory_path)
+        analysis = build_analysis(
+            goal, best_uuid, workspace_files, decisions, recipe_command
+        )
         universe = build_universe(decisions, best_uuid)
         path = write_export(capsule_dir, analysis, universe)
         print_ok(f"ASTRA analysis written to {path}")
         return path
+
+    def _write_recipe(self, capsule_dir: Path, memory_path: Path) -> str:
+        """Reconstruct the run's code into ``recipe.py`` and return its command.
+
+        Falls back to a pointer command when no executable code was recovered,
+        so the analysis stays valid for runs that produced no code steps.
+        """
+        from sources.transparency.yaml_writer import _RECIPE_FALLBACK_COMMAND
+        code = reconstruct_recipe(memory_path)
+        if not code.strip():
+            return _RECIPE_FALLBACK_COMMAND
+        capsule_dir.mkdir(parents=True, exist_ok=True)
+        (capsule_dir / RECIPE_FILENAME).write_text(code)
+        return f"python {RECIPE_FILENAME}"
 
     def _build_llm_config(self):
         """Reuse the project's judge model for cheap structured extraction."""
@@ -119,13 +142,13 @@ class AstraExporter:
         return workspace_dir
 
     def _list_workspace_files(self, workspace_dir: Path) -> list[str]:
-        """Top-level files in the restored workspace, sorted, excluding our own output."""
+        """Top-level artefact files, sorted; drops our own output and OS junk."""
         if not workspace_dir.is_dir():
             return []
-        excluded = {"astra.yaml", "universes"}
+        excluded = {"astra.yaml", "universes"} | _ARTEFACT_IGNORE
         return sorted(
             p.name for p in workspace_dir.iterdir()
-            if p.is_file() and p.name not in excluded
+            if p.is_file() and p.name not in excluded and not p.name.startswith(".")
         )
 
 
@@ -169,10 +192,12 @@ def _run_smoke_check() -> None:
         workspace_dir.mkdir()
         capsule_dir.mkdir()
         (workspace_dir / "model.pkl").write_text("fake")
+        (workspace_dir / ".DS_Store").write_text("junk")
         (memory_dir / run_uuid / "task_single_agent.json").write_text(json.dumps([
             {
+                "step_number": 1,
                 "model_output_message": {"content": "Plot."},
-                "action_output": "import matplotlib.pyplot as plt\nplt.savefig('x.png')",
+                "code_action": "import matplotlib.pyplot as plt\nplt.savefig('x.png')",
                 "observations": "saved",
             },
         ]))
@@ -183,10 +208,16 @@ def _run_smoke_check() -> None:
             judge_model="anthropic/claude-sonnet-4-5",
             openrouter_provider_for=lambda _m: None,
         )
-        AstraExporter(config)  # construction smoke
+        exporter = AstraExporter(config)
         compact = compact_trace(load_trace(memory_dir / run_uuid))
         assert compact == [], f"Mechanical step should be filtered, got {compact}"
-        analysis = build_analysis("smoke goal", run_uuid, ["model.pkl"], [])
+        files = exporter._list_workspace_files(workspace_dir)
+        assert files == ["model.pkl"], f".DS_Store should be dropped, got {files}"
+        cmd = exporter._write_recipe(capsule_dir / run_uuid, memory_dir / run_uuid)
+        assert cmd == "python recipe.py", cmd
+        recipe = (capsule_dir / run_uuid / "recipe.py").read_text()
+        assert "plt.savefig" in recipe and "step 1 · single_agent" in recipe, recipe
+        analysis = build_analysis("smoke goal", run_uuid, files, [], cmd)
         universe = build_universe([], run_uuid)
         out = write_export(capsule_dir / run_uuid, analysis, universe)
         assert out.exists() and out.parent == capsule_dir / run_uuid, out

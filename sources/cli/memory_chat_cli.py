@@ -31,6 +31,8 @@ import numpy as np
 
 from config import Config
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
+from sources.transparency.memory_trace import extract_code as _extract_code_from_step
+from sources.transparency.memory_trace import trim as _trim
 
 
 # ── Tunables (constants — no magic numbers) ────────────────────────────────
@@ -65,30 +67,9 @@ class MemoryChunk:
 
 
 # ── Chunk extraction ──────────────────────────────────────────────────────
-def _extract_code_from_step(step: dict[str, Any]) -> str:
-    """Return the executed code for a smolagent step (best-effort)."""
-    code = step.get("code_action") or ""
-    if code:
-        return str(code)
-    for tc in step.get("tool_calls", []) or []:
-        fn = tc.get("function", {}) or {}
-        if fn.get("name") == "python_interpreter":
-            args = fn.get("arguments")
-            if isinstance(args, str):
-                return args
-            if isinstance(args, dict):
-                return args.get("code", "") or json.dumps(args)
-    return ""
-
-
-def _trim(text: str, limit: int) -> str:
-    """Hard-truncate text to *limit* characters, appending an ellipsis marker."""
-    if not text:
-        return ""
-    text = str(text)
-    if len(text) <= limit:
-        return text
-    return text[:limit] + " …[truncated]"
+# Code/trim primitives live in sources.transparency.memory_trace so the ASTRA
+# exporter and this RAG CLI never drift on "the code the agent ran" — imported
+# above as ``_extract_code_from_step`` / ``_trim``.
 
 
 def _summarize_step(step: dict[str, Any], code: str) -> str:

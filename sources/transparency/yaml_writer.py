@@ -32,13 +32,22 @@ _ASTRA_VERSION = "0.1"
 _DEFAULT_UNIVERSE_ID = "best"
 
 
+_RECIPE_FALLBACK_COMMAND = "see agent trace in sources/memory/<run_uuid>/task_*.json"
+
+
 def build_analysis(
     goal: str,
     best_uuid: str,
     workspace_files: list[str],
     decisions: list[Decision],
+    recipe_command: str = _RECIPE_FALLBACK_COMMAND,
 ) -> dict[str, Any]:
-    """Assemble the dict that will be dumped to ``astra.yaml``."""
+    """Assemble the dict that will be dumped to ``astra.yaml``.
+
+    ``recipe_command`` is the POSIX command ASTRA stores per output. Callers
+    pass ``python recipe.py`` once the run's code has been reconstructed; the
+    default is a pointer used only when no executable code was recovered.
+    """
     return {
         "version": _ASTRA_VERSION,
         "name": f"Mimosa best run {best_uuid}",
@@ -47,7 +56,7 @@ def build_analysis(
             "Decisions reconstructed post-run from the agent memory trace."
         ),
         "inputs": _build_inputs(goal),
-        "outputs": _build_outputs(workspace_files, decisions),
+        "outputs": _build_outputs(workspace_files, decisions, recipe_command),
         "decisions": _build_decisions(decisions),
     }
 
@@ -89,7 +98,9 @@ def _build_inputs(goal: str) -> list[dict[str, Any]]:
 
 
 def _build_outputs(
-    workspace_files: list[str], decisions: list[Decision]
+    workspace_files: list[str],
+    decisions: list[Decision],
+    recipe_command: str,
 ) -> list[dict[str, Any]]:
     decision_ids = [d.id for d in decisions]
     if not workspace_files:
@@ -101,9 +112,7 @@ def _build_outputs(
             "description": f"Artefact produced by the best run: {f}",
             "inputs": ["task_description"],
             "decisions": decision_ids,
-            "recipe": {
-                "command": "see code trace in sources/memory/<run_uuid>/task_*.json",
-            },
+            "recipe": {"command": recipe_command},
         }
         for i, f in enumerate(workspace_files)
     ]
