@@ -105,7 +105,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 工作流是**完整的 Python 程序**,作为源代码被变异。**代码即基因型 (code-as-genotype)** 是工作流文件;表现型是它在工作空间中产生的任何东西。
 
-- **选择:质量-多样性归档**(**MAP-Elites** 风格) —— 种群规模为 50,`qd_score = (1−w)·quality + w·novelty`(`w=0.4`)。**新颖性搜索 (novelty search)** 使用**行为描述符 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上的 k-NN 距离(`k=25`)。父代通过子代数量倒数轮盘抽取,使归档分布开来。
+- **选择:质量-多样性归档**(**MAP-Elites** 风格) —— 种群规模为 50,`qd_score = (1−w)·quality + w·novelty`(`w=0.25`)。**新颖性搜索 (novelty search)** 使用**基因型嵌入 (genotype embedding)** 行为描述符——对工作流生成源代码做 L2 归一化的嵌入(默认使用本地 `all-MiniLM-L6-v2`,可选 OpenAI `text-embedding-3-small`)——上的余弦距离 k-NN(`k=15`)。父代通过子代数量倒数轮盘抽取,使归档分布开来(`MAX_CHILDREN_PER_PARENT = 2`)。
 - **变异:由停滞驱动的尺度** —— 变异的大胆程度是过去 4 个提示梯度自身重复程度的连续函数。接近优胜者的个体会被保护。变异尺度的范围从"仅提示微调"一直到"完整拓扑重思"。
 - **交叉** —— 约 30% 的代次会以强者优先的方式组合两个父代。
 - **冷启动** —— 当归档为空时,会基于相似度过滤,从磁盘上过往运行进行扫描(MiniLM 余弦相似度 ≥ 0.5)以种子化搜索。有用的工作流可在任务之间迁移。
