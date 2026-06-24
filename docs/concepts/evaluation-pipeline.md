@@ -20,11 +20,11 @@ fingerprint). The single signal that flows back to the mutator is a short
 **prompt gradient** that summarizes failure modes without leaking the
 verified claims themselves.
 
-The same per-claim verdicts are projected into a 6-dim **failure
-fingerprint** that the [evolution engine](evolution-engine.md#behaviour-descriptor-failure-fingerprint)
-uses as the behaviour descriptor for QD novelty. The descriptor is
-centered so overall quality cannot leak into novelty — see the firewall
-section below.
+The same per-claim verdicts are also projected into a 6-dim **failure
+fingerprint** — a centered vector of per-source pass rates that records
+*how* a run failed. It is persisted as a diagnostic but is **not** the QD
+behaviour descriptor: novelty is measured in genotype-embedding space
+(see [Selection](evolution-engine.md#behaviour-descriptor-genotype-embedding)).
 
 ![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
 
@@ -127,38 +127,40 @@ overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_c
 - The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
   rank ordering doesn't flatten under hard fails.
 
-## Failure fingerprint (QD behaviour descriptor)
+## Failure fingerprint (diagnostic)
 
-The verifier doesn't just emit a score — the same per-claim verdicts feed
-the QD novelty signal as a **failure fingerprint**: a centered vector
-of per-source pass rates that tells the archive *how* a candidate fails,
-not *whether* it failed.
+The verifier also projects the same per-claim verdicts into a **failure
+fingerprint**: a centered vector of per-source pass rates that records
+*how* a candidate fails, not *whether* it failed.
 
 ```python
 # Per source A..F (six entries, always — absent sources get a neutral value).
 pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
 presence[s]  = 1.0                                if total[s] > 0  else 0.0
-# Center so the descriptor encodes profile shape, not quality level.
+# Center so the vector encodes profile shape, not quality level.
 mean_present = mean(pass_rate[s] for s where presence[s] == 1)
 vector[s]    = pass_rate[s] - mean_present       if presence[s] == 1
              = 0                                  otherwise
 ```
 
-**The quality firewall.** An all-pass run and an all-fail run both yield
-the zero profile. This is intended and asserted in the tests
-(`test_all_pass_yields_zero_profile`,
-`test_all_fail_yields_zero_profile`). The QD score combines quality and
-novelty *additively* — `(1 − w)·quality_norm + w·novelty_norm` — so
-quality already drives `quality_norm`. If quality also leaked into
-novelty, QD would collapse back into greedy search. The centering step
-is what keeps these two terms separable.
+Centering means an all-pass run and an all-fail run both collapse to the
+zero profile (asserted by `test_all_pass_yields_zero_profile` and
+`test_all_fail_yields_zero_profile`), so the vector captures the *shape*
+of which sources fail rather than the overall quality level.
 
-The fingerprint is persisted under
-`state_result.json` → `evaluation.verifier.failure_fingerprint.vector`
-and consumed by
-[`SelectionPressure._extract_behaviour_descriptor`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py).
-Full info-flow audit:
-[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
+The fingerprint is computed by
+[`compute_failure_fingerprint`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
+at the end of `VerifierEvaluator.evaluate()` and persisted under
+`state_result.json` → `evaluation.verifier.failure_fingerprint`.
+
+> **Diagnostic only — not the novelty descriptor.** The QD behaviour
+> descriptor is the **genotype embedding** of the workflow's source code,
+> and novelty is cosine distance in that space (see
+> [Selection](evolution-engine.md#behaviour-descriptor-genotype-embedding)).
+> `SelectionPressure` no longer reads the failure fingerprint; it remains
+> persisted so failure profiles can be inspected offline.
+Full info-flow audit of the QD behaviour descriptor:
+[`docs/info-flow/genotype_embedding.md`](../info-flow/genotype_embedding.md).
 
 ## Prompt gradient
 

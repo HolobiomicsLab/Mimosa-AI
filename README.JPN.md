@@ -105,7 +105,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ワークフローは **完全な Python プログラム** であり、ソースコードとして変異されます。**コードを遺伝子型として扱う方式 (code-as-genotype)** で、遺伝子型はワークフローファイル、表現型はそれがワークスペース上に生成するものです。
 
-- **選択: Quality-Diversity アーカイブ**（**MAP-Elites** 方式）— 集団サイズ 50、`qd_score = (1−w)·quality + w·novelty`（`w=0.4`）。**新規性探索 (novelty search)** は **行動記述子 (behaviour descriptor)** `[n_agents, n_edges, n_branches, prompt_chars]` 上の k-NN 距離（`k=25`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます。
+- **選択: Quality-Diversity アーカイブ**（**MAP-Elites** 方式）— 集団サイズ 50、`qd_score = (1−w)·quality + w·novelty`（`w=0.25`）。**新規性探索 (novelty search)** は **ゲノタイプ埋め込み (genotype embedding)** の行動記述子 — ワークフローの生成ソースコードを L2 正規化した埋め込み（既定はローカルの `all-MiniLM-L6-v2`、オプションで OpenAI `text-embedding-3-small`）— 上のコサイン距離 k-NN（`k=15`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます（`MAX_CHILDREN_PER_PARENT = 2`）。
 - **変異: 停滞駆動のスコープ** — 変異の大胆さは、直近 4 回のプロンプト勾配がどの程度反復しているかの連続関数です。勝者に近い個体は保護されます。スコープ帯域は「プロンプトのみの微調整」から「トポロジー全面再考」まで及びます。
 - **交叉** — 約 30 % の世代で 2 つの親（強いもの優先）を組み合わせます。
 - **コールドスタート** — アーカイブが空の場合、ディスク上の過去実行を類似度フィルタ（MiniLM コサイン ≥ 0.5）でスキャンして探索を播種します。有用なワークフローはタスク間で転移します。
