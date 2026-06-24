@@ -107,11 +107,37 @@ class AstraExporter:
         )
 
 
-if __name__ == "__main__":
-    import sys
+def _resolve_goal(memory_dir: Path, uuid: str, override: str | None) -> str:
+    """Read the goal from ``state_result.json`` unless an override is given."""
+    if override:
+        return override
+    state_path = memory_dir / uuid / "state_result.json"
+    if not state_path.exists():
+        return "(unknown goal — pass --goal to override)"
+    try:
+        return json.loads(state_path.read_text()).get("goal") or "(unknown goal)"
+    except (OSError, json.JSONDecodeError):
+        return "(unknown goal — state_result.json unreadable)"
+
+
+def _run_standalone(uuid: str, goal_override: str | None) -> int:
+    """Export ASTRA for a real memory UUID using the project's Config."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    from config import Config
+    config = Config()
+    goal = _resolve_goal(Path(config.memory_dir), uuid, goal_override)
+    path = AstraExporter(config).export(uuid, goal)
+    if path is None:
+        print("[FAIL] export returned None — see warnings above.")
+        return 1
+    print(f"[OK] ASTRA export wrote {path}")
+    return 0
+
+
+def _run_smoke_check() -> None:
+    """Self-contained sanity check — sandboxed in /var/folders, leaves nothing behind."""
     import tempfile
     from types import SimpleNamespace
-
     with tempfile.TemporaryDirectory() as tmp:
         memory_dir = Path(tmp) / "memory"
         workspace_dir = Path(tmp) / "workspace"
@@ -135,7 +161,7 @@ if __name__ == "__main__":
             judge_model="openrouter/deepseek/deepseek-v4-flash",
             openrouter_provider_for=lambda _m: None,
         )
-        exporter = AstraExporter(config)
+        AstraExporter(config)  # construction smoke
         compact = compact_trace(load_trace(memory_dir / run_uuid))
         assert compact == [], f"Mechanical step should be filtered, got {compact}"
         analysis = build_analysis("smoke goal", run_uuid, ["model.pkl"], [])
@@ -143,4 +169,21 @@ if __name__ == "__main__":
         out = write_export(capsule_dir / run_uuid, analysis, universe)
         assert out.exists() and out.parent == capsule_dir / run_uuid, out
         print(f"[OK] astra_exporter smoke check passed (wrote {out})")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(
+        description=(
+            "ASTRA exporter. Without args, runs a self-cleaning smoke check. "
+            "With --uuid, exports a real run's memory under sources/memory/<uuid> "
+            "to runs_capsule/<uuid>/."
+        )
+    )
+    parser.add_argument("--uuid", help="Run UUID under config.memory_dir to export.")
+    parser.add_argument("--goal", help="Override goal text (default: read from state_result.json).")
+    args = parser.parse_args()
+    if args.uuid:
+        sys.exit(_run_standalone(args.uuid, args.goal))
+    _run_smoke_check()
     sys.exit(0)
