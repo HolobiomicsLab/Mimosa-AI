@@ -102,6 +102,7 @@ RULES:
 - When the goal text names an output path with a column or key schema (dataset preview, EXPECTED OUTPUT: block, or explicit 'columns exactly equal to …'), use the goal's schema as the source of truth for column/key literals.
   The file preview shows what the workflow actually produced — which may be wrong. If the preview's schema differs from the goal's, the check must use the goal's schema; the workflow's deviation is exactly what fails the claim
   (eg: Never check AF_TOX_prob when the goal show that AF_TOX is used for columns format)
+- When checking whether a call name or attribute is used, walk the AST for any ast.Call.func whose terminal attribute or .id matches the target, AND also walk for any ast.Attribute chain ending in the target (FQN access). Never compare against a literal ast.List of Constants — if the script needs to find a dropped column or a hyperparameter name, runtime-introspect the produced artefact (read the CSV, import the module, call feature_labels()) instead of parsing the workflow source for literals
 
 ERROR HANDLING:
 
