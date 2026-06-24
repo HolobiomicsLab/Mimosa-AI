@@ -882,10 +882,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+  <a href="#behaviour-descriptor-genotype-embedding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behaviour descriptor: failure fingerprint
+        Behaviour descriptor: genotype embedding
       
     </span>
   </a>
@@ -900,31 +900,31 @@
         <li class="md-nav__item">
   <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
-
+      
     </span>
   </a>
-
+  
     <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
       <ul class="md-nav__list">
-
+        
           <li class="md-nav__item">
   <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Mutation directive: offloading reasoning from the orchestrator
-
+      
     </span>
   </a>
-
+  
 </li>
-
+        
       </ul>
     </nav>
-
+  
 </li>
-
+      
         <li class="md-nav__item">
   <a href="#crossover" class="md-nav__link">
     <span class="md-ellipsis">
@@ -950,7 +950,7 @@
         <li class="md-nav__item">
   <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Watching evolution happen
       
     </span>
@@ -2080,10 +2080,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+  <a href="#behaviour-descriptor-genotype-embedding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behaviour descriptor: failure fingerprint
+        Behaviour descriptor: genotype embedding
       
     </span>
   </a>
@@ -2098,31 +2098,31 @@
         <li class="md-nav__item">
   <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
-
+      
     </span>
   </a>
-
+  
     <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
       <ul class="md-nav__list">
-
+        
           <li class="md-nav__item">
   <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Mutation directive: offloading reasoning from the orchestrator
-
+      
     </span>
   </a>
-
+  
 </li>
-
+        
       </ul>
     </nav>
-
+  
 </li>
-
+      
         <li class="md-nav__item">
   <a href="#crossover" class="md-nav__link">
     <span class="md-ellipsis">
@@ -2148,7 +2148,7 @@
         <li class="md-nav__item">
   <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
-
+      
         Watching evolution happen
       
     </span>
@@ -2309,10 +2309,12 @@ implements four strategies — <code>greedy</code>, <code>tournament</code>, <co
   novelty cannot drag a broken run above peers.</li>
 <li>Quality is sourced from <code>reward_uncapped</code> so the hard-fail cap doesn't
   flatten rank ordering.</li>
-<li>Novelty is k-NN distance (<code>k = 15</code>) in <strong>failure-fingerprint</strong> space.
-  The descriptor is the centered per-source pass-rate vector produced by
-  <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py"><code>failure_fingerprint.py</code></a>
-  from the verifier's per-claim verdicts (see below).</li>
+<li>Novelty is cosine-distance k-NN (<code>k = 15</code>) in <strong>genotype-embedding</strong>
+  space. The descriptor is the L2-normalised embedding of the workflow's
+  generated source code (its <em>genotype</em>), produced by
+  <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py"><code>genotype_embedding.py</code></a>
+  through the <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
+  shim (see below).</li>
 <li>Admission gate: candidate is admitted when it either improves over
   baseline by <code>min_improvement_threshold</code> or clears
   <code>qd_score &gt; admit_threshold</code>. When the archive reaches capacity, the
@@ -2326,36 +2328,46 @@ implements four strategies — <code>greedy</code>, <code>tournament</code>, <co
 falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥ 0.8</code> on MiniLM
 embeddings of <code>original_task</code>, <code>score ≥ 0.1</code>) — this lets useful workflows
 transfer across tasks.</p>
-<h3 id="behaviour-descriptor-failure-fingerprint">Behaviour descriptor: failure fingerprint<a class="headerlink" href="#behaviour-descriptor-failure-fingerprint" title="Permanent link">&para;</a></h3>
-<p>The novelty signal compares candidates in <strong>failure-fingerprint</strong> space.
-Per source A–F (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), the verifier
-records a pass rate. Sources with zero claims get the neutral value
-<code>0.5</code> and a presence-mask entry of <code>0</code>. The vector is then <strong>centered</strong>:
-the mean pass rate across present sources is subtracted from every entry.</p>
-<p>The centering is the <em>quality firewall</em>. Without it, an all-pass run sits
-at <code>[1,1,1,1,1,1]</code> and an all-fail run at <code>[0,0,0,0,0,0]</code> — Euclidean
-distance between them is large, and quality silently leaks into novelty.
-After centering, <strong>both</strong> runs collapse to the zero profile and novelty
-encodes only the <em>shape</em> of which sources fail relative to the others.
-Two workflows that fail in the same way are redundant regardless of how
-different their DAGs look; two that fail in different ways explore
-different basins and both deserve a seat in the archive.</p>
-<p>The fingerprint is computed at the end of <code>VerifierEvaluator.evaluate()</code>
-and persisted in <code>state_result.json</code> under
-<code>evaluation.verifier.failure_fingerprint.vector</code>. The full audit trail —
-which variable comes from where, the failure modes the descriptor must
-survive, and the centering invariant asserted by the tests — lives in
-<a href="../info-flow/failure_fingerprint.html"><code>docs/info-flow/failure_fingerprint.md</code></a>.</p>
-<p>When a run has no usable fingerprint (verifier short-circuit on a fully
-failed workflow), <code>SelectionPressure._extract_behaviour_descriptor</code>
-returns a neutral zero vector so distance lookups stay well-defined and
-the cold path doesn't artificially win or lose on novelty.</p>
-<p>The legacy structural descriptor (<code>[n_agents, n_edges, n_branches,
-prompt_chars]</code>) shipped by
-<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
-is retained for ablations and offline analysis but is <strong>no longer used</strong>
-for QD novelty — empirical work showed it barely co-varies with outcomes.</p>
+<h3 id="behaviour-descriptor-genotype-embedding">Behaviour descriptor: genotype embedding<a class="headerlink" href="#behaviour-descriptor-genotype-embedding" title="Permanent link">&para;</a></h3>
+<p>The novelty signal compares candidates in <strong>genotype-embedding</strong> space.
+Each workflow's generated source code (its <em>genotype</em>) is embedded into a
+dense vector and L2-normalised; novelty is the mean <strong>cosine distance</strong>
+(<code>1 − cosine_similarity</code>, range <code>[0, 2]</code>) from a candidate to its
+comparison set. Two workflows whose code is semantically similar collapse
+to nearly the same point and are treated as redundant; two that explored
+different approaches land far apart, and both earn a seat in the archive.
+This reads "how different is the generated approach" directly, rather
+than inferring it from a proxy.</p>
+<p>The embedding backend is pluggable
+(<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py"><code>genotype_embedding.py</code></a>):</p>
+<ul>
+<li><strong>Default — local <code>all-MiniLM-L6-v2</code></strong> (sentence-transformers): no
+  network at runtime, deterministic, free. Embeddings are cached per
+  process by the SHA-1 of the source, so the QD inner loop stays cheap
+  even when archive refresh walks dozens of members.</li>
+<li><strong>Optional — OpenAI <code>text-embedding-3-small</code></strong>, used only when both
+  <code>MIMOSA_GENOTYPE_EMBEDDING_BACKEND=openai</code> and <code>OPENAI_API_KEY</code> are
+  set; it falls back to MiniLM if the client can't be constructed.</li>
+</ul>
+<p>The descriptor dimension is whatever the backend emits (384 for MiniLM),
+not a fixed width — drain the archive if you switch backends mid-run.</p>
+<p>When a genotype is degenerate — missing, empty, or the backend errors —
+the embedder returns <code>None</code> and
+<code>SelectionPressure._extract_behaviour_descriptor</code> treats the missing
+signal as <strong>neutral</strong> (no novelty) rather than max-novel, so broken
+offspring are never rewarded merely for being "different".</p>
+<blockquote>
+<p><strong>The failure fingerprint is no longer the novelty signal.</strong> Earlier
+versions derived QD novelty from a <em>failure fingerprint</em> — a 6-D
+centered vector of per-source verifier pass rates — and, before that,
+from a structural descriptor <code>[n_agents, n_edges, n_branches,
+prompt_chars]</code>. Both have been retired as the behaviour descriptor. The
+failure fingerprint is <strong>still computed and persisted</strong> by the verifier
+under <code>state_result.json</code> → <code>evaluation.verifier.failure_fingerprint</code>,
+but only as a diagnostic — selection no longer reads it. The structural
+descriptor is gone entirely; <code>code_features.py</code> is now the
+genotype-embedding shim.</p>
+</blockquote>
 <h2 id="variation-evidence-driven-mutation-scope-rechenberg-15-rule">Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)<a class="headerlink" href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py"><code>VariationEngine</code></a>
 assembles mutation and crossover prompts. There is no fixed phase
@@ -2540,7 +2552,7 @@ EXPLORATION-band mutation actually looks like.</p>
   <code>novelty_score</code>, the <code>selection_log</code>, and the
   <code>variation_state</code> (<code>iters_since_improvement</code>, <code>plateau</code>,
   <code>success_rate</code>, <code>effective_boldness</code>, <code>parent_score</code>,
-  <code>respeciation_gate_open</code>, <code>agent_budget</code>) that produced
+  <code>respeciation_gate_open</code>, , <code>agent_budget</code>) that produced
   this offspring.</li>
 <li><code>sources/workflows/qd_archive.jsonl</code> — append-only, one line per
   <code>validate_survivor</code> call. Records the candidate's descriptor,

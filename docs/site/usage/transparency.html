@@ -2391,11 +2391,7 @@ spotting where the agent's understanding shifted.</p>
 </tr>
 <tr>
 <td><code>base_mean</code></td>
-<td>Mean over non-error per-claim scores.</td>
-</tr>
-<tr>
-<td><code>information_bonus</code></td>
-<td>Saturating thoroughness bonus, <code>α·(1 − exp(−n_hard_pass / β))</code>.</td>
+<td>Importance-weighted mean over non-error per-claim scores.</td>
 </tr>
 <tr>
 <td><code>hard_fail_capped</code></td>
@@ -2404,14 +2400,6 @@ spotting where the agent's understanding shifted.</p>
 <tr>
 <td><code>n_claims</code> / <code>n_pass</code> / <code>n_fail</code> / <code>n_error</code> / <code>n_unsure</code> / <code>n_scored</code></td>
 <td>Per-claim status counts.</td>
-</tr>
-<tr>
-<td><code>n_hard_pass</code></td>
-<td>Count of <code>hard</code> claims that passed (drives <code>information_bonus</code>).</td>
-</tr>
-<tr>
-<td><code>cheat_penalty</code></td>
-<td>Cheat-detector penalty. Currently always <code>0.0</code> (detector disabled, pending rewrite).</td>
 </tr>
 <tr>
 <td><code>abstracted_prompt_gradient</code></td>
@@ -2430,7 +2418,7 @@ JSON.</p>
 <ul>
 <li>The abstracted prompt gradient is vague and you want to see what the
   agents actually do.</li>
-<li>You suspect a cheat the verifier missed.</li>
+<li>You suspect the verifier missed something.</li>
 <li>You want to lift a successful workflow into another project as a
   starting point.</li>
 </ul>
