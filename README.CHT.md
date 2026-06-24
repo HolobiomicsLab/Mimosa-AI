@@ -81,8 +81,6 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 > 於 ScienceAgentBench 上使用 DeepSeek-V3.2 時,迭代學習能改善 GPT-4o 的表現,但對 Claude Haiku 4.5 卻造成輕微的退化——與模型相關的行為差異已於[論文](https://arxiv.org/abs/2603.28986)中分析。PaperBench 結果請見 [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
 
-> **成本與執行時間。** `$1.70/task` 的數字是依預設 `--learn` 預算(最多 35 個世代,於 `overall_score > 0.97` 時提前終止)所攤提的結果。在 DeepSeek-V3.2 上,典型的演化執行需 30–90 分鐘實際時間,並大致隨模型價格等比例縮放。單發執行(未使用 `--learn`)約需 5–15 分鐘,成本則低一個量級。
-
 ---
 
 ## 運作原理
@@ -222,7 +220,7 @@ Mimosa 專為科學用途而設計——每一項決策皆可事後檢視。
 
 | 工具 | 功能 |
 |------|--------------|
-| `uv run memory_explorer.py <uuid>` | 逐步檢視單一世代的完整軌跡 —— 思路、工具呼叫、輸出、狀態差異。 |
+| `uv run workflow_evolution_anim.py` | 互動式檢視器,走訪演化樹並重播每一代的軌跡 —— 思路、工具呼叫、評分通過/未通過。 |
 | `uv run main.py --memory_cli` | 對已完成的執行記憶進行 RAG 支援的問答。可直接詢問「*task_builder 用了哪個分類器?*」,而不必滾動翻找。 |
 | `uv run memory_timelapse.py <uuid>` | 以動畫方式逐影格檢視記憶在各次迭代間的成長。 |
 | `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | 智能體實際執行的精確 Python 程式碼。無 DSL。 |
@@ -247,9 +245,8 @@ Mimosa 專為科學用途而設計——每一項決策皆可事後檢視。
 | `workflow_llm_model` | 合成多智能體工作流程的模型(例如 `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | 執行智能體所使用的模型 |
 | `judge_model` | 撰寫驗證器程式並產出軟性裁決的 LLM |
-| `learned_score_threshold` | `--learn` 模式下的提前終止門檻(預設 `0.97`) |
-| `max_learning_evolve_iterations` | 世代上限(預設 `35`) |
-| `population_size` / `novelty_weight` / `min_improvement_threshold` | QD 檔案庫調校 |
+| `learned_score_threshold` | `--learn` 模式下的提前終止門檻(預設 `0.9`) |
+| `max_learning_evolve_iterations` | 世代上限(預設 `20`) |
 
 完整參考:[`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 

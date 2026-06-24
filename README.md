@@ -221,7 +221,7 @@ Mimosa is built for scientific use — every decision is inspectable after the f
 
 | Tool | What it does |
 |------|--------------|
-| `uv run memory_explorer.py <uuid>` | Step through one generation's full trace — thoughts, tool calls, outputs, state deltas. |
+| `uv run workflow_evolution_anim.py` | Interactive viewer that walks the evolution tree and replays each generation's trace — thoughts, tool calls, rubric pass/fail. |
 | `uv run main.py --memory_cli` | RAG-backed Q&A over a finished run's memory. Ask "*what classifier did task_builder use?*" instead of scrolling. |
 | `uv run memory_timelapse.py <uuid>` | Animated frame-by-frame view of memory growth across iterations. |
 | `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | The exact Python the agents executed. No DSL. |
@@ -246,9 +246,8 @@ Copy `config_default.json` to `my_config.json` and edit. The fields you'll touch
 | `workflow_llm_model` | Synthesizes the multi-agent workflow (e.g. `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | Model used by execution agents |
 | `judge_model` | LLM that writes verifier programs and renders soft verdicts |
-| `learned_score_threshold` | Early-stop threshold in `--learn` mode (default `0.97`) |
-| `max_learning_evolve_iterations` | Cap on generations (default `35`) |
-| `population_size` / `novelty_weight` / `min_improvement_threshold` | QD archive tuning |
+| `learned_score_threshold` | Early-stop threshold in `--learn` mode (default `0.9`) |
+| `max_learning_evolve_iterations` | Cap on generations (default `20`) |
 
 Full reference: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 

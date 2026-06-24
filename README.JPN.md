@@ -81,8 +81,6 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 > ScienceAgentBench 上で DeepSeek-V3.2 を用いた場合、反復学習は GPT-4o を改善しますが、Claude Haiku 4.5 では僅かな劣化をもたらします。モデル依存の挙動については[論文](https://arxiv.org/abs/2603.28986)で分析しています。PaperBench の結果は [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md) を参照してください。
 
-> **コストと実行時間.** `$1.70/task` の数値は、デフォルトの `--learn` 予算（最大 35 世代、`overall_score > 0.97` で早期停止）に対して償却された値です。DeepSeek-V3.2 を用いた典型的な進化実行はタスクあたり 30 〜 90 分の実時間で、概ねモデル価格に比例してスケールします。ワンショット実行（`--learn` なし）は約 5 〜 15 分で、コストは一桁安価です。
-
 ---
 
 ## 仕組み
@@ -222,7 +220,7 @@ Mimosa は科学的用途のために構築されており、すべての決定�
 
 | ツール | 役割 |
 |------|--------------|
-| `uv run memory_explorer.py <uuid>` | 1 世代の完全なトレース（思考、ツール呼び出し、出力、状態差分）をステップ実行します。 |
+| `uv run workflow_evolution_anim.py` | 進化ツリーを辿り、各世代のトレース（思考、ツール呼び出し、ルーブリックの合否）を再生するインタラクティブビューア。 |
 | `uv run main.py --memory_cli` | 完了した実行のメモリに対する RAG ベースの Q&A。「*task_builder が使用した分類器は何か?*」のように、スクロールせずに質問できます。 |
 | `uv run memory_timelapse.py <uuid>` | 反復にわたるメモリ成長のフレーム単位アニメーション表示。 |
 | `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | エージェントが実行した正確な Python。DSL なし。 |
@@ -247,9 +245,8 @@ Mimosa は科学的用途のために構築されており、すべての決定�
 | `workflow_llm_model` | マルチエージェントワークフローを合成（例: `anthropic/claude-opus-4-5`） |
 | `smolagent_model_id` | 実行エージェントが使用するモデル |
 | `judge_model` | verifier プログラムを記述し、ソフト判定を下す LLM |
-| `learned_score_threshold` | `--learn` モードでの早期停止しきい値（デフォルト `0.97`） |
-| `max_learning_evolve_iterations` | 世代数の上限（デフォルト `35`） |
-| `population_size` / `novelty_weight` / `min_improvement_threshold` | QD アーカイブのチューニング |
+| `learned_score_threshold` | `--learn` モードでの早期停止しきい値（デフォルト `0.9`） |
+| `max_learning_evolve_iterations` | 世代数の上限（デフォルト `20`） |
 
 完全なリファレンス: [`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 
