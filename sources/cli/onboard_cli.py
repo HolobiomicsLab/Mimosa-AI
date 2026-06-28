@@ -510,6 +510,7 @@ class OnboardCLI:
         path = _ask(
             f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
         )
+        loaded = False
         if path:
             if not os.path.isfile(path):
                 _warn(f"File not found: {path}. Using default configuration.")
@@ -517,6 +518,7 @@ class OnboardCLI:
                 try:
                     self.config.load(path)
                     _ok(f"Configuration loaded from {path}")
+                    loaded = True
                 except Exception as exc:
                     _warn(f"Failed to load config ({exc}). Using defaults.")
         else:
@@ -525,13 +527,29 @@ class OnboardCLI:
                 try:
                     self.config.load(self._CONFIG_DEFAULT_PATH)
                     _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
+                    loaded = True
                 except Exception as exc:
                     _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
             else:
                 _info("Using built-in default configuration.")
 
+        if not loaded:
+            _warn(
+                f"{self._CONFIG_DEFAULT_PATH} could not be loaded. "
+                "Using the built-in default configuration from config.py."
+            )
+            self._dump_full_config_default()
+
         # Ensure internal directories exist before later steps need them
         self.config.create_paths()
+
+    def _dump_full_config_default(self) -> None:
+        """Write the full current configuration to *config_default.json*."""
+        try:
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved full default configuration to {self._CONFIG_DEFAULT_PATH}")
+        except Exception as exc:
+            _warn(f"Could not save default configuration to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     async def _check_toolomics(self) -> None:
         """Discover MCP servers; loop until at least one is found or user skips."""
@@ -603,6 +621,7 @@ class OnboardCLI:
             workspace = self.config.workspace_dir
             if os.path.isdir(workspace):
                 _ok(f"Workspace directory found: {workspace}")
+                self._warn_if_workspace_not_in_toolomics(workspace)
                 return
 
             _err(f"Workspace directory not found: {workspace}")
@@ -624,29 +643,30 @@ class OnboardCLI:
                 self.config.workspace_dir = new_path
                 _ok(f"Workspace directory set to: {new_path}")
                 self._persist_workspace_dir(new_path)
+                self._warn_if_workspace_not_in_toolomics(new_path)
                 return
             _err(f"Directory does not exist: {new_path}. Please try again.")
 
+    def _warn_if_workspace_not_in_toolomics(self, path: str) -> None:
+        """Warn when the workspace path is not inside a Toolomics directory."""
+        if "toolomics" not in os.path.abspath(path).lower():
+            _warn(
+                "The workspace path does not contain a 'toolomics' directory. "
+                "If you wish to use Toolomics, execution will fail; "
+                "otherwise, if you are bringing your own MCP, ensure they are "
+                "configured to the same path as the file mount."
+            )
+
     def _persist_workspace_dir(self, path: str) -> None:
-        """Write *path* as workspace_dir into config_default.json."""
-        cfg_path = self._CONFIG_DEFAULT_PATH
+        """Write *path* as workspace_dir into config_default.json.
+
+        The full configuration is written so that other settings are not lost.
+        """
         try:
-            # Read existing config (or start from empty dict)
-            if os.path.isfile(cfg_path):
-                with open(cfg_path, encoding="utf-8") as fh:
-                    data = json.load(fh)
-            else:
-                data = {}
-
-            data["workspace_dir"] = path
-
-            with open(cfg_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=2)
-                fh.write("\n")
-
-            _ok(f"Saved workspace_dir to {cfg_path}")
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved workspace_dir to {self._CONFIG_DEFAULT_PATH}")
         except Exception as exc:
-            _warn(f"Could not persist workspace path to {cfg_path}: {exc}")
+            _warn(f"Could not persist workspace path to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     # ------------------------------------------------------------------
     # Workspace file setup
@@ -991,29 +1011,15 @@ class OnboardCLI:
         self._persist_models(orch_model or "", agent_model or "")
 
     def _persist_models(self, orch_model_id: str, agent_model_id: str) -> None:
-        """Write both model choices to config_default.json."""
-        cfg_path = self._CONFIG_DEFAULT_PATH
+        """Write both model choices to config_default.json.
+
+        The full configuration is written so that other settings are not lost.
+        """
         try:
-            if os.path.isfile(cfg_path):
-                with open(cfg_path, encoding="utf-8") as fh:
-                    data = json.load(fh)
-            else:
-                data = {}
-
-            if orch_model_id:
-                for key in _MODEL_CFG_KEYS:
-                    data[key] = orch_model_id
-
-            if agent_model_id:
-                data["smolagent_model_id"] = agent_model_id
-
-            with open(cfg_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=2)
-                fh.write("\n")
-
-            _ok(f"Saved model choices to {cfg_path}")
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved model choices to {self._CONFIG_DEFAULT_PATH}")
         except Exception as exc:
-            _warn(f"Could not persist model choices to {cfg_path}: {exc}")
+            _warn(f"Could not persist model choices to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     def _collect_objective(self) -> None:
         """Prompt the user for their initial research objective."""
