@@ -24,6 +24,14 @@ dependencies = [
     "pillow>=11.3.0",
 ]
 
+[dependency-groups]
+# Test/dev tooling. Install with `uv sync --dev`; run the suite with
+# `uv run pytest` (or `uv run pytest tests/`). The test files use the
+# `*_test.py` pytest convention.
+dev = [
+    "pytest>=8.0",
+]
+
 [tool.ruff]
 line-length = 88
 fix = true
