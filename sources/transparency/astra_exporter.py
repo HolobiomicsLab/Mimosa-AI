@@ -78,6 +78,9 @@ class AstraExporter:
             return None
 
         raw_steps = load_trace(memory_path)
+        if not raw_steps:
+            print_warn(f"Empty trace for {best_uuid}; ASTRA export skipped.")
+            return None
         compact = compact_trace(raw_steps)
         print_info(
             f"Trace compacted: {len(raw_steps)} raw → {len(compact)} candidate steps."

@@ -577,6 +577,9 @@ class SelectionPressure:
             member: The population member to admit.
         """
         self._archive.append(member)
+        # Refresh metrics first so eviction uses up-to-date qd_scores (including
+        # the newly-admitted member's novelty contribution to existing peers).
+        self._refresh_member_metrics()
 
         if len(self._archive) > self.population_size:
             weakest = min(self._archive, key=lambda m: m.qd_score)
@@ -586,8 +589,6 @@ class SelectionPressure:
                 f"Evicted archive member (qd={weakest.qd_score:.3f}, "
                 f"reward={weakest.reward:.3f}) — archive full"
             )
-
-        self._refresh_member_metrics()
 
     def _refresh_member_metrics(self) -> None:
         """Recompute stored novelty + qd_score for every archive member."""

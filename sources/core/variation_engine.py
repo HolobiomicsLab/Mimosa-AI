@@ -51,10 +51,13 @@ class VariationEngine:
         self.judge_model = config.workflow_llm_model
         try:
             provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
+            # Anthropic/Claude caps at 1.0; Opus 4.x strips temperature entirely (handled by LLMProvider)
+            is_claude = provider == "anthropic" or "claude" in model.lower()
+            variation_temperature = min(1.2, 1.0) if is_claude else 1.2
             self.llm_config = LLMConfig().from_dict({
                 "model": model,
                 "provider": provider,
-                "temperature": 1.2,
+                "temperature": variation_temperature,
                 "reasoning_effort": config.reasoning_effort,
                 "max_tokens": getattr(config, 'max_tokens', 8192),
                 "openrouter_provider": config.openrouter_provider_for(self.judge_model),

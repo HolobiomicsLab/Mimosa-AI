@@ -336,7 +336,13 @@ class WorkflowRunner:
         with open(script_path, "w") as f:
             f.write(code)
         cmd = [*self._python_cmd, script_path]
-        return await self._run_command(cmd, execution_id, progress_callback)
+        try:
+            return await self._run_command(cmd, execution_id, progress_callback)
+        finally:
+            try:
+                os.unlink(script_path)
+            except OSError:
+                pass
 
     @staticmethod
     def _build_color_env() -> dict[str, str]:
