@@ -193,7 +193,13 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
-        self.max_retries = 3
+        # Hard cap on transient-error retries. Previously the retry loop was
+        # `while True` and this value was never read, so a persistently
+        # overloaded/rate-limited provider could retry indefinitely, re-sending
+        # the full prompt each time. 6 attempts with exponential backoff
+        # (capped at 500s) keeps resilience to transient blips while
+        # guaranteeing the call terminates.
+        self.max_retries = 6
         self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:
@@ -458,7 +464,11 @@ class LLMProvider:
                 break
 
             except TimeoutError as e:
-                # Timeout is retryable
+                # Timeout is retryable, up to the max_retries ceiling.
+                if attempt >= self.max_retries:
+                    raise RuntimeError(
+                        f"❌ LLM API error: timed out after {self.max_retries} retries"
+                    ) from e
                 wait_time = self._calculate_backoff_wait(attempt, max_wait)
                 self.logger.warning(
                     f"⌛ Timeout on attempt {attempt + 1}. Retrying in {wait_time:.1f}s..."
@@ -496,7 +506,13 @@ class LLMProvider:
                             )
                         attempt += 1
                     else:
-                        # Regular retry with backoff for other retryable errors
+                        # Regular retry with backoff for other retryable errors,
+                        # bounded by the max_retries ceiling so a persistently
+                        # failing provider cannot loop forever.
+                        if attempt >= self.max_retries:
+                            raise RuntimeError(
+                                f"❌ LLM API error after {self.max_retries} retries: {str(e)}"
+                            ) from e
                         wait_time = self._calculate_backoff_wait(attempt, max_wait)
                         self.logger.warning(
                             f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:512]}. "
