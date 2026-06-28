@@ -76,7 +76,7 @@ the parent's absolute score re-enter, as a near-finish damper, so
 near-winners aren't gambled away one generation before early-stop. The
 agent budget grows with boldness up to a hard ceiling of `7`.
 
-By default `~10 %` of generations do **crossover** instead of mutation
+By default `~40 %` of generations do **crossover** instead of mutation
 (`crossover_rate = 0.1`) — two parents combined, best-parent-first, with
 the offspring hard-capped at the highest parent agent count.
 
