@@ -132,7 +132,9 @@ Query the literature to design a litterature grounded approach.
 CONSTRAINTS: Cite sources for all methodological claims. Note where literature is sparse or conflicting.
         """
         try:
-            response = query_perspicacite(prompt) or "No relevant scientific context."
+            response = query_perspicacite(
+                prompt, kb_name=self.config.perspicacite_agent_kb_name
+            ) or "No relevant scientific context."
             return response
         except Exception as e:
             return "Query failed. Unable to help with scientific litterature"
@@ -150,6 +152,11 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             The craft instructions, optionally prepended with formatted
             scientific context retrieved from Perspicacite-AI.
         """
+        # Agent-side grounding is opt-out: disable it (or point it at a
+        # leak-free KB via perspicacite_agent_kb_name) for fair benchmarking,
+        # since the default web-search can surface the source paper.
+        if not self.config.perspicacite_agent_grounding_enabled:
+            return craft_instructions
         print_phase(
             "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
         )

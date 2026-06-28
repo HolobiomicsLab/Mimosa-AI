@@ -111,6 +111,9 @@ class VerifierEvaluator(
         self.preview_tail_bytes = preview_tail_bytes
         self.preview_per_claim_cap = preview_per_claim_cap
         self.use_grounding = use_grounding
+        # KB the verifier grounds from (may be the full ground-truth KB; this is
+        # the verifier side, distinct from the agent's fair-tier KB).
+        self.verifier_kb_name = getattr(config, "perspicacite_verifier_kb_name", None)
         self.gen_parallelism = max(1, int(gen_parallelism))
         self.exec_parallelism = max(1, int(exec_parallelism))
         self._preview_cache: dict[str, str] = {}
@@ -203,7 +206,7 @@ class VerifierEvaluator(
         if uuid in self._grounding_cache:
             return self._grounding_cache[uuid]
         try:
-            grounding = get_perspicacite_grounding(goal)
+            grounding = get_perspicacite_grounding(goal, kb_name=self.verifier_kb_name)
         except Exception as e:
             self.logger.warning(f"Perspicacite grounding raised for {uuid}: {e}")
             grounding = f"{self._GROUNDING_FAILED_MARKER}: {e}"

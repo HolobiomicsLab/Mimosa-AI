@@ -90,6 +90,11 @@ class Planner:
             The literature-grounded response text, or a fallback message when
             the service is unavailable or returns no relevant context.
         """
+        # Agent-side grounding is opt-out for fair benchmarking (default web
+        # search can surface the source paper); disable or point at a leak-free
+        # KB via the perspicacite_agent_* config fields.
+        if not self.config.perspicacite_agent_grounding_enabled:
+            return "No relevant scientific context."
         prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
 
 TASK TO SUPPORT:
@@ -115,7 +120,9 @@ OUTPUT FORMAT:
 CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain conventions. Note if literature is sparse/conflicting.
         """
         try:
-            response = query_perspicacite(prompt) or "No relevant scientific context."
+            response = query_perspicacite(
+                prompt, kb_name=self.config.perspicacite_agent_kb_name
+            ) or "No relevant scientific context."
             return response
         except Exception as e:
             return "Query failed. Unable to help with scientific litterature"

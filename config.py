@@ -65,6 +65,15 @@ class Config:
             "heavy": "openrouter/z-ai/glm-5.2",
             "light": "openrouter/minimax/minimax-m3",
         }
+        # Perspicacite grounding — per-side KB selection. The AGENT and the
+        # VERIFIER ground from potentially DIFFERENT knowledge bases: the
+        # verifier may use full ground truth, but the agent must use only a
+        # leak-free tier for a fair benchmark. kb_name None => web search (no
+        # specific KB). Set agent grounding disabled (or to a leak-free brief
+        # KB) for fair runs; web search can surface the source paper.
+        self.perspicacite_agent_grounding_enabled: bool = True
+        self.perspicacite_agent_kb_name: str | None = None
+        self.perspicacite_verifier_kb_name: str | None = None
         self.engine_name: str = "litellm" # for smolagent
 
 
@@ -240,6 +249,9 @@ class Config:
             "judge_model": self.judge_model,
             "judge_extraction_model": self.judge_extraction_model,
             "model_tiers": self.model_tiers,
+            "perspicacite_agent_grounding_enabled": self.perspicacite_agent_grounding_enabled,
+            "perspicacite_agent_kb_name": self.perspicacite_agent_kb_name,
+            "perspicacite_verifier_kb_name": self.perspicacite_verifier_kb_name,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
@@ -298,6 +310,15 @@ class Config:
             "judge_extraction_model", self.judge_extraction_model
         )
         self.capsule_namer_model = data.get("capsule_namer_model", self.capsule_namer_model)
+        self.perspicacite_agent_grounding_enabled = data.get(
+            "perspicacite_agent_grounding_enabled", self.perspicacite_agent_grounding_enabled
+        )
+        self.perspicacite_agent_kb_name = data.get(
+            "perspicacite_agent_kb_name", self.perspicacite_agent_kb_name
+        )
+        self.perspicacite_verifier_kb_name = data.get(
+            "perspicacite_verifier_kb_name", self.perspicacite_verifier_kb_name
+        )
         # Resolve any tier aliases ("heavy"/"light") on the model roles now that
         # both the roles and model_tiers have been loaded from the dict.
         for _role in (
@@ -391,6 +412,9 @@ class Config:
         lines.append(f"  judge_extraction_model={self.judge_extraction_model or '(= judge_model)'}")
         lines.append(f"  capsule_namer_model={self.capsule_namer_model}")
         lines.append(f"  model_tiers={self.model_tiers}")
+        lines.append(f"  perspicacite_agent_grounding_enabled={self.perspicacite_agent_grounding_enabled}")
+        lines.append(f"  perspicacite_agent_kb_name={self.perspicacite_agent_kb_name}")
+        lines.append(f"  perspicacite_verifier_kb_name={self.perspicacite_verifier_kb_name}")
         lines.append(f"  engine_name={self.engine_name}")
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")

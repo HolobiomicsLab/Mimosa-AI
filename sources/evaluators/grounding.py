@@ -6,7 +6,7 @@ Perspicacite grounding for litterature-retrieve of science goals success indicat
 from sources.utils.perspicacite_client import query_perspicacite
 
 
-def get_perspicacite_grounding(goal: str) -> str:
+def get_perspicacite_grounding(goal: str, kb_name: str | None = None) -> str:
     """Retrieve a literature grounding block for a workflow goal.
 
     Delegates to the local Perspicacite agentic retriever. Prompts it to
@@ -49,7 +49,7 @@ RULES:
 - If the literature is silent on a specific threshold or hyperparameter, say so — do not invent a number
 """
     try:
-        response = query_perspicacite(prompt)
+        response = query_perspicacite(prompt, kb_name=kb_name)
         return response
     except Exception:
         return "Perspicacite query failed, unable to provide grounded expectations. Proceeding without external grounding."

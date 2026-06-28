@@ -26,15 +26,23 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _CACHE_DIR = pathlib.Path(__file__).resolve().parent.parent / "memory" / "perspicacite_requests"
 
-def _cache_key(science_query: str, mode: str) -> str:
-    """Return a deterministic hex digest for a (query, mode) pair."""
-    blob = json.dumps({"query": science_query, "mode": mode}, sort_keys=True)
+def _cache_key(science_query: str, mode: str, kb_name: Optional[str] = None) -> str:
+    """Return a deterministic hex digest for a (query, mode, kb_name) tuple.
+
+    ``kb_name`` is included in the key only when set, so per-KB grounding caches
+    are kept separate while the existing (web-search, ``kb_name=None``) keys are
+    unchanged.
+    """
+    payload = {"query": science_query, "mode": mode}
+    if kb_name is not None:
+        payload["kb_name"] = kb_name
+    blob = json.dumps(payload, sort_keys=True)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def _read_cache(science_query: str, mode: str) -> Optional[str]:
-    """Return the cached answer for *science_query* + *mode*, or ``None``."""
-    key = _cache_key(science_query, mode)
+def _read_cache(science_query: str, mode: str, kb_name: Optional[str] = None) -> Optional[str]:
+    """Return the cached answer for *science_query* + *mode* + *kb_name*, or ``None``."""
+    key = _cache_key(science_query, mode, kb_name)
     cache_file = _CACHE_DIR / f"{key}.json"
     if not cache_file.exists():
         return None
@@ -50,14 +58,15 @@ def _read_cache(science_query: str, mode: str) -> Optional[str]:
         return None
 
 
-def _write_cache(science_query: str, mode: str, answer: str) -> None:
+def _write_cache(science_query: str, mode: str, answer: str, kb_name: Optional[str] = None) -> None:
     """Persist *answer* to disk so future identical requests are served from cache."""
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    key = _cache_key(science_query, mode)
+    key = _cache_key(science_query, mode, kb_name)
     cache_file = _CACHE_DIR / f"{key}.json"
     payload = {
         "query": science_query,
         "mode": mode,
+        "kb_name": kb_name,
         "answer": answer,
     }
     try:
@@ -103,6 +112,7 @@ def query_perspicacite(
     science_query: str,
     mode: str = "agentic",
     base_url: str = PERSPICACITE_BASE_URL,
+    kb_name: Optional[str] = None,
 ) -> Optional[str]:
     """Query Perspicacite-AI for scientific knowledge relevant to a task.
 
@@ -125,21 +135,21 @@ def query_perspicacite(
         or ``None`` if the service is unavailable or the query fails.
     """
     # ---- check the on-disk cache first ----
-    cached = _read_cache(science_query, mode)
+    cached = _read_cache(science_query, mode, kb_name)
     if cached is not None:
         return cached
 
     # Try streaming first (preferred — keeps connection alive during long ops)
-    result = _query_perspicacite_streaming(science_query, mode, base_url)
+    result = _query_perspicacite_streaming(science_query, mode, base_url, kb_name)
     if result:
-        _write_cache(science_query, mode, result)
+        _write_cache(science_query, mode, result, kb_name)
         return result
 
     # Fall back to non-streaming JSON if streaming failed
     logger.info("[Perspicacite] Streaming failed; trying non-streaming fallback.")
-    result = _query_perspicacite_non_streaming(science_query, mode, base_url)
+    result = _query_perspicacite_non_streaming(science_query, mode, base_url, kb_name)
     if result:
-        _write_cache(science_query, mode, result)
+        _write_cache(science_query, mode, result, kb_name)
     return result
 
 
@@ -147,6 +157,7 @@ def _query_perspicacite_streaming(
     science_query: str,
     mode: str,
     base_url: str,
+    kb_name: Optional[str] = None,
 ) -> Optional[str]:
     """Query Perspicacite using SSE streaming.
 
@@ -172,7 +183,7 @@ def _query_perspicacite_streaming(
         "query": science_query,
         "mode": mode,
         "stream": True,           # SSE streaming
-        "kb_name": None,          # web-search only, no specific KB needed
+        "kb_name": kb_name,       # None -> web-search; a name -> that KB bundle
         "max_papers": 5,
         "databases": ["semantic_scholar", "openalex", "pubmed"],
     }
@@ -256,6 +267,7 @@ def _query_perspicacite_non_streaming(
     science_query: str,
     mode: str,
     base_url: str,
+    kb_name: Optional[str] = None,
 ) -> Optional[str]:
     """Query Perspicacite using a plain (non-streaming) JSON POST.
 
@@ -274,7 +286,7 @@ def _query_perspicacite_non_streaming(
         "query": science_query,
         "mode": mode,
         "stream": False,
-        "kb_name": None,
+        "kb_name": kb_name,
         "max_papers": 5,
         "databases": ["semantic_scholar", "openalex", "pubmed"],
     }
