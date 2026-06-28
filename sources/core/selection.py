@@ -21,7 +21,7 @@ from typing import Any
 
 from .code_features import genotype_embedding_descriptor
 
-MAX_CHILDREN_PER_PARENT = 2
+MAX_CHILDREN_PER_PARENT = 8
 
 # Comparison-set modes for novelty.
 NOVELTY_ARCHIVE_KNN = "archive_knn"

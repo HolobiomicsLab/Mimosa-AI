@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. **코드를 유전자형으로 다루는 방식 (code-as-genotype)** 으로, 유전자형(genotype)은 워크플로우 파일이고 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
 
-- **선택: Quality-Diversity 아카이브**(**MAP-Elites** 방식) — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.25`). **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 2`).
+- **선택: Quality-Diversity 아카이브**(**MAP-Elites** 방식) — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.25`). **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 8`).
 - **변이: 정체 기반 범위 조절** — 변이의 대담함은 마지막 4개의 프롬프트 그래디언트가 얼마나 반복되는지에 대한 연속 함수입니다. 거의 승리한 개체는 보호됩니다. 범위 대역은 "프롬프트만 미세 조정"부터 "완전한 토폴로지 재고"까지 이어집니다.
 - **교차** — 약 30%의 세대에서 두 부모를 결합하며, 강한 쪽이 먼저 적용됩니다.
 - **콜드 스타트** — 아카이브가 비어 있으면, 디스크의 과거 실행을 유사도 필터링(MiniLM 코사인 ≥ 0.5)으로 스캔하여 탐색을 시드합니다. 유용한 워크플로우는 태스크 간에 전이됩니다.
