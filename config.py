@@ -74,6 +74,12 @@ class Config:
         self.perspicacite_agent_grounding_enabled: bool = True
         self.perspicacite_agent_kb_name: str | None = None
         self.perspicacite_verifier_kb_name: str | None = None
+        # Verifier cost knobs. None -> keep the verifier's own defaults (100
+        # claims, grounding on). Lower verifier_max_claims to grade only the
+        # top-N most important claims for a faster/cheaper run (trades coverage
+        # of low-priority claims for speed).
+        self.verifier_max_claims: int | None = None
+        self.verifier_use_grounding: bool | None = None
         self.engine_name: str = "litellm" # for smolagent
 
 
@@ -252,6 +258,8 @@ class Config:
             "perspicacite_agent_grounding_enabled": self.perspicacite_agent_grounding_enabled,
             "perspicacite_agent_kb_name": self.perspicacite_agent_kb_name,
             "perspicacite_verifier_kb_name": self.perspicacite_verifier_kb_name,
+            "verifier_max_claims": self.verifier_max_claims,
+            "verifier_use_grounding": self.verifier_use_grounding,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
@@ -318,6 +326,10 @@ class Config:
         )
         self.perspicacite_verifier_kb_name = data.get(
             "perspicacite_verifier_kb_name", self.perspicacite_verifier_kb_name
+        )
+        self.verifier_max_claims = data.get("verifier_max_claims", self.verifier_max_claims)
+        self.verifier_use_grounding = data.get(
+            "verifier_use_grounding", self.verifier_use_grounding
         )
         # Resolve any tier aliases ("heavy"/"light") on the model roles now that
         # both the roles and model_tiers have been loaded from the dict.
@@ -415,6 +427,8 @@ class Config:
         lines.append(f"  perspicacite_agent_grounding_enabled={self.perspicacite_agent_grounding_enabled}")
         lines.append(f"  perspicacite_agent_kb_name={self.perspicacite_agent_kb_name}")
         lines.append(f"  perspicacite_verifier_kb_name={self.perspicacite_verifier_kb_name}")
+        lines.append(f"  verifier_max_claims={self.verifier_max_claims}")
+        lines.append(f"  verifier_use_grounding={self.verifier_use_grounding}")
         lines.append(f"  engine_name={self.engine_name}")
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")

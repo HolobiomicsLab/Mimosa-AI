@@ -63,7 +63,13 @@ class WorkflowEvaluator:
                 bs_fraud_threshold=bs_fraud_threshold,
             )
             self.scenario_evaluator = ScenarioEvaluator(config, scenarios_dir=scenarios_dir)
-            self.verifier_evaluator = VerifierEvaluator(config, workspace_dir=verifier_workspace_dir)
+            verifier_kwargs = {"workspace_dir": verifier_workspace_dir}
+            # Optional config-driven verifier cost knobs (omit -> library defaults).
+            if getattr(config, "verifier_max_claims", None) is not None:
+                verifier_kwargs["max_claims"] = config.verifier_max_claims
+            if getattr(config, "verifier_use_grounding", None) is not None:
+                verifier_kwargs["use_grounding"] = config.verifier_use_grounding
+            self.verifier_evaluator = VerifierEvaluator(config, **verifier_kwargs)
             self.logger = logging.getLogger(__name__)
             self.logger.info("WorkflowEvaluator initialized successfully")
         except Exception as e:
