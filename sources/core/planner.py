@@ -135,11 +135,17 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
         Returns:
             str: Enhanced prompt with scientific context
         """
-        print_phase(
-            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
-        )
+        # Only announce the query when agent-side grounding is actually enabled;
+        # perspicacite_grounding() itself returns a no-context sentinel when it
+        # is disabled, so printing "Querying…" there would be misleading.
+        grounding_on = getattr(self.config, "perspicacite_agent_grounding_enabled", True)
+        if grounding_on:
+            print_phase(
+                f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+            )
         scientific_context = self.perspicacite_grounding(goal)
-        print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
+        if grounding_on:
+            print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
 
         return f"""
 You are a top-tier scientific in research. When generating the plan, please incorporate relevant scientific principles, theories, or findings that could inform the approach to achieving the goal. This will help ensure that the plan is not only practical but also grounded in scientific understanding.
