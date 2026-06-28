@@ -214,6 +214,10 @@ START --> [Solver] --> [Grounded Checker] --> END
 - Degenerate output is failure. Any fallback, constant, placeholder, or base-rate result must route to repair, never report SUCCESS.
 - Prefer the smallest workflow with a grounded check and a repair path. Add an agent only when it forces a commitment the single pass skips or routes around a real bottleneck.
 - Reserve deliberation for genuinely independent inputs. Use the debate pattern only when the critics are grounded in different external evidence or run on different models; otherwise it is agreement theater.
+- **MCP tool response schema**: Toolomics tools return JSON strings with schema `{"status": "success"|"error", "stdout": "...", "stderr": "...", "exit_code": 0}`. Agent code must always do `import json; result = json.loads(raw) if isinstance(raw, str) else raw` before indexing, then read content via `result.get("stdout", raw)`. Never assume keys like `page_content`, `text`, or `content` — check the actual response shape before indexing.
+- **Absolute paths only**: All file paths in agent instructions must be absolute. The global `WORKSPACE_DIR` is available in the workflow context; use it as the base for output paths (e.g. `os.path.join(WORKSPACE_DIR, subdir, filename)`).
+- **Environment setup via shell tool**: When the task requires installing packages or setting up an environment (conda, pip, apt, etc.), instruct the agent to use `execute_command("conda install ...", timeout=1800)` (or longer for heavy installs). Never use `import subprocess` — it is forbidden in the sandbox. Set `timeout` explicitly for any command that may take more than 5 minutes.
+- **No built-in file I/O**: The sandbox forbids `open()`, `f.write()`, and `f.read()`. Agent instructions must direct agents to use the file-write tools available in the workflow — never Python's built-in file I/O.
 
 ## Checklist
 

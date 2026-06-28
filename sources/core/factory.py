@@ -47,22 +47,41 @@ class Factory:
         """
         tools_code = ""
         existing_tool_prompt = ""
+        import asyncio as _asyncio
         tool_manager = ToolManager(self.config)
-        try:
-            tool_setup = False
-            while tool_setup == False:
+        _max_retries = 5
+        _backoff = 1.0
+        mcps = []
+        for _attempt in range(_max_retries):
+            try:
                 mcps = await tool_manager.discover_mcp_servers()
                 tool_setup = await tool_manager.verify_tools()
-        except Exception as e:
-            self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
-            raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
+                if tool_setup and mcps:
+                    break
+            except Exception as e:
+                if _attempt == _max_retries - 1:
+                    self.logger.error(
+                        f"load_tools_code: MCP discovery failed after {_max_retries} attempts: {e}"
+                    )
+                    raise RuntimeError(
+                        f"MCP discovery failed after {_max_retries} attempts: {e}"
+                    ) from e
+                self.logger.warning(
+                    f"MCP discovery attempt {_attempt + 1}/{_max_retries} failed: {e}. "
+                    f"Retrying in {_backoff:.1f}s…"
+                )
+                await _asyncio.sleep(_backoff)
+                _backoff = min(_backoff * 2, 30.0)
+        else:
+            raise RuntimeError(
+                f"MCP servers did not become ready after {_max_retries} attempts."
+            )
         if not mcps:
             raise ValueError(
                 "\n" + "=" * 80 +
                 "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
                 "\n" + "-" * 80 +
                 "\nPlease ensure at least one MCP instance is running on Toolomics."
-                "\nRetrying until MCPs detected.... use CTRL+C to stop."
                 "\n" + "=" * 80 + "\n"
             )
         for mcp in mcps:

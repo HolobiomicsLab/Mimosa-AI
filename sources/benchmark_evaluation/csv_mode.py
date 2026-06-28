@@ -404,6 +404,17 @@ You MUST work exclusively in the workspace subfolder: {workspace_subfolder}
 All file operations MUST be performed within this subfolder.
 """
 
+        # When the Prompt is a self-contained task capsule (non-empty) and the URL
+        # points to a local file rather than a web resource, the file cannot be
+        # navigated to by the agent and the capsule already encodes all required
+        # context. In that case, skip the paper/URL wrapper entirely.
+        is_local_path = url and not url.startswith("http")
+        if prompt and is_local_path:
+            return f"""
+{prompt}
+{workspace_instruction}
+            """.strip()
+
         return f"""
     Paper title: {paper_title}
     Url to paper: {url}
@@ -500,9 +511,11 @@ EXECUTION RESULTS:
 Provide your analysis following the specified output format."""
 
         analysis_text = self.result_analyzer(prompt)
+        import re as _re
+        _sl = _re.search(r'SUCCESS_LEVEL:\s*(High|Medium|Low|Incomplete|Failed|Error)', analysis_text, _re.IGNORECASE)
         analysis = {
             "full_analysis": analysis_text,
-            "success_level": "Medium",
+            "success_level": _sl.group(1) if _sl else "Medium",
             "key_insight": "Analysis completed"
         }
         return analysis
@@ -607,6 +620,8 @@ Provide your analysis following the specified output format."""
         isolated_workspace = Path(self._base_workspace_dir) / f"worker_{task_id}"
         isolated_workspace.mkdir(parents=True, exist_ok=True)
         isolated_config.workspace_dir = str(isolated_workspace)
+        # Resolve to absolute so CWD-relative paths don't break in concurrent workers
+        isolated_config.runs_capsule_dir = str(Path(self.config.runs_capsule_dir).resolve())
         return isolated_config
 
     def _cleanup_isolated_workspace(self, task_id: str) -> None:
@@ -721,7 +736,7 @@ Provide your analysis following the specified output format."""
                         goal=goal,
                         judge=True,
                         enable_evolution=learning,
-                        scenario_rubric=None,
+                        scenario_rubric=scenario_rubric_filename,
                         single_agent_mode=single_agent_mode
                     )
                     results_str = self._format_task_mode_results(runs[-1])
@@ -827,9 +842,11 @@ EXECUTION RESULTS:
 Provide your analysis following the specified output format."""
 
         analysis_text = self.result_analyzer(prompt)
+        import re as _re
+        _sl = _re.search(r'SUCCESS_LEVEL:\s*(High|Medium|Low|Incomplete|Failed|Error)', analysis_text, _re.IGNORECASE)
         analysis = {
             "full_analysis": analysis_text,
-            "success_level": "Medium",
+            "success_level": _sl.group(1) if _sl else "Medium",
             "key_insight": "Analysis completed"
         }
         return analysis
@@ -1017,7 +1034,7 @@ Provide your analysis following the specified output format."""
                         runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
                                                         enable_evolution=learning,
-                                                        scenario_rubric=None,
+                                                        scenario_rubric=scenario_rubric_filename,
                                                         single_agent_mode=single_agent_mode
                                                        )
                         results_str = self._format_task_mode_results(runs[-1])

@@ -111,6 +111,9 @@ class Config:
         # Per-agent (SmolAgentFactory) execution timeout in seconds. Injected into
         # the generated workflow as AGENT_EXECUTION_TIMEOUT. 3600 = 1 hour.
         self.agent_execution_timeout: int = 18000
+        # Maximum input tokens per agent step before the context-window guard fires.
+        # Prevents runaway context explosion. Default 800k; raise for large-context models.
+        self.max_context_tokens: int = 800_000
         self.runner_default_max_memory_mb: int = 10000
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = "./tmp"
@@ -237,6 +240,7 @@ class Config:
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "agent_execution_timeout": self.agent_execution_timeout,
+            "max_context_tokens": self.max_context_tokens,
             "runner_default_max_memory_mb": self.runner_default_max_memory_mb,
             "runner_default_max_cpu_percent": self.runner_default_max_cpu_percent,
             "runner_temp_dir": self.runner_temp_dir,
@@ -256,6 +260,7 @@ class Config:
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.capsule_namer_model = data.get("capsule_namer_model", self.capsule_namer_model)
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
@@ -298,6 +303,9 @@ class Config:
         )
         self.agent_execution_timeout = data.get(
             "agent_execution_timeout", self.agent_execution_timeout
+        )
+        self.max_context_tokens = data.get(
+            "max_context_tokens", self.max_context_tokens
         )
         self.runner_default_max_memory_mb = data.get(
             "runner_default_max_memory_mb", self.runner_default_max_memory_mb
@@ -360,6 +368,7 @@ class Config:
         lines.append(f"  runner_default_python_version={self.runner_default_python_version}")
         lines.append(f"  runner_default_timeout={self.runner_default_timeout}")
         lines.append(f"  agent_execution_timeout={self.agent_execution_timeout}")
+        lines.append(f"  max_context_tokens={self.max_context_tokens}")
         lines.append(f"  runner_default_max_memory_mb={self.runner_default_max_memory_mb}")
         lines.append(f"  runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}")
         lines.append(f"  runner_temp_dir={self.runner_temp_dir}")

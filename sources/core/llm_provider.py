@@ -216,6 +216,14 @@ class LLMProvider:
         """
         return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
 
+    def _is_no_temperature_model(self) -> bool:
+        """True for models that reject the temperature parameter entirely.
+
+        Claude Opus 4.x (e.g. claude-opus-4-8) does not accept temperature
+        at all — passing it triggers an invalid_request_error from Anthropic.
+        """
+        return "claude-opus-4" in self.config.model.lower()
+
     def save_call(self, call: dict[str, Any]) -> None:
         """Save the API call details to a JSON file.
 
@@ -317,8 +325,11 @@ class LLMProvider:
 
     @staticmethod
     def _is_temperature_error(error: Exception) -> bool:
-        """True when the API rejected ``temperature``, read from ``error.param``."""
-        return getattr(error, "param", None) == "temperature"
+        """True when the API rejected the ``temperature`` parameter."""
+        if getattr(error, "param", None) == "temperature":
+            return True
+        msg = str(error).lower()
+        return "temperature" in msg and ("deprecated" in msg or "range" in msg)
 
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
@@ -404,18 +415,20 @@ class LLMProvider:
         attempt = 0
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
-        effective_temperature = self.config.temperature
+        # None means "omit temperature from the request" (required for Opus 4.x)
+        effective_temperature = None if self._is_no_temperature_model() else self.config.temperature
 
         while True:  # Infinite retry loop
             try:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": message,
-                    "temperature": effective_temperature,
                     "timeout": timeout,
                     "max_tokens": self.config.max_tokens,
                     "drop_params": True,
                 }
+                if effective_temperature is not None:
+                    completion_params["temperature"] = effective_temperature
                 completion_params["api_key"] = self.config.key
                 # Add reasoning effort if supported (not for Claude models)
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
@@ -454,12 +467,12 @@ class LLMProvider:
                 attempt += 1
 
             except Exception as e:
-                if self._is_temperature_error(e) and effective_temperature != 1.0:
+                if self._is_temperature_error(e) and effective_temperature is not None:
                     self.logger.warning(
-                        f"Provider rejected temperature={effective_temperature:.2f}; "
-                        f"falling back to 1.0 and retrying."
+                        f"Provider rejected temperature={effective_temperature}; "
+                        f"stripping temperature and retrying."
                     )
-                    effective_temperature = 1.0
+                    effective_temperature = None
                     continue
 
                 # Check if this is a retryable error

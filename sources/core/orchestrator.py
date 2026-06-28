@@ -89,8 +89,15 @@ class WorkflowOrchestrator:
                 result.stdout or result.stderr or "No output from workflow execution."
             )
         else:
-            print_err(f"Workflow execution failed: {result.stderr}")
-            raise Exception(f"Workflow execution failed: {result.stderr}")
+            stderr = result.stderr or ""
+            if "TimeoutExpired" in stderr or "timed out" in stderr.lower():
+                error_type = "TIMEOUT"
+            elif "SyntaxError" in stderr:
+                error_type = "SYNTAX_ERROR"
+            else:
+                error_type = "RUNTIME_ERROR"
+            print_err(f"[{error_type}] Workflow execution failed: {stderr}")
+            raise Exception(f"[{error_type}] Workflow execution failed: {stderr}")
 
     def perspicacite_grounding_task(self, task: str) -> str:
         """Query Perspicacite-AI for a literature-grounded approach to a task.

@@ -38,10 +38,9 @@ load_dotenv()
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
-
-import subprocess
-DANGEROUS_FUNCTIONS = {subprocess}
-DANGEROUS_MODULES = {}
+# Sandbox enforcement relies on smolagents' LocalPythonExecutor defaults.
+# Do NOT rebind DANGEROUS_MODULES/DANGEROUS_FUNCTIONS here — that only
+# changes the module-level name and never reaches the executor.
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -57,6 +56,29 @@ if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
 
     SmolagentsInstrumentor().instrument(tracer_provider=trace_provider)
 
+def _make_tool_json_aware(tool):
+    """Patch a tool's forward() so JSON-string responses are auto-parsed to dicts.
+
+    Toolomics MCP tools return raw JSON strings. Generated agent code that indexes
+    into the result without calling json.loads() first gets a TypeError. This wrapper
+    makes every tool silently parse its output when it is a valid JSON string, so
+    generated code can index directly without the boilerplate.
+    """
+    if not hasattr(tool, "forward"):
+        return tool
+    original_forward = tool.forward
+    def _json_aware_forward(*args, **kwargs):
+        result = original_forward(*args, **kwargs)
+        if isinstance(result, str):
+            try:
+                return json.loads(result)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return result
+    tool.forward = _json_aware_forward
+    return tool
+
+
 class SmolAgentFactory:
 
     def __init__(self,
@@ -64,11 +86,11 @@ class SmolAgentFactory:
                  instruct_prompt,
                  tools=[],
                  temperature=0.7,
-                 max_steps=128,
+                 max_steps=35,
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
-        self.tools = tools
+        self.tools = [_make_tool_json_aware(t) for t in tools]
         # variable defined by workflow factory
         self.model_id = MODEL_ID
         self.memory_folder = MEMORY_PATH
@@ -92,13 +114,37 @@ class SmolAgentFactory:
         assert os.path.exists(self.memory_folder), f"Memory folder {self.memory_folder} does not exist. Please create it."
 
 
+        # Maximum input-token count allowed per agent run. When any step's
+        # cumulative input tokens exceed this, the agent is stopped early to
+        # prevent context-window explosion and runaway cost. Injected from
+        # config as MAX_CONTEXT_TOKENS; falls back to 800k if not set.
+        self.max_context_tokens: int = globals().get("MAX_CONTEXT_TOKENS", 800_000)
+
         try:
             self.engine = self.get_engine()
+
+            def _context_guard_callback(step):
+                """Stop the agent when input tokens exceed the configured ceiling."""
+                if not isinstance(step, ActionStep):
+                    return
+                usage = getattr(step, "token_usage", None)
+                if usage is None:
+                    return
+                input_tokens = getattr(usage, "input_tokens", None) or (
+                    usage.get("input_tokens") if isinstance(usage, dict) else None
+                )
+                if input_tokens and input_tokens > self.max_context_tokens:
+                    raise RuntimeError(
+                        f"Context window guard: input tokens ({input_tokens:,}) exceeded "
+                        f"limit ({self.max_context_tokens:,}). Stopping agent '{self.name}'."
+                    )
+
             self.agent = CodeAgent(
                 tools=self.tools,
                 model=self.engine,
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
+                step_callbacks=[_context_guard_callback],
                 #planning_interval=planning_interval, # think more before acting
                 additional_authorized_imports = [
                     'requests', 'json', 'requests.exceptions',
@@ -201,9 +247,20 @@ class SmolAgentFactory:
                 truncated_answer = str(answer)[:4096] + "..." if len(str(answer)) > 4096 else str(answer)
                 prev_infos += f"- Agent '{step_name}': {truncated_answer}\n\n"
 
+        workspace_dir = globals().get("WORKSPACE_DIR", "")
+        workspace_hint = f"Workspace dir: {workspace_dir}" if workspace_dir else ""
+
         return f"""
 OPERATIONAL CONTEXT:
 {prev_infos}
+
+SANDBOX RULES (MANDATORY):
+1. NEVER use `open()`, `f.write()`, or any built-in file I/O — forbidden in this sandbox.
+   Use the file-write tools provided in the workflow context instead.
+2. Tool responses may be JSON strings — always parse before indexing:
+   result = json.loads(raw) if isinstance(raw, str) else raw
+   Then access content via result.get("stdout", str(raw)). Never assume arbitrary key names.
+3. ALL file paths must be ABSOLUTE. {workspace_hint}
 
 TASK:
 {self.instruct_prompt}
@@ -261,9 +318,14 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                     )
                     memories.append(action_step)
             try:
+                import fcntl
                 agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
                 with open(agent_task_path, "w") as f:
-                    json.dump(memories, f, indent=2)
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    try:
+                        json.dump(memories, f, indent=2)
+                    finally:
+                        fcntl.flock(f, fcntl.LOCK_UN)
                 print(f"Agent memories saved successfully to {agent_task_path}")
             except Exception as e:
                 print(f"Failed to save memory: {str(e)}")
@@ -358,12 +420,11 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                     error = False
                     warning = True
                 except Exception as e:
+                    result['exception'] = e
                     print(str(e))
                     print("retrying...")
                     error = True
                     count += 1
-                #result['exception'] = e
-                #result['completed'] = True
 
         agent_thread = threading.Thread(target=_run_agent, daemon=True)
         agent_thread.start()
@@ -377,6 +438,9 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                 raise result['exception']
             self.save_memories(workflow_uuid=workflow_uuid)
             return result['response']
+        except TimeoutError:
+            self.save_memories(workflow_uuid=workflow_uuid)
+            raise
         except Exception as e:
             self.save_memories(workflow_uuid=workflow_uuid)
             raise e

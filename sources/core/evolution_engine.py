@@ -353,8 +353,12 @@ class EvolutionEngine:
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
 
-        # Reset archive at session start
+        # Reset archive and variation history at session start so each task
+        # starts with a clean slate (prevents boldness contamination across rows).
         self.selection._archive = []
+        self.variation.score_history.clear()
+        self.variation.textual_gradient_history.clear()
+        self.variation.agent_count_history.clear()
 
         parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
@@ -467,7 +471,8 @@ class EvolutionEngine:
             original_task=runs[-1].original_task,
             single_agent_mode=single_agent_mode
         )
-        wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}"))
+        _valid_uuid = uuid and uuid != "generation_failed"
+        wf_info = WorkflowInfo(uuid, Path(f"{self.workflow_dir}/{uuid}")) if _valid_uuid else None
         self._save_evolution_prompt_artifact(uuid, runs[-1].prompt)
         # Persist lineage as soon as we have a uuid so the evolution tree can
         # include even runs that subsequently fail evaluation.
@@ -487,7 +492,7 @@ class EvolutionEngine:
         if workspace_mgr is not None and uuid:
             workspace_mgr.save_run_snapshot(uuid)
 
-        if workflow_genotype_code:
+        if workflow_genotype_code and wf_info:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
@@ -496,7 +501,7 @@ class EvolutionEngine:
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].code = wf_info.code
 
-        if uuid:
+        if uuid and wf_info:
             verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
             is_failure = (
                 on_error
@@ -518,11 +523,14 @@ class EvolutionEngine:
             )
 
         runs[-1].current_uuid = uuid
-        runs[-1].answers = wf_info.answers
-        runs[-1].state_result = wf_info.state_result
-        agents_answers = self.extract_agents_behavior(wf_info.state_result)
+        runs[-1].answers = wf_info.answers if wf_info else []
+        runs[-1].state_result = wf_info.state_result if wf_info else {}
+        agents_answers = self.extract_agents_behavior(wf_info.state_result if wf_info else {})
         self.show_answers(agents_answers)
-        rewards_history.append(wf_info.overall_score)
+        if not on_error and wf_info:
+            rewards_history.append(wf_info.overall_score)
+        else:
+            rewards_history.append(0.0)
 
         # ── Survivor validation: gate + populate _archive (steady-state population)
         if uuid and not on_error:
@@ -676,6 +684,40 @@ class EvolutionEngine:
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
         return runs
+
+    def _export_astra(self, best_uuid: str, goal: str) -> bool:
+        """Best-effort post-run ASTRA export of the best workflow's trace.
+
+        Gated on ``config.export_astra`` (opt-in, off by default). Failure is
+        non-fatal: a missing memory directory, an LLM hiccup, or a YAML write
+        error must not break the evolution loop. Writes a ``.export_status``
+        sidecar under the capsule directory so callers can inspect outcomes.
+
+        Returns:
+            ``True`` if export succeeded, ``False`` otherwise.
+        """
+        if not getattr(self.config, "export_astra", False):
+            return False
+        status_dir = os.path.join(self.config.runs_capsule_dir, best_uuid)
+        status_path = os.path.join(status_dir, ".export_status")
+        try:
+            from sources.transparency import AstraExporter
+            result = AstraExporter(self.config, self.logger).export(best_uuid, goal)
+            os.makedirs(status_dir, exist_ok=True)
+            with open(status_path, "w") as _f:
+                json.dump({"status": "ok", "path": str(result)}, _f)
+            return True
+        except Exception as exc:
+            self.logger.warning(f"[ASTRA] export skipped: {exc}")
+            print_warn(f"ASTRA export failed (non-fatal): {exc}")
+            try:
+                os.makedirs(status_dir, exist_ok=True)
+                with open(status_path, "w") as _f:
+                    json.dump({"status": "error", "error": str(exc)}, _f)
+            except Exception:
+                pass
+            return False
+
 
     def _get_human_validation(self) -> bool:
         """Get human validation for continuing the workflow.
