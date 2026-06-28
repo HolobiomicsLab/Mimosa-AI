@@ -131,6 +131,7 @@ nav:
       - ScienceAgentBench: science_agent_bench_evaluation.md
       - PaperBench: papers_bench_evaluation.md
       - Custom benchmarks: evaluation/custom-benchmarks.md
+      - Cost & fairness knobs: evaluation/cost_and_fairness.md
   - Reference:
       - CLI reference: reference/cli.md
       - Configuration reference: reference/configuration.md
