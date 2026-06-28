@@ -185,7 +185,7 @@ def test_declare_claim_importance_drops_duplicates_and_clamps_scale() -> None:
     """Rater output is respected: drop ids removed, importance clamped to [1,10]."""
     v = _StubVerifier()
 
-    def _fake_judge(_uuid, _agent, _prompt):
+    def _fake_judge(_uuid, _agent, _prompt, **_kwargs):
         return ({
             "drop_ids": ["dup"],
             "importance": [

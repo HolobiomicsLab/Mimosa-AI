@@ -371,7 +371,8 @@ class _VerifierPerClaimMixin:
         )
         cid = str(claim.get("id", "unknown"))
         parsed, err = self._call_judge_for_json(
-            uuid, f"verifier_select_files_{cid}", prompt
+            uuid, f"verifier_select_files_{cid}", prompt,
+            use_extraction_model=True,
         )
         if err or not isinstance(parsed, dict):
             self.logger.debug(f"file selection failed for {cid}: {err or 'non-dict JSON'}")
@@ -485,7 +486,9 @@ Return STRICT JSON only, in one of these two shapes:
         """Call the judge for a verifier spec; soft-fail to ``executable: False``."""
         suffix = "" if attempt == 1 else "_retry"
         agent_name = f"verifier_gen_{claim['id']}{suffix}"
-        spec, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        spec, err = self._call_judge_for_json(
+            uuid, agent_name, prompt, use_extraction_model=True
+        )
         if err is not None:
             return {"executable": False, "reason": err}
         if not isinstance(spec, dict):
@@ -805,7 +808,8 @@ Return STRICT JSON only, in one of these two shapes:
         """Ask the judge which missing pip packages are genuinely required."""
         prompt = self._build_package_check_prompt(claim, stderr)
         parsed, err = self._call_judge_for_json(
-            uuid, f"verifier_pkg_check_{claim['id']}", prompt
+            uuid, f"verifier_pkg_check_{claim['id']}", prompt,
+            use_extraction_model=True,
         )
         if err is not None or not isinstance(parsed, dict):
             self.logger.debug(
