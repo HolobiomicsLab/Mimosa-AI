@@ -56,6 +56,15 @@ class Config:
         # unless this is set. Final claim verdicts stay on judge_model.
         self.judge_extraction_model: str | None = None
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        # Capability tiers. Any *_model role above may be set to a tier alias
+        # ("heavy"/"light") instead of a concrete id; aliases are resolved to
+        # the tier's model at load time (see resolve_model). This lets the whole
+        # fleet's cost profile be swapped by editing these two lines. Defaults
+        # below use concrete ids (no alias), so the tiers are inert until used.
+        self.model_tiers: dict[str, str] = {
+            "heavy": "openrouter/z-ai/glm-5.2",
+            "light": "openrouter/minimax/minimax-m3",
+        }
         self.engine_name: str = "litellm" # for smolagent
 
 
@@ -230,6 +239,7 @@ class Config:
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
             "judge_extraction_model": self.judge_extraction_model,
+            "model_tiers": self.model_tiers,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
@@ -259,6 +269,17 @@ class Config:
             "runner_requirements": self.runner_requirements,
         }
 
+    def resolve_model(self, value: str | None) -> str | None:
+        """Resolve a model-role value: a tier alias -> its model, else as-is.
+
+        Lets any ``*_model`` config field hold a tier alias ("heavy"/"light")
+        which maps via ``model_tiers``. A concrete model id (or None) is
+        returned unchanged, so this is a no-op for the default concrete ids.
+        """
+        if value is None:
+            return None
+        return self.model_tiers.get(value, value)
+
     def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workspace_dir = data.get("workspace_dir", self.workspace_dir)
@@ -266,6 +287,7 @@ class Config:
             AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
             for addr in data.get("discovery_addresses", [])
         ]
+        self.model_tiers = data.get("model_tiers", self.model_tiers)
         self.planner_llm_model = data.get("planner_llm_model", self.planner_llm_model)
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
@@ -276,6 +298,13 @@ class Config:
             "judge_extraction_model", self.judge_extraction_model
         )
         self.capsule_namer_model = data.get("capsule_namer_model", self.capsule_namer_model)
+        # Resolve any tier aliases ("heavy"/"light") on the model roles now that
+        # both the roles and model_tiers have been loaded from the dict.
+        for _role in (
+            "planner_llm_model", "workflow_llm_model", "smolagent_model_id",
+            "judge_model", "judge_extraction_model", "capsule_namer_model",
+        ):
+            setattr(self, _role, self.resolve_model(getattr(self, _role)))
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
@@ -361,6 +390,7 @@ class Config:
         lines.append(f"  judge_model={self.judge_model}")
         lines.append(f"  judge_extraction_model={self.judge_extraction_model or '(= judge_model)'}")
         lines.append(f"  capsule_namer_model={self.capsule_namer_model}")
+        lines.append(f"  model_tiers={self.model_tiers}")
         lines.append(f"  engine_name={self.engine_name}")
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")
