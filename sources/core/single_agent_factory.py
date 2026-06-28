@@ -189,6 +189,13 @@ agent = CodeAgent(
         'math', 'random', 'statistics', 'decimal', 'fractions',
         'traceback', 'inspect', 'gc', 'warnings', 'io',
         'gzip', 'zipfile', 'tarfile', 'zlib',
+        # Scientific computing & ML — enables data-analysis reproduction
+        # workflows (RandomForest, PCA/PCoA, distance metrics, clustering).
+        'scipy', 'scipy.stats', 'scipy.spatial', 'scipy.spatial.distance',
+        'scipy.cluster', 'scipy.cluster.hierarchy',
+        'sklearn', 'sklearn.ensemble', 'sklearn.decomposition',
+        'sklearn.preprocessing', 'sklearn.model_selection',
+        'sklearn.metrics', 'sklearn.manifold',
     ]
 )
 

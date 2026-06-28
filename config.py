@@ -163,6 +163,9 @@ class Config:
             #"matplotlib>=3.9.0",
             "pandas==2.3.2",
             "numpy>=2.0.0",
+            # scientific computing & ML for data-analysis reproduction workflows
+            "scikit-learn>=1.4",
+            "scipy>=1.11",
             # correct PyPI package name
             "python-a2a",
             "opentelemetry-sdk",
