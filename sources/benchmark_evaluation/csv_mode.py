@@ -244,7 +244,6 @@ Provide a structured analysis with:
         self,
         capsule_name: str,
         goal: str,
-        analysis: dict,
         execution_time: float,
         current_execution_data: dict | None = None
     ) -> None:
@@ -254,7 +253,6 @@ Provide a structured analysis with:
         Args:
             capsule_name: Name of the capsule directory
             goal: The task goal
-            analysis: Analysis results dictionary
             execution_time: Time taken for execution
             current_execution_data: Optional current task execution data (for concurrent mode).
                                    If provided, this task's data is included even if not yet
@@ -276,7 +274,6 @@ Provide a structured analysis with:
             "model": self.config.smolagent_model_id,
             "goal": goal,
             "execution_time_seconds": execution_time,
-            "analysis": analysis["full_analysis"],
             "total_eval": len(sab_runs),
             "start_row": self._start_row + 1,
             "git": self._get_git_info()
@@ -486,26 +483,6 @@ EXPECTED OUTPUT:
                 for (n, x) in zip(state_result["step_name"], state_result["answers"], strict=True)
             )
         return "No answers found in workflow execution."
-
-    def _analyze_results(self, goal: str, results_str: str, execution_time: float) -> dict[str, str]:
-        """Analyze execution results using LLM."""
-        files = list_files(self.config.workspace_dir, max_depth=3)
-        prompt = f"""Analyze the following Mimosa-AI execution:
-TASK: {goal}
-EXECUTION TIME: {execution_time:.2f} seconds
-FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
-{files}
-EXECUTION RESULTS:
-{results_str}
-Provide your analysis following the specified output format."""
-
-        analysis_text = self.result_analyzer(prompt)
-        analysis = {
-            "full_analysis": analysis_text,
-            "success_level": "Medium",
-            "key_insight": "Analysis completed"
-        }
-        return analysis
 
     def sab_files_transfer(self, sab_loader, file_transfer, row):
         """Transfer dataset files to workspace with validation."""
@@ -747,14 +724,10 @@ Provide your analysis following the specified output format."""
                 execution_time = time.time() - iteration_start_time
 
                 # Analyze results using isolated workspace path
-                analysis = self._analyze_results_isolated(goal, results_str, execution_time, isolated_config.workspace_dir)
-
                 execution_data = {
                     "iteration": i + 1,
                     "goal": goal,
                     "execution_time": execution_time,
-                    "success_level": analysis.get("success_level", "Unknown"),
-                    "key_insight": analysis.get("full_analysis", "Unknown"),
                     "task_id": task_id
                 }
 
@@ -773,7 +746,7 @@ Provide your analysis following the specified output format."""
                 # Save run notes (thread-safe via file system)
                 # Pass current execution_data for concurrent mode since execution_history isn't updated yet
                 self._save_run_notes(
-                    capsule_name, goal, analysis, execution_time,
+                    capsule_name, goal, execution_time,
                     current_execution_data=execution_data
                 )
 
@@ -999,7 +972,7 @@ Provide your analysis following the specified output format."""
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
             self.logger.info(f"[PAPERS DATASET MODE] Starting autonomous loop for {total_rows} CSV entry")
-            print_phase("🤖 RUN ON PAPERS DATASETS")
+            print_phase("Evaluating on paper datasets...")
             for i, row in enumerate(reader):
                 if i < start_row:
                     print_info(f"Skipping evaluation (using cache) for row {i + 1}")
@@ -1026,19 +999,15 @@ Provide your analysis following the specified output format."""
                                     judge=True,
                                     max_task_retry=3
                                    )
-                        results_str = self._format_goal_mode_results(tasks_data)
                     print_info("📦 Transferring results files…")
                     trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
                     capsule_name = trs.transfer_workspace_files_to_capsule(goal)
                     print_info("📊 Analyzing results…")
                     execution_time = time.time() - iteration_start_time
-                    analysis = self._analyze_results(goal, results_str, execution_time)
                     execution_data = {
                         "iteration": i + 1,
                         "goal": goal,
                         "execution_time": execution_time,
-                        "success_level": analysis.get("success_level", "Unknown"),
-                        "key_insight": analysis.get("full_analysis", "Unknown"),
                         "task_id": self._extract_workspace_name_from_row(row),
                     }
                     if dataset_type == "science_agent_bench" and sab_loader:
