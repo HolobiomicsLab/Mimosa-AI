@@ -129,8 +129,7 @@ class _VerifierClaimExtractionMixin:
             prompt = source.build(source_ctx)
             t_src = time.time()
             data, err = self._call_judge_for_json(
-                uuid, f"verifier_extract_claims_{label}", prompt,
-                use_extraction_model=True,
+                uuid, f"verifier_extract_claims_{label}", prompt
             )
             if err is not None:
                 self.logger.warning(
@@ -353,9 +352,7 @@ class _VerifierClaimExtractionMixin:
         """Rate one batch; default-importance fallback on parse/call error."""
         prompt = self._build_importance_batch_prompt(goal, batch, grounding)
         agent_name = f"verifier_rate_importance_b{batch_idx}"
-        data, err = self._call_judge_for_json(
-            uuid, agent_name, prompt, use_extraction_model=True
-        )
+        data, err = self._call_judge_for_json(uuid, agent_name, prompt)
         if err is not None or not isinstance(data, dict):
             self.logger.warning(
                 f"importance batch {batch_idx} failed for {uuid} "

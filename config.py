@@ -50,10 +50,11 @@ class Config:
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.smolagent_model_id: str = "deepseek/deepseek-v4-flash"
         self.judge_model = "openrouter/mistralai/mixtral-8x22b-instruct"
-        # Optional cheaper model for the verifier's mechanical calls (claim
-        # extraction, dedup, importance rating, file selection, verifier-script
-        # generation). None reuses judge_model, so behaviour is unchanged
-        # unless set. Final claim verdicts stay on judge_model.
+        # Optional cheaper model for the verifier's genuinely mechanical calls
+        # (claim dedup, missing-package checks). None reuses judge_model, so
+        # behaviour is unchanged unless set. Calls that need judgement
+        # (extraction, importance, file selection, verifier-script generation,
+        # verdicts) always stay on judge_model.
         self.judge_extraction_model: str | None = None
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent

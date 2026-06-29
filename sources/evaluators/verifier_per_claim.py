@@ -371,8 +371,7 @@ class _VerifierPerClaimMixin:
         )
         cid = str(claim.get("id", "unknown"))
         parsed, err = self._call_judge_for_json(
-            uuid, f"verifier_select_files_{cid}", prompt,
-            use_extraction_model=True,
+            uuid, f"verifier_select_files_{cid}", prompt
         )
         if err or not isinstance(parsed, dict):
             self.logger.debug(f"file selection failed for {cid}: {err or 'non-dict JSON'}")
@@ -486,9 +485,7 @@ Return STRICT JSON only, in one of these two shapes:
         """Call the judge for a verifier spec; soft-fail to ``executable: False``."""
         suffix = "" if attempt == 1 else "_retry"
         agent_name = f"verifier_gen_{claim['id']}{suffix}"
-        spec, err = self._call_judge_for_json(
-            uuid, agent_name, prompt, use_extraction_model=True
-        )
+        spec, err = self._call_judge_for_json(uuid, agent_name, prompt)
         if err is not None:
             return {"executable": False, "reason": err}
         if not isinstance(spec, dict):

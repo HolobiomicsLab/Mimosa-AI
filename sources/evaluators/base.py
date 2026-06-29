@@ -123,9 +123,9 @@ class BaseEvaluator:
             self.workflow_dir.mkdir(parents=True, exist_ok=True)
 
             self.judge_model = config.judge_model
-            # Optional cheaper tier for the verifier's mechanical extraction
-            # calls. Falls back to judge_model when unset, so the default
-            # behaviour (one model for everything) is unchanged.
+            # Optional cheaper tier for the verifier's genuinely mechanical
+            # calls (claim dedup, missing-package checks). Falls back to
+            # judge_model when unset, so default behaviour is unchanged.
             self.judge_extraction_model = (
                 getattr(config, "judge_extraction_model", None) or self.judge_model
             )
@@ -346,9 +346,11 @@ class BaseEvaluator:
             agent_name: Logical name for this judge call (used for memory file).
             prompt: User-side prompt to send to the judge.
             use_extraction_model: Route this call to the cheaper
-                ``judge_extraction_model`` tier (for mechanical extraction calls
-                such as claim extraction, importance rating, file selection and
-                verifier-script generation). Defaults to False (strong judge).
+                ``judge_extraction_model`` tier. Reserved for the genuinely
+                mechanical calls (claim dedup, missing-package checks); calls
+                that need judgement — claim extraction, importance rating, file
+                selection, verifier-script generation, soft verdicts — stay on
+                judge_model. Defaults to False (strong judge).
 
         Returns:
             Raw text response from the LLM provider.
