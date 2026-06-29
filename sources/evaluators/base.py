@@ -123,17 +123,19 @@ class BaseEvaluator:
             self.workflow_dir.mkdir(parents=True, exist_ok=True)
 
             self.judge_model = config.judge_model
+            # Optional cheaper tier for the verifier's mechanical extraction
+            # calls. Falls back to judge_model when unset, so the default
+            # behaviour (one model for everything) is unchanged.
+            self.judge_extraction_model = (
+                getattr(config, "judge_extraction_model", None) or self.judge_model
+            )
             try:
-                provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
-                self.llm_config = LLMConfig().from_dict({
-                    "model": model,
-                    "provider": provider,
-                    "temperature": 0.2,
-                    "reasoning_effort": config.reasoning_effort,
-                    "max_tokens": getattr(config, 'max_tokens', 8192),
-                    "openrouter_provider": config.openrouter_provider_for(self.judge_model),
-                    "openrouter_quantizations": config.openrouter_quantizations_for(self.judge_model),
-                })
+                self.llm_config = self._build_judge_llm_config(self.judge_model, config)
+                self.extraction_llm_config = (
+                    self.llm_config
+                    if self.judge_extraction_model == self.judge_model
+                    else self._build_judge_llm_config(self.judge_extraction_model, config)
+                )
             except Exception as e:
                 raise EvaluatorError(f"Failed to initialize LLM configuration: {str(e)}") from e
 
@@ -308,13 +310,45 @@ class BaseEvaluator:
         "the JSON object, no prose, no markdown fences, no commentary."
     )
 
-    def _call_judge(self, uuid: str, agent_name: str, prompt: str) -> str:
+    def _build_judge_llm_config(self, model_id: str, config: "Config") -> LLMConfig:
+        """Build an LLMConfig for a judge/extraction model id ("provider/model").
+
+        Centralises judge LLM construction so the strong judge and the optional
+        cheaper extraction tier are configured identically (temperature,
+        reasoning effort, OpenRouter provider/quantization routing).
+
+        Args:
+            model_id: Model identifier, optionally "provider/model" (defaults to
+                the ``openai`` provider when no "/" is present).
+            config: The run config (supplies reasoning_effort, max_tokens and the
+                OpenRouter routing lookups).
+
+        Returns:
+            A configured :class:`LLMConfig` for that model.
+        """
+        provider, model = model_id.split("/", 1) if "/" in model_id else ("openai", model_id)
+        return LLMConfig().from_dict({
+            "model": model,
+            "provider": provider,
+            "temperature": 0.2,
+            "reasoning_effort": config.reasoning_effort,
+            "max_tokens": getattr(config, 'max_tokens', 8192),
+            "openrouter_provider": config.openrouter_provider_for(model_id),
+            "openrouter_quantizations": config.openrouter_quantizations_for(model_id),
+        })
+
+    def _call_judge(self, uuid: str, agent_name: str, prompt: str,
+                    use_extraction_model: bool = False) -> str:
         """One judge round-trip; raises whatever the LLM provider raises.
 
         Args:
             uuid: Workflow identifier (used to scope per-uuid memory).
             agent_name: Logical name for this judge call (used for memory file).
             prompt: User-side prompt to send to the judge.
+            use_extraction_model: Route this call to the cheaper
+                ``judge_extraction_model`` tier (for mechanical extraction calls
+                such as claim extraction, importance rating, file selection and
+                verifier-script generation). Defaults to False (strong judge).
 
         Returns:
             Raw text response from the LLM provider.
@@ -325,7 +359,7 @@ class BaseEvaluator:
             agent_name=agent_name,
             memory_path=memory_path,
             system_msg=self._get_judge_system_prompt(),
-            config=self.llm_config,
+            config=self.extraction_llm_config if use_extraction_model else self.llm_config,
         )
         return provider(prompt)
 
@@ -334,6 +368,7 @@ class BaseEvaluator:
         uuid: str,
         agent_name: str,
         prompt: str,
+        use_extraction_model: bool = False,
     ) -> tuple[Any, str | None]:
         """Call the judge expecting JSON; one retry on parse failure.
 
@@ -353,7 +388,9 @@ class BaseEvaluator:
         for attempt in (1, 2):
             agent = agent_name if attempt == 1 else f"{agent_name}_retry"
             try:
-                raw = self._call_judge(uuid, agent, cur_prompt)
+                raw = self._call_judge(
+                    uuid, agent, cur_prompt, use_extraction_model=use_extraction_model
+                )
             except Exception as e:
                 last_err = f"judge call failed: {type(e).__name__}: {e}"
                 self.logger.warning(f"[{agent}] {last_err}")

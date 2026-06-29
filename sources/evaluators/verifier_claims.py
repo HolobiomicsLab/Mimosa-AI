@@ -129,7 +129,8 @@ class _VerifierClaimExtractionMixin:
             prompt = source.build(source_ctx)
             t_src = time.time()
             data, err = self._call_judge_for_json(
-                uuid, f"verifier_extract_claims_{label}", prompt
+                uuid, f"verifier_extract_claims_{label}", prompt,
+                use_extraction_model=True,
             )
             if err is not None:
                 self.logger.warning(
@@ -302,7 +303,8 @@ class _VerifierClaimExtractionMixin:
         """Single cheap LLM call returning only ids to drop as near-duplicates."""
         prompt = self._build_dedup_prompt(goal, claims, grounding)
         data, err = self._call_judge_for_json(
-            uuid, "verifier_dedup_claims", prompt
+            uuid, "verifier_dedup_claims", prompt,
+            use_extraction_model=True,
         )
         if err is not None or not isinstance(data, dict):
             self.logger.warning(
@@ -351,7 +353,9 @@ class _VerifierClaimExtractionMixin:
         """Rate one batch; default-importance fallback on parse/call error."""
         prompt = self._build_importance_batch_prompt(goal, batch, grounding)
         agent_name = f"verifier_rate_importance_b{batch_idx}"
-        data, err = self._call_judge_for_json(uuid, agent_name, prompt)
+        data, err = self._call_judge_for_json(
+            uuid, agent_name, prompt, use_extraction_model=True
+        )
         if err is not None or not isinstance(data, dict):
             self.logger.warning(
                 f"importance batch {batch_idx} failed for {uuid} "

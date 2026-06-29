@@ -50,6 +50,11 @@ class Config:
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
         self.smolagent_model_id: str = "deepseek/deepseek-v4-flash"
         self.judge_model = "openrouter/mistralai/mixtral-8x22b-instruct"
+        # Optional cheaper model for the verifier's mechanical calls (claim
+        # extraction, dedup, importance rating, file selection, verifier-script
+        # generation). None reuses judge_model, so behaviour is unchanged
+        # unless set. Final claim verdicts stay on judge_model.
+        self.judge_extraction_model: str | None = None
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         self.engine_name: str = "litellm" # for smolagent
 
@@ -221,6 +226,7 @@ class Config:
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
+            "judge_extraction_model": self.judge_extraction_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "prompt_planner": self.prompt_planner,
@@ -262,6 +268,9 @@ class Config:
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.judge_extraction_model = data.get(
+            "judge_extraction_model", self.judge_extraction_model
+        )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
@@ -342,6 +351,7 @@ class Config:
         lines.append(f"  workflow_llm_model={self.workflow_llm_model}")
         lines.append(f"  smolagent_model_id={self.smolagent_model_id}")
         lines.append(f"  judge_model={self.judge_model}")
+        lines.append(f"  judge_extraction_model={self.judge_extraction_model or '(= judge_model)'}")
         lines.append(f"  capsule_namer_model={self.capsule_namer_model}")
         lines.append(f"  engine_name={self.engine_name}")
         lines.append(f"  prompt_planner={self.prompt_planner}")

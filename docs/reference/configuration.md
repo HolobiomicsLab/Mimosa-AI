@@ -24,6 +24,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `workflow_llm_model` | `str` | `openai/gpt-5.5` | Workflow synthesis. |
 | `smolagent_model_id` | `str` | `openrouter/deepseek/deepseek-v3.2` | Execution agents inside the sandbox. |
 | `judge_model` | `str` | `openai/gpt-5.5` | Verifier soft-claim verdicts. |
+| `judge_extraction_model` | `str \| None` | `None` | Cheaper model for the verifier's mechanical calls (claim extraction, dedup, importance, file selection, verifier-script generation). Falls back to `judge_model` when unset. |
 | `capsule_namer_model` | `str` | `deepseek/deepseek-chat` | Generates human-readable capsule names. |
 | `engine_name` | `str` | `litellm` | SmolAgents engine — keep as `litellm`. |
 | `reasoning_effort` | `str` | `medium` | `minimal | low | medium | high` for models that support it. |
