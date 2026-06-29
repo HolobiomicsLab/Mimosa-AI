@@ -19,7 +19,7 @@ in [`concepts/evolution-engine.md`](../../concepts/evolution-engine.md) and
 |---|------|---------------|--------------|
 | 1 | `fig01_evolution_loop` | The per-generation cycle: synthesize → run → verify → select → vary | Evolution engine · Big picture |
 | 2 | `fig02_genotype_phenotype` | Code-as-genotype → workspace-as-phenotype, plus the embedding branch | Evolution engine · what's evolving |
-| 3 | `fig03_qd_archive` | The MAP-Elites quality × novelty archive (`qd = ¾·quality + ¼·novelty`) | Selection: Quality-Diversity |
+| 3 | `fig03_qd_archive` | The unstructured Quality-Diversity archive scored by `qd = ¾·quality + ¼·novelty` | Selection: Quality-Diversity |
 | 4 | `fig04_genotype_embedding` | Genotype embedding (MiniLM 384-d) → cosine k-NN novelty, `k = 15` | Behaviour descriptor |
 | 5 | `fig05_rechenberg_boldness` | Effective-boldness function vs. success rate / plateau (Rechenberg 1/5) | Variation · evidence-driven scope |
 | 6 | `fig06_scope_ladder` | The five mutation-scope bands, EXPLOITATION → RE-SPECIATION | Variation · scope band table |

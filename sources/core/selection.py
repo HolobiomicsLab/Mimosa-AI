@@ -33,7 +33,7 @@ class SelectionStrategy(Enum):
     GREEDY = "greedy"             # Accept only if strictly better (current behaviour)
     TOURNAMENT = "tournament"     # Probabilistic tournament selection
     NOVELTY = "novelty"           # Novelty search: reward behavioural diversity
-    QUALITY_DIVERSITY = "qd"      # MAP-Elites style: novelty + quality combined
+    QUALITY_DIVERSITY = "qd"      # Unstructured archive scored by scalarised novelty + quality
 
 
 @dataclass
