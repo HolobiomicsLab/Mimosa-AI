@@ -49,11 +49,54 @@ LLM choice is the biggest lever you have. Some practical guidance:
 
 === "Judge"
 
-    The judge needs decent reasoning but is only called once per generation. A
-    capable medium-size model is usually enough:
+    The judge model scores the soft claims in the verifier. During an
+    evaluation run the verifier is one of the places where the most tokens get
+    spent, so the model you choose here has a real effect on how much a run
+    costs in the end.
 
+    The judge needs decent reasoning, but it does not need the single most
+    expensive flagship model you can find. A capable medium-size model is
+    usually enough, and a medium-size model costs a lot less per token than a
+    flagship one. As a rough guide, a mid-tier model such as a Sonnet-class
+    Claude or `deepseek-v4-pro` is in the region of five times cheaper per
+    token than a top-tier flagship such as an Opus-class Claude, and it still
+    does a good job on the kind of judging the verifier asks for. Good picks
+    that you call directly:
+
+    - `anthropic/claude-sonnet-4-6`
     - `openai/gpt-5.5`
-    - `anthropic/claude-opus-4-5`
+
+    If you run your models through OpenRouter, which is the common setup for
+    the metabolomics evaluation, there are several capable-but-cheaper routes
+    that also work well as a judge:
+
+    - `openrouter/deepseek/deepseek-v4-pro`
+    - `openrouter/z-ai/glm-5`
+    - an OpenRouter MiniMax route (for example the latest `minimax` model)
+
+    The exact version tag for a given model changes over time on OpenRouter,
+    so it is worth checking what is currently offered and picking the most
+    recent capable version of whichever family you prefer. Either way, the
+    point is the same: a mid-tier model is plenty for the judge, and it costs
+    much less than a flagship.
+
+    So the simplest and biggest cost saving you can make for evaluation is to
+    set `judge_model` to one capable-but-cheaper model and let the whole
+    verifier run on it, rather than pointing it at the most expensive model
+    you have.
+
+    You might be tempted to go one step further and add a second, even cheaper
+    model just for the small mechanical steps inside the verifier — for
+    example dropping duplicate claims, or checking which Python packages a
+    claim needs. In practice this is not worth doing. Those mechanical steps
+    are only a small fraction of all the tokens the verifier uses, so moving
+    them onto a separate cheap model saves almost nothing while making the
+    configuration harder to follow. The calls that actually cost tokens, and
+    that actually need good judgement — rating how important a claim is,
+    choosing which files to look at, writing the small verifier script, and
+    giving the final verdict — are better left on the one `judge_model` you
+    already picked. Choosing a sensible `judge_model` is where essentially all
+    of the saving comes from.
 
 !!! tip "OpenRouter routing"
     For OpenRouter models, Mimosa picks providers from `openrouter_provider`
