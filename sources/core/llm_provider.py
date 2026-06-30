@@ -216,6 +216,40 @@ class LLMProvider:
         """
         return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
 
+    def _supports_prompt_caching(self) -> bool:
+        """True for providers that honour Anthropic-style ``cache_control`` hints.
+
+        Anthropic direct caches the marked prefix; OpenRouter forwards the
+        hint to upstreams that support it and silently ignores it elsewhere.
+        OpenAI caches long prompts automatically and needs no flag.
+        """
+        return self.config.provider in ("anthropic", "openrouter")
+
+    def _apply_cache_control(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Return a copy of ``messages`` with an ephemeral breakpoint on the system block.
+
+        Leaves the input list untouched so persistence and the exact-match
+        disk cache keep their plain-string shape. Only the system message is
+        marked — one of Anthropic's four allowed breakpoints.
+        """
+        if not self.sys_msg or not self._supports_prompt_caching():
+            return messages
+
+        out: list[dict[str, Any]] = []
+        for msg in messages:
+            if msg.get("role") == "system" and isinstance(msg.get("content"), str):
+                out.append({
+                    "role": "system",
+                    "content": [{
+                        "type": "text",
+                        "text": msg["content"],
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                })
+            else:
+                out.append(msg)
+        return out
+
     def save_call(self, call: dict[str, Any]) -> None:
         """Save the API call details to a JSON file.
 
@@ -410,7 +444,7 @@ class LLMProvider:
             try:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
-                    "messages": message,
+                    "messages": self._apply_cache_control(message),
                     "temperature": effective_temperature,
                     "timeout": timeout,
                     "max_tokens": self.config.max_tokens,
@@ -503,9 +537,21 @@ class LLMProvider:
             prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
             completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
             total_tokens = getattr(usage, 'total_tokens', 0) or 0
+            # Anthropic surfaces cache hits as cache_{read,creation}_input_tokens via
+            # litellm; OpenAI's automatic cache appears under prompt_tokens_details.
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+            cache_creation = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+            if not cache_read:
+                details = getattr(usage, 'prompt_tokens_details', None)
+                if details is not None:
+                    cache_read = getattr(details, 'cached_tokens', 0) or 0
+            cache_suffix = (
+                f", Cache read: {cache_read}, Cache creation: {cache_creation}"
+                if (cache_read or cache_creation) else ""
+            )
             self.logger.info(
                 f"📊 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, "
-                f"Total: {total_tokens} (max_tokens: {self.config.max_tokens})"
+                f"Total: {total_tokens}{cache_suffix} (max_tokens: {self.config.max_tokens})"
             )
 
         # Check for truncation due to max_tokens limit
