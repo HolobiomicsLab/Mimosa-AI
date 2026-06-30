@@ -66,10 +66,6 @@ class ClaimContext:
             source A only. Empty string when unavailable.
         execution_text: Agent narration / produced output; consumed by
             source E only.
-        prior_claims: Rendered text of claims produced for this source on
-            an earlier workflow for the same task. The builder appends it
-            so the LLM is steered to reproduce the same ids and descriptions
-            where they still apply. Empty string when no prior cache exists.
     """
 
     goal: str
@@ -78,41 +74,6 @@ class ClaimContext:
     target_max: int
     grounding: str = ""
     execution_text: str = ""
-    prior_claims: str = ""
-
-
-# Rendered when prior claims for this source exist. The instruction keeps the
-# claim_id set stable across iterations of the same task so verifier scores
-# are comparable, while still permitting adaptation when the current workspace
-# legitimately diverges from the seed (e.g. a referenced file no longer
-# exists, or the workflow now produces a different artefact type).
-_PRIOR_CLAIMS_INSTRUCTION = """
-PRIOR CLAIMS — REPRODUCE THE SAME LIST WHERE STILL APPLICABLE
-The list below was extracted from a prior workflow attempt for THIS SAME
-task. Reproduce this list as closely as possible:
-- KEEP the same `id` verbatim for any prior claim that still applies to the
-  current workspace; reusing the id is how downstream scoring stays
-  comparable across iterations.
-- KEEP the description if it still describes a true success condition; adapt
-  it only when the current artefact's shape or naming makes the old wording
-  wrong (e.g. a referenced file is gone, the workflow now produces a PNG
-  where it previously produced a CSV).
-- DROP a prior claim only when no artefact in the current workspace could
-  plausibly let it be checked (the file is gone and nothing replaces it).
-- ADD new claims only when the current workflow exposes a success condition
-  not covered by any prior claim. Do not duplicate intents already covered.
-
-PRIOR CLAIMS (id — description; likely_relevant_files):
-{prior_claims}
-"""
-
-
-def _render_prior_claims_block(prior_claims: str) -> str:
-    """Return the prior-claims instruction block, or empty when no cache exists."""
-    text = (prior_claims or "").strip()
-    if not text:
-        return ""
-    return _PRIOR_CLAIMS_INSTRUCTION.format(prior_claims=text)
 
 
 @dataclass(frozen=True)
@@ -169,7 +130,6 @@ quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
 must encode that bar — not merely "a result exists". Phrase it so a
 workflow that skipped, faked, or left the deliverable empty FAILS it.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims.
@@ -250,7 +210,6 @@ short list — DO NOT pad with claims the user did not write. It is fine
 to return fewer than {ctx.target_min} claims when the goal is terse; do not
 invent constraints.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for up to {ctx.target_max} Source-B claims, but only as many as the goal
@@ -307,7 +266,6 @@ Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
 suboptimal — it is incorrect.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims, but only ones grounded
@@ -354,7 +312,6 @@ EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
 This source verifies non-negotiable computer-science PRACTICE — not
 engineering aesthetics.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for up to {ctx.target_max} Source-D claims, but only as many as the
@@ -426,7 +383,6 @@ scientific success — claims that target the headline result deserve
 extraction. Skip baseline claims for tasks with no obvious null to
 compare against — do not invent one.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims, only as many as the

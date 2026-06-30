@@ -221,10 +221,12 @@ class VerifierEvaluator(
     def evaluate(self, uuid: str) -> dict[str, Any]:
         """Run the verifier pipeline; persists scores under ``evaluation.verifier``.
 
-        Claim continuity across iterations is achieved by a per-(task, source)
-        claim-text cache (``_load_prior_claims_text`` / ``_persist_claims_for_source``),
-        not by reusing verifier scripts. Every per-claim verifier script is
-        generated fresh against the current workspace.
+        Claim continuity across iterations is achieved by a per-task rubric
+        cache (``_load_cached_rubric`` / ``_persist_rubric``): the first run
+        freezes the full ranked claim list (ids, descriptions, importance),
+        every subsequent run reuses it verbatim and skips extraction, dedup,
+        and importance rating. Per-claim verifier scripts are still generated
+        fresh against the current workspace.
 
         Args:
             uuid: Workflow identifier to evaluate.
@@ -516,12 +518,14 @@ class VerifierEvaluator(
         return {"uuid": uuid, "claims": [], **scores}
 
     # ------------------------------------------------------------------
-    # Per-(task, source) claim-list cache — seeds claim continuity across
-    # workflow iterations without reusing verifier scripts (which would
-    # anchor the rubric to the seed's surface naming choices).
+    # Per-task rubric cache — freezes the final (post-dedup, post-importance)
+    # claim list so verifier scores are comparable across iterations of the
+    # SAME task. On cache hit, claim extraction, dedup, and importance rating
+    # are all skipped; only `likely_relevant_files` is re-validated against
+    # the current workspace.
     # ------------------------------------------------------------------
 
-    _CLAIM_CACHE_FILENAME_FMT = "claim_cache_{task_key}_source_{label}.json"
+    _RUBRIC_CACHE_FILENAME_FMT = "rubric_cache_{task_key}.json"
 
     @property
     def verifier_temp_root(self) -> Path:
@@ -538,80 +542,80 @@ class VerifierEvaluator(
         """
         return hashlib.sha256((goal or "").encode("utf-8")).hexdigest()[:16]
 
-    def _claim_cache_path(self, task_key: str, source_label: str) -> Path:
-        """On-disk path of the cached claim list for one (task, source) pair."""
-        return self._runner_temp_root / self._CLAIM_CACHE_FILENAME_FMT.format(
-            task_key=task_key, label=source_label
+    def _rubric_cache_path(self, task_key: str) -> Path:
+        """On-disk path of the frozen rubric for one task."""
+        return self._runner_temp_root / self._RUBRIC_CACHE_FILENAME_FMT.format(
+            task_key=task_key
         )
 
-    def _load_prior_claims_text(self, task_key: str, source_label: str) -> str:
-        """Return the rendered prior-claims block for this source, or empty string.
+    def _load_cached_rubric(self, task_key: str) -> list[dict[str, Any]] | None:
+        """Return the cached rubric claim list, or None when no cache exists.
 
-        The text is consumed by the source-builder's prompt; an empty string
-        means "no prior cache exists, extract freshly without continuity hints".
+        ``None`` means "fresh extraction required". A returned list is the
+        verbatim frozen rubric — ids, descriptions, importance, and
+        rationales are reused as-is; only file paths get re-validated by
+        ``_adapt_rubric_to_workspace`` before use.
         """
-        path = self._claim_cache_path(task_key, source_label)
+        path = self._rubric_cache_path(task_key)
         if not path.exists():
-            return ""
+            return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
-            self.logger.warning(f"Could not read claim cache {path}: {e}")
-            return ""
+            self.logger.warning(f"Could not read rubric cache {path}: {e}")
+            return None
         claims = data.get("claims") if isinstance(data, dict) else None
         if not isinstance(claims, list) or not claims:
-            return ""
-        lines = []
-        for c in claims:
-            if not isinstance(c, dict):
-                continue
-            cid = c.get("id", "?")
-            desc = str(c.get("description", "")).strip()
-            files = c.get("likely_relevant_files") or []
-            files_str = f"  likely_relevant_files: {list(files)}" if files else ""
-            lines.append(f"- [{cid}] {desc}{files_str}")
-        return "\n".join(lines)
+            return None
+        return claims
 
-    def _persist_claims_for_source(
+    def _persist_rubric(
         self,
         task_key: str,
-        source_label: str,
         claims: list[dict[str, Any]],
     ) -> None:
-        """Seed the cache from the FIRST successful extraction; no-op afterwards.
+        """Seed the rubric from the FIRST successful extraction; no-op afterwards.
 
         Never overwrites an existing cache: the first workflow that produces a
-        non-empty claim list for this (task, source) defines the rubric for
-        every subsequent workflow on the same task. Wiping the cache file (or
+        non-empty ranked claim list for this task defines the rubric for every
+        subsequent workflow on the same task. Wiping the cache file (or
         ``cleanup.sh``) reseeds.
         """
         if not claims:
             return
-        path = self._claim_cache_path(task_key, source_label)
+        path = self._rubric_cache_path(task_key)
         if path.exists():
             return
-        payload = {
-            "task_key": task_key,
-            "source": source_label,
-            "claims": [
-                {
-                    "id": c.get("id"),
-                    "description": str(c.get("description", "")).strip(),
-                    "likely_relevant_files": list(c.get("likely_relevant_files") or []),
-                }
-                for c in claims
-                if c.get("id")
-            ],
-        }
+        payload = {"task_key": task_key, "claims": claims}
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             self.logger.info(
-                f"Claim cache seeded for source {source_label}: "
-                f"{len(payload['claims'])} claims at {path}"
+                f"Rubric cache seeded: {len(claims)} claims at {path}"
             )
         except OSError as e:
-            self.logger.warning(f"Could not write claim cache {path}: {e}")
+            self.logger.warning(f"Could not write rubric cache {path}: {e}")
+
+    def _adapt_rubric_to_workspace(
+        self,
+        claims: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Re-validate `likely_relevant_files` against the current workspace.
+
+        Importance, id, description, and rationale are preserved verbatim —
+        those are the frozen rubric. Only the per-claim file hints adapt to
+        the workspace at hand so per-claim verifier scripts get pointed at
+        files that actually exist in this iteration.
+        """
+        out: list[dict[str, Any]] = []
+        for c in claims:
+            files = self._validate_workspace_paths(
+                c.get("likely_relevant_files") or [],
+                allowed=self._workspace_files or None,
+                label=str(c.get("id", "?")),
+            )
+            out.append({**c, "likely_relevant_files": files})
+        return out
 
     # ------------------------------------------------------------------
     # Stage 5 — importance-weighted aggregation
