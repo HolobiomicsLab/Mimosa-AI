@@ -73,15 +73,31 @@ class Config:
         # Touch with caution, for ablation studies and research only.
         ##############
 
+        # strategy: "qd" (default), "tournament", "novelty"
+        self.selection_strategy = "qd"
         # learning parameters
         self.learned_score_threshold = 0.92
-        self.max_learning_evolve_iterations = 20
+        self.max_learning_evolve_iterations = 25
         # KNN settings for novelty
         self.novelty_comparison: str = "archive_knn"
         self.novelty_previous_n: int = 15
         # Length penalty: genotype size at which the penalty starts to grow
         self.length_penalty_baseline_chars: int = 8000
         self.length_penalty_lambda: float = 0.05
+        # Selection pressure / archive settings
+        self.min_improvement_threshold: float = 0.01
+        self.population_size: int = 20
+        self.novelty_k_neighbours: int = 15
+        self.novelty_weight: float = 0.25
+        self.admit_threshold: float = 0.3
+        # Cold-start / parent-selection settings
+        self.initial_population: int = 2
+        self.crossover_rate: float = 0.4
+        self.n_parents: int = 2
+        # goal similarity thresholds before even considered by qd (need similar goal to avoid picking parents from a different task)
+        self.parent_threshold_similarity: float = 0.8
+        # bare minimum score for selection (don't pick failed parents)
+        self.parent_threshold_score: float = 0.01
 
         ##############
         # LLM Related, advanced settings, touch with caution
@@ -237,11 +253,22 @@ class Config:
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
+            "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
             "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
             "length_penalty_lambda": self.length_penalty_lambda,
+            "min_improvement_threshold": self.min_improvement_threshold,
+            "population_size": self.population_size,
+            "novelty_k_neighbours": self.novelty_k_neighbours,
+            "novelty_weight": self.novelty_weight,
+            "admit_threshold": self.admit_threshold,
+            "initial_population": self.initial_population,
+            "crossover_rate": self.crossover_rate,
+            "n_parents": self.n_parents,
+            "parent_threshold_similarity": self.parent_threshold_similarity,
+            "parent_threshold_score": self.parent_threshold_score,
             "schema_code_path": self.schema_code_path,
             "smolagent_factory_code_path": self.smolagent_factory_code_path,
             "runs_capsule_dir": self.runs_capsule_dir,
@@ -281,6 +308,7 @@ class Config:
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )
+        self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
         )
@@ -293,6 +321,26 @@ class Config:
         )
         self.length_penalty_lambda = float(
             data.get("length_penalty_lambda", self.length_penalty_lambda)
+        )
+        self.min_improvement_threshold = float(
+            data.get("min_improvement_threshold", self.min_improvement_threshold)
+        )
+        self.population_size = int(data.get("population_size", self.population_size))
+        self.novelty_k_neighbours = int(
+            data.get("novelty_k_neighbours", self.novelty_k_neighbours)
+        )
+        self.novelty_weight = float(data.get("novelty_weight", self.novelty_weight))
+        self.admit_threshold = float(data.get("admit_threshold", self.admit_threshold))
+        self.initial_population = int(
+            data.get("initial_population", self.initial_population)
+        )
+        self.crossover_rate = float(data.get("crossover_rate", self.crossover_rate))
+        self.n_parents = int(data.get("n_parents", self.n_parents))
+        self.parent_threshold_similarity = float(
+            data.get("parent_threshold_similarity", self.parent_threshold_similarity)
+        )
+        self.parent_threshold_score = float(
+            data.get("parent_threshold_score", self.parent_threshold_score)
         )
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get(
@@ -355,11 +403,22 @@ class Config:
         lines.append(f"  reasoning_effort={self.reasoning_effort}")
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
+        lines.append(f"  selection_strategy={self.selection_strategy}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
         lines.append(f"  novelty_comparison={self.novelty_comparison}")
         lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
         lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
         lines.append(f"  length_penalty_lambda={self.length_penalty_lambda}")
+        lines.append(f"  min_improvement_threshold={self.min_improvement_threshold}")
+        lines.append(f"  population_size={self.population_size}")
+        lines.append(f"  novelty_k_neighbours={self.novelty_k_neighbours}")
+        lines.append(f"  novelty_weight={self.novelty_weight}")
+        lines.append(f"  admit_threshold={self.admit_threshold}")
+        lines.append(f"  initial_population={self.initial_population}")
+        lines.append(f"  crossover_rate={self.crossover_rate}")
+        lines.append(f"  n_parents={self.n_parents}")
+        lines.append(f"  parent_threshold_similarity={self.parent_threshold_similarity}")
+        lines.append(f"  parent_threshold_score={self.parent_threshold_score}")
         lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
         lines.append(f"  schema_code_path={self.schema_code_path}")
         lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")
