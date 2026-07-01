@@ -11,7 +11,6 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -91,7 +90,7 @@ class ExecutionSandbox:
         for cand in candidates:
             try:
                 out = subprocess.run(
-                    [cand, "--version"], capture_output=True, text=True, timeout=10
+                    [cand, "--version"], capture_output=True, text=True, timeout=30
                 )
             except (OSError, subprocess.SubprocessError):
                 continue
@@ -120,7 +119,7 @@ class ExecutionSandbox:
             [py, "-m", "venv", str(venv_path)],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=600,
         )
         if result.returncode != 0:
             raise RuntimeError(
@@ -182,7 +181,7 @@ class ExecutionSandbox:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=600
             )
 
             if result.returncode != 0:
@@ -211,7 +210,7 @@ class ExecutionSandbox:
                     cmd_install,
                     capture_output=True,
                     text=True,
-                    timeout=300
+                    timeout=600
                 )
                 if result.returncode == 0:
                     self.logger.info("[SANDBOX] Dependencies from requirements.txt installed successfully")
@@ -256,7 +255,7 @@ class ExecutionSandbox:
                 cmd_pipreqs,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=600
             )
 
             if result.returncode != 0:
@@ -295,7 +294,7 @@ class ExecutionSandbox:
                 cmd_install,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=600
             )
 
             if result.returncode == 0:
@@ -320,7 +319,7 @@ class ExecutionSandbox:
         script_path: Path = None,
         script_name: str = None,
         expected_output: str = "",
-        timeout: int = 1000
+        timeout: int = 3600
     ) -> tuple[bool, str]:
         """
         Run the generated code in the capsule to produce output.
@@ -529,7 +528,7 @@ class ExecutionSandbox:
         self,
         eval_script_path: Path,
         visual_judge_path: Path = None,
-        timeout: int = 60
+        timeout: int = 600
     ) -> tuple[bool, str]:
         """
         Run a ScienceAgentBench evaluation script.

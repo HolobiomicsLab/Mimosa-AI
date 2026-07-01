@@ -7,7 +7,6 @@ import copy
 import csv
 import json
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -18,13 +17,10 @@ from pathlib import Path
 from typing import Any
 
 from sources.core.evolution_engine import EvolutionEngine
-from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
-from sources.core.schema import Task, IndividualRun
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
-from sources.utils.list_files import list_files
 from sources.utils.email_reporter import send_evaluation_report
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
@@ -97,15 +93,6 @@ class CsvEvaluationMode:
         self._semaphore: asyncio.Semaphore | None = None
         self._base_workspace_dir = config.workspace_dir
 
-        model_name = config.judge_model
-        provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
-
-        self.llm_config = LLMConfig(
-            model=model,
-            provider=provider,
-            temperature=1.0,
-            max_tokens=8192
-        )
         # Track execution history
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
@@ -426,16 +413,6 @@ EXPECTED OUTPUT:
             self.logger.error(f"Error generating task for row: {row}, error: {e}")
             return "Error generating task", None, None
 
-
-    def _format_task_mode_results(self, run: IndividualRun) -> str:
-        state_result = run.state_result
-        if isinstance(state_result.get("answers", None), list) and "step_name" in state_result:
-            return "\n".join(
-                f"agent {n}: {x}"
-                for (n, x) in zip(state_result["step_name"], state_result["answers"], strict=True)
-            )
-        return "No answers found in workflow execution."
-
     def sab_files_transfer(self, sab_loader, file_transfer, row):
         """Transfer dataset files to workspace with validation."""
         file_transfer.clean_workspace()
@@ -653,9 +630,8 @@ EXPECTED OUTPUT:
                         scenario_rubric=None,
                         single_agent_mode=single_agent_mode
                     )
-                    results_str = self._format_task_mode_results(runs[-1])
                 else:
-                    tasks_data = await isolated_planner.start_planner(
+                    _ = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
                         max_task_retry=3
@@ -923,9 +899,8 @@ EXPECTED OUTPUT:
                                                         scenario_rubric=None,
                                                         single_agent_mode=single_agent_mode
                                                        )
-                        results_str = self._format_task_mode_results(runs[-1])
                     else:
-                        tasks_data = await self.planner.start_planner(goal=goal,
+                        _ = await self.planner.start_planner(goal=goal,
                                     judge=True,
                                     max_task_retry=3
                                    )
@@ -1069,8 +1044,7 @@ EXPECTED OUTPUT:
             ("Dataset path", self._dataset_path or "unknown"),
             ("CSV runs limit", str(self.csv_runs_limit)),
             ("Start row", str(self._start_row + 1)),
-            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown")),
-            ("Judge model", f"{self.llm_config.provider}/{self.llm_config.model}"),
+            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown"))
         ]
 
     def _build_task_table(self) -> dict | None:

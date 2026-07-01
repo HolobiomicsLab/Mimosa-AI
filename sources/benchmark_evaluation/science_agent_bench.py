@@ -5,7 +5,6 @@ Provides methods for loading task data, getting dataset paths, and transferring 
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class ScienceAgentBenchLoader:
