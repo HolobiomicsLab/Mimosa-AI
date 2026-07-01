@@ -92,17 +92,18 @@ class EvolutionEngine:
         self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
         self.selection = SelectionPressure(
-            min_improvement_threshold=0.01,
+            min_improvement_threshold=getattr(config, "min_improvement_threshold", 0.01),
             strategy="qd", # quality-diversity selection
-            population_size=50, # max individuals to keep in the selection pool
-            novelty_k_neighbours=15,
-            novelty_weight=0.25,
+            population_size=getattr(config, "population_size", 50), # max individuals to keep in the selection pool
+            novelty_k_neighbours=getattr(config, "novelty_k_neighbours", 15),
+            novelty_weight=getattr(config, "novelty_weight", 0.25),
+            admit_threshold=getattr(config, "admit_threshold", 0.3),
             novelty_comparison=getattr(config, "novelty_comparison", "archive_knn"),
             previous_n=getattr(config, "novelty_previous_n", 5),
             length_penalty_baseline_chars=getattr(config, "length_penalty_baseline_chars", 5000),
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
-        self.initial_population = 2 # number of initial random workflows before enabling mutation
+        self.initial_population = getattr(config, "initial_population", 2) # number of initial random workflows before enabling mutation
 
     async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
         """Use existing workflow data instead of orchestrating a fresh run.
@@ -248,8 +249,8 @@ class EvolutionEngine:
         self,
         goal: str,
         template_uuid: str | None = None,
-        crossover_rate: float = 0.4,
-        n_parents: int = 2,
+        crossover_rate: float | None = None,
+        n_parents: int | None = None,
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
 
@@ -280,13 +281,18 @@ class EvolutionEngine:
             wf = WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
             return [wf], False
 
+        if crossover_rate is None:
+            crossover_rate = getattr(self.config, "crossover_rate", 0.4)
+        if n_parents is None:
+            n_parents = getattr(self.config, "n_parents", 2)
+
         selected, use_crossover = self.workflow_selector.select_parent_workflows(
             goal=goal,
             selection_pressure=self.selection,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
-            threshold_similarity=0.8,
-            threshold_score=0.01,
+            threshold_similarity=getattr(self.config, "parent_threshold_similarity", 0.8),
+            threshold_score=getattr(self.config, "parent_threshold_score", 0.01),
         )
 
         mode = "CROSSOVER" if use_crossover else "MUTATION"
