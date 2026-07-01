@@ -106,12 +106,6 @@ class CsvEvaluationMode:
             temperature=1.0,
             max_tokens=8192
         )
-        self.result_analyzer = LLMProvider(
-            agent_name="result_analyzer",
-            memory_path=None,
-            system_msg=self._get_result_analyzer_system_prompt(),
-            config=self.llm_config
-        )
         # Track execution history
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
@@ -123,39 +117,6 @@ class CsvEvaluationMode:
         self._single_agent_mode: bool = False
         self._concurrent: bool = False
         self._start_row: int = 0
-
-    def _get_result_analyzer_system_prompt(self) -> str:
-        """System prompt for the result analysis LLM."""
-        return """You are an autonomous AI scientist result analyzer for Mimosa-AI.
-
-Mimosa-AI is a multi-agent system designed to autonomously conduct scientific goals.
-
-Your role is to analyze workflow execution results and provide insights for the next goal generation.
-You must be strict and harsh in your analysis.
-
-ANALYSIS FOCUS:
-1. Assess goal completion quality and success level
-2. Identify strengths and weaknesses in the execution
-3. Note any errors, limitations, or areas for improvement
-
-EVALUATION CRITERIA:
-- Task completion: Was the full goal achieved? An incomplete goal should be considered as failed.
-- Quality: How well was the goal executed?
-- Scalability: Could this approach work for similar goals?
-
-INPUT FORMAT:
-You will receive a list of agent name and their corresponding answers from the workflow execution.
-The answers will be in the format:
-agent 1: <answer from agent 1>
-agent 2: <answer from agent 2>
-agent 3: <answer from agent 3>
-...
-
-OUTPUT FORMAT:
-Provide a structured analysis with:
-1. SUCCESS_LEVEL: (High/Medium/Low/Incomplete/Failed/Error)
-2. COMMENTS: Comments on what the multi-agents workflow tried to do, what worked, what failed and why.
-"""
 
     def _load_previous_run_notes(self) -> dict | None:
         """
@@ -465,15 +426,6 @@ EXPECTED OUTPUT:
             self.logger.error(f"Error generating task for row: {row}, error: {e}")
             return "Error generating task", None, None
 
-    def _format_goal_mode_results(self, tasks_data: Task) -> str:
-        """Format task results for analysis."""
-        return '\n\n'.join(
-            f"Task {task.name}:\n"
-            f"  UUID: {task.evolve_runs[-1].current_uuid}\n"
-            f"  Description: {task.description}\n"
-            f"  Agent Chain: {' -> '.join(task.final_answers)}"
-            for task in tasks_data
-        )
 
     def _format_task_mode_results(self, run: IndividualRun) -> str:
         state_result = run.state_result
@@ -708,7 +660,6 @@ EXPECTED OUTPUT:
                         judge=True,
                         max_task_retry=3
                     )
-                    results_str = self._format_goal_mode_results(tasks_data)
 
                 print(f"\033[96m[Worker {task_id}] 📊 Transferring results files...\033[0m")
 
@@ -723,7 +674,6 @@ EXPECTED OUTPUT:
                 print(f"\033[96m[Worker {task_id}] 📊 Analyzing results...\033[0m")
                 execution_time = time.time() - iteration_start_time
 
-                # Analyze results using isolated workspace path
                 execution_data = {
                     "iteration": i + 1,
                     "goal": goal,
@@ -741,7 +691,6 @@ EXPECTED OUTPUT:
                     )
 
                 print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
-                print(f"\033[96m[Worker {task_id}]    Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
 
                 # Save run notes (thread-safe via file system)
                 # Pass current execution_data for concurrent mode since execution_history isn't updated yet
@@ -787,25 +736,6 @@ EXPECTED OUTPUT:
             )
         self.logger.info(f"[Worker {task_id}] Successfully transferred {files_transferred} files")
 
-    def _analyze_results_isolated(self, goal: str, results_str: str, execution_time: float, workspace_dir: str) -> dict[str, str]:
-        """Analyze execution results using LLM with isolated workspace."""
-        files = list_files(workspace_dir, max_depth=3)
-        prompt = f"""Analyze the following Mimosa-AI execution:
-TASK: {goal}
-EXECUTION TIME: {execution_time:.2f} seconds
-FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
-{files}
-EXECUTION RESULTS:
-{results_str}
-Provide your analysis following the specified output format."""
-
-        analysis_text = self.result_analyzer(prompt)
-        analysis = {
-            "full_analysis": analysis_text,
-            "success_level": "Medium",
-            "key_insight": "Analysis completed"
-        }
-        return analysis
 
     async def run_concurrent_eval_loop(
         self,
@@ -1022,12 +952,10 @@ Provide your analysis following the specified output format."""
                     self.execution_history.append(execution_data)
                     self._print_final_summary()
                     self._save_run_notes(
-                        capsule_name, goal,
-                        analysis, execution_time
+                        capsule_name, goal, execution_time
                     )
 
                     print_ok(f"Iteration {i + 1} completed")
-                    print_info(f"  Success Level: {analysis.get('success_level', 'Unknown')}")
                     print_info(f"  Time: {execution_time:.2f}s")
                 except Exception as e:
                     self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
