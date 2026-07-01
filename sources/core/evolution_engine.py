@@ -94,7 +94,7 @@ class EvolutionEngine:
         self.selection = SelectionPressure(
             min_improvement_threshold=0.01,
             strategy="qd", # quality-diversity selection
-            population_size=50, # max individuals to keep in the selection pool
+            population_size=25, # max individuals to keep in the selection pool
             novelty_k_neighbours=15,
             novelty_weight=0.25,
             novelty_comparison=getattr(config, "novelty_comparison", "archive_knn"),
@@ -102,7 +102,7 @@ class EvolutionEngine:
             length_penalty_baseline_chars=getattr(config, "length_penalty_baseline_chars", 5000),
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
-        self.initial_population = 2 # number of initial random workflows before enabling mutation
+        self.initial_population = 3 # number of initial random workflows before enabling mutation
 
     async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
         """Use existing workflow data instead of orchestrating a fresh run.
