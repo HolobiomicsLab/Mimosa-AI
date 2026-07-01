@@ -474,7 +474,8 @@ EXPECTED OUTPUT:
                 'SR_message': eval_results['SR'][1],
                 'CBS': eval_results['CBS'],
                 'eval_cost': eval_results['cost'],
-                'runs': runs
+                'runs': runs,
+                'success_level': "Success" if eval_results['VER'][0] else "Failed"
             })
             print_ok(eval_results['summary'])
 
@@ -494,7 +495,8 @@ EXPECTED OUTPUT:
                 'SR': False,
                 'CBS': 0.0,
                 'eval_error': str(eval_error),
-                'runs': runs
+                'runs': runs,
+                'success_level': "Failed"
             })
 
         return execution_data
@@ -954,7 +956,7 @@ EXPECTED OUTPUT:
                        if exec_data.get("success_level") != "Cached"]
 
         successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") in ["High", "Medium"]]
+                          if exec_data.get("success_level") == "Success"]
 
         success_rate = (
             f"{len(successful_runs)/len(current_runs)*100:.1f}%"
@@ -988,7 +990,7 @@ EXPECTED OUTPUT:
 
         # Recompute the values needed for the cli-notes side-effect below.
         successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") in ["High", "Medium"]]
+                          if exec_data.get("success_level") == "Success"]
         success_rate = (
             f"{len(successful_runs)/len(current_runs)*100:.1f}%"
             if current_runs else "N/A"
