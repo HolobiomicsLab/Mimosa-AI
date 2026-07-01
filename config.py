@@ -5,7 +5,6 @@ from typing import Any
 
 from sources.utils.pricing import OpenRouterPricingClient
 
-
 @dataclass
 class AddressMCP:
     """Represents an MCP server address with port range."""
@@ -37,51 +36,77 @@ class Config:
 
     def __init__(self):
 
-        # workspace configuration
+        ##############
+        # Workspace Configuration
+        ##############
         self.workspace_dir = "/Users/mlg/Documents/CNRS/toolomics/workspace"
 
-        # MCPs server discovery
+        ##############
+        # MCP Related
+        ##############
         self.discovery_addresses: list[AddressMCP] = [
             AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
 
-        # LLMs choices
-        self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "deepseek/deepseek-v4-flash"
-        self.judge_model = "openrouter/mistralai/mixtral-8x22b-instruct"
+        ##############
+        # AUdit / Export 
+        ##############
+        # When True, writes an ASTRA spec YAML after task completion.
+        self.export_astra: bool = False
+
+        ##############
+        # LLM Related
+        ##############
+        self.planner_llm_model: str = "openrouter/z-ai/glm-5.2"
+        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.2"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
+        self.judge_model = "openrouter/z-ai/glm-5.2"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+
+        ##############
+        # ScienceAgentBench Concurrency settings
+        ##############
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+
+        ##############
+        # QD/Novelty / Learning parameters 
+        # Touch with caution, for ablation studies and research only.
+        ##############
+
+        # learning parameters
+        self.learned_score_threshold = 0.92
+        self.max_learning_evolve_iterations = 20
+        # KNN settings for novelty
+        self.novelty_comparison: str = "archive_knn"
+        self.novelty_previous_n: int = 15
+        # Length penalty: genotype size at which the penalty starts to grow
+        self.length_penalty_baseline_chars: int = 8000
+        self.length_penalty_lambda: float = 0.05
+
+        ##############
+        # LLM Related, advanced settings, touch with caution
+        ##############
         self.engine_name: str = "litellm" # for smolagent
-
-
-        # prompts for planner / workflow generator
-        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
-        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
-
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "medium"
-
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 8192
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
+        # openrouter providers
+        self.openrouter_provider: list[str] | None = [
+            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
+            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
+             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
+             "groq", "cerebras", "sambanova", "nvidia"
+        ]
 
-        # learning parameters
-        self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 10
-
-        # QD novelty + length penalty (open-ended modes)
-        #  "archive_knn" (default) or "k-NN archive"
-        self.novelty_comparison: str = "archive_knn"
-        self.novelty_previous_n: int = 5
-        # Length penalty: genotype size at which the penalty starts to
-        # grow; lambda is small so it only breaks near-ties.
-        self.length_penalty_baseline_chars: int = 8000
-        self.length_penalty_lambda: float = 0.05
-
-        # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+        ##############
+        # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
+        ##############
+        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
+        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
+        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
 
         # folder paths for workflow pre-defined code
         self.schema_code_path: str = "sources/modules/state_schema.py"
@@ -90,23 +115,7 @@ class Config:
         self.runs_capsule_dir = "runs_capsule/"
         self.workflow_dir: str = "sources/workflows"
         self.memory_dir: str = "sources/memory"
-        # When True, every child workflow's verifier eval anchors on the
-        # earliest ancestor's cached rubric (claims + verify_*.py) so scores
-        # are comparable across an evolved lineage. Disable for ablation.
-        self.reuse_lineage_rubric: bool = True
 
-        # When True, the evolution loop writes an ASTRA spec YAML for the
-        # best run after workspace restore. Off by default — adds an LLM
-        # decision-extraction pass per surviving trace step.
-        self.export_astra: bool = False
-
-        # openrouter providers
-        self.openrouter_provider: list[str] | None = [
-            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
-            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
-             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
-             "groq", "cerebras", "sambanova", "nvidia"
-        ]
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
         self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
         self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
@@ -238,7 +247,6 @@ class Config:
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
-            "reuse_lineage_rubric": self.reuse_lineage_rubric,
             "export_astra": self.export_astra,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
@@ -293,9 +301,6 @@ class Config:
         self.runs_capsule_dir = data.get("runs_capsule_dir", self.runs_capsule_dir)
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.memory_dir = data.get("memory_dir", self.memory_dir)
-        self.reuse_lineage_rubric = bool(
-            data.get("reuse_lineage_rubric", self.reuse_lineage_rubric)
-        )
         self.export_astra = bool(
             data.get("export_astra", self.export_astra)
         )
@@ -361,7 +366,6 @@ class Config:
         lines.append(f"  runs_capsule_dir={self.runs_capsule_dir}")
         lines.append(f"  workflow_dir={self.workflow_dir}")
         lines.append(f"  memory_dir={self.memory_dir}")
-        lines.append(f"  reuse_lineage_rubric={self.reuse_lineage_rubric}")
         lines.append(f"  openrouter_provider={self.openrouter_provider}")
         lines.append(f"  openrouter_provider_by_model={self.openrouter_provider_by_model}")
         lines.append(f"  openrouter_quantizations_by_model={self.openrouter_quantizations_by_model}")
