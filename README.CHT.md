@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 工作流程是**完整的 Python 程式**,以原始碼形式進行突變。**程式碼即基因型 (code-as-genotype)** 即為工作流程檔案;表現型則為其在工作區內所產生的一切。
 
-- **選擇:品質-多樣性 (QD) 檔案庫** —— **非結構化檔案庫**(單一名單,而非離散網格),族群大小上限為 50,以單一標量化目標 `qd_score = (1−w)·quality + w·novelty` (`w=0.25`) 評分;額滿時淘汰 `qd_score` 最低的成員。**新穎性搜尋 (novelty search)** 以**基因型嵌入 (genotype embedding)** 行為描述子——對工作流程生成原始碼做 L2 正規化的嵌入(預設使用本機 `all-MiniLM-L6-v2`,可選 OpenAI `text-embedding-3-small`)——上的餘弦距離 k-NN (`k=15`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散 (`MAX_CHILDREN_PER_PARENT = 8`)。
+- **選擇:品質-多樣性 (QD) 檔案庫** —— **非結構化檔案庫**(單一名單,而非離散網格),族群大小上限為 20,以單一標量化目標 `qd_score = (1−w)·quality + w·novelty` (`w=0.25`) 評分;額滿時淘汰 `qd_score` 最低的成員。**新穎性搜尋 (novelty search)** 以**基因型嵌入 (genotype embedding)** 行為描述子——對工作流程生成原始碼做 L2 正規化的嵌入(預設使用本機 `all-MiniLM-L6-v2`,可選 OpenAI `text-embedding-3-small`)——上的餘弦距離 k-NN (`k=15`) 衡量。親代以反向子代數量輪盤選取,以促使檔案庫均勻擴散 (`MAX_CHILDREN_PER_PARENT = 8`)。
 - **變異:由停滯驅動的範圍** —— 突變的大膽程度是過去 4 次提示梯度自我重複程度的連續函數。接近獲勝者者受到保護。範圍從「僅微調提示」至「完整重新思考拓樸」分為多個級距。
 - **交配** —— 約 30 % 的世代會組合兩個親代,依強者優先。
 - **冷啟動** —— 當檔案庫為空時,以磁碟上過往執行的相似度過濾掃描 (MiniLM 餘弦 ≥ 0.5) 為搜尋播種。可用的工作流程能跨任務遷移。
@@ -245,8 +245,8 @@ Mimosa 專為科學用途而設計——每一項決策皆可事後檢視。
 | `workflow_llm_model` | 合成多智能體工作流程的模型(例如 `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | 執行智能體所使用的模型 |
 | `judge_model` | 撰寫驗證器程式並產出軟性裁決的 LLM |
-| `learned_score_threshold` | `--learn` 模式下的提前終止門檻(預設 `0.9`) |
-| `max_learning_evolve_iterations` | 世代上限(預設 `20`) |
+| `learned_score_threshold` | `--learn` 模式下的提前終止門檻(預設 `0.92`) |
+| `max_learning_evolve_iterations` | 世代上限(預設 `25`) |
 
 完整參考:[`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 

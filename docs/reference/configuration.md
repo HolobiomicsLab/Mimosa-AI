@@ -41,9 +41,32 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `learned_score_threshold` | `float` | `0.9` | `--learn` stops when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `int` | `20` | Hard cap on evolve iterations. |
+| `learned_score_threshold` | `float` | `0.92` | `--learn` stops when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `int` | `25` | Hard cap on evolve iterations. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
+
+## QD / novelty (selection & variation)
+
+Touch with caution — these are ablation-study knobs for the [evolution
+engine](../concepts/evolution-engine.md), not day-to-day settings.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `selection_strategy` | `str` | `qd` | One of `greedy`, `tournament`, `novelty`, `qd`. |
+| `novelty_comparison` | `str` | `archive_knn` | Novelty comparison mode (k-NN over the archive vs. previous-N). |
+| `novelty_previous_n` | `int` | `15` | Window size when `novelty_comparison` is previous-N based. |
+| `length_penalty_baseline_chars` | `int` | `8000` | Genotype size (chars) at which the length penalty starts to grow. |
+| `length_penalty_lambda` | `float` | `0.05` | Length-penalty growth rate. |
+| `min_improvement_threshold` | `float` | `0.01` | Minimum relative improvement required for admission in greedy mode. |
+| `population_size` | `int` | `20` | Max individuals kept in the QD archive. |
+| `novelty_k_neighbours` | `int` | `15` | `k` for k-nearest-neighbour novelty. |
+| `novelty_weight` | `float` | `0.25` | Weight of novelty vs. quality in `qd_score` (`0` = pure quality, `1` = pure novelty). |
+| `admit_threshold` | `float` | `0.3` | Minimum `qd_score` for admission when the candidate doesn't strictly improve. |
+| `initial_population` | `int` | `2` | Seed generations before mutation/crossover kicks in. |
+| `crossover_rate` | `float` | `0.4` | Probability a generation combines two parents instead of mutating one. |
+| `n_parents` | `int` | `2` | Number of parents drawn per crossover. |
+| `parent_threshold_similarity` | `float` | `0.8` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
+| `parent_threshold_score` | `float` | `0.01` | Cold-start disk scan / parent draw: minimum score to be considered. |
 
 ## OpenRouter routing
 

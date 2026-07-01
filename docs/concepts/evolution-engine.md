@@ -17,7 +17,7 @@ flowchart TB
     Seed -- yes --> SeedPrompt[Seed genome prompt<br/>or template mutation]
     Seed -- no --> Pick[Pick parents via QD-roulette<br/>fallback to disk similarity scan]
     SeedPrompt --> Orch[Orchestrate workflow<br/>LLM → sandbox]
-    Pick --> Decide{Crossover ≈ 0.1?}
+    Pick --> Decide{Crossover ≈ 0.4?}
     Decide -- mutation --> Think[Directive LLM<br/>diagnosis + boldness<br/>→ 3-sentence directive]
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
     Think --> Mut[Mutation prompt<br/>parent code + directive]
@@ -53,17 +53,18 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score >= learned_score_threshold` (default `0.9`) in `--learn` mode, *or*
+- `overall_score >= learned_score_threshold` (default `0.92`) in `--learn` mode, *or*
 - `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
-  (default `20`) in `--learn` mode.
+  (default `25`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 
 [`SelectionPressure`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
 implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
-(default). In QD mode:
+(default, set via config's `selection_strategy`). In QD mode:
 
-- A **session archive** holds up to `population_size = 50` members.
+- A **session archive** holds up to `population_size = 20` members
+  (config field, ablation-tunable).
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
   `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
   multiplied — so high quality cannot rescue a redundant profile and high
@@ -77,18 +78,24 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
   through the [`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py)
   shim (see below).
 - Admission gate: candidate is admitted when it either improves over
-  baseline by `min_improvement_threshold` or clears
-  `qd_score > admit_threshold`. When the archive reaches capacity, the
-  lowest-`qd_score` member is evicted.
+  baseline by `min_improvement_threshold` (default `0.01`) or clears
+  `qd_score > admit_threshold` (default `0.3`). When the archive reaches
+  capacity, the lowest-`qd_score` member is evicted.
 - Parent draw applies an inverse-child-count penalty
   `÷ (1 + n_children_already)`, and parents are hard-capped at
-  `MAX_CHILDREN_PER_PARENT = 2` before that penalty kicks in, so the
+  `MAX_CHILDREN_PER_PARENT = 8` before that penalty kicks in, so the
   offspring stream stays spread across the archive.
 
+All of the above — `min_improvement_threshold`, `population_size`,
+`novelty_k_neighbours`, `novelty_weight`, `admit_threshold` — are `Config`
+fields (see [Configuration reference](../reference/configuration.md#qd-novelty-selection-variation)),
+not hardcoded constants; touch them only for ablation studies.
+
 When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
-falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.8` on MiniLM
-embeddings of `original_task`, `score ≥ 0.1`) — this lets useful workflows
-transfer across tasks.
+falls back to a **similarity-filtered disk scan** (`cosine ≥
+parent_threshold_similarity` — default `0.8` — on MiniLM embeddings of
+`original_task`, `score ≥ parent_threshold_score` — default `0.01`) — this
+lets useful workflows transfer across tasks.
 
 ### Behaviour descriptor: genotype embedding
 
@@ -259,13 +266,14 @@ unintended structural rewrites.
 
 ## Crossover
 
-With probability `crossover_rate` per generation (default `0.1`, and only
-once at least `initial_population = 2` runs have happened), two parents
-are combined instead of one being mutated. The crossover prompt is
-**best-parent-first**: the strongest parent's code structure leads,
-weaker parents contribute specific improvements rather than competing
-for the skeleton, and the offspring is hard-capped at the highest
-parent agent count to prevent runaway complexity.
+With probability `crossover_rate` per generation (default `0.4`, and only
+once at least `initial_population` — default `2` — runs have happened),
+`n_parents` (default `2`) parents are combined instead of one being
+mutated. The crossover prompt is **best-parent-first**: the strongest
+parent's code structure leads, weaker parents contribute specific
+improvements rather than competing for the skeleton, and the offspring
+is hard-capped at the highest parent agent count to prevent runaway
+complexity.
 
 ## Lineage & reproducibility
 

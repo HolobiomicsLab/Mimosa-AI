@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ワークフローは **完全な Python プログラム** であり、ソースコードとして変異されます。**コードを遺伝子型として扱う方式 (code-as-genotype)** で、遺伝子型はワークフローファイル、表現型はそれがワークスペース上に生成するものです。
 
-- **選択: Quality-Diversity アーカイブ** — **非構造アーカイブ**（離散グリッドではなく単一の名簿）。最大集団サイズ 50、単一のスカラ化スコア `qd_score = (1−w)·quality + w·novelty`（`w=0.25`）で評価し、満杯時は最低 `qd_score` のメンバーを退去させます。**新規性探索 (novelty search)** は **ゲノタイプ埋め込み (genotype embedding)** の行動記述子 — ワークフローの生成ソースコードを L2 正規化した埋め込み（既定はローカルの `all-MiniLM-L6-v2`、オプションで OpenAI `text-embedding-3-small`）— 上のコサイン距離 k-NN（`k=15`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます（`MAX_CHILDREN_PER_PARENT = 8`）。
+- **選択: Quality-Diversity アーカイブ** — **非構造アーカイブ**（離散グリッドではなく単一の名簿）。最大集団サイズ 20、単一のスカラ化スコア `qd_score = (1−w)·quality + w·novelty`（`w=0.25`）で評価し、満杯時は最低 `qd_score` のメンバーを退去させます。**新規性探索 (novelty search)** は **ゲノタイプ埋め込み (genotype embedding)** の行動記述子 — ワークフローの生成ソースコードを L2 正規化した埋め込み（既定はローカルの `all-MiniLM-L6-v2`、オプションで OpenAI `text-embedding-3-small`）— 上のコサイン距離 k-NN（`k=15`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます（`MAX_CHILDREN_PER_PARENT = 8`）。
 - **変異: 停滞駆動のスコープ** — 変異の大胆さは、直近 4 回のプロンプト勾配がどの程度反復しているかの連続関数です。勝者に近い個体は保護されます。スコープ帯域は「プロンプトのみの微調整」から「トポロジー全面再考」まで及びます。
 - **交叉** — 約 30 % の世代で 2 つの親（強いもの優先）を組み合わせます。
 - **コールドスタート** — アーカイブが空の場合、ディスク上の過去実行を類似度フィルタ（MiniLM コサイン ≥ 0.5）でスキャンして探索を播種します。有用なワークフローはタスク間で転移します。
@@ -245,8 +245,8 @@ Mimosa は科学的用途のために構築されており、すべての決定�
 | `workflow_llm_model` | マルチエージェントワークフローを合成（例: `anthropic/claude-opus-4-5`） |
 | `smolagent_model_id` | 実行エージェントが使用するモデル |
 | `judge_model` | verifier プログラムを記述し、ソフト判定を下す LLM |
-| `learned_score_threshold` | `--learn` モードでの早期停止しきい値（デフォルト `0.9`） |
-| `max_learning_evolve_iterations` | 世代数の上限（デフォルト `20`） |
+| `learned_score_threshold` | `--learn` モードでの早期停止しきい値（デフォルト `0.92`） |
+| `max_learning_evolve_iterations` | 世代数の上限（デフォルト `25`） |
 
 完全なリファレンス: [`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 

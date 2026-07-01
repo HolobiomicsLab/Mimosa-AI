@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. **코드를 유전자형으로 다루는 방식 (code-as-genotype)** 으로, 유전자형(genotype)은 워크플로우 파일이고 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
 
-- **선택: Quality-Diversity 아카이브** — **비구조 아카이브**(이산 그리드가 아니라 단일 목록), 인구 상한 50, 단일 스칼라화 점수 `qd_score = (1−w)·quality + w·novelty` (`w=0.25`)로 평가하며, 가득 차면 가장 낮은 `qd_score` 멤버를 퇴출합니다. **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 8`).
+- **선택: Quality-Diversity 아카이브** — **비구조 아카이브**(이산 그리드가 아니라 단일 목록), 인구 상한 20, 단일 스칼라화 점수 `qd_score = (1−w)·quality + w·novelty` (`w=0.25`)로 평가하며, 가득 차면 가장 낮은 `qd_score` 멤버를 퇴출합니다. **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 8`).
 - **변이: 정체 기반 범위 조절** — 변이의 대담함은 마지막 4개의 프롬프트 그래디언트가 얼마나 반복되는지에 대한 연속 함수입니다. 거의 승리한 개체는 보호됩니다. 범위 대역은 "프롬프트만 미세 조정"부터 "완전한 토폴로지 재고"까지 이어집니다.
 - **교차** — 약 30%의 세대에서 두 부모를 결합하며, 강한 쪽이 먼저 적용됩니다.
 - **콜드 스타트** — 아카이브가 비어 있으면, 디스크의 과거 실행을 유사도 필터링(MiniLM 코사인 ≥ 0.5)으로 스캔하여 탐색을 시드합니다. 유용한 워크플로우는 태스크 간에 전이됩니다.
@@ -245,8 +245,8 @@ Mimosa는 과학적 용도로 설계되었습니다 — 모든 결정은 사후�
 | `workflow_llm_model` | 멀티에이전트 워크플로우를 합성합니다 (예: `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | 실행 에이전트가 사용하는 모델 |
 | `judge_model` | 검증기 프로그램을 작성하고 소프트 판정을 내리는 LLM |
-| `learned_score_threshold` | `--learn` 모드에서의 조기 종료 임계값 (기본값 `0.9`) |
-| `max_learning_evolve_iterations` | 세대 수 상한 (기본값 `20`) |
+| `learned_score_threshold` | `--learn` 모드에서의 조기 종료 임계값 (기본값 `0.92`) |
+| `max_learning_evolve_iterations` | 세대 수 상한 (기본값 `25`) |
 
 전체 레퍼런스: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 

@@ -2178,11 +2178,11 @@ field with defaults and types, see the <a href="../reference/configuration.html"
 </tr>
 <tr>
 <td><code>learned_score_threshold</code></td>
-<td>Score that triggers early stop in <code>--learn</code> mode (default <code>0.9</code>).</td>
+<td>Score that triggers early stop in <code>--learn</code> mode (default <code>0.92</code>).</td>
 </tr>
 <tr>
 <td><code>max_learning_evolve_iterations</code></td>
-<td>Hard cap on evolve iterations (default <code>20</code>).</td>
+<td>Hard cap on evolve iterations (default <code>25</code>).</td>
 </tr>
 </tbody>
 </table>
@@ -2209,12 +2209,51 @@ fairly self-contained, so a cheaper/faster model works well:</p>
 </ul>
 </div>
 <div class="tabbed-block">
-<p>The judge needs decent reasoning but is only called once per generation. A
-capable medium-size model is usually enough:</p>
+<p>The judge model scores the soft claims in the verifier. During an
+evaluation run the verifier is one of the places where the most tokens get
+spent, so the model you choose here has a real effect on how much a run
+costs in the end.</p>
+<p>The judge needs decent reasoning, but it does not need the single most
+expensive flagship model you can find. A capable medium-size model is
+usually enough, and a medium-size model costs a lot less per token than a
+flagship one. As a rough guide, a mid-tier model such as a Sonnet-class
+Claude or <code>deepseek-v4-pro</code> is in the region of five times cheaper per
+token than a top-tier flagship such as an Opus-class Claude, and it still
+does a good job on the kind of judging the verifier asks for. Good picks
+that you call directly:</p>
 <ul>
+<li><code>anthropic/claude-sonnet-4-6</code></li>
 <li><code>openai/gpt-5.5</code></li>
-<li><code>anthropic/claude-opus-4-5</code></li>
 </ul>
+<p>If you run your models through OpenRouter, which is the common setup for
+the metabolomics evaluation, there are several capable-but-cheaper routes
+that also work well as a judge:</p>
+<ul>
+<li><code>openrouter/deepseek/deepseek-v4-pro</code></li>
+<li><code>openrouter/z-ai/glm-5</code></li>
+<li>an OpenRouter MiniMax route (for example the latest <code>minimax</code> model)</li>
+</ul>
+<p>The exact version tag for a given model changes over time on OpenRouter,
+so it is worth checking what is currently offered and picking the most
+recent capable version of whichever family you prefer. Either way, the
+point is the same: a mid-tier model is plenty for the judge, and it costs
+much less than a flagship.</p>
+<p>So the simplest and biggest cost saving you can make for evaluation is to
+set <code>judge_model</code> to one capable-but-cheaper model and let the whole
+verifier run on it, rather than pointing it at the most expensive model
+you have.</p>
+<p>You might be tempted to go one step further and add a second, even cheaper
+model just for the small mechanical steps inside the verifier — for
+example dropping duplicate claims, or checking which Python packages a
+claim needs. In practice this is not worth doing. Those mechanical steps
+are only a small fraction of all the tokens the verifier uses, so moving
+them onto a separate cheap model saves almost nothing while making the
+configuration harder to follow. The calls that actually cost tokens, and
+that actually need good judgement — rating how important a claim is,
+choosing which files to look at, writing the small verifier script, and
+giving the final verdict — are better left on the one <code>judge_model</code> you
+already picked. Choosing a sensible <code>judge_model</code> is where essentially all
+of the saving comes from.</p>
 </div>
 </div>
 </div>
@@ -2313,16 +2352,22 @@ in generated code — Mimosa filters those out for you. See
 <tbody>
 <tr>
 <td><code>learned_score_threshold</code></td>
-<td><code>0.9</code></td>
+<td><code>0.92</code></td>
 <td>Stop evolving when <code>overall_score</code> reaches this.</td>
 </tr>
 <tr>
 <td><code>max_learning_evolve_iterations</code></td>
-<td><code>20</code></td>
+<td><code>25</code></td>
 <td>Max generations before giving up.</td>
 </tr>
 </tbody>
 </table>
+<p>The QD selection and variation engine also exposes tuning knobs
+(<code>selection_strategy</code>, <code>population_size</code>, <code>novelty_weight</code>,
+<code>crossover_rate</code>, <code>admit_threshold</code>, …) — see the <a href="../reference/configuration.html#qd-novelty-selection-variation">QD / novelty
+reference</a>.
+Touch these with caution; they're meant for ablation studies, not routine
+use.</p>
 <p>See <a href="../usage/learning.html">Iterative learning</a> for the full evolution machinery.</p>
 <h2 id="cli-overrides">CLI overrides<a class="headerlink" href="#cli-overrides" title="Permanent link">&para;</a></h2>
 <p>A handful of config fields can be overridden directly on the command line —

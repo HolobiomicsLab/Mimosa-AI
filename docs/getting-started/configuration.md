@@ -22,8 +22,8 @@ field with defaults and types, see the [Configuration reference](../reference/co
 | `smolagent_model_id` | LLM used by execution agents inside each workflow. |
 | `judge_model` | LLM that scores soft claims in the verifier. |
 | `planner_llm_model` | LLM that decomposes goals into tasks (`--goal` mode only). |
-| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.9`). |
-| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `20`). |
+| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.92`). |
+| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `25`). |
 
 ## Choosing models
 
@@ -138,8 +138,15 @@ uv run main.py --task "…" \
 
 | Field | Default | Meaning |
 | ----- | ------- | ------- |
-| `learned_score_threshold` | `0.9` | Stop evolving when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `20` | Max generations before giving up. |
+| `learned_score_threshold` | `0.92` | Stop evolving when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `25` | Max generations before giving up. |
+
+The QD selection and variation engine also exposes tuning knobs
+(`selection_strategy`, `population_size`, `novelty_weight`,
+`crossover_rate`, `admit_threshold`, …) — see the [QD / novelty
+reference](../reference/configuration.md#qd-novelty-selection-variation).
+Touch these with caution; they're meant for ablation studies, not routine
+use.
 
 See [Iterative learning](../usage/learning.md) for the full evolution machinery.
 

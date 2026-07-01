@@ -2260,7 +2260,7 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
     Seed -- yes --&gt; SeedPrompt[Seed genome prompt&lt;br/&gt;or template mutation]
     Seed -- no --&gt; Pick[Pick parents via QD-roulette&lt;br/&gt;fallback to disk similarity scan]
     SeedPrompt --&gt; Orch[Orchestrate workflow&lt;br/&gt;LLM → sandbox]
-    Pick --&gt; Decide{Crossover ≈ 0.1?}
+    Pick --&gt; Decide{Crossover ≈ 0.4?}
     Decide -- mutation --&gt; Think[Directive LLM&lt;br/&gt;diagnosis + boldness&lt;br/&gt;→ 3-sentence directive]
     Decide -- crossover --&gt; Cross[Crossover prompt&lt;br/&gt;best-parent-first]
     Think --&gt; Mut[Mutation prompt&lt;br/&gt;parent code + directive]
@@ -2293,16 +2293,17 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
 </ol>
 <p>Termination:</p>
 <ul>
-<li><code>overall_score &gt;= learned_score_threshold</code> (default <code>0.9</code>) in <code>--learn</code> mode, <em>or</em></li>
+<li><code>overall_score &gt;= learned_score_threshold</code> (default <code>0.92</code>) in <code>--learn</code> mode, <em>or</em></li>
 <li><code>max_depth</code> reached — <code>1</code> in single-shot mode, <code>max_learning_evolve_iterations</code>
-  (default <code>20</code>) in <code>--learn</code> mode.</li>
+  (default <code>25</code>) in <code>--learn</code> mode.</li>
 </ul>
 <h2 id="selection-quality-diversity-qd">Selection: Quality-Diversity (QD)<a class="headerlink" href="#selection-quality-diversity-qd" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py"><code>SelectionPressure</code></a>
 implements four strategies — <code>greedy</code>, <code>tournament</code>, <code>novelty</code>, and <code>qd</code>
-(default). In QD mode:</p>
+(default, set via config's <code>selection_strategy</code>). In QD mode:</p>
 <ul>
-<li>A <strong>session archive</strong> holds up to <code>population_size = 50</code> members.</li>
+<li>A <strong>session archive</strong> holds up to <code>population_size = 20</code> members
+  (config field, ablation-tunable).</li>
 <li>Each member has <code>qd_score = (1−w)·quality_norm + w·novelty_norm</code>, with
   <code>w = novelty_weight = 0.25</code>. Quality and novelty are <strong>additive</strong> — never
   multiplied — so high quality cannot rescue a redundant profile and high
@@ -2316,18 +2317,23 @@ implements four strategies — <code>greedy</code>, <code>tournament</code>, <co
   through the <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
   shim (see below).</li>
 <li>Admission gate: candidate is admitted when it either improves over
-  baseline by <code>min_improvement_threshold</code> or clears
-  <code>qd_score &gt; admit_threshold</code>. When the archive reaches capacity, the
-  lowest-<code>qd_score</code> member is evicted.</li>
+  baseline by <code>min_improvement_threshold</code> (default <code>0.01</code>) or clears
+  <code>qd_score &gt; admit_threshold</code> (default <code>0.3</code>). When the archive reaches
+  capacity, the lowest-<code>qd_score</code> member is evicted.</li>
 <li>Parent draw applies an inverse-child-count penalty
   <code>÷ (1 + n_children_already)</code>, and parents are hard-capped at
-  <code>MAX_CHILDREN_PER_PARENT = 2</code> before that penalty kicks in, so the
+  <code>MAX_CHILDREN_PER_PARENT = 8</code> before that penalty kicks in, so the
   offspring stream stays spread across the archive.</li>
 </ul>
+<p>All of the above — <code>min_improvement_threshold</code>, <code>population_size</code>,
+<code>novelty_k_neighbours</code>, <code>novelty_weight</code>, <code>admit_threshold</code> — are <code>Config</code>
+fields (see <a href="../reference/configuration.html#qd-novelty-selection-variation">Configuration reference</a>),
+not hardcoded constants; touch them only for ablation studies.</p>
 <p>When the archive is empty (cold start), <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py"><code>WorkflowSelector</code></a>
-falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥ 0.8</code> on MiniLM
-embeddings of <code>original_task</code>, <code>score ≥ 0.1</code>) — this lets useful workflows
-transfer across tasks.</p>
+falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥
+parent_threshold_similarity</code> — default <code>0.8</code> — on MiniLM embeddings of
+<code>original_task</code>, <code>score ≥ parent_threshold_score</code> — default <code>0.01</code>) — this
+lets useful workflows transfer across tasks.</p>
 <h3 id="behaviour-descriptor-genotype-embedding">Behaviour descriptor: genotype embedding<a class="headerlink" href="#behaviour-descriptor-genotype-embedding" title="Permanent link">&para;</a></h3>
 <p>The novelty signal compares candidates in <strong>genotype-embedding</strong> space.
 Each workflow's generated source code (its <em>genotype</em>) is embedded into a
@@ -2503,13 +2509,14 @@ implement one named change. This consistently reduces drift between
 generations and prevents the boldness budget from leaking into
 unintended structural rewrites.</p>
 <h2 id="crossover">Crossover<a class="headerlink" href="#crossover" title="Permanent link">&para;</a></h2>
-<p>With probability <code>crossover_rate</code> per generation (default <code>0.1</code>, and only
-once at least <code>initial_population = 2</code> runs have happened), two parents
-are combined instead of one being mutated. The crossover prompt is
-<strong>best-parent-first</strong>: the strongest parent's code structure leads,
-weaker parents contribute specific improvements rather than competing
-for the skeleton, and the offspring is hard-capped at the highest
-parent agent count to prevent runaway complexity.</p>
+<p>With probability <code>crossover_rate</code> per generation (default <code>0.4</code>, and only
+once at least <code>initial_population</code> — default <code>2</code> — runs have happened),
+<code>n_parents</code> (default <code>2</code>) parents are combined instead of one being
+mutated. The crossover prompt is <strong>best-parent-first</strong>: the strongest
+parent's code structure leads, weaker parents contribute specific
+improvements rather than competing for the skeleton, and the offspring
+is hard-capped at the highest parent agent count to prevent runaway
+complexity.</p>
 <h2 id="lineage-reproducibility">Lineage &amp; reproducibility<a class="headerlink" href="#lineage-reproducibility" title="Permanent link">&para;</a></h2>
 <p>After each generation, <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/lineage.py"><code>lineage.py</code></a>
 writes a sidecar record <code>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</code>
