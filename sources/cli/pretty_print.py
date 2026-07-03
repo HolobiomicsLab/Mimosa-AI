@@ -81,7 +81,7 @@ def print_phase(
     title: str,
     icon: str = "▶▶",
     width: int = _W,
-    color: str = CYAN,
+    color: str = YELLOW,
 ) -> None:
     """
     Full-width phase banner with centred title and horizontal rules.
@@ -106,7 +106,7 @@ def print_section(
     print(f"\n{color}──{label}{'─' * remaining}{RESET}")
 
 
-def print_rule(width: int = _W, color: str = CYAN) -> None:
+def print_rule(width: int = _W, color: str = YELLOW) -> None:
     """Print a plain horizontal rule."""
     print(f"{color}{'─' * width}{RESET}")
 
