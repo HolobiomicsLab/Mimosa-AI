@@ -555,6 +555,7 @@ class EvolutionEngine:
             runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
         self._refresh_evolution_tree(runs[-1].goal, uuid)
+        self._refresh_archive_projection(uuid)
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
@@ -918,6 +919,28 @@ class EvolutionEngine:
                 self.logger.info(f"Evolution tree refreshed: {output}")
         except Exception as e:
             self.logger.warning(f"Failed to refresh evolution tree: {e}")
+
+    def _refresh_archive_projection(self, uuid: str | None = None) -> None:
+        """Re-render the PCA projection PNG of the QD archive after each iteration.
+
+        Projects the SelectionPressure archive's behaviour descriptors and writes
+        ``<workflow_dir>/archive_pca.png``, starring *uuid* when it is present.
+
+        Best-effort: rendering failures are logged and swallowed so an archive
+        image issue never aborts an iterative refinement run. The renderer is
+        imported lazily to avoid a circular import via ``sources.utils``.
+        """
+        try:
+            from sources.utils.archive_projection import render_archive_pca
+            output = render_archive_pca(
+                self.selection.archive,
+                self.workflow_dir,
+                highlight_uuid=uuid,
+            )
+            if output is not None:
+                self.logger.info(f"Archive projection refreshed: {output}")
+        except Exception as e:
+            self.logger.warning(f"Failed to refresh archive projection: {e}")
 
     def _save_evolution_prompt_artifact(self, uuid: str, prompt: str) -> None:
         """Persist the variation/seed prompt that produced this workflow into its folder.
