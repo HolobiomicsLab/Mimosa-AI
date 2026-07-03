@@ -54,6 +54,11 @@ async def _prompt_with_default(prompt: str, default: str = "0") -> str:
     return raw.strip() if raw.strip() else default
 
 
+def _is_excluded(run: dict) -> bool:
+    """True if a run was dropped as an eval-infra failure (not a real VER/SR result)."""
+    return run.get("status") == "excluded" or run.get("success_level") == "Excluded"
+
+
 @dataclass
 class TaskContext:
     """Context for a single concurrent task evaluation."""
@@ -208,11 +213,12 @@ class CsvEvaluationMode:
         """
         timestamp = datetime.now().isoformat()
 
-        # Build the list of SAB runs, including current task if provided
-        sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
+        # Build the list of evaluated SAB runs (VER is None for infra-excluded tasks).
+        sab_runs = [exec_data for exec_data in self.execution_history
+                    if exec_data.get('VER') is not None]
 
-        # For concurrent mode: include current_execution_data if it has SAB metrics
-        if current_execution_data and 'VER' in current_execution_data:
+        # For concurrent mode: include current_execution_data if it was evaluated
+        if current_execution_data and current_execution_data.get('VER') is not None:
             # Check if this task is not already in execution_history (concurrent mode)
             if current_execution_data not in sab_runs:
                 sab_runs = sab_runs + [current_execution_data]
@@ -229,7 +235,7 @@ class CsvEvaluationMode:
 
         if sab_runs:
             # Use current_execution_data if provided, otherwise use last from sab_runs
-            current_task_data = current_execution_data if current_execution_data and 'VER' in current_execution_data else sab_runs[-1]
+            current_task_data = current_execution_data if current_execution_data and current_execution_data.get('VER') is not None else sab_runs[-1]
             runs_data = current_task_data.get('runs', [])
 
             notes = {
@@ -467,36 +473,62 @@ EXPECTED OUTPUT:
 
             eval_results = evaluator.evaluate_all()
             evaluator.save_results()
-            execution_data.update({
-                'VER': eval_results['VER'][0],
-                'VER_message': eval_results['VER'][1],
-                'SR': eval_results['SR'][0],
-                'SR_message': eval_results['SR'][1],
-                'CBS': eval_results['CBS'],
-                'eval_cost': eval_results['cost'],
-                'runs': runs,
-                'success_level': "Success" if eval_results['VER'][0] else "Failed"
-            })
-            print_ok(eval_results['summary'])
 
-            self.logger.info(
-                f"[SAB EVAL] Task {row.get('instance_id')}: "
-                f"VER={eval_results['VER'][0]}, "
-                f"SR={eval_results['SR'][0]}, "
-                f"CBS={eval_results['CBS']:.3f}, "
-                f"eval_cost={eval_results['cost']:.3f}"
-            )
+            if eval_results.get('status') == 'excluded':
+                infra_error = eval_results.get('infra_error')
+                execution_data.update({
+                    'status': 'excluded',
+                    'infra_error': infra_error,
+                    'VER': None,
+                    'SR': None,
+                    'CBS': None,
+                    'eval_cost': eval_results['cost'],
+                    'runs': runs,
+                    'success_level': "Excluded",
+                })
+                print_warn(f"Task {row.get('instance_id')} EXCLUDED (infra): {infra_error}")
+                self.logger.warning(
+                    f"[SAB EVAL] Task {row.get('instance_id')} EXCLUDED (infra): {infra_error}"
+                )
+            else:
+                execution_data.update({
+                    'status': 'evaluated',
+                    'VER': eval_results['VER'][0],
+                    'VER_message': eval_results['VER'][1],
+                    'SR': eval_results['SR'][0],
+                    'SR_message': eval_results['SR'][1],
+                    'CBS': eval_results['CBS'],
+                    'eval_cost': eval_results['cost'],
+                    'runs': runs,
+                    'success_level': "Success" if eval_results['VER'][0] else "Failed"
+                })
+                print_ok(eval_results['summary'])
+                self.logger.info(
+                    f"[SAB EVAL] Task {row.get('instance_id')}: "
+                    f"VER={eval_results['VER'][0]}, "
+                    f"SR={eval_results['SR'][0]}, "
+                    f"CBS={eval_results['CBS']:.3f}, "
+                    f"eval_cost={eval_results['cost']:.3f}"
+                )
 
         except Exception as eval_error:
-            self.logger.error(f"[SAB EVAL] Evaluation error: {str(eval_error)}")
-            print_err(f"Evaluation failed: {str(eval_error)}")
+            # An exception escaping the evaluator is a harness fault, not the
+            # agent's — exclude it (loudly) rather than counting it as SR=0.
+            self.logger.error(
+                f"[SAB EVAL] Unexpected harness error — EXCLUDING task "
+                f"{row.get('instance_id')}: {eval_error}",
+                exc_info=True,
+            )
+            print_warn(f"Task {row.get('instance_id')} EXCLUDED (harness error): {eval_error}")
             execution_data.update({
-                'VER': False,
-                'SR': False,
-                'CBS': 0.0,
+                'status': 'excluded',
+                'infra_error': f"Unexpected harness error: {eval_error}",
+                'VER': None,
+                'SR': None,
+                'CBS': None,
                 'eval_error': str(eval_error),
                 'runs': runs,
-                'success_level': "Failed"
+                'success_level': "Excluded",
             })
 
         return execution_data
@@ -955,20 +987,24 @@ EXPECTED OUTPUT:
         current_runs = [exec_data for exec_data in self.execution_history
                        if exec_data.get("success_level") != "Cached"]
 
-        successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") == "Success"]
+        # Infra-excluded runs are neither pass nor fail — drop from denominators.
+        excluded_runs = [d for d in current_runs if _is_excluded(d)]
+        evaluable = [d for d in current_runs if not _is_excluded(d)]
+        successful_runs = [d for d in evaluable
+                          if d.get("success_level") == "Success"]
 
         success_rate = (
-            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
-            if current_runs else "N/A"
+            f"{len(successful_runs)/len(evaluable)*100:.1f}%"
+            if evaluable else "N/A"
         )
         rows: list[tuple[str, str]] = [
-            ("Steps evaluated", str(len(current_runs))),
+            ("Steps evaluated", str(len(evaluable))),
+            ("Excluded (infra)", str(len(excluded_runs))),
             ("Successful runs", str(len(successful_runs))),
             ("Success rate", success_rate),
         ]
 
-        sab_runs = [exec_data for exec_data in current_runs if 'VER' in exec_data]
+        sab_runs = [d for d in current_runs if d.get('VER') is not None]
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
             sr_success = sum(1 for run in sab_runs if run.get('SR', False))
@@ -989,11 +1025,12 @@ EXPECTED OUTPUT:
         rows, current_runs, sab_runs = self._build_summary_rows()
 
         # Recompute the values needed for the cli-notes side-effect below.
-        successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") == "Success"]
+        evaluable = [d for d in current_runs if not _is_excluded(d)]
+        successful_runs = [d for d in evaluable
+                          if d.get("success_level") == "Success"]
         success_rate = (
-            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
-            if current_runs else "N/A"
+            f"{len(successful_runs)/len(evaluable)*100:.1f}%"
+            if evaluable else "N/A"
         )
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
@@ -1058,10 +1095,13 @@ EXPECTED OUTPUT:
         if not current_runs:
             return None
 
-        has_sab = any("VER" in d for d in current_runs)
+        has_sab = any(d.get("VER") is not None for d in current_runs)
         headers = ["#", "Task", "Time (s)", "Success"]
         if has_sab:
             headers += ["VER", "SR", "CBS", "Cost ($)"]
+
+        def mark(value) -> str:
+            return "—" if value is None else ("✓" if value else "✗")
 
         rows: list[list[str]] = []
         for d in current_runs:
@@ -1073,10 +1113,11 @@ EXPECTED OUTPUT:
                 str(d.get("success_level", "?")),
             ]
             if has_sab:
+                cbs = d.get("CBS")
                 row += [
-                    "✓" if d.get("VER") else "✗",
-                    "✓" if d.get("SR") else "✗",
-                    f"{d.get('CBS', 0.0):.3f}",
+                    mark(d.get("VER")),
+                    mark(d.get("SR")),
+                    "—" if cbs is None else f"{cbs:.3f}",
                     f"{d.get('eval_cost', 0.0):.4f}",
                 ]
             rows.append(row)

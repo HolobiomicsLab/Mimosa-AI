@@ -4,12 +4,17 @@ Execution Sandbox - Safe execution utilities for evaluating generated code.
 Provides isolated execution environment with automatic dependency management.
 """
 
+from __future__ import annotations
+
+import ast
+import atexit
 import logging
 import os
+import re
 import subprocess
 import shutil
-import sys
 import tempfile
+import threading
 from pathlib import Path
 
 
@@ -18,12 +23,21 @@ logger = logging.getLogger(__name__)
 SANDBOX_PYTHON_VERSION = "3.12"
 
 
+class EvalInfraError(RuntimeError):
+    """Raised when the eval harness/environment fails — not the agent's code.
+
+    Signals the task should be EXCLUDED from VER/SR metrics rather than counted
+    as a failure. Examples: sandbox/venv build failure, missing gold_results,
+    or a figure-judged task with no OPENAI_API_KEY / AZURE_OPENAI_KEY set.
+    """
+
+
 class ExecutionSandbox:
     """
     Execution sandbox for safely running generated code with dependency management.
 
     Follows ScienceAgentBench approach:
-    - Uses virtual environment to avget_eval_script_pathoid package conflicts
+    - Uses virtual environment to avoid package conflicts
     - Initializes with basic packages: numpy, pandas, matplotlib, pytorch, tensorflow, rdkit, tf-keras
     - Uses pipreqs to analyze generated code for dependencies
     - Uses pip-tools for dependency resolution and installation
@@ -43,9 +57,23 @@ class ExecutionSandbox:
         "openai"
     ]
 
-    def __init__(self, capsule_path: Path, cpu_only: bool = True):
+    # Process-wide base venv, created once and reused across tasks.
+    _shared_venv_path: Path | None = None
+    _shared_base_dir: str | None = None
+    _shared_venv_lock = threading.Lock()
+
+    def __init__(
+        self,
+        capsule_path: Path,
+        cpu_only: bool = True,
+        base_packages: list[str] | None = None,
+    ):
         """
-        Initialize execution sandbox and set up virtual environment with dependencies.
+        Initialize execution sandbox and set up its Python environment.
+
+        The base venv is created ONCE per process and reused across tasks (see
+        _create_or_reuse_base_venv); only the per-task working directories are
+        rebuilt each time. This avoids re-installing torch/tensorflow per task.
 
         Args:
             capsule_path: Path to capsule directory containing generated code
@@ -53,22 +81,24 @@ class ExecutionSandbox:
                 from the spawned scripts. Sidesteps CUDA/XLA plumbing issues
                 (e.g. missing libdevice) that would otherwise fail VER on
                 machines with a partial CUDA install.
+            base_packages: Packages to ensure in the shared venv. Defaults to
+                BASIC_PACKAGES; pass a lighter set for fast, targeted runs.
         """
         self.capsule_path = Path(capsule_path)
         self.cpu_only = cpu_only
+        self.base_packages = list(base_packages) if base_packages is not None else list(self.BASIC_PACKAGES)
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Create a single temporary directory for this sandbox instance
-        # This will be used for venv, dependency analysis, and code execution
+        # Per-instance temp dir for execution/eval working copies (cleaned per task).
         self._temp_dir_context = tempfile.TemporaryDirectory(prefix="mimosa_sandbox_")
         self.temp_dir = Path(self._temp_dir_context.name)
 
-        # Create virtual environment inside the temp directory
-        self.venv_path = self._create_virtual_environment()
+        # Reuse the process-wide base venv instead of rebuilding it per task.
+        self.venv_path = self._create_or_reuse_base_venv()
         self.python_exe = self.venv_path / "bin" / "python"
         self.pip_exe = self.venv_path / "bin" / "pip"
 
-        # Install basic packages and analyze/setup dependencies
+        # Ensure base + capsule dependencies are present in the shared venv.
         self._setup_environment()
 
     def _resolve_sandbox_python(self) -> str:
@@ -106,61 +136,80 @@ class ExecutionSandbox:
             f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
         )
 
-    def _create_virtual_environment(self) -> Path:
-        """Create a Python SANDBOX_PYTHON_VERSION venv for isolated execution."""
-        venv_path = self.temp_dir / "venv"
+    def _create_or_reuse_base_venv(self) -> Path:
+        """Create the process-wide base venv once, then reuse it across tasks.
 
-        py = self._resolve_sandbox_python()
-        self.logger.info(
-            f"[SANDBOX] Creating Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py}"
-        )
+        Building a fresh venv and re-installing heavy packages (torch,
+        tensorflow) for every task dominated eval time. The venv is created
+        once, cached on the class, and reused; per-task working directories stay
+        isolated. Creation is lock-guarded. Concurrent per-task installs into the
+        shared venv rely on the eval loop being effectively serialized by its
+        blocking subprocess calls.
+        """
+        cls = type(self)
+        with cls._shared_venv_lock:
+            existing = cls._shared_venv_path
+            if existing is not None and (existing / "bin" / "python").exists():
+                self.logger.info(f"[SANDBOX] Reusing shared base venv at {existing}")
+                return existing
 
-        result = subprocess.run(
-            [py, "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"venv creation failed via {py}: {result.stderr[:500]} "
-                f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
+            base_dir = tempfile.mkdtemp(prefix="mimosa_base_venv_")
+            venv_path = Path(base_dir) / "venv"
+            py = self._resolve_sandbox_python()
+            self.logger.info(
+                f"[SANDBOX] Creating shared Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py}"
             )
+            result = subprocess.run(
+                [py, "-m", "venv", str(venv_path)],
+                capture_output=True, text=True, timeout=600,
+            )
+            if result.returncode != 0:
+                shutil.rmtree(base_dir, ignore_errors=True)
+                raise RuntimeError(
+                    f"venv creation failed via {py}: {result.stderr[:500]} "
+                    f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
+                )
 
-        # Verify the venv was created successfully
-        if sys.platform == "win32":
-            python_exe = venv_path / "Scripts" / "python.exe"
-        else:
             python_exe = venv_path / "bin" / "python"
+            if not python_exe.exists():
+                shutil.rmtree(base_dir, ignore_errors=True)
+                raise RuntimeError(
+                    f"Virtual environment created but Python executable not found at {python_exe}."
+                )
 
-        if not python_exe.exists():
-            raise RuntimeError(
-                f"Virtual environment created but Python executable not found at {python_exe}. "
-                f"This may indicate a problem with the Python installation or venv module."
+            # Fail loudly on a version mismatch instead of evaluating on the wrong interpreter.
+            ver = subprocess.run(
+                [str(python_exe), "--version"], capture_output=True, text=True, timeout=10
             )
+            got = (ver.stdout or ver.stderr).strip()
+            if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
+                shutil.rmtree(base_dir, ignore_errors=True)
+                raise RuntimeError(
+                    f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
+                )
 
-        # Assert the venv really is the pinned version, so a mismatch fails loudly
-        # instead of silently evaluating on the wrong interpreter.
-        ver = subprocess.run(
-            [str(python_exe), "--version"], capture_output=True, text=True, timeout=10
-        )
-        got = (ver.stdout or ver.stderr).strip()
-        if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
-            raise RuntimeError(
-                f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
-            )
+            cls._shared_venv_path = venv_path
+            cls._shared_base_dir = base_dir
+            atexit.register(cls.cleanup_shared_venv)
+            self.logger.info(f"[SANDBOX] Shared base venv ready at {venv_path} ({got})")
+            return venv_path
 
-        self.logger.info(
-            f"[SANDBOX] Virtual environment created successfully at {venv_path} ({got})"
-        )
-        return venv_path
+    @classmethod
+    def cleanup_shared_venv(cls) -> None:
+        """Remove the process-wide base venv (also registered with atexit)."""
+        with cls._shared_venv_lock:
+            base_dir = cls._shared_base_dir
+            if base_dir and Path(base_dir).exists():
+                shutil.rmtree(base_dir, ignore_errors=True)
+            cls._shared_venv_path = None
+            cls._shared_base_dir = None
 
     def _setup_environment(self) -> None:
-        """Set up the virtual environment with basic packages and capsule dependencies."""
+        """Ensure base packages and capsule dependencies exist in the shared venv."""
         try:
-            # Install basic packages
-            self.logger.info("[SANDBOX] Installing basic packages...")
-            self._install_packages(self.BASIC_PACKAGES)
+            # pip skips already-satisfied packages, so this is cheap after the first task.
+            self.logger.info("[SANDBOX] Ensuring base packages...")
+            self._install_packages(self.base_packages)
 
             # Analyze capsule code and install additional dependencies
             self._install_capsule_dependencies()
@@ -353,6 +402,10 @@ class ExecutionSandbox:
 
             self._copy_capsule_contents_to_temp(temp_path)
 
+            # SAB output convention is pred_results/; provide it so a program
+            # that writes there without mkdir doesn't fail VER on the last line.
+            (temp_path / "pred_results").mkdir(exist_ok=True)
+
             # Run the generated script
             cmd = [str(self.python_exe), generated_script.name]
 
@@ -403,6 +456,25 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Generated code error: {str(e)}")
             return False, f"Code execution error: {str(e)}"
+
+    def select_generated_script(self, script_name: str = None) -> Path | None:
+        """
+        Return the capsule Python file that best matches script_name.
+
+        Single source of truth for "which file is the generated program", so
+        VER execution and CBS scoring judge the same file instead of drifting
+        onto an arbitrary glob order.
+
+        Args:
+            script_name: Reference name to match against (e.g. gold program name)
+
+        Returns:
+            Best-matching Python file, or None if the capsule has no .py files
+        """
+        py_files = list(self.capsule_path.glob("*.py"))
+        if not py_files:
+            return None
+        return self._select_best_matching_file(py_files, script_name)
 
     def _select_best_matching_file(self, py_files: list[Path], script_name: str = None) -> Path:
         """
@@ -543,9 +615,32 @@ class ExecutionSandbox:
 
         Returns:
             (success: bool, message: str)
+
+        Raises:
+            EvalInfraError: if gold_results is missing, or the task is figure-
+                judged but no OPENAI_API_KEY / AZURE_OPENAI_KEY is set. These are
+                harness/setup problems, so the task is excluded from metrics
+                rather than scored as an SR failure.
         """
         try:
             self.logger.info(f"[SANDBOX] Running eval script: {eval_script_path.name}")
+
+            # Detect figure-judged tasks by an ACTUAL import of the judge, not a
+            # loose substring (a comment mentioning it must not force exclusion).
+            needs_judge = self._eval_needs_judge(
+                eval_script_path.read_text(encoding="utf-8", errors="ignore")
+            )
+            if needs_judge:
+                if visual_judge_path is None or not Path(visual_judge_path).exists():
+                    raise EvalInfraError(
+                        f"Figure-judged task '{eval_script_path.name}' needs "
+                        f"gpt4_visual_judge.py — not available; excluding from metrics"
+                    )
+                if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("AZURE_OPENAI_KEY")):
+                    raise EvalInfraError(
+                        f"Figure-judged task '{eval_script_path.name}' needs OPENAI_API_KEY "
+                        f"or AZURE_OPENAI_KEY; none set — excluding from metrics"
+                    )
 
             # Use the sandbox's persistent temp directory for eval script execution
             temp_path = self.temp_dir / "eval"
@@ -565,8 +660,10 @@ class ExecutionSandbox:
                 shutil.copytree(gold_results_src, gold_results_dst)
                 self.logger.info("[SANDBOX] Copied gold_results for evaluation")
             else:
-                self.logger.warning("[SANDBOX] Could not find gold results.")
-                return False, "Failed to find gold results folder."
+                raise EvalInfraError(
+                    f"gold_results not found next to {eval_script_path.name} "
+                    f"({gold_results_src}) — benchmark eval data incomplete"
+                )
 
             shutil.copy2(eval_script_path, temp_path / eval_script_path.name)
             if visual_judge_path:
@@ -595,6 +692,8 @@ class ExecutionSandbox:
 
             return self._parse_eval_output(output)
 
+        except EvalInfraError:
+            raise  # infra problem — let the caller exclude the task
         except subprocess.TimeoutExpired:
             self.logger.error(f"[SANDBOX] Eval script timeout after {timeout}s")
             return False, f"Evaluation timeout after {timeout} seconds"
@@ -621,21 +720,71 @@ class ExecutionSandbox:
             pass
 
     def _parse_eval_output(self, output: str) -> tuple[bool, str]:
-        """Parse evaluation script output."""
+        """
+        Parse a ScienceAgentBench eval script's stdout into (success, message).
+
+        Every SAB eval script ends with ``print(eval())`` where ``eval`` returns
+        an ``(int_status, message)`` tuple, so the RESULT is the last printable
+        line. Scientific libraries (tensorflow, sklearn, rdkit) commonly print
+        banners first, so we scan from the last non-empty line for the first
+        line that parses as that tuple.
+
+        Unparseable output is treated as failure, never success. The previous
+        heuristic returned success whenever the raw text contained "1", "True"
+        or "success" — a stray line number or float silently turned a failing
+        task into a pass.
+
+        Args:
+            output: Captured stdout from the eval script
+
+        Returns:
+            (success, message) — success is False if no result tuple is found
+        """
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        for line in reversed(lines):
+            parsed = self._parse_result_tuple(line)
+            if parsed is not None:
+                return parsed
+        return False, f"No (status, message) result tuple in eval output: {output[:1000]}"
+
+    @staticmethod
+    def _eval_needs_judge(eval_text: str) -> bool:
+        """True if the eval script actually imports the GPT figure judge.
+
+        Matches a real import line, not any mention — so a comment referencing
+        the judge never forces a task to be excluded for lack of an API key.
+        """
+        return bool(re.search(
+            r"^\s*(?:from\s+gpt4_visual_judge\s+import|import\s+gpt4_visual_judge)",
+            eval_text, re.MULTILINE,
+        ))
+
+    @staticmethod
+    def _parse_result_tuple(line: str) -> tuple[bool, str] | None:
+        """Return (success, message) if line is a SAB result tuple, else None."""
         try:
-            import ast
-            parsed = ast.literal_eval(output)
-            if isinstance(parsed, tuple) and len(parsed) >= 2:
-                success = bool(parsed[0])
-                message = str(parsed[1])
-                return success, message
-            else:
-                if output.startswith("(1,") or output.startswith("(True,"):
-                    return True, output
-                else:
-                    return False, output
+            parsed = ast.literal_eval(line)
         except (ValueError, SyntaxError):
-            if "1" in output or "True" in output or "success" in output.lower():
-                return True, output
-            else:
-                return False, output
+            return None
+        if not (isinstance(parsed, tuple) and len(parsed) >= 2):
+            return None
+        try:
+            success = bool(int(parsed[0]))
+        except (ValueError, TypeError):
+            success = bool(parsed[0])
+        return success, str(parsed[1])
+
+
+if __name__ == "__main__":
+    # Lightweight smoke check: exercise output parsing without building a venv.
+    logging.basicConfig(level=logging.INFO)
+    _sb = object.__new__(ExecutionSandbox)  # bypass heavy env setup
+    assert _sb._parse_eval_output("(1, 'ok')") == (True, "ok")
+    assert _sb._parse_eval_output("(0, 'nope')")[0] is False
+    # Library banners before the result tuple must not fool the parser
+    _noisy = "tensorflow: using CPU\n(1, \"{'data_correctness': True}\")"
+    assert _sb._parse_eval_output(_noisy)[0] is True
+    # A stray '1' with no result tuple is a failure, not a spurious success
+    assert _sb._parse_eval_output("Traceback: error on line 12")[0] is False
+    assert _sb._parse_eval_output("")[0] is False
+    print("execution_sandbox smoke check passed")
