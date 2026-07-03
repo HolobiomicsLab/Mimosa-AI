@@ -3,15 +3,7 @@ Render a 2-D PCA projection of the QD archive's genotype embeddings.
 
 Each archive member is one point; distance on the map approximates the
 cosine geometry the novelty score is computed in, so a newcomer landing
-far from the cloud illustrates *why* it was admitted. The projection is
-refit from the current archive on every call: axes may rotate as members
-arrive or get evicted, so each PNG is a self-contained snapshot, not a
-frame in a fixed coordinate system. Axis labels carry the explained
-variance so the reader can judge how faithful the 2-D picture is.
-
-Kept import-light on purpose (matplotlib + numpy only) so callers and
-tests never drag in the embedding backend; the ``__main__`` CLI lazily
-imports it to rebuild descriptors from on-disk genotypes.
+far from the cloud illustrates why it was admitted.
 """
 
 from __future__ import annotations
