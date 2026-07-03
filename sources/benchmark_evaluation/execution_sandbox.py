@@ -20,7 +20,49 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SANDBOX_PYTHON_VERSION = "3.12"
+# ScienceAgentBench pins its eval environment to Python 3.10 (config_conda_env.py).
+# Old rdkit/deepchem-era wheels do not exist for 3.12, so we match 3.10 to reproduce.
+SANDBOX_PYTHON_VERSION = "3.10"
+
+# Version caps mirroring the authors' pinned eval environment. Applied as a pip
+# constraints file to the base AND every per-task install, so pipreqs-discovered
+# deps (e.g. deepchem) cannot pull an incompatible numpy/rdkit.
+PINNED_CONSTRAINTS = [
+    "numpy<2.0",
+    "scipy<1.14.0",
+    "pandas<=1.5.3",
+    "matplotlib<3.8.0",
+    "torch<=2.3.0",
+    "tensorflow<=2.17.0",
+    "tf_keras<=2.17.0",
+    "rdkit<=2023.09.5",
+    "pymatgen<=2024.5.1",
+    "oggm<=1.6.1",
+]
+
+# pipreqs import name -> PyPI package name (authors' handcrafted remaps).
+IMPORT_NAME_REMAP = {
+    "scvi": "scvi-tools",
+    "skimage": "scikit-image",
+    "iris": "scitools-iris",
+}
+
+# Imports pipreqs may report that must not be installed.
+DROP_PACKAGES = {"benchmark"}
+
+# Extra runtime deps some libraries need but pipreqs misses (keyed lowercase).
+EXTRA_DEPS = {
+    "biopsykit": ["mne"],
+    "oggm": ["salem", "tables", "geopandas"],
+    "scanpy": ["scikit-misc", "leidenalg"],
+}
+
+# Libraries needing bespoke install commands (keyed lowercase); best-effort.
+SPECIAL_CASE_INSTALLS = {
+    "deepchem": [["dgl", "-f", "https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html"]],
+    "deeppurpose": [["git+https://github.com/bp-kelley/descriptastorus"]],
+    "qsprpred": [["papyrus-scaffold-visualizer", "kaleido"]],
+}
 
 
 class EvalInfraError(RuntimeError):
@@ -37,29 +79,33 @@ class ExecutionSandbox:
     Execution sandbox for safely running generated code with dependency management.
 
     Follows ScienceAgentBench approach:
-    - Uses virtual environment to avoid package conflicts
-    - Initializes with basic packages: numpy, pandas, matplotlib, pytorch, tensorflow, rdkit, tf-keras
-    - Uses pipreqs to analyze generated code for dependencies
-    - Uses pip-tools for dependency resolution and installation
+    - Uses a virtual environment to avoid package conflicts
+    - Installs the authors' pinned base stack (numpy, scipy, pandas, matplotlib,
+      scikit-learn, torch, tensorflow, tf_keras, rdkit) at their exact versions
+    - Uses pipreqs + the authors' handcrafted rules to add per-program deps,
+      capped by a shared constraints file
     """
 
-    # Basic packages to install in every environment (for ScienceAgentBench)
+    # Authors' pinned base stack (config_conda_env.py); versions matter for repro.
     BASIC_PACKAGES = [
-        "numpy",
-        "pandas",
-        "matplotlib",
-        "scikit-learn",  # sklearn
-        "torch",  # pytorch
-        "tensorflow",
-        "rdkit",  # rdkit
-        "pipreqs",  # for dependency analysis
-        "pip-tools",  # for dependency resolution
-        "openai"
+        "numpy<2.0",
+        "scipy<1.14.0",
+        "pandas<=1.5.3",
+        "matplotlib<3.8.0",
+        "scikit-learn",
+        "torch<=2.3.0",
+        "tensorflow<=2.17.0",
+        "tf_keras<=2.17.0",
+        "rdkit<=2023.09.5",
+        "openai==1.54.4",
+        "pipreqs",
+        "pip-tools",
     ]
 
     # Process-wide base venv, created once and reused across tasks.
     _shared_venv_path: Path | None = None
     _shared_base_dir: str | None = None
+    _constraints_file: str | None = None
     _shared_venv_lock = threading.Lock()
 
     def __init__(
@@ -188,8 +234,12 @@ class ExecutionSandbox:
                     f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
                 )
 
+            constraints = Path(base_dir) / "constraints.txt"
+            constraints.write_text("\n".join(PINNED_CONSTRAINTS) + "\n")
+
             cls._shared_venv_path = venv_path
             cls._shared_base_dir = base_dir
+            cls._constraints_file = str(constraints)
             atexit.register(cls.cleanup_shared_venv)
             self.logger.info(f"[SANDBOX] Shared base venv ready at {venv_path} ({got})")
             return venv_path
@@ -203,6 +253,7 @@ class ExecutionSandbox:
                 shutil.rmtree(base_dir, ignore_errors=True)
             cls._shared_venv_path = None
             cls._shared_base_dir = None
+            cls._constraints_file = None
 
     def _setup_environment(self) -> None:
         """Ensure base packages and capsule dependencies exist in the shared venv."""
@@ -218,142 +269,108 @@ class ExecutionSandbox:
             self.logger.error(f"[SANDBOX] Failed to setup environment: {e}")
             raise
 
-    def _install_packages(self, packages: list[str]) -> None:
-        """Install packages in the virtual environment."""
+    def _install_packages(self, packages: list[str], best_effort: bool = False) -> None:
+        """Install packages in the venv, capped by the shared constraints file."""
         if not packages:
             return
 
-        cmd = [str(self.pip_exe), "install", "--quiet"] + packages
+        cmd = [str(self.pip_exe), "install", "--quiet"]
+        if self._constraints_file:
+            cmd += ["-c", self._constraints_file]
+        cmd += packages
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
-
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] Package installation warnings: {result.stderr[:500]}")
+                self.logger.warning(f"[SANDBOX] Package install warnings: {result.stderr[:500]}")
             else:
-                self.logger.info(f"[SANDBOX] Installed packages: {', '.join(packages)}")
-
+                self.logger.info(f"[SANDBOX] Installed: {', '.join(packages)}")
         except subprocess.TimeoutExpired:
             self.logger.error("[SANDBOX] Package installation timed out")
-            raise
+            if not best_effort:
+                raise
         except Exception as e:
             self.logger.error(f"[SANDBOX] Package installation failed: {e}")
-            raise
+            if not best_effort:
+                raise
 
     def _install_capsule_dependencies(self) -> None:
-        """Analyze capsule code with pipreqs and install dependencies using pip-tools."""
-        self.logger.info(f"[SANDBOX] Analyzing capsule {self.capsule_path.name}...")
-
-        # First, check if there's a requirements.txt in the capsule directory
-        requirements_txt = self.capsule_path / "requirements.txt"
-        if requirements_txt.exists():
-            self.logger.info("[SANDBOX] Found requirements.txt in capsule, installing dependencies...")
-            try:
-                cmd_install = [str(self.pip_exe), "install", "-r", str(requirements_txt)]
-                result = subprocess.run(
-                    cmd_install,
-                    capture_output=True,
-                    text=True,
-                    timeout=600
-                )
-                if result.returncode == 0:
-                    self.logger.info("[SANDBOX] Dependencies from requirements.txt installed successfully")
-                    return
-                else:
-                    self.logger.warning(f"[SANDBOX] Failed to install from requirements.txt: {result.stderr[:500]}")
-                    # Continue to try pipreqs as fallback
-            except subprocess.TimeoutExpired:
-                self.logger.error("[SANDBOX] requirements.txt installation timed out")
-            except Exception as e:
-                self.logger.error(f"[SANDBOX] requirements.txt installation failed: {e}")
-                # Continue to try pipreqs as fallback
-
-        # Find Python files in capsule
-        python_files = list(self.capsule_path.glob("*.py"))
-        if not python_files:
-            self.logger.info("[SANDBOX] No Python files found in capsule")
+        """Install per-program deps via pipreqs + the authors' handcrafted rules."""
+        # A capsule-provided requirements.txt wins (still constraint-capped).
+        capsule_reqs = self.capsule_path / "requirements.txt"
+        if capsule_reqs.exists():
+            self._pip_install_requirements(capsule_reqs)
             return
-        try:
-            self.logger.info("[SANDBOX] Analyzing code dependencies with pipreqs...")
-            temp_path = self.temp_dir / "deps_analysis"
-            temp_path.mkdir(exist_ok=True)
-            # Copy capsule files to temp directory for analysis
-            for file_path in python_files:
-                shutil.copy2(file_path, temp_path / file_path.name)
-            # Run pipreqs (installed as console script in venv)
-            pipreqs_exe = self.venv_path / "bin" / "pipreqs"
 
-            # Check if pipreqs is available (may not be if basic package installation failed)
-            if not pipreqs_exe.exists():
-                self.logger.warning("[SANDBOX] pipreqs not found in venv, skipping dependency analysis")
-                return
+        if not list(self.capsule_path.glob("*.py")):
+            self.logger.info("[SANDBOX] No Python files in capsule")
+            return
 
-            cmd_pipreqs = [
-                str(pipreqs_exe),
-                "--savepath", str(temp_path / "requirements.in"),
-                "--mode", "no-pin",
-                str(temp_path)
-            ]
+        requirements_in = self._run_pipreqs()
+        if requirements_in is None:
+            return
+        packages, present = self._apply_dependency_rules(requirements_in.read_text())
+        if packages:
+            self.logger.info(f"[SANDBOX] Installing per-program deps: {', '.join(packages)}")
+            self._install_packages(packages)
+        self._run_special_case_installs(present)
 
-            result = subprocess.run(
-                cmd_pipreqs,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
+    def _pip_install_requirements(self, req_file: Path) -> None:
+        """pip install -r req_file, capped by the shared constraints file."""
+        cmd = [str(self.pip_exe), "install", "-r", str(req_file)]
+        if self._constraints_file:
+            cmd += ["-c", self._constraints_file]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        if result.returncode == 0:
+            self.logger.info(f"[SANDBOX] Installed deps from {req_file.name}")
+        else:
+            self.logger.warning(f"[SANDBOX] Dep install warnings: {result.stderr[:500]}")
 
-            if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pipreqs failed: {result.stderr[:512]}")
-                return
+    def _run_pipreqs(self) -> Path | None:
+        """Run pipreqs over the capsule's Python files; return requirements.in or None."""
+        pipreqs_exe = self.venv_path / "bin" / "pipreqs"
+        if not pipreqs_exe.exists():
+            self.logger.warning("[SANDBOX] pipreqs missing, skipping dependency analysis")
+            return None
+        temp_path = self.temp_dir / "deps_analysis"
+        if temp_path.exists():
+            shutil.rmtree(temp_path)
+        temp_path.mkdir(parents=True, exist_ok=True)
+        for py in self.capsule_path.glob("*.py"):
+            shutil.copy2(py, temp_path / py.name)
+        req_in = temp_path / "requirements.in"
+        cmd = [str(pipreqs_exe), "--savepath", str(req_in), "--mode", "no-pin", str(temp_path)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0 or not req_in.exists():
+            self.logger.warning(f"[SANDBOX] pipreqs found no deps: {result.stderr[:300]}")
+            return None
+        return req_in
 
-            requirements_in = temp_path / "requirements.in"
-            if not requirements_in.exists():
-                self.logger.info("[SANDBOX] No additional dependencies found")
-                return
-            # Use pip-tools to compile requirements
-            self.logger.info("[SANDBOX] Compiling requirements with pip-tools...")
-            requirements_txt = temp_path / "requirements.txt"
-            cmd_compile = [
-                str(self.python_exe), "-m", "piptools", "compile",
-                "--output-file", str(requirements_txt),
-                str(requirements_in)
-            ]
-            result = subprocess.run(
-                cmd_compile,
-                capture_output=True,
-                text=True,
-                timeout=180
-            )
+    @staticmethod
+    def _apply_dependency_rules(req_text: str) -> tuple[list[str], list[str]]:
+        """Apply SAB rules (remap/drop/extras); return (install_list, present_names)."""
+        packages, present = [], []
+        dropped = {d.lower() for d in DROP_PACKAGES}
+        for raw in req_text.splitlines():
+            name = re.split(r"[=<>!~\[; ]", raw.strip(), 1)[0].strip()
+            if not name or name.startswith("#") or name.lower() in dropped:
+                continue
+            present.append(name)
+            packages.append(IMPORT_NAME_REMAP.get(name.lower(), name))
+            packages.extend(EXTRA_DEPS.get(name.lower(), []))
+        seen, out = set(), []
+        for pkg in packages:  # de-dup, preserve order
+            if pkg not in seen:
+                seen.add(pkg)
+                out.append(pkg)
+        return out, present
 
-            if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] pip-tools compile failed: {result.stderr[:512]}")
-                # Fall back to direct installation from .in file
-                requirements_txt = requirements_in
-
-            # Install the compiled requirements
-            self.logger.info("[SANDBOX] Installing additional dependencies...")
-            cmd_install = [str(self.pip_exe), "install", "-r", str(requirements_txt)]
-
-            result = subprocess.run(
-                cmd_install,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
-
-            if result.returncode == 0:
-                self.logger.info("[SANDBOX] Additional dependencies installed successfully")
-            else:
-                self.logger.warning(f"[SANDBOX] Dependency installation warnings: {result.stderr[:500]}")
-
-        except Exception as e:
-            self.logger.error(f"[SANDBOX] Dependency analysis/installation failed: {e}")
-            # Continue execution even if dependency installation fails
+    def _run_special_case_installs(self, present: list[str]) -> None:
+        """Run bespoke installs for libs pipreqs can't fully provision (best-effort)."""
+        for name in present:
+            for extra in SPECIAL_CASE_INSTALLS.get(name.lower(), []):
+                self.logger.info(f"[SANDBOX] Special-case install for {name}: {' '.join(extra)}")
+                self._install_packages(extra, best_effort=True)
 
     def _subprocess_env(self) -> dict:
         """Build the env dict for spawned scripts, applying cpu_only if set."""
@@ -787,4 +804,9 @@ if __name__ == "__main__":
     # A stray '1' with no result tuple is a failure, not a spurious success
     assert _sb._parse_eval_output("Traceback: error on line 12")[0] is False
     assert _sb._parse_eval_output("")[0] is False
+    # dependency-rule mapping (remap, drop, extra deps)
+    _pkgs, _present = _sb._apply_dependency_rules("scvi\nskimage\nbenchmark\nbiopsykit\ndeepchem\n")
+    assert "scvi-tools" in _pkgs and "scikit-image" in _pkgs
+    assert "benchmark" not in _pkgs and "benchmark" not in _present
+    assert "mne" in _pkgs and "deepchem" in _present  # biopsykit adds mne
     print("execution_sandbox smoke check passed")
