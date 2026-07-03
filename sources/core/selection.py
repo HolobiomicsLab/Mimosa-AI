@@ -806,7 +806,7 @@ if __name__ == "__main__":
         )
 
     sp = SelectionPressure(
-        strategy="qd", population_size=50, novelty_k_neighbours=25,
+        config={}, strategy="qd", population_size=50, novelty_k_neighbours=25,
         novelty_weight=0.4, length_penalty_baseline_chars=5000,
         length_penalty_lambda=0.05,
     )
@@ -830,7 +830,7 @@ if __name__ == "__main__":
 
     # previous_n mode: cosine distance against the recent window.
     sp_pn = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         novelty_comparison="previous_n", previous_n=4,
     )
     sp_pn._validate_open_ended([seed], [seed], threshold=0.01)

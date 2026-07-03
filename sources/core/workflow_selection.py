@@ -344,7 +344,7 @@ if __name__ == "__main__":
     for wf in matching_workflow:
         print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
     print("\n=== Evolutionary parent selection ===")
-    sp = SelectionPressure(strategy="tournament")
+    sp = SelectionPressure(config={}, strategy="tournament")
     selected, crossover = mcts.select_parent_workflows(
         goal=goal,
         selection_pressure=sp,
