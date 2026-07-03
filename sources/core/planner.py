@@ -1,29 +1,37 @@
 import json
-import time
 import os
 import re
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
-from .evolution_engine import EvolutionEngine
-from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
-from .schema import Task, Plan, PlanStep, TaskStatus, IndividualRun
-from .workflow_selection import WorkflowSelector
-from sources.utils.notify import PushNotifier
-from sources.utils.planner_visualization import PlannerVisualizer
-from sources.utils.list_files import list_files
-from sources.extensibility.text_to_speech import create_tts_service
-from sources.cli.pretty_print import (
-    print_ok, print_warn, print_err, print_info,
-    print_phase, print_section, print_summary,
-    CYAN, BOLD, DIM, RESET,
-)
 
+from sources.cli.pretty_print import (
+    BOLD,
+    CYAN,
+    DIM,
+    RESET,
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_section,
+    print_summary,
+    print_warn,
+)
+from sources.extensibility.text_to_speech import create_tts_service
+from sources.utils.list_files import list_files
+from sources.utils.notify import PushNotifier
 from sources.utils.perspicacite_client import (
-    format_scientific_context,
     query_perspicacite,
 )
+from sources.utils.planner_visualization import PlannerVisualizer
+
+from .evolution_engine import EvolutionEngine
+from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
+from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
+from .workflow_selection import WorkflowSelector
 
 
 class PlanValidationError(Exception):
@@ -117,7 +125,7 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
         try:
             response = query_perspicacite(prompt) or "No relevant scientific context."
             return response
-        except Exception as e:
+        except Exception:
             return "Query failed. Unable to help with scientific litterature"
 
     def make_scientific_grounded_prompt(self, goal: str) -> str:
@@ -129,7 +137,7 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
             str: Enhanced prompt with scientific context
         """
         print_phase(
-            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+            "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
         )
         scientific_context = self.perspicacite_grounding(goal)
         print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
@@ -167,7 +175,7 @@ Important: Every task description should be very detailled and specific with the
             try:
                 print_info(f"Plan generation attempt {attempt}/{max_retries}")
 
-                memory_path = getattr(self.config, 'memory_path', 'sources/memory')
+                memory_path = self.config.memory_dir
                 raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
 
                 if not raw_plan or not isinstance(raw_plan, str):

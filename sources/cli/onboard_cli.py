@@ -10,20 +10,32 @@ or Task-mode, then hands off to the appropriate execution entry-point
 
 from __future__ import annotations
 
-import asyncio
 import json
-import re
-import time
 import os
+import re
 import sys
 import textwrap
+import time
 from typing import Literal
 
 from config import Config
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.core.tools_manager import ToolManager
+from sources.utils import paths
 from sources.utils.list_files import list_files
 from sources.utils.transfer_toolomics import LocalTransfer
+
+
+def _persisted_config_path() -> str:
+    """Return where onboarding loads and saves persistent settings.
+
+    Repo checkouts keep the historical ``config_default.json`` in the
+    working directory; installed (uv tool / pip) runs persist to
+    ``~/.config/mimosa/config.json`` so onboarding works from any path.
+    """
+    if os.path.isfile("config_default.json") or paths.is_repo_checkout():
+        return "config_default.json"
+    return str(paths.user_config_file())
 
 
 # ---------------------------------------------------------------------------
@@ -609,7 +621,7 @@ class OnboardCLI:
             _warn(f"Discovery error: {exc}")
             return []
 
-    _CONFIG_DEFAULT_PATH = "config_default.json"
+    _CONFIG_DEFAULT_PATH = _persisted_config_path()
 
     def _verify_workspace_dir(self) -> None:
         """Check that config.workspace_dir exists; prompt the user until it does.
@@ -1312,7 +1324,6 @@ class OnboardCLI:
     async def _launch_goal(self) -> None:
         """Start planner mode (multi-step goal)."""
         from sources.core.planner import Planner
-        from sources.utils.transfer_toolomics import LocalTransfer
 
         print(f"\n{GREEN}{BOLD}  Launching in GOAL mode …{RESET}\n")
         planner = Planner(self.config)

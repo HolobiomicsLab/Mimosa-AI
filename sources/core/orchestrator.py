@@ -44,6 +44,7 @@ class WorkflowOrchestrator:
             python_version=self.config.runner_default_python_version,
             timeout=self.config.runner_default_timeout,
             max_memory_mb=self.config.runner_default_max_memory_mb,
+            temp_dir=self.config.runner_temp_dir,
         )
         self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 

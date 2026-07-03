@@ -35,6 +35,12 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from dotenv import load_dotenv
 load_dotenv()
+# Fallback: user-level env file. Inline (no project imports) because this
+# file is injected into generated workflows running in a separate venv.
+load_dotenv(os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "mimosa", ".env",
+))
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
