@@ -2,25 +2,31 @@
 """
 Brute sanity check of the ScienceAgentBench eval pipeline against gold solutions.
 
-For each task it EXECUTES the gold program in the sandbox (VER) using the task's
+With no arguments it runs the FULL benchmark (every task in ScienceAgentBench.csv):
+for each task it EXECUTES the gold program in the sandbox (VER) with the task's
 real input data, then runs the task's eval script on the produced output (SR).
-A correct pipeline must score VER=1 and SR=1 for the gold, so the aggregate
-should be ~100%.
+A correct pipeline scores VER=1 and SR=1 on the gold, so a fully-provisioned run
+should approach 100% (figure tasks need OPENAI_API_KEY or they are excluded).
+
+Uses the SAME ExecutionSandbox + methods (run_generated_code / run_eval_script)
+as Mimosa's real eval, and by default the SAME base packages
+(ExecutionSandbox.BASIC_PACKAGES: torch/tensorflow/rdkit/…). The first task pays
+a one-time heavy install into the shared venv; every task after reuses it.
 
 Input datasets are untracked and live in the MAIN working tree, not in a git
-worktree — this harness resolves them by walking up to the main repo. When the
-gold program or its data is unavailable, it falls back to SEED mode: it feeds the
-gold OUTPUT through the eval script (SR only) to still validate the eval machinery.
+worktree — this harness resolves them (and the CSV) by walking up to the main
+repo. If a gold program or its data is unavailable it falls back to SEED mode:
+it feeds the gold OUTPUT through the eval script (SR only).
 
-Exercises the exact code paths that matter: ExecutionSandbox.run_generated_code,
-run_eval_script, _parse_eval_output, dependency auto-install, and the
-infra-exclusion path. Not named `test_*` so pytest does not auto-collect it.
+Not named `test_*` so pytest does not auto-collect it.
 
-    python3.12 tests/brute_gold_eval.py                       # default tasks, VER when possible
+    python3.12 tests/brute_gold_eval.py                # full benchmark, full base
+    python3.12 tests/brute_gold_eval.py --list         # list the tasks, run nothing
+    python3.12 tests/brute_gold_eval.py --light CogSci_pattern_high_sim_eval
     python3.12 tests/brute_gold_eval.py --seed-only clintox_nn_eval
-    python3.12 tests/brute_gold_eval.py CogSci_pattern_high_sim_eval
 """
 
+import csv
 import os
 import re
 import shutil
@@ -37,31 +43,44 @@ EVAL_DIR = SAB_ROOT / "eval_programs"
 GOLD_RESULTS_DIR = EVAL_DIR / "gold_results"
 GOLD_PROG_DIR = SAB_ROOT / "gold_programs"
 
-# Light base for a fast run; pipreqs/pip-tools auto-install each gold's own deps.
-# Tasks needing a heavy core dep (e.g. deepchem -> tensorflow) require the full
-# ExecutionSandbox.BASIC_PACKAGES set instead — pass base via the sandbox there.
-BASE_PACKAGES = ["numpy", "pandas", "scikit-learn", "pipreqs", "pip-tools"]
+# Lighter base for fast subset runs (--light); pipreqs still adds per-gold deps.
+LIGHT_BASE = ["numpy", "pandas", "scikit-learn", "pipreqs", "pip-tools"]
 
-# Defaults are the light, self-contained tasks that run real VER+SR fast here.
-DEFAULT_TASKS = [
-    "CogSci_pattern_high_sim_eval",  # pandas/numpy/ccobra
-    "mountainLion3_eval",            # rasterio geospatial reclassification
-]
+FLAGS = {"--seed-only", "--light", "--list"}
 
 
-def _resolve_datasets_dir() -> Path | None:
-    """Locate the SAB input datasets, incl. the main working tree above a worktree."""
-    local = SAB_ROOT / "datasets"
-    if local.exists():
-        return local
+def _resolve_up(*rel_parts: str) -> Path | None:
+    """Find datasets/<...> which may live in the main working tree above a worktree."""
+    direct = SAB_ROOT.parent / Path(*rel_parts)
+    if direct.exists():
+        return direct
     for anc in Path(__file__).resolve().parents:
-        cand = anc / "datasets" / "ScienceAgentBench" / "datasets"
-        if cand.exists() and cand != local:
+        cand = anc / "datasets" / Path(*rel_parts)
+        if cand.exists():
             return cand
     return None
 
 
-DATASETS_DIR = _resolve_datasets_dir()
+DATASETS_DIR = _resolve_up("ScienceAgentBench", "datasets")
+TASK_CSV = _resolve_up("ScienceAgentBench.csv")
+
+
+def _load_tasks() -> tuple[list[str], dict[str, str]]:
+    """Return (all eval basenames, {eval_base: gold_base}) from the benchmark CSV."""
+    if not TASK_CSV or not TASK_CSV.exists():
+        return [], {}
+    evals, mapping = [], {}
+    with open(TASK_CSV, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            eval_base = (row.get("eval_script_name") or "").replace(".py", "").strip()
+            gold_base = (row.get("gold_program_name") or "").replace(".py", "").strip()
+            if eval_base:
+                evals.append(eval_base)
+                mapping[eval_base] = gold_base
+    return evals, mapping
+
+
+ALL_TASKS, EVAL_TO_GOLD = _load_tasks()
 
 
 def _parse_io_paths(eval_text: str) -> tuple[str | None, str | None]:
@@ -93,10 +112,18 @@ def _seed_capsule_with_gold(capsule: Path, pred_rel: str, gold_name: str) -> Non
     shutil.copy2(src, dst)
 
 
-def brute_test_one(eval_name: str, run_ver: bool = True) -> dict:
+def _gold_program_for(eval_name: str) -> Path:
+    """Resolve a task's gold program via the CSV map (fallback: strip _eval)."""
+    gold_base = EVAL_TO_GOLD.get(eval_name) or (
+        eval_name[:-5] if eval_name.endswith("_eval") else eval_name
+    )
+    return GOLD_PROG_DIR / f"{gold_base}.py"
+
+
+def brute_test_one(eval_name: str, base_packages=None, run_ver: bool = True) -> dict:
     """Run VER (execute gold) + SR (eval), or SR-only seed mode; return a record."""
     eval_path = EVAL_DIR / f"{eval_name}.py"
-    gold_prog = GOLD_PROG_DIR / f"{eval_name[:-5] if eval_name.endswith('_eval') else eval_name}.py"
+    gold_prog = _gold_program_for(eval_name)
     record = {"task": eval_name, "ver": "skipped", "sr": None, "msg": ""}
 
     if not eval_path.exists():
@@ -120,7 +147,7 @@ def brute_test_one(eval_name: str, run_ver: bool = True) -> dict:
 
         if do_ver:
             shutil.copy2(gold_prog, capsule / gold_prog.name)
-            sandbox = ExecutionSandbox(capsule, base_packages=BASE_PACKAGES)
+            sandbox = ExecutionSandbox(capsule, base_packages=base_packages)
             ver_ok, ver_msg = sandbox.run_generated_code(
                 script_path=capsule / gold_prog.name,
                 script_name=gold_prog.name,
@@ -139,7 +166,7 @@ def brute_test_one(eval_name: str, run_ver: bool = True) -> dict:
             _seed_capsule_with_gold(capsule, pred_rel, gold_name)
             if not record["ver"].startswith("skipped"):
                 record["ver"] = "skipped (seed mode)"
-            sandbox = ExecutionSandbox(capsule, base_packages=BASE_PACKAGES)
+            sandbox = ExecutionSandbox(capsule, base_packages=base_packages)
 
         try:
             success, msg = sandbox.run_eval_script(eval_path, visual_judge_path=None, timeout=300)
@@ -157,14 +184,21 @@ def brute_test_one(eval_name: str, run_ver: bool = True) -> dict:
     return record
 
 
-def run_brute_test(eval_names: list[str], run_ver: bool = True) -> list[dict]:
-    """Run the gold check over the given tasks and print a report."""
-    print("=" * 78)
-    print("BRUTE GOLD-SOLUTION CHECK — execute gold (VER) then run eval (SR)")
-    print(f"datasets: {DATASETS_DIR or 'NOT FOUND (SR-seed only)'}")
-    print("=" * 78)
+def run_brute_test(eval_names: list[str], base_packages=None, run_ver: bool = True) -> list[dict]:
+    """Run the gold check over the tasks, streaming each result, then summarize."""
+    total = len(eval_names)
+    base_label = "light" if base_packages is not None else "full (BASIC_PACKAGES)"
+    print("=" * 84)
+    print(f"BRUTE GOLD-SOLUTION CHECK — execute gold (VER) then run eval (SR) — {total} task(s)")
+    print(f"datasets: {DATASETS_DIR or 'NOT FOUND (SR-seed only)'} | base: {base_label}")
+    print("=" * 84)
 
-    records = [brute_test_one(name, run_ver=run_ver) for name in eval_names]
+    records = []
+    for i, name in enumerate(eval_names, 1):
+        r = brute_test_one(name, base_packages=base_packages, run_ver=run_ver)
+        records.append(r)
+        sr = "—(excluded)" if r["sr"] is None else ("PASS" if r["sr"] else "FAIL")
+        print(f"[{i}/{total}] {r['task']:<38} VER={r['ver']:<22} SR={sr:<12} {r['msg'][:44]}")
 
     evaluated = [r for r in records if r["sr"] is not None]
     excluded = [r for r in records if r["sr"] is None]
@@ -172,23 +206,29 @@ def run_brute_test(eval_names: list[str], run_ver: bool = True) -> list[dict]:
     ver_pass = sum(1 for r in ver_ran if r["ver"] == "PASS")
     sr_pass = sum(1 for r in evaluated if r["sr"])
 
-    for r in records:
-        sr = "—(excluded)" if r["sr"] is None else ("PASS" if r["sr"] else "FAIL")
-        print(f"  {r['task']:<34} VER={r['ver']:<26} SR={sr:<12} {r['msg'][:52]}")
-
-    print("-" * 78)
+    print("-" * 84)
     ver_line = f"{ver_pass}/{len(ver_ran)} ({ver_pass/len(ver_ran)*100:.0f}%)" if ver_ran else "none executed"
     sr_pct = (sr_pass / len(evaluated) * 100) if evaluated else 0.0
     print(f"VER: {ver_line} | SR: {sr_pass}/{len(evaluated)} ({sr_pct:.0f}%) | excluded (infra): {len(excluded)}")
-    print("=" * 78)
+    print("=" * 84)
     return records
 
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
     run_ver = "--seed-only" not in argv
-    tasks = [a for a in argv if a != "--seed-only"] or DEFAULT_TASKS
-    results = run_brute_test(tasks, run_ver=run_ver)
+    base = LIGHT_BASE if "--light" in argv else None
+    tasks = [a for a in argv if a not in FLAGS] or ALL_TASKS
+
+    if not tasks:
+        print("No tasks: benchmark CSV not found and none given on the command line.")
+        sys.exit(2)
+    if "--list" in argv:
+        print("\n".join(tasks))
+        print(f"total: {len(tasks)}")
+        sys.exit(0)
+
+    results = run_brute_test(tasks, base_packages=base, run_ver=run_ver)
     evaluated = [r for r in results if r["sr"] is not None]
     ver_ran = [r for r in results if r["ver"] in ("PASS", "FAIL")]
     ok = (

@@ -193,18 +193,27 @@ in the config.
 
 `tests/brute_gold_eval.py` is a sanity check: it runs each task's **gold**
 program (VER) and feeds the result through the eval script (SR). A correct
-pipeline scores VER = SR = 100% on the gold. Run from the main checkout:
+pipeline scores VER = SR = 100% on the gold. With no arguments it runs the
+**full benchmark** (all 102 tasks from the CSV) using the same base packages as
+Mimosa (`BASIC_PACKAGES`), so the first task pays a one-time heavy install into
+the shared venv. Run from the main checkout (the input datasets are not in a
+worktree):
 
 ```sh
-# default light tasks (fast, real VER+SR)
+# full benchmark — all 102 tasks
 python3.12 tests/brute_gold_eval.py
 
-# specific tasks
-python3.12 tests/brute_gold_eval.py CogSci_pattern_high_sim_eval mountainLion3_eval
+# list the tasks, run nothing
+python3.12 tests/brute_gold_eval.py --list
 
-# SR-only (feed the gold output through the eval, skip executing the gold)
+# a fast subset with a lighter base env
+python3.12 tests/brute_gold_eval.py --light CogSci_pattern_high_sim_eval mountainLion3_eval
+
+# SR-only: feed the gold output through the eval, skip executing the gold
 python3.12 tests/brute_gold_eval.py --seed-only clintox_nn_eval
 ```
+
+Set `OPENAI_API_KEY` (or `AZURE_OPENAI_KEY`) for figure tasks, or they are excluded.
 
 Unit tests for the error-handling behaviour:
 
