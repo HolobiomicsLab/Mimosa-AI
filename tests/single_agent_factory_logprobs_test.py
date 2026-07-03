@@ -52,7 +52,7 @@ EXPECTED_LOGPROBS = {
 }
 
 
-def craft_setup_namespace(tmp_path, save_logprobs):
+def craft_setup_namespace(tmp_path, save_logprobs, model_id="openrouter/test-model"):
     """Generate the single-agent script and exec everything before the run.
 
     Stubs keep crafting offline: no MCP tools, no prompt file, and
@@ -63,7 +63,7 @@ def craft_setup_namespace(tmp_path, save_logprobs):
     config = SimpleNamespace(
         workflow_dir=str(tmp_path / "workflows"),
         memory_dir=str(tmp_path / "memory"),
-        smolagent_model_id="openrouter/test-model",
+        smolagent_model_id=model_id,
         max_tokens=64,
         engine_name="litellm",
         save_logprobs=save_logprobs,
@@ -118,6 +118,20 @@ def test_generated_engine_requests_logprobs_when_enabled(enabled_namespace):
 def test_generated_engine_skips_logprobs_when_disabled(disabled_namespace):
     assert disabled_namespace["SAVE_LOGPROBS"] is False
     engine = disabled_namespace["engine"]
+    assert "logprobs" not in engine.kwargs
+    assert "top_logprobs" not in engine.kwargs
+
+
+def test_generated_engine_drops_logprobs_for_unsupported_provider(tmp_path, capsys):
+    """Regression: mistral rejects logprobs params; the generated script
+    must drop the request instead of letting litellm raise
+    UnsupportedParamsError on the first model call."""
+    namespace = craft_setup_namespace(
+        tmp_path, save_logprobs=True, model_id="mistral/mistral-small-2603"
+    )
+    assert "logprobs disabled" in capsys.readouterr().out
+    assert namespace["save_logprobs"] is False
+    engine = namespace["engine"]
     assert "logprobs" not in engine.kwargs
     assert "top_logprobs" not in engine.kwargs
 
