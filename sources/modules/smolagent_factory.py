@@ -43,6 +43,9 @@ import subprocess
 DANGEROUS_FUNCTIONS = {subprocess}
 DANGEROUS_MODULES = {}
 
+# Cap accepted by most OpenRouter providers (OpenAI allows up to 20).
+TOP_LOGPROBS = 5
+
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
 
@@ -82,6 +85,12 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
+        # Request token logprobs and save them with memory (for ablations).
+        # Only the litellm engine forwards the request, so gate on it to
+        # keep the missing-logprobs warning honest on other engines.
+        self.save_logprobs = (
+            globals().get("SAVE_LOGPROBS", False) and self.engine_name == "litellm"
+        )
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         # Per-agent execution timeout (seconds). Injected from the main config
@@ -155,6 +164,9 @@ class SmolAgentFactory:
             )
         elif self.engine_name == "litellm":
             extra_kwargs = {}
+            if self.save_logprobs:
+                extra_kwargs["logprobs"] = True
+                extra_kwargs["top_logprobs"] = TOP_LOGPROBS
             if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
                 order = (
                     [self.openrouter_provider]
@@ -236,6 +248,31 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             success.append(step.error is None)
         return actions, observations, success
 
+    def extract_logprobs(self, step) -> Optional[dict]:
+        """Return token logprobs from a step's raw model response, or None.
+
+        Logprobs only exist on the raw provider response kept in
+        ``model_output_message.raw``, which ``save_memories`` strips.
+        Steps replayed from memory carry no raw response and yield None.
+        Drops the per-token ``bytes`` arrays (redundant with ``token``)
+        to keep memory files small.
+        """
+        raw = getattr(getattr(step, "model_output_message", None), "raw", None)
+        if raw is None:
+            return None
+        try:
+            logprobs = raw.choices[0].logprobs
+            if logprobs is None:
+                return None
+            dumped = logprobs.model_dump() if hasattr(logprobs, "model_dump") else dict(logprobs)
+            for token_entry in dumped.get("content") or []:
+                token_entry.pop("bytes", None)
+                for alternative in token_entry.get("top_logprobs") or []:
+                    alternative.pop("bytes", None)
+            return dumped
+        except (AttributeError, IndexError, TypeError, KeyError):
+            return None
+
     def save_memories(self, workflow_uuid: str):
         print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
         if not workflow_uuid or not workflow_uuid.strip():
@@ -259,7 +296,10 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                         if step.model_output_message
                         else None
                     )
+                    action_step["logprobs"] = self.extract_logprobs(step)
                     memories.append(action_step)
+            if self.save_logprobs and memories and all(m["logprobs"] is None for m in memories):
+                print(f"WARNING: logprobs requested but none returned for agent '{self.name}'; check provider support.")
             try:
                 agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
                 with open(agent_task_path, "w") as f:
@@ -371,7 +411,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
 
         try:
             if not result['completed']:
-                self.save_memories(workflow_uuid=workflow_uuid)
+                # no save here: the except branch below saves once for all failures
                 raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
             if result['exception']:
                 raise result['exception']

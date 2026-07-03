@@ -346,6 +346,7 @@ MODEL_ID = {self.config.smolagent_model_id!r}
 ENGINE_NAME = {self.config.engine_name!r}
 OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 

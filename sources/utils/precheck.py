@@ -138,6 +138,12 @@ class PreCheck:
             "num_retries": 0,
             "extra_body": {"provider": provider_routing},
         }
+        if getattr(self.config, "save_logprobs", False):
+            # Probe under the same params the runtime sends: with
+            # require_parameters, providers lacking logprobs must fail
+            # here rather than pass precheck and 404 at run time.
+            params["logprobs"] = True
+            params["top_logprobs"] = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
 
         outputs: list[str] = []
         latencies: list[float] = []

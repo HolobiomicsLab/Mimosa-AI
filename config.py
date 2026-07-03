@@ -116,6 +116,11 @@ class Config:
              "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
              "groq", "cerebras", "sambanova", "nvidia"
         ]
+        # Request token logprobs and save them with agent memory (for ablations).
+        # litellm engine only. With pinned providers, OpenRouter only routes to
+        # those supporting them; models whose providers all lack logprobs then
+        # fail routing (precheck probes with them too) — disable here if needed.
+        self.save_logprobs: bool = True
 
         ##############
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
@@ -248,6 +253,7 @@ class Config:
             "judge_model": self.judge_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
+            "save_logprobs": self.save_logprobs,
             "prompt_planner": self.prompt_planner,
             "prompt_workflow_creator": self.prompt_workflow_creator,
             "reasoning_effort": self.reasoning_effort,
@@ -299,6 +305,7 @@ class Config:
         self.judge_model = data.get("judge_model", self.judge_model)
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
+        self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
@@ -397,6 +404,7 @@ class Config:
         lines.append(f"  judge_model={self.judge_model}")
         lines.append(f"  capsule_namer_model={self.capsule_namer_model}")
         lines.append(f"  engine_name={self.engine_name}")
+        lines.append(f"  save_logprobs={self.save_logprobs}")
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")
         lines.append(f"  prompt_smolagent={self.prompt_smolagent}")
