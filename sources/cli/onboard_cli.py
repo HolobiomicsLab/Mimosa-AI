@@ -646,41 +646,38 @@ class OnboardCLI:
             "A config file lets you override LLM models, workspace paths, "
             "port ranges, etc. (see config_default.json for reference)."
         )
-        path = _ask(
-            f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
-        )
-        loaded = False
-        if path:
-            if not os.path.isfile(path):
-                _warn(f"File not found: {path}. Using default configuration.")
-            else:
-                try:
-                    self.config.load(path)
-                    _ok(f"Configuration loaded from {path}")
-                    loaded = True
-                except Exception as exc:
-                    _warn(f"Failed to load config ({exc}). Using defaults.")
-        else:
-            # Auto-load config_default.json if it exists
-            if os.path.isfile(self._CONFIG_DEFAULT_PATH):
-                try:
-                    self.config.load(self._CONFIG_DEFAULT_PATH)
-                    _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
-                    loaded = True
-                except Exception as exc:
-                    _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
-            else:
-                _info("Using built-in default configuration.")
-
-        if not loaded:
-            _warn(
-                f"{self._CONFIG_DEFAULT_PATH} could not be loaded. "
-                "Using the built-in default configuration from config.py."
+        while True:
+            path = _ask(
+                f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
             )
-            self._dump_full_config_default()
+            if not path:
+                self._load_default_config()
+                break
+            if not os.path.isfile(path):
+                _err(f"File not found: {path}. Try again, or leave blank for the default.")
+                continue
+            try:
+                self.config.load(path)
+                _ok(f"Configuration loaded from {path}")
+                break
+            except Exception as exc:
+                _err(f"Failed to load config ({exc}). Try again, or leave blank for the default.")
 
         # Ensure internal directories exist before later steps need them
         self.config.create_paths()
+
+    def _load_default_config(self) -> None:
+        """Auto-load the persisted config; fall back to built-in defaults."""
+        if not os.path.isfile(self._CONFIG_DEFAULT_PATH):
+            _info("Using built-in default configuration.")
+            self._dump_full_config_default()
+            return
+        try:
+            self.config.load(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
+        except Exception as exc:
+            _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
+            self._dump_full_config_default()
 
     def _dump_full_config_default(self) -> None:
         """Write the full current configuration to *config_default.json*."""
@@ -975,22 +972,30 @@ class OnboardCLI:
     def _import_files_to_workspace(self) -> None:
         """Copy one or more source directories into the workspace
         using ``LocalTransfer.transfer_files_to_workspace``.
+
+        Failed transfers loop back to the folder selection (Enter skips).
         """
-        sources = self._select_import_sources()
-        if not sources:
-            _info("No source selected — skipping import.")
-            return
         transfer = LocalTransfer(
             config=self.config,
             workspace_path=self.config.workspace_dir,
             runs_capsule_dir=self.config.runs_capsule_dir,
         )
-        for src in sources:
-            try:
-                copied = transfer.transfer_files_to_workspace(src)
-                _ok(f"Copied {copied} file(s) from {src} into workspace.")
-            except Exception as exc:
-                _err(f"File transfer failed for {src}: {exc}")
+        while True:
+            sources = self._select_import_sources()
+            if not sources:
+                _info("No source selected — skipping import.")
+                return
+            failed = False
+            for src in sources:
+                try:
+                    copied = transfer.transfer_files_to_workspace(src)
+                    _ok(f"Copied {copied} file(s) from {src} into workspace.")
+                except Exception as exc:
+                    _err(f"File transfer failed for {src}: {exc}")
+                    failed = True
+            if not failed:
+                return
+            _warn("Import failed — choose again, or press Enter to skip.")
 
     def _select_import_sources(self) -> list[str]:
         """List folders under the current directory and/or accept a typed path.
