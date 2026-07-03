@@ -19,6 +19,46 @@ import time
 from typing import Literal
 
 from config import Config
+from sources.cli.theme import (
+    AMBER,
+    EMBER,
+    GREY,
+    LOCKED,
+    RESET,
+    WHITE,
+    banner,
+    frame_bottom,
+    frame_top,
+    kv,
+    leader,
+    section,
+    substep,
+    term_width,
+)
+from sources.cli.theme import (
+    ask as _ask,
+)
+from sources.cli.theme import (
+    ask_yn as _ask_yn,
+)
+from sources.cli.theme import (
+    fail as _err,
+)
+from sources.cli.theme import (
+    info as _info,
+)
+from sources.cli.theme import (
+    ok as _ok,
+)
+from sources.cli.theme import (
+    step_header as _print_step,
+)
+from sources.cli.theme import (
+    warn as _warn,
+)
+from sources.cli.theme import (
+    wrap as _wrap,
+)
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.core.tools_manager import ToolManager
 from sources.utils import paths
@@ -85,38 +125,10 @@ def _upsert_env_file(env_file, values: dict[str, str]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Terminal helpers
+# Banner (chrome helpers live in sources.cli.theme)
 # ---------------------------------------------------------------------------
 
-CYAN   = "\033[96m"
-GREEN  = "\033[92m"
-YELLOW = "\033[93m"
-RED    = "\033[91m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
-RESET  = "\033[0m"
-
-MIMOSA_BANNER = f"""
-{CYAN}{BOLD}
-  ███╗   ███╗██╗███╗   ███╗ ██████╗ ███████╗ █████╗
-  ████╗ ████║██║████╗ ████║██╔═══██╗██╔════╝██╔══██╗
-  ██╔████╔██║██║██╔████╔██║██║   ██║███████╗███████║
-  ██║╚██╔╝██║██║██║╚██╔╝██║██║   ██║╚════██║██╔══██║
-  ██║ ╚═╝ ██║██║██║ ╚═╝ ██║╚██████╔╝███████║██║  ██║
-  ╚═╝     ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
-{RESET}
-{DIM}  Self-evolving AI Framework for Autonomous Scientific Research{RESET}
-"""
-
-MIMOSA_START_BANNER = f"""
-{GREEN}{BOLD}
-  ╔══════════════════════════════════════════════════════════════╗
-  ║                                                              ║
-  ║    🌱  M I M O S A   —   S T A R T I N G   U P  🌱           ║
-  ║                                                              ║
-  ╚══════════════════════════════════════════════════════════════╝
-{RESET}
-"""
+MIMOSA_BANNER = banner("Flight console", "Self-evolving AI · autonomous science")
 
 TOTAL_STEPS = 9
 
@@ -179,55 +191,6 @@ def _recommended_presets(role: str) -> list[tuple[str, str]]:
         for env_key, models in _RECOMMENDED_MODELS.items()
         if os.getenv(env_key)
     ]
-
-
-def _print_step(step: int, total: int, title: str, no_count: bool = False) -> None:
-    bar = "─" * 60
-    print(f"\n{CYAN}{bar}{RESET}")
-    if not no_count:
-        print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
-    else:
-        print(f"{CYAN}  {title}{RESET}")
-    print(f"{CYAN}{bar}{RESET}")
-
-
-def _ok(msg: str) -> None:
-    print(f"{GREEN}  ✅  {msg}{RESET}")
-
-
-def _warn(msg: str) -> None:
-    print(f"{YELLOW}  ⚠️   {msg}{RESET}")
-
-
-def _err(msg: str) -> None:
-    print(f"{RED}  ❌  {msg}{RESET}")
-
-
-def _info(msg: str) -> None:
-    print(f"{DIM}  ℹ️   {msg}{RESET}")
-
-
-def _ask(prompt: str, default: str = "") -> str:
-    """Print a prompt and return stripped user input.  Empty → *default*."""
-    suffix = f" [{default}]" if default else ""
-    try:
-        answer = input(f"\n{BOLD}  ➤  {prompt}{suffix}: {RESET}").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        sys.exit(0)
-    return answer if answer else default
-
-
-def _ask_yn(prompt: str, default: bool = True) -> bool:
-    """Ask a yes/no question and return a boolean."""
-    hint = "Y/n" if default else "y/N"
-    raw = _ask(f"{prompt} ({hint})", default="y" if default else "n").lower()
-    return raw in ("y", "yes", "1", "true")
-
-
-def _wrap(text: str, width: int = 72, indent: int = 4) -> str:
-    return textwrap.fill(text, width=width, initial_indent=" " * indent,
-                         subsequent_indent=" " * indent)
 
 
 def _build_llm(config: Config, temperature: float = 0.0,
@@ -510,9 +473,8 @@ class OnboardCLI:
         """Run the full onboarding flow, then launch the selected mode."""
         print(MIMOSA_BANNER)
         print(_wrap(
-            "Welcome to Mimosa-AI!"
+            "Welcome to Mimosa-AI! "
             "Press Ctrl-C at any time to quit.",
-            width=70, indent=2,
         ))
 
         # Step 1 – API keys
@@ -539,20 +501,21 @@ class OnboardCLI:
         while True:
             # Infine loop for conversation to continue
             # Step 6 – Initial objective
-            step_6_text = "Your Research Objective" if first_pass else "Keep working on the same objective"
-            _print_step(6, TOTAL_STEPS, "Your Research Objective", no_count=not first_pass)
+            step_6_text = ("Your Research Objective" if first_pass
+                           else "Keep working on the same objective")
+            _print_step(6, TOTAL_STEPS, step_6_text, show_progress=first_pass)
             self._collect_objective()
 
             # Step 7 – LLM clarification + prompt refinement loop
-            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", no_count=not first_pass)
+            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", show_progress=first_pass)
             self._clarify_and_refine()
 
             # Step 8 – Mode classification
-            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", no_count=not first_pass)
+            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", show_progress=first_pass)
             self._classify_and_confirm()
 
             # Step 9 – Extra options then launch
-            _print_step(9, TOTAL_STEPS, "Options & Launch", no_count=not first_pass)
+            _print_step(9, TOTAL_STEPS, "Options & Launch", show_progress=first_pass)
             self._collect_options()
 
             await self._launch()
@@ -576,7 +539,7 @@ class OnboardCLI:
         found = [k for k in self._KNOWN_API_KEYS if os.getenv(k)]
         if found:
             for k in found:
-                _ok(f"Found {k}")
+                _ok(leader(k, "found"))
             return
 
         _warn("No LLM API key found in environment.")
@@ -595,11 +558,10 @@ class OnboardCLI:
         print(_wrap(
             "Mimosa needs at least one API key to call a hosted LLM. "
             "Which of these do you have?",
-            width=70, indent=2,
         ))
         print()
         for idx, key in enumerate(self._KNOWN_API_KEYS, start=1):
-            print(f"    {CYAN}[{idx}]{RESET}  {key}")
+            print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{key}{RESET}")
         print()
         while True:
             choice = _ask("Your keys (e.g. 1,3 — or 'none' for local models only)")
@@ -692,7 +654,6 @@ class OnboardCLI:
         print(_wrap(
             "Mimosa requires Toolomics (the companion MCP server) to be running "
             "before execution. Scanning your configured discovery addresses …",
-            width=70, indent=2,
         ))
 
         tool_manager = ToolManager(config=self.config)
@@ -703,7 +664,7 @@ class OnboardCLI:
             if mcps:
                 tool_manager.mcps = mcps
                 for mcp in mcps:
-                    _ok(f"MCP server online: {mcp}")
+                    _ok(leader(str(mcp), "online"))
                 bash_ok = await tool_manager.verify_tools()
                 if not bash_ok:
                     _warn(
@@ -725,12 +686,11 @@ class OnboardCLI:
             print(_wrap(
                 "Please start Toolomics on the configured port range "
                 f"({self.config.discovery_addresses}).",
-                width=70, indent=2,
             ))
-            print(f"\n  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter{RESET}   – retry scan")
-            print(f"    {CYAN}skip{RESET}    – continue without Toolomics "
-                  f"(execution will fail later)")
+            print(f"\n  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter{RESET}   {GREY}– retry scan{RESET}")
+            print(f"    {AMBER}skip{RESET}    {GREY}– continue without Toolomics "
+                  f"(execution will fail later){RESET}")
             choice = _ask("Retry or skip?").lower()
             if choice == "skip":
                 _warn("Skipping Toolomics check. Execution may fail at runtime.")
@@ -765,7 +725,6 @@ class OnboardCLI:
                 "This path must point to the Toolomics workspace folder — the shared "
                 "directory where Mimosa reads and writes task artifacts. "
                 "Please enter the correct absolute path, or press Enter to skip.",
-                width=70, indent=2,
             ))
             new_path = _ask("Workspace directory path (Enter to skip)")
             if not new_path:
@@ -837,20 +796,20 @@ class OnboardCLI:
             print(_wrap(
                 f"The workspace ({workspace}) currently contains "
                 f"{len(file_list)} file(s):",
-                width=70, indent=2,
             ))
             print()
 
             # Show numbered file list
             for idx, fname in enumerate(file_list, start=1):
-                print(f"    {CYAN}[{idx}]{RESET}  {fname}")
+                print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{fname}{RESET}")
 
             print()
-            print(f"  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter numbers{RESET}  – comma-separated list of files to "
-                  f"{GREEN}keep{RESET} (others will be deleted)")
-            print(f"    {CYAN}all{RESET}           – keep all files")
-            print(f"    {CYAN}none{RESET}          – {RED}delete all{RESET} files in the workspace")
+            print(f"  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter numbers{RESET}  {GREY}– comma-separated list of "
+                  f"files to keep (others will be deleted){RESET}")
+            print(f"    {AMBER}all{RESET}            {GREY}– keep all files{RESET}")
+            print(f"    {AMBER}none{RESET}           {GREY}– delete all files in the "
+                  f"workspace{RESET}")
             print()
 
             while True:
@@ -874,32 +833,12 @@ class OnboardCLI:
                     _warn("Empty input — please type numbers, 'all', or 'none'.")
                     continue
 
-                # Parse comma-separated indices
-                selected_indices: set[int] = set()
-                had_bad_token = False
-                for part in choice.replace(" ", "").split(","):
-                    if not part:
-                        continue
-                    # Support ranges like "1-5"
-                    if "-" in part:
-                        bounds = part.split("-", 1)
-                        try:
-                            lo, hi = int(bounds[0]), int(bounds[1])
-                            selected_indices.update(range(lo, hi + 1))
-                        except ValueError:
-                            _warn(f"Invalid range: {part}")
-                            had_bad_token = True
-                    else:
-                        try:
-                            selected_indices.add(int(part))
-                        except ValueError:
-                            _warn(f"Invalid number: {part}")
-                            had_bad_token = True
-
+                # Parse comma-separated indices and ranges like "1-5"
+                selected_indices, had_bad_token = _parse_indices(
+                    choice, len(file_list),
+                )
                 kept_files = [
-                    file_list[idx - 1]
-                    for idx in sorted(selected_indices)
-                    if 1 <= idx <= len(file_list)
+                    file_list[idx - 1] for idx in sorted(selected_indices)
                 ]
 
                 if kept_files:
@@ -1006,10 +945,10 @@ class OnboardCLI:
         cwd = os.getcwd()
         folders = _list_subdirectories(cwd)
         if folders:
-            print(_wrap(f"Folders in {cwd}:", width=70, indent=2))
+            print(_wrap(f"Folders in {cwd}:"))
             print()
             for idx, name in enumerate(folders, start=1):
-                print(f"    {CYAN}[{idx}]{RESET}  {name}/")
+                print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{name}/{RESET}")
             print()
             _info("Type numbers like '1,3', a directory path, or Enter to skip.")
         while True:
@@ -1064,7 +1003,7 @@ class OnboardCLI:
         if current_value:
             _info(f"Current value (from config): {current_value}")
 
-        print(_wrap(prompt_desc, width=70, indent=2))
+        print(_wrap(prompt_desc))
         print()
 
         if not available:
@@ -1078,14 +1017,13 @@ class OnboardCLI:
                     return custom
                 _warn("A model ID is required for this role.")
 
-        print(f"  {BOLD}Available presets:{RESET}")
+        print(f"  {WHITE}Available presets:{RESET}")
         for idx, (label, model_id) in enumerate(available, start=1):
             is_default = (model_id == suggested)
-            tag = f"{GREEN}← default{RESET}" if is_default else ""
-            num_color = GREEN if is_default else CYAN
-            print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
-            print(f"         {DIM}{model_id}{RESET}")
-        print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
+            tag = f"  {LOCKED}" if is_default else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+            print(f"         {GREY}{model_id}{RESET}")
+        print(f"  {AMBER}[c]{RESET}  {GREY}Enter a custom model ID{RESET}")
 
         print()
         while True:
@@ -1145,8 +1083,8 @@ class OnboardCLI:
 
     def _choose_orchestration_model(self) -> None:
         """Sub-step 3a – select the planner / workflow-generation model."""
-        print(f"\n{BOLD}  3a · Orchestration model{RESET}")
-        print(f"  {DIM}Used for planning and workflow generation.{RESET}")
+        substep("3a", "Orchestration model",
+                "Used for planning and workflow generation.")
         orch_model = self._model_menu(
             prompt_desc=(
                 "Choose the main LLM Mimosa will use for orchestration "
@@ -1164,9 +1102,9 @@ class OnboardCLI:
 
     def _choose_agent_model(self) -> None:
         """Sub-step 3b – select the SmolAgents execution model."""
-        print(f"\n{BOLD}  3b · Agent execution model (SmolAgents){RESET}")
-        print(f"  {DIM}Used by the code-executing agents inside each workflow.{RESET}")
-        print(f"  {DIM}Can be the same as the orchestration model or a faster/cheaper one.{RESET}")
+        substep("3b", "Agent execution model (SmolAgents)",
+                "Used by the code-executing agents inside each workflow — "
+                "the orchestration model or a faster/cheaper one.")
         agent_model = self._model_menu(
             prompt_desc=(
                 "Choose the LLM for agent execution (SmolAgents tasks). "
@@ -1185,8 +1123,8 @@ class OnboardCLI:
 
     def _choose_judge_model(self) -> None:
         """Sub-step 3c – select the workflow evaluation (judge) model."""
-        print(f"\n{BOLD}  3c · Judge model{RESET}")
-        print(f"  {DIM}Used to evaluate and score workflow results.{RESET}")
+        substep("3c", "Judge model",
+                "Used to evaluate and score workflow results.")
         judge_model = self._model_menu(
             prompt_desc=(
                 "Choose the LLM that judges workflow outputs "
@@ -1219,7 +1157,6 @@ class OnboardCLI:
             "scientific goal (e.g. 'Reproduce Figure 3 from paper X') or a "
             "focused task (e.g. 'Train a toxicity model on the ClinTox dataset'). "
             "Don't worry about being too vague — we'll refine it together next.",
-            width=70, indent=2,
         ))
         while True:
             objective = _ask("Your objective")
@@ -1234,7 +1171,6 @@ class OnboardCLI:
             "The assistant will now check whether your objective is clear enough "
             "for Mimosa to execute and may ask one or more follow-up questions. "
             "Once complete, it will produce a refined, actionable prompt.",
-            width=70, indent=2,
         ))
 
         # Lower temperature → more reliable JSON; bigger token budget so long
@@ -1253,7 +1189,7 @@ class OnboardCLI:
         for round_num in range(max_clarification_rounds):
             full_context = "\n".join(context_lines)
 
-            print(f"\n{DIM}  [Clarification round {round_num + 1}/{max_clarification_rounds}]{RESET}")
+            print(f"\n  {EMBER}[ROUND {round_num + 1}/{max_clarification_rounds}]{RESET}")
 
             try:
                 result = _call_llm_json(
@@ -1277,7 +1213,7 @@ class OnboardCLI:
             if not is_clear and question:
                 # Ask the clarifying question
                 print()
-                print(f"  {BOLD}Assistant:{RESET}  {question}")
+                print(f"  {AMBER}ASSISTANT{RESET} {EMBER}▏{RESET}{WHITE}{question}{RESET}")
                 answer = _ask("Your answer (or 'skip' to stop clarifying)")
                 if answer.lower() in ("skip", "stop", "done"):
                     _info("Stopping clarification — using current objective.")
@@ -1292,12 +1228,12 @@ class OnboardCLI:
             if is_clear and refined_prompt:
                 # Show the refined prompt and ask for confirmation
                 print()
-                print(f"  {BOLD}Refined objective:{RESET}")
+                frame_top("REFINED OBJECTIVE")
                 print()
-                # Print wrapped refined prompt with colour
-                for line in textwrap.wrap(refined_prompt, width=64):
-                    print(f"    {CYAN}{line}{RESET}")
+                for line in textwrap.wrap(refined_prompt, width=term_width() - 6):
+                    print(f"    {WHITE}{line}{RESET}")
                 print()
+                frame_bottom()
                 confirmed = _ask_yn("Accept this refined objective?", default=True)
                 if confirmed:
                     self._objective = refined_prompt
@@ -1348,7 +1284,6 @@ class OnboardCLI:
         print(_wrap(
             "Asking the LLM to classify your objective as Goal-mode "
             "(multi-step planning) or Task-mode (single focused operation) …",
-            width=70, indent=2,
         ))
 
         classification: dict | None = None
@@ -1394,15 +1329,17 @@ class OnboardCLI:
             )
 
             print()
-            print(f"  {BOLD}Suggested mode:{RESET}  {CYAN}{mode.upper()}{RESET}  "
-                  f"(confidence: {confidence:.0%})")
-            print(f"  {BOLD}Reasoning:{RESET}      {reasoning}")
-            print(f"  {BOLD}Label:{RESET}          {label}")
+            kv("suggested mode", f"{mode.upper()}  ({confidence:.0%} confidence)",
+               accent=True)
+            kv("reasoning", reasoning)
+            kv("label", label)
             print()
             _info(
-                "Goal mode  → Mimosa decomposes the objective into a plan of tasks "
-                "and executes them sequentially (planner).\n"
-                "  ℹ️    Task mode  → Mimosa directly synthesises and runs a single "
+                "Goal mode → Mimosa decomposes the objective into a plan of "
+                "tasks and executes them sequentially (planner)."
+            )
+            _info(
+                "Task mode → Mimosa directly synthesises and runs a single "
                 "multi-agent workflow for the objective (evolution engine)."
             )
 
@@ -1413,9 +1350,11 @@ class OnboardCLI:
 
         # Manual fallback / override — loop until the user picks a valid mode.
         print()
-        print(f"  {BOLD}Available modes:{RESET}")
-        print(f"    {CYAN}goal{RESET}  – high-level research objective (planner + evolution engine)")
-        print(f"    {CYAN}task{RESET}  – single focused operation (evolution engine only)")
+        print(f"  {WHITE}Available modes:{RESET}")
+        print(f"    {AMBER}goal{RESET}  {GREY}– high-level research objective "
+              f"(planner + evolution engine){RESET}")
+        print(f"    {AMBER}task{RESET}  {GREY}– single focused operation "
+              f"(evolution engine only){RESET}")
         while True:
             choice = _ask("Choose mode (goal/task)", default="task").lower().strip()
             if choice in ("goal", "g"):
@@ -1433,7 +1372,6 @@ class OnboardCLI:
             "Learning mode enables Mimosa to iteratively improve its workflow "
             "through Darwinian self-evolution until a quality threshold is met "
             "(recommended for first-time runs on a new objective).",
-            width=70, indent=2,
         ))
         self._learn = _ask_yn("Enable learning mode?", default=False)
         if self._learn:
@@ -1448,7 +1386,6 @@ class OnboardCLI:
             "ASTRA export writes a standards-compliant YAML "
             "(https://astra-spec.org) describing the scientific decisions "
             "the best run made — useful for audit and reproducibility.",
-            width=70, indent=2,
         ))
         _warn("This adds an extra LLM pass after evolution and takes a bit more time.")
         self.config.export_astra = _ask_yn("Save the best run as ASTRA?", default=False)
@@ -1459,15 +1396,15 @@ class OnboardCLI:
 
         # Summary
         print()
-        print(f"  {BOLD}{'─'*54}{RESET}")
-        print(f"  {BOLD}LAUNCH SUMMARY{RESET}")
-        print(f"  {'─'*54}")
-        print(f"  Mode:      {CYAN}{self._mode.upper()}{RESET}")
-        print(f"  Learning:  {'Yes' if self._learn else 'No'}")
-        print(f"  ASTRA:     {'Yes' if self.config.export_astra else 'No'}")
-        print(f"  Objective: {self._objective[:60]}{'…' if len(self._objective) > 60 else ''}")
-        print(f"  {'─'*54}")
+        frame_top("PRE-FLIGHT")
         print()
+        kv("mode", self._mode.upper(), accent=True)
+        kv("learning", "ENABLED" if self._learn else "OFF", accent=self._learn)
+        kv("astra export", "ENABLED" if self.config.export_astra else "OFF",
+           accent=self.config.export_astra)
+        kv("objective", self._objective)
+        print()
+        frame_bottom()
         go = _ask_yn("Launch Mimosa now?", default=True)
         if not go:
             print("\n  Exiting without launching. Run again when ready.\n")
@@ -1485,7 +1422,8 @@ class OnboardCLI:
             )
             sys.exit(1)
 
-        print(MIMOSA_START_BANNER)
+        section("IGNITION")
+        _ok("Config paths validated")
 
         if self._mode == "goal":
             await self._launch_goal()
@@ -1498,13 +1436,15 @@ class OnboardCLI:
             runs_capsule_dir=self.config.runs_capsule_dir,
         )
         capsule = trs.transfer_workspace_files_to_capsule(self._objective)
-        print(f"\n{GREEN}{BOLD}  Workspace files archived to capsule: {capsule}{RESET}\n")
+        print()
+        _ok(f"Workspace files archived to capsule: {capsule}")
+        print()
 
     async def _launch_goal(self) -> None:
         """Start planner mode (multi-step goal)."""
         from sources.core.planner import Planner
 
-        print(f"\n{GREEN}{BOLD}  Launching in GOAL mode …{RESET}\n")
+        _ok(f"Planner engaged {EMBER}·{RESET} {AMBER}GOAL MODE{RESET}\n")
         planner = Planner(self.config)
         await planner.start_planner(
             goal=self._objective,
@@ -1515,7 +1455,7 @@ class OnboardCLI:
         """Start evolution engine task mode (single operation)."""
         from sources.core.evolution_engine import EvolutionEngine
 
-        print(f"\n{GREEN}{BOLD}  Launching in TASK mode …{RESET}\n")
+        _ok(f"Evolution engine engaged {EMBER}·{RESET} {AMBER}TASK MODE{RESET}\n")
         evolve = EvolutionEngine(self.config)
         await evolve.start_workflow_evolution(
             goal=self._objective,
