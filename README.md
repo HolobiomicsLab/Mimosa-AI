@@ -47,7 +47,7 @@ The workflow is emitted as plain Python — no DSL, no YAML — so any generatio
 
 **Complete Install:**
 ```bash
-uv tool install . && ./mimosa # Interactive onboarding
+uv tool install . && mimosa # Interactive onboarding
 ```
 
 **Run without system-wide install:**
