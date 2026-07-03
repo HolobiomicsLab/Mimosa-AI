@@ -82,12 +82,30 @@ not save its output is `VER = False`; an eval script that returns `(0, …)` is
 
 ### Sandbox environment
 
-The sandbox builds its Python venv **once per process** and reuses it across
-tasks (installing each program's extra dependencies on top), rather than
-rebuilding it per task. The base packages are the seven ScienceAgentBench core
-packages (numpy, pandas, matplotlib, scikit-learn, torch, tensorflow, rdkit)
-plus tooling; heavy programs (e.g. `deepchem`, which needs tensorflow) rely on
-that full base being present.
+The sandbox mirrors the ScienceAgentBench authors' pinned eval environment
+(`config_conda_env.py`) so gold/agent programs reproduce instead of failing on
+version drift:
+
+- **Python 3.10** — a hard requirement (`SANDBOX_PYTHON_VERSION`); the sandbox
+  errors clearly if `python3.10` is absent. Old rdkit/deepchem-era wheels do not
+  exist for 3.12, so matching 3.10 is required to reproduce their results.
+- **Pinned base stack:** `numpy<2.0`, `scipy<1.14.0`, `pandas<=1.5.3`,
+  `matplotlib<3.8.0`, `scikit-learn`, `torch<=2.3.0`, `tensorflow<=2.17.0`,
+  `tf_keras<=2.17.0`, `rdkit<=2023.09.5`, `openai==1.54.4`.
+- **Constraints file:** those version caps are written once and passed as `-c`
+  to every install (base and per-task), so a program's `pipreqs`-discovered deps
+  cannot pull an incompatible numpy/rdkit.
+- **Handcrafted rules** (matching the authors): import-name remaps
+  (`scvi`→`scvi-tools`, `skimage`→`scikit-image`, `iris`→`scitools-iris`, drop
+  `benchmark`), extra deps (`biopsykit`→`mne`, `scanpy`→`scikit-misc`+`leidenalg`,
+  `oggm`→`salem`+`tables`+`geopandas`), and special-case installs
+  (`deepchem`→`dgl`, `DeepPurpose`→`descriptastorus`, `qsprpred`→
+  `papyrus-scaffold-visualizer`+`kaleido`).
+
+The venv is built **once per process** and reused across tasks (per-program deps
+installed on top), so the first task pays the heavy install and the rest reuse it.
+Without the rdkit/numpy pins, RDKit-based tasks (e.g. `deepchem`/clintox) crash
+with a numpy ragged-array error; with them, the gold reproduces (VER=SR=1).
 
 ## Metrics
 
