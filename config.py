@@ -256,6 +256,7 @@ class Config:
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
+            "capsule_namer_model": self.capsule_namer_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "save_logprobs": self.save_logprobs,
@@ -308,6 +309,9 @@ class Config:
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.capsule_namer_model = data.get(
+            "capsule_namer_model", self.capsule_namer_model
+        )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
         self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
