@@ -8,10 +8,56 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sources.cli.onboard_cli import (
+    _RECOMMENDED_MODELS,
     _list_subdirectories,
     _parse_indices,
+    _recommended_presets,
     _upsert_env_file,
 )
+
+_ALL_KEY_VARS = [
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "MISTRAL_API_KEY",
+    "HF_TOKEN",
+    "OPENROUTER_API_KEY",
+]
+
+
+def test_recommended_presets_follow_available_keys(monkeypatch):
+    for var in _ALL_KEY_VARS:
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("MISTRAL_API_KEY", "sk-test")
+
+    orchestration = _recommended_presets("orchestration")
+    assert [m for _, m in orchestration] == [
+        "anthropic/claude-opus-4-8",
+        "mistral/mistral-medium-3-5",
+    ]
+    agents = _recommended_presets("agent")
+    assert [m for _, m in agents] == [
+        "anthropic/claude-sonnet-5",
+        "mistral/mistral-small-2603",
+    ]
+    judges = _recommended_presets("judge")
+    assert [m for _, m in judges] == [
+        "anthropic/claude-sonnet-5",
+        "mistral/mistral-medium-3-5",
+    ]
+
+
+def test_recommended_presets_empty_for_unmapped_keys(monkeypatch):
+    for var in _ALL_KEY_VARS:
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    assert _recommended_presets("orchestration") == []
+
+
+def test_recommendation_table_covers_all_roles():
+    for env_key, models in _RECOMMENDED_MODELS.items():
+        assert set(models) == {"orchestration", "agent", "judge"}, env_key
 
 
 def test_parse_indices_singles_and_ranges():

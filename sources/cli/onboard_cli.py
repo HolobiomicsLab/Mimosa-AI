@@ -121,7 +121,7 @@ MIMOSA_START_BANNER = f"""
 TOTAL_STEPS = 9
 
 # ---------------------------------------------------------------------------
-# Model presets — ordered by quality/preference
+# Flat model presets used by the evaluation CLI.
 # (env_key, display_label, litellm_model_id)
 # ---------------------------------------------------------------------------
 _MODEL_PRESETS: list[tuple[str, str, str]] = [
@@ -131,12 +131,54 @@ _MODEL_PRESETS: list[tuple[str, str, str]] = [
     ("OPENAI_API_KEY",     "GPT-4o             (OpenAI)",     "openai/gpt-4o"),
     ("MISTRAL_API_KEY",    "Mistral Large      (Mistral)",    "mistral/mistral-large-latest"),
 ]
-# Config keys that all share the same "main" LLM selection
-_MODEL_CFG_KEYS = [
+# Config keys that share the orchestration LLM selection
+_ORCHESTRATION_CFG_KEYS = [
     "planner_llm_model",
     "workflow_llm_model",
-    "judge_model",
 ]
+
+# ---------------------------------------------------------------------------
+# Per-provider recommended models, keyed by API-key env var.
+# Providers absent from this table (e.g. OPENAI_API_KEY, HF_TOKEN) have no
+# preset: the user must enter a model ID for each role.
+# ---------------------------------------------------------------------------
+_PROVIDER_LABELS: dict[str, str] = {
+    "ANTHROPIC_API_KEY": "Anthropic",
+    "DEEPSEEK_API_KEY": "DeepSeek",
+    "MISTRAL_API_KEY": "Mistral",
+    "OPENROUTER_API_KEY": "OpenRouter",
+}
+_RECOMMENDED_MODELS: dict[str, dict[str, str]] = {
+    "ANTHROPIC_API_KEY": {
+        "orchestration": "anthropic/claude-opus-4-8",
+        "agent": "anthropic/claude-sonnet-5",
+        "judge": "anthropic/claude-sonnet-5",
+    },
+    "DEEPSEEK_API_KEY": {
+        "orchestration": "deepseek/deepseek-v4-pro",
+        "agent": "deepseek/deepseek-v4-flash",
+        "judge": "deepseek/deepseek-v4-flash",
+    },
+    "MISTRAL_API_KEY": {
+        "orchestration": "mistral/mistral-medium-3-5",
+        "agent": "mistral/mistral-small-2603",
+        "judge": "mistral/mistral-medium-3-5",
+    },
+    "OPENROUTER_API_KEY": {
+        "orchestration": "openrouter/z-ai/glm-5.2",
+        "agent": "openrouter/deepseek/deepseek-v4-flash",
+        "judge": "openrouter/qwen/qwen3.7-plus",
+    },
+}
+
+
+def _recommended_presets(role: str) -> list[tuple[str, str]]:
+    """Return (label, model_id) presets for *role* from available API keys."""
+    return [
+        (f"{_PROVIDER_LABELS[env_key]} recommended", models[role])
+        for env_key, models in _RECOMMENDED_MODELS.items()
+        if os.getenv(env_key)
+    ]
 
 
 def _print_step(step: int, total: int, title: str, no_count: bool = False) -> None:
@@ -1020,17 +1062,25 @@ class OnboardCLI:
         print(_wrap(prompt_desc, width=70, indent=2))
         print()
 
-        if available:
-            print(f"  {BOLD}Available presets:{RESET}")
-            for idx, (label, model_id) in enumerate(available, start=1):
-                is_default = (model_id == suggested)
-                tag = f"{GREEN}← default{RESET}" if is_default else ""
-                num_color = GREEN if is_default else CYAN
-                print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
-                print(f"         {DIM}{model_id}{RESET}")
-            print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
-        else:
-            _warn("No matching API key found — enter a model ID manually.")
+        if not available:
+            _warn(
+                "No recommended preset for your API key(s) — "
+                "a model ID must be entered for this role."
+            )
+            while True:
+                custom = _ask("Enter model ID (e.g. openai/gpt-4o)").strip()
+                if custom:
+                    return custom
+                _warn("A model ID is required for this role.")
+
+        print(f"  {BOLD}Available presets:{RESET}")
+        for idx, (label, model_id) in enumerate(available, start=1):
+            is_default = (model_id == suggested)
+            tag = f"{GREEN}← default{RESET}" if is_default else ""
+            num_color = GREEN if is_default else CYAN
+            print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
+            print(f"         {DIM}{model_id}{RESET}")
+        print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
 
         print()
         while True:
@@ -1044,7 +1094,7 @@ class OnboardCLI:
 
             if not choice and suggested:
                 return suggested
-            if choice.lower() == "c" or (not available):
+            if choice.lower() == "c":
                 custom = _ask(
                     "Enter model ID  (e.g. openai/gpt-4o, "
                     "anthropic/claude-3-5-sonnet-20241022)"
@@ -1076,38 +1126,39 @@ class OnboardCLI:
     def _choose_models(self) -> None:
         """Step 3 – model selection.
 
-        Sub-step 3a: orchestration model (planner, prompts, workflow, judge).
-        Sub-step 3b: agent execution model (smolagent_model_id).
+        Sub-step 3a: orchestration model (planner + workflow generation).
+        Sub-step 3b: agent execution model; the capsule-namer model follows it.
+        Sub-step 3c: judge model (workflow evaluation).
 
-        Both choices are persisted to *config_default.json*.
+        Each role offers per-provider recommended presets based on the API
+        keys present; all choices are persisted.
         """
-        available: list[tuple[str, str]] = [
-            (label, model_id)
-            for env_key, label, model_id in _MODEL_PRESETS
-            if os.getenv(env_key)
-        ]
+        self._choose_orchestration_model()
+        self._choose_agent_model()
+        self._choose_judge_model()
+        self._persist_models()
 
-        # ── 3a · Orchestration model ──────────────────────────────────
+    def _choose_orchestration_model(self) -> None:
+        """Sub-step 3a – select the planner / workflow-generation model."""
         print(f"\n{BOLD}  3a · Orchestration model{RESET}")
-        print(f"  {DIM}Used for planning, workflow generation, and evaluation.{RESET}")
+        print(f"  {DIM}Used for planning and workflow generation.{RESET}")
         orch_model = self._model_menu(
             prompt_desc=(
                 "Choose the main LLM Mimosa will use for orchestration "
-                "(planning, workflow generation, and evaluation). Applied to "
-                "planner, prompts, workflow, and judge roles."
+                "(planning and workflow generation)."
             ),
             current_value=self.config.planner_llm_model or "",
-            available=available,
+            available=_recommended_presets("orchestration"),
         )
-
         if orch_model:
-            for key in _MODEL_CFG_KEYS:
+            for key in _ORCHESTRATION_CFG_KEYS:
                 setattr(self.config, key, orch_model)
             _ok(f"Orchestration model: {orch_model}")
         else:
             _warn("No orchestration model chosen — keeping existing config values.")
 
-        # ── 3b · Agent execution model (smolagent_model_id) ──────────
+    def _choose_agent_model(self) -> None:
+        """Sub-step 3b – select the SmolAgents execution model."""
         print(f"\n{BOLD}  3b · Agent execution model (SmolAgents){RESET}")
         print(f"  {DIM}Used by the code-executing agents inside each workflow.{RESET}")
         print(f"  {DIM}Can be the same as the orchestration model or a faster/cheaper one.{RESET}")
@@ -1117,20 +1168,36 @@ class OnboardCLI:
                 "A fast, cost-effective model works well here."
             ),
             current_value=self.config.smolagent_model_id or "",
-            available=available,
+            available=_recommended_presets("agent"),
         )
-
         if agent_model:
             self.config.smolagent_model_id = agent_model
+            # Cheap auxiliary role — always follows the agent model.
+            self.config.capsule_namer_model = agent_model
             _ok(f"Agent execution model: {agent_model}")
         else:
             _warn("No agent model chosen — keeping existing config values.")
 
-        # Persist both choices at once
-        self._persist_models(orch_model or "", agent_model or "")
+    def _choose_judge_model(self) -> None:
+        """Sub-step 3c – select the workflow evaluation (judge) model."""
+        print(f"\n{BOLD}  3c · Judge model{RESET}")
+        print(f"  {DIM}Used to evaluate and score workflow results.{RESET}")
+        judge_model = self._model_menu(
+            prompt_desc=(
+                "Choose the LLM that judges workflow outputs "
+                "(rubric scoring and claim verification)."
+            ),
+            current_value=self.config.judge_model or "",
+            available=_recommended_presets("judge"),
+        )
+        if judge_model:
+            self.config.judge_model = judge_model
+            _ok(f"Judge model: {judge_model}")
+        else:
+            _warn("No judge model chosen — keeping existing config values.")
 
-    def _persist_models(self, orch_model_id: str, agent_model_id: str) -> None:
-        """Write both model choices to config_default.json.
+    def _persist_models(self) -> None:
+        """Write the selected models to the persisted config file.
 
         The full configuration is written so that other settings are not lost.
         """
