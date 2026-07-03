@@ -45,9 +45,17 @@ Mimosa-AI is an **open-source Python framework for autonomous scientific researc
 
 The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier score workflows by running deterministic Python checks that verify litterature grounding, non-triviality, and quality metrics against artifacts that the agents produced. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
+**Complete Install:**
 ```bash
-uv sync && uv run main.py        # interactive onboarding
+uv tool install . && ./mimosa # Interactive onboarding
 ```
+
+**Run without system-wide install:**
+```bash
+uv sync && uv run main.py    # Interactive onboarding
+```
+
+**Note:** Mimosa needs Toolomics and Perspicacité-AI running in background.
 
 ---
 
