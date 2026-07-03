@@ -83,6 +83,7 @@ class SelectionPressure:
 
     def __init__(
         self,
+        config: dict[str, Any],
         min_improvement_threshold: float = 0.01,
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
@@ -116,6 +117,7 @@ class SelectionPressure:
                 subtracted from ``qd_score``. Kept conservative so it only
                 breaks near-ties.
         """
+        self.config = config
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
 

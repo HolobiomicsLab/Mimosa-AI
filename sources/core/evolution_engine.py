@@ -92,6 +92,7 @@ class EvolutionEngine:
         self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
         self.selection = SelectionPressure(
+            config,
             min_improvement_threshold=getattr(config, "min_improvement_threshold", 0.01),
             strategy=getattr(config, "selection_strategy", "qd"),
             population_size=getattr(config, "population_size", 50), # max individuals to keep in the selection pool
