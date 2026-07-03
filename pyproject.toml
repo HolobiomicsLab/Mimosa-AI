@@ -91,3 +91,8 @@ ignore = [
 convention = "google"
 
 [tool.ruff.format]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
