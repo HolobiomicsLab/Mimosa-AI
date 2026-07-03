@@ -144,9 +144,18 @@ cd Mimosa-AI
 uv sync
 ```
 
+**Or install as a standalone `mimosa` command**, usable from any directory:
+
+```bash
+uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git   # or: uv tool install /path/to/Mimosa-AI
+mimosa --task "..."
+```
+
+When installed this way, settings persist to `~/.config/mimosa/config.json` (written by the onboarding wizard, loaded automatically on every run), API keys can live in `~/.config/mimosa/.env`, and runtime state (memory, workflows, run capsules) goes to `~/.local/share/mimosa/`. Repo checkouts keep the historical layout: `config_default.json` and state directories inside the checkout.
+
 ### 2. Add at least one LLM key
 
-Create `.env` at the project root. Only the providers you actually use are required.
+Create `.env` at the project root (or `~/.config/mimosa/.env` for the installed command). Only the providers you actually use are required.
 
 ```env
 ANTHROPIC_API_KEY=...       # Claude — recommended for workflow synthesis

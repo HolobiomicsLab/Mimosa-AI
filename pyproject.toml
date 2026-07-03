@@ -24,6 +24,27 @@ dependencies = [
     "pillow>=11.3.0",
 ]
 
+[project.scripts]
+mimosa = "main:cli_main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sources"]
+# Runtime state and caches never ship in the wheel; installed runs keep
+# them under the XDG user dirs instead (see sources/utils/paths.py).
+exclude = [
+    "sources/workflows",
+    "sources/memory",
+    "sources/cache",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"main.py" = "main.py"
+"config.py" = "config.py"
+
 [tool.ruff]
 line-length = 88
 fix = true

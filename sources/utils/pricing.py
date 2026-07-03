@@ -11,6 +11,8 @@ from pathlib import Path
 
 import requests
 
+from sources.utils import paths
+
 
 @dataclass
 class TokenUsage:
@@ -322,7 +324,13 @@ class PricingCalculator:
             total_all_tokens += call.total_tokens
 
         from sources.cli.pretty_print import (
-            BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW,
+            BOLD,
+            CYAN,
+            DIM,
+            GREEN,
+            MAGENTA,
+            RESET,
+            YELLOW,
         )
 
         W = 64
@@ -361,10 +369,10 @@ class PricingCalculator:
 class OpenRouterPricingClient:
     """Client for fetching real-time model pricing from OpenRouter API."""
 
-    def __init__(self, cache_duration_hours: int = 24):
+    def __init__(self, cache_duration_hours: int = 24, cache_file: str | None = None):
         self.base_url = "https://openrouter.ai/api/v1"
         self.cache_duration = timedelta(hours=cache_duration_hours)
-        self.cache_file = "sources/cache/openrouter_pricing.json"
+        self.cache_file = cache_file or paths.pricing_cache_file()
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self):

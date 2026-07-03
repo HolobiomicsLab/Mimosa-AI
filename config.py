@@ -3,7 +3,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from sources.utils import paths
 from sources.utils.pricing import OpenRouterPricingClient
+
 
 @dataclass
 class AddressMCP:
@@ -125,17 +127,17 @@ class Config:
         ##############
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
-        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
-        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
+        self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
+        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v11.md")
+        self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
 
         # folder paths for workflow pre-defined code
-        self.schema_code_path: str = "sources/modules/state_schema.py"
-        self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
+        self.schema_code_path: str = paths.resource_path("sources/modules/state_schema.py")
+        self.smolagent_factory_code_path: str = paths.resource_path("sources/modules/smolagent_factory.py")
         # folder path for cache
-        self.runs_capsule_dir = "runs_capsule/"
-        self.workflow_dir: str = "sources/workflows"
-        self.memory_dir: str = "sources/memory"
+        self.runs_capsule_dir = paths.default_runs_capsule_dir()
+        self.workflow_dir: str = paths.default_workflow_dir()
+        self.memory_dir: str = paths.default_memory_dir()
 
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
         self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
@@ -148,7 +150,7 @@ class Config:
         self.agent_execution_timeout: int = 18000
         self.runner_default_max_memory_mb: int = 10000
         self.runner_default_max_cpu_percent: int = 100
-        self.runner_temp_dir: str = "./tmp"
+        self.runner_temp_dir: str = paths.default_tmp_dir()
         self.runner_requirements: list[str] = [
             "setuptools>=70.0",
             "python-dotenv",
@@ -232,6 +234,9 @@ class Config:
         )
         assert os.path.exists(self.prompt_workflow_creator), (
             f"System prompt file not found: {self.prompt_workflow_creator}"
+        )
+        assert os.path.exists(self.prompt_planner), (
+            f"Planner prompt file not found: {self.prompt_planner}"
         )
         assert os.path.exists(self.workspace_dir), (
             f"Workspace directory not found: {self.workspace_dir}"
@@ -378,9 +383,46 @@ class Config:
         self.runner_requirements = data.get(
             "runner_requirements", self.runner_requirements
         )
+        self._reanchor_relative_paths()
+
+    def _reanchor_relative_paths(self) -> None:
+        """Resolve relative paths loaded from legacy config files.
+
+        Older config files stored working-directory-relative paths
+        ("sources/prompts/…", "./tmp"). Resolve them the same way the
+        defaults are resolved so a persisted config keeps working when
+        Mimosa is launched from any directory.
+        """
+        resource_fields = (
+            "prompt_planner",
+            "prompt_workflow_creator",
+            "schema_code_path",
+            "smolagent_factory_code_path",
+        )
+        for field in resource_fields:
+            value = getattr(self, field)
+            if value and not os.path.isabs(value):
+                setattr(self, field, paths.resource_path(value))
+        state_fields = ("workflow_dir", "memory_dir", "runs_capsule_dir")
+        for field in state_fields:
+            value = getattr(self, field)
+            if value and not os.path.isabs(value):
+                relative = os.path.normpath(value)
+                setattr(self, field, paths.state_dir(relative, os.path.basename(relative)))
+        tmp = self.runner_temp_dir
+        if tmp and not os.path.isabs(tmp):
+            relative = os.path.normpath(tmp)
+            if paths.is_repo_checkout():
+                self.runner_temp_dir = str(paths.PACKAGE_ROOT / relative)
+            else:
+                # Scratch data belongs in the cache dir, matching the default.
+                self.runner_temp_dir = str(paths.cache_dir() / os.path.basename(relative))
 
     def dump(self, filepath: str) -> None:
-        """Save configuration to a JSON file."""
+        """Save configuration to a JSON file, creating parent dirs as needed."""
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         config_data = self.jsonify()
         with open(filepath, "w") as f:
             json.dump(config_data, f, indent=2)
