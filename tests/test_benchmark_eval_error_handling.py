@@ -267,6 +267,25 @@ def test_needs_judge_false_on_plain_script_eval():
     assert ExecutionSandbox._eval_needs_judge(text) is False
 
 
+# --- dependency handcrafted rules -------------------------------------------
+
+def test_dependency_rules_remap_and_drop():
+    pkgs, present = ExecutionSandbox._apply_dependency_rules("scvi\nskimage\niris\nbenchmark\n")
+    assert pkgs == ["scvi-tools", "scikit-image", "scitools-iris"]
+    assert "benchmark" not in present  # dropped entirely
+
+
+def test_dependency_rules_add_extra_deps():
+    pkgs, _ = ExecutionSandbox._apply_dependency_rules("biopsykit\nscanpy\n")
+    assert "mne" in pkgs  # biopsykit needs mne
+    assert "scikit-misc" in pkgs and "leidenalg" in pkgs  # scanpy extras
+
+
+def test_dependency_rules_strip_versions_and_dedup():
+    pkgs, present = ExecutionSandbox._apply_dependency_rules("numpy==1.26\nnumpy>=1.20\n# c\n\n")
+    assert pkgs == ["numpy"] and present == ["numpy", "numpy"]
+
+
 # --- get_eval_script_path: judge is optional, eval script is required --------
 
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
