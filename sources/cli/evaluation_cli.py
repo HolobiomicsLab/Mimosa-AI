@@ -25,45 +25,52 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from config import Config, AddressMCP
-from sources.core.tools_manager import ToolManager
-from sources.cli.onboard_cli import (
-    _MODEL_PRESETS,
-    _print_step,
-    _ok,
-    _warn,
-    _err,
-    _info,
-    _ask,
-    _ask_yn,
-    _wrap,
-    CYAN,
-    GREEN,
-    BOLD,
-    DIM,
+from config import AddressMCP, Config
+from sources.cli.onboard_cli import _MODEL_PRESETS
+from sources.cli.theme import (
+    AMBER,
+    EMBER,
+    GREY,
+    LOCKED,
     RESET,
+    WHITE,
+    banner,
+    frame_bottom,
+    frame_top,
+    kv,
+    section,
 )
-
+from sources.cli.theme import (
+    ask as _ask,
+)
+from sources.cli.theme import (
+    ask_yn as _ask_yn,
+)
+from sources.cli.theme import (
+    fail as _err,
+)
+from sources.cli.theme import (
+    info as _info,
+)
+from sources.cli.theme import (
+    ok as _ok,
+)
+from sources.cli.theme import (
+    step_header as _print_step,
+)
+from sources.cli.theme import (
+    warn as _warn,
+)
+from sources.cli.theme import (
+    wrap as _wrap,
+)
+from sources.core.tools_manager import ToolManager
 
 # ---------------------------------------------------------------------------
 # Banner
 # ---------------------------------------------------------------------------
 
-_EVAL_BANNER = f"""
-{CYAN}{BOLD}
-  ███╗   ███╗██╗███╗   ███╗ ██████╗ ███████╗ █████╗
-  ████╗ ████║██║████╗ ████║██╔═══██╗██╔════╝██╔══██╗
-  ██╔████╔██║██║██╔████╔██║██║   ██║███████╗███████║
-  ██║╚██╔╝██║██║██║╚██╔╝██║██║   ██║╚════██║██╔══██║
-  ██║ ╚═╝ ██║██║██║ ╚═╝ ██║╚██████╔╝███████║██║  ██║
-  ╚═╝     ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
-{RESET}
-{DIM}  Evaluation CLI  ·  ScienceAgentBench{RESET}
-"""
-
-YELLOW = "\033[93m"
-RED = "\033[91m"
-MAGENTA = "\033[95m"
+_EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
 TOTAL_STEPS = 6  # Updated: Config → Model → Connectivity → Mode → Tasks → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
@@ -172,10 +179,7 @@ class EvaluationCLI:
         run_id = self._next_run_id
         self._next_run_id += 1
 
-        print()
-        print(f"  {MAGENTA}{BOLD}{'═' * 54}{RESET}")
-        print(f"  {MAGENTA}{BOLD}  CONFIGURING RUN #{run_id}{RESET}")
-        print(f"  {MAGENTA}{BOLD}{'═' * 54}{RESET}")
+        section(f"CONFIGURING RUN #{run_id}")
         print()
 
         # Deep-copy the base config so each run is independent
@@ -222,7 +226,6 @@ class EvaluationCLI:
         print(_wrap(
             "Choose the LLM for agent execution (SmolAgents). "
             "This is the only model you can change for evaluations.",
-            width=70, indent=2,
         ))
 
         suggested = run_config.smolagent_model_id or (
@@ -233,14 +236,13 @@ class EvaluationCLI:
             _info(f"Current value: {run_config.smolagent_model_id}")
 
         if available:
-            print(f"\n  {BOLD}Available presets:{RESET}")
+            print(f"\n  {WHITE}Available presets:{RESET}")
             for idx, (label, model_id) in enumerate(available, start=1):
                 is_default = model_id == suggested
-                tag = f"{GREEN}← default{RESET}" if is_default else ""
-                num_color = GREEN if is_default else CYAN
-                print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
-                print(f"         {DIM}{model_id}{RESET}")
-            print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
+                tag = f"  {LOCKED}" if is_default else ""
+                print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+                print(f"         {GREY}{model_id}{RESET}")
+            print(f"  {AMBER}[c]{RESET}  {GREY}Enter a custom model ID{RESET}")
         else:
             _warn("No matching API key found – enter a model ID manually.")
 
@@ -453,12 +455,11 @@ class EvaluationCLI:
             )
             print(_wrap(
                 f"Please start Toolomics on the configured port range ({addr_str}).",
-                width=70, indent=2,
             ))
-            print(f"\n  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter{RESET}   – retry scan")
-            print(f"    {CYAN}skip{RESET}    – queue this run anyway "
-                  "(will fail at launch)")
+            print(f"\n  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter{RESET}   {GREY}– retry scan{RESET}")
+            print(f"    {AMBER}skip{RESET}    {GREY}– queue this run anyway "
+                  f"(will fail at launch){RESET}")
             choice = _ask("Retry or skip?").strip().lower()
             if choice == "skip":
                 _warn(
@@ -474,7 +475,6 @@ class EvaluationCLI:
         print(_wrap(
             "Workspace directory — the Toolomics folder where Mimosa reads "
             "and writes task artifacts. Each queued run must use a unique workspace.",
-            width=70, indent=2,
         ))
 
         if ws_is_new_suggestion:
@@ -524,12 +524,14 @@ class EvaluationCLI:
     def _choose_eval_mode(self) -> str:
         print(_wrap(
             "Choose how Mimosa should run each benchmark task:",
-            width=70, indent=2,
         ))
         print()
-        print(f"  {CYAN}[1]{RESET}  Single-agent       – one agent per task (baseline comparison)")
-        print(f"  {CYAN}[2]{RESET}  One-shot            – multi-agent workflow, no learning")
-        print(f"  {CYAN}[3]{RESET}  Iterative learning  – multi-agent with evolution loop")
+        print(f"  {AMBER}[1]{RESET}  {WHITE}Single-agent{RESET}        "
+              f"{GREY}– one agent per task (baseline comparison){RESET}")
+        print(f"  {AMBER}[2]{RESET}  {WHITE}One-shot{RESET}            "
+              f"{GREY}– multi-agent workflow, no learning{RESET}")
+        print(f"  {AMBER}[3]{RESET}  {WHITE}Iterative learning{RESET}  "
+              f"{GREY}– multi-agent with evolution loop{RESET}")
         print()
 
         while True:
@@ -558,7 +560,6 @@ class EvaluationCLI:
             "How many benchmark tasks should this run evaluate? "
             "This is equivalent to --csv_runs_limit. "
             "Enter a number (default: 200 = all tasks).",
-            width=70, indent=2,
         ))
         while True:
             raw = _ask("Number of tasks", default="200")
@@ -639,23 +640,22 @@ class EvaluationCLI:
     def _print_queue_summary(self) -> None:
         """Print a summary table of all queued runs."""
         print()
-        print(f"  {BOLD}{'═' * 70}{RESET}")
-        print(f"  {BOLD}EVALUATION QUEUE — {len(self._queue)} run(s){RESET}")
-        print(f"  {'═' * 70}")
+        frame_top(f"EVALUATION QUEUE · {len(self._queue)} RUN(S)")
         for spec in self._queue:
             addrs = spec.config.discovery_addresses
             port_str = ", ".join(f"{a.ip}:{a.port_min}-{a.port_max}" for a in addrs)
-            print(f"  {CYAN}Run #{spec.run_id}{RESET}")
-            print(f"    Model:      {spec.config.smolagent_model_id}")
-            print(f"    Mode:       {spec.eval_mode}")
-            print(f"    Tasks:      {spec.csv_runs_limit}")
-            print(f"    Ports:      {port_str}")
-            print(f"    Workspace:  {spec.config.workspace_dir}")
-            print(f"    MCPs:       {len(spec.mcp_list)}")
-            print(f"  {'─' * 70}")
+            print(f"\n    {AMBER}RUN #{spec.run_id}{RESET}")
+            kv("model", spec.config.smolagent_model_id)
+            kv("mode", spec.eval_mode)
+            kv("tasks", str(spec.csv_runs_limit))
+            kv("ports", port_str)
+            kv("workspace", spec.config.workspace_dir)
+            kv("mcps", str(len(spec.mcp_list)))
+        print()
+        frame_bottom()
         if len(self._queue) > 1:
-            print(f"  {BOLD}Execution: adaptive parallelism (starting with "
-                  f"{min(_INITIAL_CONCURRENCY, len(self._queue))} concurrent){RESET}")
+            _info(f"Execution: adaptive parallelism (starting with "
+                  f"{min(_INITIAL_CONCURRENCY, len(self._queue))} concurrent)")
         print()
 
     # ------------------------------------------------------------------
@@ -754,11 +754,8 @@ class EvaluationCLI:
         concurrency = min(_INITIAL_CONCURRENCY, len(remaining))
         batch_num = 0
 
-        print()
-        print(f"  {MAGENTA}{BOLD}{'═' * 60}{RESET}")
-        print(f"  {MAGENTA}{BOLD}  LAUNCHING {len(remaining)} EVALUATION(S){RESET}")
-        print(f"  {MAGENTA}{BOLD}  Initial concurrency: {concurrency}{RESET}")
-        print(f"  {MAGENTA}{BOLD}{'═' * 60}{RESET}")
+        section(f"IGNITION · {len(remaining)} EVALUATION(S)")
+        _info(f"Initial concurrency: {concurrency}")
         print()
 
         while remaining:
@@ -917,30 +914,31 @@ class EvaluationCLI:
     def _print_final_queue_report(self) -> None:
         """Print a summary of all queue execution results."""
         print()
-        print(f"  {BOLD}{'═' * 60}{RESET}")
-        print(f"  {BOLD}QUEUE EXECUTION REPORT{RESET}")
-        print(f"  {'═' * 60}")
+        frame_top("QUEUE EXECUTION REPORT")
+        print()
 
         completed = sum(1 for s in self._queue if s.status == "completed")
         errors = sum(1 for s in self._queue if s.status == "error")
         other = len(self._queue) - completed - errors
 
         for spec in self._queue:
+            line = (f"{WHITE}Run #{spec.run_id}{RESET}  "
+                    f"{GREY}{spec.config.smolagent_model_id}  "
+                    f"({spec.eval_mode}, {spec.csv_runs_limit} tasks){RESET} "
+                    f"{EMBER}·{RESET} {spec.status}")
             if spec.status == "completed":
-                icon = f"{GREEN}✓{RESET}"
+                _ok(line)
             elif spec.status == "error":
-                icon = f"{RED}✗{RESET}"
+                _err(line)
             else:
-                icon = f"{YELLOW}?{RESET}"
-
-            print(f"  {icon}  Run #{spec.run_id}  "
-                  f"{spec.config.smolagent_model_id}  "
-                  f"({spec.eval_mode}, {spec.csv_runs_limit} tasks)  "
-                  f"→ {spec.status}")
+                _warn(line)
             if spec.notes_path:
-                print(f"      {DIM}Notes: {spec.notes_path}{RESET}")
+                print(f"          {GREY}Notes: {spec.notes_path}{RESET}")
 
-        print(f"  {'─' * 60}")
-        print(f"  Completed: {completed}  |  Errors: {errors}  |  Other: {other}")
-        print(f"  {'═' * 60}")
+        print()
+        kv("completed", str(completed), accent=True)
+        kv("errors", str(errors), accent=errors > 0)
+        kv("other", str(other))
+        print()
+        frame_bottom()
         print()
