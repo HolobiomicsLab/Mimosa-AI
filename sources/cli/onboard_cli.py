@@ -38,6 +38,52 @@ def _persisted_config_path() -> str:
     return str(paths.user_config_file())
 
 
+def _parse_indices(text: str, max_index: int) -> tuple[set[int], bool]:
+    """Parse a '1,3' / '2-5' selection string.
+
+    Args:
+        text: Raw user input.
+        max_index: Highest valid 1-based index.
+
+    Returns:
+        A tuple of (valid selected indices, whether any token was invalid).
+    """
+    selected: set[int] = set()
+    had_bad_token = False
+    for part in text.replace(" ", "").split(","):
+        if not part:
+            continue
+        bounds = part.split("-", 1) if "-" in part else [part, part]
+        try:
+            lo, hi = int(bounds[0]), int(bounds[1])
+        except ValueError:
+            had_bad_token = True
+            continue
+        selected.update(range(lo, hi + 1))
+    return {i for i in selected if 1 <= i <= max_index}, had_bad_token
+
+
+def _list_subdirectories(root: str) -> list[str]:
+    """Return sorted, non-hidden subdirectory names of *root* ([] on error)."""
+    try:
+        return sorted(
+            entry.name for entry in os.scandir(root)
+            if entry.is_dir(follow_symlinks=False) and not entry.name.startswith(".")
+        )
+    except OSError:
+        return []
+
+
+def _upsert_env_file(env_file, values: dict[str, str]) -> None:
+    """Create or update *env_file* (a Path), replacing entries listed in *values*."""
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    lines = env_file.read_text().splitlines() if env_file.is_file() else []
+    kept = [ln for ln in lines if ln.split("=", 1)[0].strip() not in values]
+    kept.extend(f"{key}={value}" for key, value in values.items())
+    env_file.write_text("\n".join(kept) + "\n")
+    env_file.chmod(0o600)
+
+
 # ---------------------------------------------------------------------------
 # Terminal helpers
 # ---------------------------------------------------------------------------
@@ -474,39 +520,78 @@ class OnboardCLI:
     # Step implementations
     # ------------------------------------------------------------------
 
-    def _check_api_keys(self) -> None:
-        """Check for at least one known LLM API key in the environment."""
-        known_keys = [
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "MISTRAL_API_KEY",
-            "HF_TOKEN",
-            "OPENROUTER_API_KEY",
-        ]
-        found = [k for k in known_keys if os.getenv(k)]
+    _KNOWN_API_KEYS = [
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "MISTRAL_API_KEY",
+        "HF_TOKEN",
+        "OPENROUTER_API_KEY",
+    ]
 
+    def _check_api_keys(self) -> None:
+        """Check for known LLM API keys; ask which providers the user has."""
+        found = [k for k in self._KNOWN_API_KEYS if os.getenv(k)]
         if found:
             for k in found:
                 _ok(f"Found {k}")
             return
 
         _warn("No LLM API key found in environment.")
+        selected = self._select_api_key_names()
+        if not selected:
+            _warn("Continuing without API keys — only locally served models will work.")
+            return
+        entered = self._prompt_key_values(selected)
+        if entered:
+            self._offer_env_file_save(entered)
+        else:
+            _warn("No key entered — only locally served models will work.")
+
+    def _select_api_key_names(self) -> list[str]:
+        """Show the supported providers and return the key names the user has."""
         print(_wrap(
-            "Mimosa needs at least one API key to call an LLM. "
-            "Supported variables: " + ", ".join(known_keys),
+            "Mimosa needs at least one API key to call a hosted LLM. "
+            "Which of these do you have?",
             width=70, indent=2,
         ))
         print()
-        for k in known_keys:
-            value = _ask(f"Enter {k} (leave blank to skip)")
+        for idx, key in enumerate(self._KNOWN_API_KEYS, start=1):
+            print(f"    {CYAN}[{idx}]{RESET}  {key}")
+        print()
+        while True:
+            choice = _ask("Your keys (e.g. 1,3 — or 'none' for local models only)")
+            choice = choice.strip().lower()
+            if choice in ("", "none") and _ask_yn(
+                "Continue without any API key (local models only)?", default=False,
+            ):
+                return []
+            indices, _ = _parse_indices(choice, len(self._KNOWN_API_KEYS))
+            if indices:
+                return [self._KNOWN_API_KEYS[i - 1] for i in sorted(indices)]
+            _warn("No valid selection — type numbers like '1,3', or 'none'.")
+
+    def _prompt_key_values(self, key_names: list[str]) -> dict[str, str]:
+        """Prompt for each selected key's value and export it for this session."""
+        entered: dict[str, str] = {}
+        for key in key_names:
+            value = _ask(f"Enter {key} (leave blank to skip)")
             if value:
-                os.environ[k] = value
-                _ok(f"{k} set for this session.")
-                break
-        else:
-            _err("No API key provided. Mimosa cannot run without one.")
-            sys.exit(1)
+                os.environ[key] = value
+                entered[key] = value
+                _ok(f"{key} set for this session.")
+        return entered
+
+    def _offer_env_file_save(self, entered: dict[str, str]) -> None:
+        """Offer to persist entered keys to the user env file for future runs."""
+        env_file = paths.user_env_file()
+        if not _ask_yn(f"Save key(s) to {env_file} for future runs?", default=True):
+            return
+        try:
+            _upsert_env_file(env_file, entered)
+            _ok(f"Saved {len(entered)} key(s) to {env_file}")
+        except OSError as exc:
+            _warn(f"Could not save keys: {exc}")
 
     def _load_config(self) -> None:
         """Optionally load a JSON config file.
@@ -846,29 +931,51 @@ class OnboardCLI:
                 _info("Workspace will remain empty — agents can create files at runtime.")
 
     def _import_files_to_workspace(self) -> None:
-        """Ask for a source directory and copy its contents into the workspace
+        """Copy one or more source directories into the workspace
         using ``LocalTransfer.transfer_files_to_workspace``.
         """
-        while True:
-            src_path = _ask("Path to source directory")
-            if not src_path:
-                _info("No path provided — skipping import.")
-                return
-            src_path = os.path.expanduser(src_path.strip())
-            if os.path.isdir(src_path):
-                break
-            _err(f"Directory not found: {src_path}. Please try again.")
+        sources = self._select_import_sources()
+        if not sources:
+            _info("No source selected — skipping import.")
+            return
+        transfer = LocalTransfer(
+            config=self.config,
+            workspace_path=self.config.workspace_dir,
+            runs_capsule_dir=self.config.runs_capsule_dir,
+        )
+        for src in sources:
+            try:
+                copied = transfer.transfer_files_to_workspace(src)
+                _ok(f"Copied {copied} file(s) from {src} into workspace.")
+            except Exception as exc:
+                _err(f"File transfer failed for {src}: {exc}")
 
-        try:
-            transfer = LocalTransfer(
-                config=self.config,
-                workspace_path=self.config.workspace_dir,
-                runs_capsule_dir=self.config.runs_capsule_dir,
-            )
-            copied = transfer.transfer_files_to_workspace(src_path)
-            _ok(f"Copied {copied} file(s) into workspace.")
-        except Exception as exc:
-            _err(f"File transfer failed: {exc}")
+    def _select_import_sources(self) -> list[str]:
+        """List folders under the current directory and/or accept a typed path.
+
+        Returns:
+            Absolute source directory paths to import ([] to skip).
+        """
+        cwd = os.getcwd()
+        folders = _list_subdirectories(cwd)
+        if folders:
+            print(_wrap(f"Folders in {cwd}:", width=70, indent=2))
+            print()
+            for idx, name in enumerate(folders, start=1):
+                print(f"    {CYAN}[{idx}]{RESET}  {name}/")
+            print()
+            _info("Type numbers like '1,3', a directory path, or Enter to skip.")
+        while True:
+            choice = _ask("Folder(s) to import")
+            if not choice:
+                return []
+            indices, _ = _parse_indices(choice.strip().lower(), len(folders))
+            if indices:
+                return [os.path.join(cwd, folders[i - 1]) for i in sorted(indices)]
+            path = os.path.abspath(os.path.expanduser(choice.strip()))
+            if os.path.isdir(path):
+                return [path]
+            _err(f"Directory not found: {choice}. Type numbers, a valid path, or Enter to skip.")
 
     @staticmethod
     def _prune_empty_dirs(root: str) -> None:
