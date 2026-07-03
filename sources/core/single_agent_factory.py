@@ -118,6 +118,10 @@ provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
 openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
+TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
+# Only the litellm engine forwards the logprobs request.
+save_logprobs = SAVE_LOGPROBS and engine_name == "litellm"
 engine = None
 
 if engine_name == "mlx":
@@ -138,6 +142,9 @@ elif engine_name == "inference_client":
     )
 elif engine_name == "litellm":
     _litellm_extra = {{}}
+    if save_logprobs:
+        _litellm_extra["logprobs"] = True
+        _litellm_extra["top_logprobs"] = TOP_LOGPROBS
     if openrouter_provider and str(model_id).startswith("openrouter/"):
         _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
         _litellm_extra["extra_body"] = {{
@@ -194,6 +201,30 @@ agent = CodeAgent(
 
 agent.prompt_templates["system_prompt"] = SYSTEM_PROMPT
 
+def extract_logprobs(step):
+    \"\"\"Return token logprobs from a step's raw model response, or None.
+
+    Mirrors smolagent_factory.extract_logprobs: logprobs only exist on the
+    raw provider response kept in model_output_message.raw, which
+    save_agent_memories strips. Drops the per-token "bytes" arrays
+    (redundant with "token") to keep memory files small.
+    \"\"\"
+    raw = getattr(getattr(step, "model_output_message", None), "raw", None)
+    if raw is None:
+        return None
+    try:
+        logprobs = raw.choices[0].logprobs
+        if logprobs is None:
+            return None
+        dumped = logprobs.model_dump() if hasattr(logprobs, "model_dump") else dict(logprobs)
+        for token_entry in dumped.get("content") or []:
+            token_entry.pop("bytes", None)
+            for alternative in token_entry.get("top_logprobs") or []:
+                alternative.pop("bytes", None)
+        return dumped
+    except (AttributeError, IndexError, TypeError, KeyError):
+        return None
+
 def save_agent_memories(agent, memory_path: str, agent_name: str):
     print(f"Saving agent memory to: {{{{memory_path}}}}")
     try:
@@ -216,8 +247,11 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                     if step.model_output_message
                     else None
                 )
+                action_step["logprobs"] = extract_logprobs(step)
                 memories.append(action_step)
 
+        if save_logprobs and memories and all(m["logprobs"] is None for m in memories):
+            print(f"WARNING: logprobs requested but none returned for agent '{{agent_name}}'; check provider support.")
         os.makedirs(memory_path, exist_ok=True)
         agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
         with open(agent_task_path, "w") as f:
