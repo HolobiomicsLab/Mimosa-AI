@@ -193,6 +193,10 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
+        # Hard cap on transient-error retries in __call__. The retry loop is
+        # otherwise unbounded (`while True`), so a persistently overloaded or
+        # rate-limited provider would retry forever, re-sending the full prompt
+        # each time. Both retryable paths raise once this ceiling is reached.
         self.max_retries = 3
         self.logger = logging.getLogger(__name__)
 
@@ -479,7 +483,11 @@ class LLMProvider:
                 break
 
             except TimeoutError as e:
-                # Timeout is retryable
+                # Timeout is retryable, up to the max_retries ceiling.
+                if attempt >= self.max_retries:
+                    raise RuntimeError(
+                        f"❌ LLM API error: timed out after {self.max_retries} retries"
+                    ) from e
                 wait_time = self._calculate_backoff_wait(attempt, max_wait)
                 self.logger.warning(
                     f"⌛ Timeout on attempt {attempt + 1}. Retrying in {wait_time:.1f}s..."
@@ -517,7 +525,13 @@ class LLMProvider:
                             )
                         attempt += 1
                     else:
-                        # Regular retry with backoff for other retryable errors
+                        # Regular retry with backoff for other retryable errors,
+                        # bounded by the max_retries ceiling so a persistently
+                        # failing provider cannot loop forever.
+                        if attempt >= self.max_retries:
+                            raise RuntimeError(
+                                f"❌ LLM API error after {self.max_retries} retries: {str(e)}"
+                            ) from e
                         wait_time = self._calculate_backoff_wait(attempt, max_wait)
                         self.logger.warning(
                             f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:512]}. "
