@@ -122,6 +122,9 @@ class Config:
         # litellm engine only. With pinned providers, OpenRouter only routes to
         # those supporting them; models whose providers all lack logprobs then
         # fail routing (precheck probes with them too) — disable here if needed.
+        # For direct (non-OpenRouter) providers whose litellm param map lacks
+        # logprobs (e.g. mistral, anthropic), the request is dropped with a
+        # warning instead of raising UnsupportedParamsError at run time.
         self.save_logprobs: bool = True
 
         ##############

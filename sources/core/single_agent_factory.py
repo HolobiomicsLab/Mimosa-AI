@@ -120,8 +120,37 @@ engine_name = {self.config.engine_name!r}
 openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}
 TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
-# Only the litellm engine forwards the logprobs request.
-save_logprobs = SAVE_LOGPROBS and engine_name == "litellm"
+
+def logprobs_kwargs_for(model_id):
+    \"\"\"Return the logprobs request params the model's provider accepts.
+
+    Mirrors smolagent_factory.logprobs_kwargs_for: litellm raises
+    UnsupportedParamsError for request params a provider lacks (mistral and
+    anthropic take neither param, gemini takes logprobs but not
+    top_logprobs), so build the request from its param map instead of
+    crashing at call time. Providers litellm has no param map for keep the
+    full request.
+    \"\"\"
+    kwargs = {{"logprobs": True, "top_logprobs": TOP_LOGPROBS}}
+    try:
+        import litellm
+        supported = litellm.get_supported_openai_params(model=model_id)
+    except Exception:
+        return kwargs
+    if supported is None:
+        return kwargs
+    if "logprobs" not in supported:
+        print(f"WARNING: logprobs disabled for '{{model_id}}': provider does not support them.")
+        return {{}}
+    if "top_logprobs" not in supported:
+        del kwargs["top_logprobs"]
+    return kwargs
+
+# Only the litellm engine forwards the logprobs request, and only when the
+# provider accepts the params — gating both keeps the missing-logprobs
+# warning honest.
+logprobs_kwargs = logprobs_kwargs_for(model_id) if SAVE_LOGPROBS and engine_name == "litellm" else {{}}
+save_logprobs = bool(logprobs_kwargs)
 engine = None
 
 if engine_name == "mlx":
@@ -141,10 +170,7 @@ elif engine_name == "inference_client":
         max_tokens=max_tokens,
     )
 elif engine_name == "litellm":
-    _litellm_extra = {{}}
-    if save_logprobs:
-        _litellm_extra["logprobs"] = True
-        _litellm_extra["top_logprobs"] = TOP_LOGPROBS
+    _litellm_extra = dict(logprobs_kwargs)
     if openrouter_provider and str(model_id).startswith("openrouter/"):
         _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
         _litellm_extra["extra_body"] = {{

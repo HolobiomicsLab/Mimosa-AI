@@ -52,6 +52,32 @@ DANGEROUS_MODULES = {}
 # Cap accepted by most OpenRouter providers (OpenAI allows up to 20).
 TOP_LOGPROBS = 5
 
+
+def logprobs_kwargs_for(model_id) -> dict:
+    """Return the logprobs request params `model_id`'s provider accepts.
+
+    litellm raises UnsupportedParamsError for request params a provider
+    lacks (mistral and anthropic take neither param, gemini takes logprobs
+    but not top_logprobs), so build the request from its param map instead
+    of crashing at call time. Providers litellm has no param map for keep
+    the full request — litellm cannot validate those, so it won't reject
+    the params either.
+    """
+    kwargs = {"logprobs": True, "top_logprobs": TOP_LOGPROBS}
+    try:
+        import litellm
+        supported = litellm.get_supported_openai_params(model=model_id)
+    except Exception:
+        return kwargs
+    if supported is None:
+        return kwargs
+    if "logprobs" not in supported:
+        print(f"WARNING: logprobs disabled for '{model_id}': provider does not support them.")
+        return {}
+    if "top_logprobs" not in supported:
+        del kwargs["top_logprobs"]
+    return kwargs
+
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
 
@@ -92,11 +118,17 @@ class SmolAgentFactory:
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
         # Request token logprobs and save them with memory (for ablations).
-        # Only the litellm engine forwards the request, so gate on it to
-        # keep the missing-logprobs warning honest on other engines.
-        self.save_logprobs = (
+        # Only the litellm engine forwards the request, and only when the
+        # provider accepts the params (litellm raises UnsupportedParamsError
+        # otherwise, e.g. mistral) — gating both keeps the missing-logprobs
+        # warning honest.
+        logprobs_requested = (
             globals().get("SAVE_LOGPROBS", False) and self.engine_name == "litellm"
         )
+        self.logprobs_kwargs = (
+            logprobs_kwargs_for(self.model_id) if logprobs_requested else {}
+        )
+        self.save_logprobs = bool(self.logprobs_kwargs)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         # Per-agent execution timeout (seconds). Injected from the main config
@@ -169,10 +201,7 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "litellm":
-            extra_kwargs = {}
-            if self.save_logprobs:
-                extra_kwargs["logprobs"] = True
-                extra_kwargs["top_logprobs"] = TOP_LOGPROBS
+            extra_kwargs = dict(self.logprobs_kwargs)
             if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
                 order = (
                     [self.openrouter_provider]
