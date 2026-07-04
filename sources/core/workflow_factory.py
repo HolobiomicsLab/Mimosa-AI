@@ -265,6 +265,12 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         nodes = set(re.findall(patterns["nodes"], workflow_genotype_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
+        import keyword as _keyword
+        invalid_ids = {n for n in nodes if _keyword.iskeyword(n) or not n.isidentifier()}
+        if invalid_ids:
+            raise ValueError(
+                f"Workflow node names are Python keywords or invalid identifiers: {sorted(invalid_ids)}"
+            )
         self.logger.debug(f"Workflow nodes discovered: {', '.join(sorted(nodes))}")
 
         # Validate START edge target exists
@@ -389,8 +395,11 @@ print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
 if WORKFLOW_PATH:
     print("workflow run: saving workflow state JSON at :", WORKFLOW_PATH)
     try:
-        with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
+        _state_path = os.path.join(WORKFLOW_PATH, "state_result.json")
+        _tmp_path = _state_path + ".tmp"
+        with open(_tmp_path, "w") as f:
             json.dump(result_state, f, indent=2)
+        os.replace(_tmp_path, _state_path)
     except Exception as e:
         raise(Exception(f"Could not save workflow data:" + str(e)))
 """
@@ -486,6 +495,11 @@ if WORKFLOW_PATH:
             goal,
             smolagent_system_prompt
         )
+
+        try:
+            compile(complete_code, "<assembled_workflow>", "exec")
+        except SyntaxError as e:
+            raise ValueError(f"UUID:{uuid_str}|Assembled workflow has invalid syntax: {e}") from e
 
         self.logger.info("Workflow generation completed")
 

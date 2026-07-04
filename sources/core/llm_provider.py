@@ -445,11 +445,14 @@ class LLMProvider:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": self._apply_cache_control(message),
-                    "temperature": effective_temperature,
                     "timeout": timeout,
                     "max_tokens": self.config.max_tokens,
                     "drop_params": True,
                 }
+                # Anthropic models reject (Opus 4.x) or ignore an explicit
+                # temperature; omit it for all of them rather than version-gate.
+                if not self._is_claude_model():
+                    completion_params["temperature"] = effective_temperature
                 completion_params["api_key"] = self.config.key
                 # Add reasoning effort if supported (not for Claude models)
                 if self._supports_reasoning_tokens() and not self._is_claude_model():

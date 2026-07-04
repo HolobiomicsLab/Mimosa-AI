@@ -664,6 +664,14 @@ Original request:
             dep_task = next((task for task in self.task_history if task.name == dep_name), None)
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
                 missing_deps.append(dep_name)
+                continue
+            expected_outputs = getattr(dep_task, "expected_outputs", None)
+            if expected_outputs:
+                outputs_ok, missing_outputs = self._verify_expected_outputs(expected_outputs)
+                if not outputs_ok:
+                    missing_deps.append(
+                        f"{dep_name}[missing_outputs:{','.join(missing_outputs)}]"
+                    )
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:

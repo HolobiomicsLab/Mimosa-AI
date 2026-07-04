@@ -360,8 +360,12 @@ class EvolutionEngine:
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
 
-        # Reset archive at session start
+        # Reset archive and variation history at session start so each task
+        # starts with a clean slate (prevents boldness contamination across rows).
         self.selection._archive = []
+        self.variation.score_history.clear()
+        self.variation.textual_gradient_history.clear()
+        self.variation.agent_count_history.clear()
 
         parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
