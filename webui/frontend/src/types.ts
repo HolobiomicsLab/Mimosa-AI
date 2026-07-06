@@ -205,12 +205,19 @@ export interface McpHealth {
   note: string | null
 }
 
-/** Bridge results: `available` is false when the Mimosa venv is missing. */
+/** Bridge results: `available` is false when the Mimosa venv is missing;
+ * `degraded` is true when the LLM/parse failed but a usable fallback was returned. */
 export interface RefineResult {
   ok: boolean
   available?: boolean
   error?: string
-  result?: { is_clear: boolean; question: string | null; refined_prompt: string }
+  result?: {
+    is_clear: boolean
+    question: string | null
+    refined_prompt: string
+    degraded?: boolean
+    note?: string | null
+  }
 }
 
 export interface ClassifyResult {
@@ -222,6 +229,8 @@ export interface ClassifyResult {
     confidence: number | null
     reasoning: string | null
     suggested_label: string | null
+    degraded?: boolean
+    note?: string | null
   }
 }
 

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 
 RESULT_MARKER = "@@RESULT@@"
@@ -38,19 +37,6 @@ def _load_env() -> None:
         pass
 
 
-def _parse_json(text: str) -> dict:
-    """Best-effort JSON extraction from a model response (may be fenced/prose)."""
-    text = text.strip()
-    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1)
-    else:
-        brace = re.search(r"\{.*\}", text, re.DOTALL)
-        if brace:
-            text = brace.group(0)
-    return json.loads(text)
-
-
 def _persisted_config():
     """Load Mimosa config, preferring the persisted file for the user's models."""
     import config as cfgmod
@@ -69,24 +55,25 @@ def _persisted_config():
     return cfg
 
 
-def _llm_json(system: str, user: str, temperature: float) -> dict:
-    """One JSON-returning LLM call via litellm, using the planner model."""
-    import litellm
+def _llm_json(
+    system: str,
+    user: str,
+    temperature: float,
+    expected_keys: dict[str, str],
+    max_tokens: int = 1024,
+) -> dict:
+    """Robust JSON-returning LLM call, reusing the CLI onboarding's own helpers.
 
-    cfg = _persisted_config()
-    model = cfg.planner_llm_model
-    kwargs = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "max_tokens": 1024,
-    }
-    if not model.lower().startswith("anthropic"):
-        kwargs["temperature"] = temperature  # Anthropic rejects explicit temperature
-    resp = litellm.completion(**kwargs)
-    return _parse_json(resp.choices[0].message.content)
+    ``_build_llm`` sets a low reasoning effort so the token budget isn't spent
+    reasoning and truncating the JSON, and ``_call_llm_json`` recovers malformed
+    output by stripping fences, repairing, retrying with self-correction, and
+    finally regex-extracting ``expected_keys`` — the path that made the CLI
+    reliable and that the bridge previously reimplemented without any recovery.
+    """
+    from sources.cli.onboard_cli import _build_llm, _call_llm_json
+
+    llm = _build_llm(_persisted_config(), temperature=temperature, max_tokens=max_tokens)
+    return _call_llm_json(llm, system, user, expected_keys=expected_keys)
 
 
 def cmd_refine(payload: dict) -> dict:
@@ -99,7 +86,21 @@ def cmd_refine(payload: dict) -> dict:
         convo += "\n\nClarifications so far:\n" + "\n".join(
             f"Q: {h.get('question','')}\nA: {h.get('answer','')}" for h in history
         )
-    out = _llm_json(_CLARIFIER_SYSTEM, convo, temperature=0.1)
+    try:
+        out = _llm_json(
+            _CLARIFIER_SYSTEM,
+            convo,
+            temperature=0.1,
+            expected_keys={"is_clear": "bool", "question": "str", "refined_prompt": "str"},
+        )
+    except Exception as exc:  # refinement is optional — never block the wizard
+        return {
+            "is_clear": True,
+            "question": None,
+            "refined_prompt": objective,
+            "degraded": True,
+            "note": f"{type(exc).__name__}: {exc}",
+        }
     return {
         "is_clear": bool(out.get("is_clear")),
         "question": out.get("question"),
@@ -110,7 +111,29 @@ def cmd_refine(payload: dict) -> dict:
 def cmd_classify(payload: dict) -> dict:
     from sources.cli.onboard_cli import _CLASSIFIER_SYSTEM
 
-    out = _llm_json(_CLASSIFIER_SYSTEM, payload.get("objective", ""), temperature=0.0)
+    objective = payload.get("objective", "")
+    try:
+        out = _llm_json(
+            _CLASSIFIER_SYSTEM,
+            objective,
+            temperature=0.0,
+            max_tokens=512,
+            expected_keys={
+                "mode": "str",
+                "confidence": "number",
+                "reasoning": "str",
+                "suggested_label": "str",
+            },
+        )
+    except Exception as exc:  # fall back to task mode rather than erroring
+        return {
+            "mode": "task",
+            "confidence": None,
+            "reasoning": "Automatic mode selection was unavailable; defaulting to task mode.",
+            "suggested_label": None,
+            "degraded": True,
+            "note": f"{type(exc).__name__}: {exc}",
+        }
     mode = out.get("mode")
     if mode not in ("task", "goal"):
         mode = "task"
