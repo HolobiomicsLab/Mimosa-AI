@@ -66,18 +66,18 @@ export default function RunDetail({ runId }: { runId: string }) {
   )
 }
 
-/** Landing view: did it succeed, and what did it produce. */
+/** Landing view: what it produced first (the files a scientist wants), then the score. */
 function Results({ run }: { run: RunDetailT }) {
   const ev = run.evaluation_scores
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {ev && <EvalCard ev={ev} />}
       <div>
         <div className="card-head" style={{ padding: '0 0 10px', border: 'none' }}>
           output files
         </div>
         <WorkspacePanel runId={run.id} />
       </div>
+      {ev && <EvalCard ev={ev} />}
     </div>
   )
 }
