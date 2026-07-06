@@ -154,6 +154,11 @@ class Config:
         self.runner_default_max_memory_mb: int = 10000
         self.runner_default_max_cpu_percent: int = 100
         self.runner_temp_dir: str = paths.default_tmp_dir()
+        ######
+        # SmolAgent runner requirements
+        # THIS IS NOT WHERE SCIENTIFIC PACKAGE REQUIREMENTS GO.
+        # Those should be installed by the agent themselves in the dockerized shell MCP.
+        ######
         self.runner_requirements: list[str] = [
             "setuptools>=70.0",
             "python-dotenv",
