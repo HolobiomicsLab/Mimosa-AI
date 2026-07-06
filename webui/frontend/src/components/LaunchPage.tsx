@@ -138,6 +138,12 @@ function RefineStep({ objective, onDone }: { objective: string; onDone: (refined
             objective as written.
           </div>
         )}
+        {res?.degraded && (
+          <div className="hint" style={{ marginBottom: 10 }}>
+            Auto-refinement wasn't available this time — your objective is shown below as written;
+            edit it if you'd like before continuing.
+          </div>
+        )}
         {asksQuestion && refined === null && (
           <div className="field">
             <label>The planner asks</label>
