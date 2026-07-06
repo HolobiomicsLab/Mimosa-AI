@@ -25,11 +25,26 @@ export interface Artifact {
   empty: boolean
 }
 
+export type ClaimStatus = 'pass' | 'fail' | 'error' | 'unsure'
+
+export interface EvaluationClaim {
+  id: string
+  importance: number
+  rationale: string
+  description: string
+  relevant_files: string[]
+  kind: string | null
+  status: ClaimStatus | null
+  score: number | null
+  details: string | null
+}
+
 export interface RunDetail extends RunSummary {
   original_task: string | null
   textual_gradient: string | null
   evaluation_text: string | null
   evaluation_scores: Record<string, unknown> | null
+  evaluation_claims: EvaluationClaim[] | null
   genotype: string | null
   evolution_prompt: string | null
   metrics: Record<string, unknown> | null

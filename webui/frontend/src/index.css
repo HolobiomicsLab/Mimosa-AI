@@ -315,6 +315,35 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .log-tail { max-height: 420px; background: #090d14; }
 .log-tail.failed { border-color: #ef6a6a88; }
 
+/* ── per-claim verification breakdown ── */
+.claim-list { margin-top: 14px; display: flex; flex-direction: column; gap: 1px; }
+.claim-row {
+  display: flex; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--border);
+}
+.claim-status {
+  flex: none; align-self: flex-start; margin-top: 1px; width: 52px; text-align: center;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 2px 0; border-radius: 5px; color: #0b0e14;
+}
+.claim-status.ok { background: var(--ok); }
+.claim-status.bad { background: var(--bad); }
+.claim-status.warn { background: var(--warn); }
+.claim-status.dim { background: #6b7688; }
+.claim-body { min-width: 0; flex: 1; }
+.claim-desc { font-size: 13px; line-height: 1.4; }
+.claim-details { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.45; }
+.claim-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 5px; }
+.claim-tags .muted { font-size: 10.5px; }
+.claim-file {
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px;
+}
+.claim-toggle {
+  align-self: flex-start; margin-top: 8px; background: transparent; border: none;
+  color: var(--accent); font-size: 12px; padding: 2px 0;
+}
+.claim-toggle:hover { background: transparent; text-decoration: underline; }
+
 .banner.error { border-color: #ef6a6a66; background: #ef6a6a12; color: var(--bad); margin-bottom: 12px; }
 .banner.error a, .banner.error code { color: inherit; }
 
