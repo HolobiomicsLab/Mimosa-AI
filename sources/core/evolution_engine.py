@@ -530,11 +530,13 @@ class EvolutionEngine:
             )
 
         runs[-1].current_uuid = uuid
-        runs[-1].answers = wf_info.answers
-        runs[-1].state_result = wf_info.state_result
-        agents_answers = self.extract_agents_behavior(wf_info.state_result)
+        runs[-1].answers = wf_info.answers if wf_info else []
+        runs[-1].state_result = wf_info.state_result if wf_info else {}
+        agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
-        rewards_history.append(wf_info.overall_score)
+
+        if rewards_history is not None and wf_info is not None:
+            rewards_history.append(wf_info.overall_score)
 
         # ── Survivor validation: gate + populate _archive (steady-state population)
         if uuid and not on_error:
@@ -580,16 +582,17 @@ class EvolutionEngine:
             )
 
         # Log and notify completion (show per-iteration cost, not cumulative)
-        self._log_iteration_completion(
-            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-            wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
-        )
+        if wf_info:
+            self._log_iteration_completion(
+                runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
+                wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+            )
 
         # Check termination conditions
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
-        if enable_evolution:
+        if wf_info and enable_evolution:
             if wf_info.overall_score >= self.config.learned_score_threshold:
                 print_ok("Evolution engine reached learning threshold.")
                 self._save_final_plots(assertion_history, rewards_history, uuid)
@@ -662,12 +665,12 @@ class EvolutionEngine:
             cost=runs[-1].cost,  # Correct cumulative cost
             current_uuid=uuid,
             template_uuid=None,
-            workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
+            workflow_template=runs[-1].workflow_template if (wf_info and wf_info.state_result) else None,
             iteration_count=runs[-1].iteration_count + 1,
             max_depth=runs[-1].max_depth,
             judge=runs[-1].judge,
-            answers=wf_info.answers,
-            state_result=wf_info.state_result,
+            answers=wf_info.answers if wf_info else [],
+            state_result=wf_info.state_result if wf_info else {},
             scenario_rubric=runs[-1].scenario_rubric,
             original_task=runs[-1].original_task,  # PRESERVE original_task for workflow selection
             parent_uuids=next_parent_uuids,
