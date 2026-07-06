@@ -203,8 +203,7 @@ uv sync && uv run web_app_full.py
 Mimosa 자체는 CLI 전용이지만, **Observatory**는 선택적으로 사용할 수 있는 로컬 웹 UI(FastAPI + React)로, 실행 결과물——계보 트리, 리플레이, 워크스페이스, 설정/실행 흐름——을 시각화하여 로그를 일일이 읽는 대신 진화 과정을 직접 관찰하고 살펴볼 수 있게 해줍니다. 이는 단일 운영자용 로컬호스트 전용 도구이며 인증 기능이 없습니다. 공유 네트워크나 공개 네트워크에는 노출하지 마십시오.
 
 ```bash
-cd webui/backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8848
-cd webui/frontend && npm install && npm run dev   # http://localhost:5173
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
 ```
 
 자세한 내용, 환경 변수, 전체 API 목록은 다음을 참고하십시오: [`webui/README.md`](./webui/README.md).

@@ -226,8 +226,7 @@ instead of reading logs. It's a single-operator, localhost tool with no
 authentication; don't expose it on a shared or public network.
 
 ```bash
-cd webui/backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8848
-cd webui/frontend && npm install && npm run dev   # http://localhost:5173
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
 ```
 
 Details, environment variables, and the full API surface:

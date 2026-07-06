@@ -76,11 +76,22 @@ cd webui/frontend && npm install
 
 ### Run
 
+Start both servers with the helper script (it installs dependencies on first
+run, then runs the backend and frontend together; `Ctrl-C` stops both):
+
+```bash
+cd webui && ./deploy.sh            # open http://localhost:5173
+./deploy.sh --check                # preflight + install only, don't start servers
+```
+
+Ports are overridable via `MIMOSA_BACKEND_PORT` / `MIMOSA_FRONTEND_PORT`. Or run
+the two servers by hand, in separate shells:
+
 ```bash
 # Backend — from webui/backend
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8848
 
-# Frontend — from webui/frontend, in another shell
+# Frontend — from webui/frontend
 npm run dev          # http://localhost:5173, proxies /api + /api/live to :8848
 ```
 
