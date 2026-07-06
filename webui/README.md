@@ -55,17 +55,45 @@ A live indicator reflects a WebSocket that emits semantic events
 `archive_appended`, `workflow_crafted`) from filesystem changes; the run list
 refetches on run-level events.
 
-## Running it
+## Deployment
 
-**Backend** (Python ≥ 3.11, uses `uv`):
+The Observatory is a **single-operator, localhost tool with no
+authentication**. It's meant to run on the same machine as the Mimosa
+checkout you're observing, reachable only from `localhost`. Don't expose it
+on a shared or public network as-is.
+
+### Prerequisites
+
+- Backend: Python ≥ 3.11, [`uv`](https://docs.astral.sh/uv/).
+- Frontend: Node ≥ 20.
+
+### Install
 
 ```bash
-cd webui/backend
-uv run uvicorn app.main:app --port 8848
+cd webui/backend && uv sync
+cd webui/frontend && npm install
 ```
 
-By default it reads `~/Documents/CNRS/Mimosa-AI/sources/{workflows,memory}` and
-the toolomics workspace. Override any location with env vars:
+### Run
+
+```bash
+# Backend — from webui/backend
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8848
+
+# Frontend — from webui/frontend, in another shell
+npm run dev          # http://localhost:5173, proxies /api + /api/live to :8848
+```
+
+By default the backend reads `~/Documents/CNRS/Mimosa-AI/sources/{workflows,memory}`
+and the toolomics workspace. The frontend dev server proxies `/api` (REST plus
+the `/api/live` WebSocket) to the backend on `:8848`, so the app itself only
+uses same-origin relative URLs. Point the proxy elsewhere with
+`MIMOSA_API=http://host:port npm run dev`.
+
+### Environment
+
+Every variable is optional; unset ones fall back to the defaults below,
+which assume a local Mimosa checkout at the given path.
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
@@ -74,18 +102,43 @@ the toolomics workspace. Override any location with env vars:
 | `MIMOSA_MEMORY_DIR` | `$MIMOSA_ROOT/sources/memory` | per-agent traces |
 | `MIMOSA_WORKSPACE_DIR` | `…/toolomics/workspace` | shared toolomics workspace |
 | `MIMOSA_SNAPSHOT_GLOB` | `/tmp/mimosa_run_*` | per-run workspace snapshots |
+| `MIMOSA_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | allowed dev frontend origins |
 | `MIMOSA_CONFIG` | `$MIMOSA_ROOT/config_default.json`, else `~/.config/mimosa/config.json` | Mimosa config the setup page edits |
 | `MIMOSA_PYTHON` | `$MIMOSA_ROOT/.venv/bin/python` | Python that can import Mimosa (refine/classify/launch bridge) |
 
-**Frontend** (Node ≥ 20):
+### Observability vs. setup & launch
 
-```bash
-cd webui/frontend
-npm install
-npm run dev          # http://localhost:5173, proxies /api + /api/live to :8848
-```
+The read-only observability endpoints (runs, tree, series, artifacts, memory,
+workspace, live feed) need only the backend's own dependencies — the backend
+never imports `torch`, `smolagents`, or Mimosa itself.
 
-Point the dev proxy elsewhere with `MIMOSA_API=http://host:port npm run dev`.
+The setup and launch endpoints are different: objective refinement, goal/task
+classification, and launching runs shell out to the real Mimosa install via
+`MIMOSA_PYTHON`. Those features additionally require a working Mimosa install
+with its own `.venv` and provider API keys available (in the project `.env`
+or `~/.config/mimosa/.env`). If `MIMOSA_PYTHON` doesn't resolve to a usable
+interpreter, the setup page still lets you view and edit config, but refine,
+classify, and launch are disabled and the UI says so.
+
+### Production notes
+
+There is currently no Dockerfile, docker-compose file, systemd unit, nginx
+config, or CI in this repo for the Observatory. The commands above (running
+`uvicorn` directly and `npm run dev`) are the only supported way to run it
+today.
+
+For a real deployment, build the frontend (`npm run build`, static assets
+land in `webui/frontend/dist/`) and serve `dist/` from any static server or
+CDN, with the backend reachable at the same origin through a reverse proxy
+you provide (or point the built frontend at the backend's URL directly). The
+backend does **not** currently serve the built frontend itself — there is no
+static-file mount in `app.main`. None of this reverse-proxy/static-serving
+infrastructure is shipped; it's on the operator to add, and the localhost/
+single-operator/no-auth posture above still applies once you do.
+
+See [`webui/backend/README.md`](./backend/README.md) and
+[`webui/frontend/README.md`](./frontend/README.md) for backend- and
+frontend-specific detail (tests, lint, build flags).
 
 ## API surface
 

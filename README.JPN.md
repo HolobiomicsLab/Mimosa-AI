@@ -198,6 +198,19 @@ uv sync && uv run web_app_full.py
 
 ---
 
+## Web インターフェース(Observatory)
+
+Mimosa 自体は CLI のみですが、**Observatory** はオプションのローカル Web UI(FastAPI + React)で、あるランが生み出したもの——系統樹、リプレイ、ワークスペース、セットアップ/起動フロー——を可視化し、ログを読む代わりに進化の様子を直接観察・検査できるようにします。これはシングルオペレーター向けのローカルホスト専用ツールで、認証機能はありません。共有ネットワークや公開ネットワークに公開しないでください。
+
+```bash
+cd webui/backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8848
+cd webui/frontend && npm install && npm run dev   # http://localhost:5173
+```
+
+詳細、環境変数、および API の全体像はこちら:[`webui/README.md`](./webui/README.md)。
+
+---
+
 ## 実行モード
 
 | モード | 使用場面 | コマンド |

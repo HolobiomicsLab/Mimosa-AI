@@ -1,32 +1,59 @@
-# React + TypeScript + Vite
+# Mimosa Observatory — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Vite + React + TypeScript app for the Mimosa Observatory: the lineage tree,
+replay viewer, workspace browser, and the setup/new-run pages. See
+[`../README.md`](../README.md) for what the Observatory shows and the full
+API surface; this file covers only running the frontend itself.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node >= 20
 
-## React Compiler
+## Install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Run (dev)
+
+```bash
+npm run dev
+```
+
+Serves at `http://localhost:5173`. The Vite dev server proxies `/api`
+(REST endpoints and the `/api/live` WebSocket) to the backend on `:8848`
+(see [`vite.config.ts`](./vite.config.ts)), so the app itself only ever uses
+same-origin relative URLs — no CORS setup needed in dev.
+
+Point the proxy at a different backend:
+
+```bash
+MIMOSA_API=http://host:port npm run dev
+```
+
+## Build
+
+```bash
+npm run build       # tsc -b && vite build -> static assets in dist/
+npm run preview     # serve the build locally for a smoke check
+```
+
+## Lint
+
+```bash
+npm run lint        # oxlint
+```
+
+## Production notes
+
+`npm run build` only produces static assets in `dist/`; nothing in this repo
+serves them. The backend does not mount `dist/` as static files, and there is
+no bundled reverse proxy, nginx config, or CI here. To deploy for real, serve
+`dist/` from any static host or CDN and put it at the same origin as the
+backend (via your own reverse proxy) — or point the built app at the
+backend's URL directly. These pieces are not shipped; you provide them.
+
+Keep in mind the Observatory is a single-operator, localhost tool with no
+authentication — don't expose the backend (or a deployed frontend pointed at
+it) on a shared or public network without adding your own access control.
