@@ -99,7 +99,7 @@ def cmd_refine(payload: dict) -> dict:
         convo += "\n\nClarifications so far:\n" + "\n".join(
             f"Q: {h.get('question','')}\nA: {h.get('answer','')}" for h in history
         )
-    out = _llm_json(_CLARIFIER_SYSTEM, convo, temperature=0.1)
+    out = _llm_json(_CLARIFIER_SYSTEM, convo, temperature=1.0)
     return {
         "is_clear": bool(out.get("is_clear")),
         "question": out.get("question"),
@@ -110,7 +110,7 @@ def cmd_refine(payload: dict) -> dict:
 def cmd_classify(payload: dict) -> dict:
     from sources.cli.onboard_cli import _CLASSIFIER_SYSTEM
 
-    out = _llm_json(_CLASSIFIER_SYSTEM, payload.get("objective", ""), temperature=0.0)
+    out = _llm_json(_CLASSIFIER_SYSTEM, payload.get("objective", ""), temperature=1.0)
     mode = out.get("mode")
     if mode not in ("task", "goal"):
         mode = "task"

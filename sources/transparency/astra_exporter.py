@@ -126,7 +126,7 @@ class AstraExporter:
         return LLMConfig(
             model=model,
             provider=provider,
-            temperature=0.0,
+            temperature=1.0,
             openrouter_provider=self.config.openrouter_provider_for(model),
         )
 
