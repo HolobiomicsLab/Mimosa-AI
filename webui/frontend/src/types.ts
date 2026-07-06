@@ -217,6 +217,10 @@ export interface LaunchInfo {
   pid: number
   running: boolean
   returncode: number | null
+  failed: boolean
+  /** 'workflow_generation' = the crafting LLM produced no usable workflow. */
+  failure_hint: 'workflow_generation' | 'crash' | null
+  error_line: string | null
   objective: string
   mode: RunMode
   learn: boolean

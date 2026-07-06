@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type { ClassifyResult, LaunchInfo, RunMode } from '../types'
@@ -11,7 +12,13 @@ const POLL_MS = 2000
 /** Web version of CLI onboarding steps 6–9: objective → refine → mode → launch. */
 export default function LaunchPage() {
   const launches = useAsync<LaunchInfo[]>(() => api.launches(), [])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const focusId = params.get('focus')
+  const [activeId, setActiveId] = useState<string | null>(focusId)
+
+  // ?focus=<id> deep-links straight to a launch's monitor (used by failure toasts).
+  useEffect(() => { if (focusId) setActiveId(focusId) }, [focusId, location.key])
 
   const onLaunched = (id: string) => { setActiveId(id); launches.refetch() }
   const others = (launches.data ?? []).filter((l) => l.id !== activeId)
@@ -246,7 +253,7 @@ function LaunchStep({ objective, onBack, onLaunched }: {
   )
 }
 
-/** Poll a launch: status, plain-text log tail, cancel. */
+/** Poll a launch: status, plain-text log tail, stop/interrupt, failure hints. */
 function LaunchMonitor({ id, onBack }: { id: string; onBack: () => void }) {
   const [info, setInfo] = useState<LaunchInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -273,6 +280,19 @@ function LaunchMonitor({ id, onBack }: { id: string; onBack: () => void }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [info?.log_tail])
 
+  // "Focus the log" on failure: bring the log panel into view. Show the hint on
+  // a hard failure, or a live run whose crafting LLM is failing — not on success.
+  const showFail = !!info && (info.failed || (info.running && info.failure_hint === 'workflow_generation'))
+  const failKey = showFail ? (info?.failure_hint ?? 'crash') : null
+  useEffect(() => {
+    if (failKey) logRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [failKey])
+
+  const stop = () => {
+    if (!window.confirm('Stop this run?')) return
+    api.cancelLaunch(id).then(setInfo).catch((e: Error) => setError(e.message))
+  }
+
   if (error) return <div className="empty"><div className="hint">{error}</div></div>
   if (!info) return <Spinner label="Loading launch…" />
 
@@ -289,8 +309,8 @@ function LaunchMonitor({ id, onBack }: { id: string; onBack: () => void }) {
         </span>
         <span>
           {info.running && (
-            <button onClick={() => api.cancelLaunch(id).then(setInfo)} style={{ marginRight: 8 }}>
-              Cancel run
+            <button className="btn-danger" onClick={stop} style={{ marginRight: 8 }}>
+              ■ Stop run
             </button>
           )}
           <button onClick={onBack}>← New run</button>
@@ -298,12 +318,32 @@ function LaunchMonitor({ id, onBack }: { id: string; onBack: () => void }) {
       </div>
       <div className="card-body">
         <p style={{ margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{info.objective}</p>
-        <pre className="code log-tail" ref={logRef}>{info.log_tail || 'Waiting for output…'}</pre>
+        {failKey && <FailureBanner info={info} />}
+        <pre className={`code log-tail ${failKey ? 'failed' : ''}`} ref={logRef}>
+          {info.log_tail || 'Waiting for output…'}
+        </pre>
         <div className="hint" style={{ marginTop: 8 }}>
           The run appears in the sidebar as soon as it writes its first artifacts — click it there
           to watch results, replay and workflow live.
         </div>
       </div>
+    </div>
+  )
+}
+
+function FailureBanner({ info }: { info: LaunchInfo }) {
+  if (info.failure_hint === 'workflow_generation') {
+    return (
+      <div className="banner error">
+        The LLM failed to generate a valid workflow{info.running ? ' (retrying)' : ''}. Certain
+        models — especially smaller ones — often cannot produce valid workflow code. Consider a
+        stronger orchestration model in <Link to="/setup">Setup → Models</Link>.
+      </div>
+    )
+  }
+  return (
+    <div className="banner error">
+      The run failed{info.error_line ? <> — <code>{info.error_line}</code></> : null}. See the log below.
     </div>
   )
 }
