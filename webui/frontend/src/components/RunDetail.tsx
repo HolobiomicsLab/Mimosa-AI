@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, artifactUrl } from '../api'
 import { useAsync } from '../hooks'
-import type { Artifact, RunDetail as RunDetailT } from '../types'
+import type { Artifact, ClaimStatus, EvaluationClaim, RunDetail as RunDetailT } from '../types'
 import {
   KindTag, ScoreChip, Spinner, StatusBadge, fmtCost, fmtDuration,
 } from '../ui'
@@ -77,12 +77,12 @@ function Results({ run }: { run: RunDetailT }) {
         </div>
         <WorkspacePanel runId={run.id} />
       </div>
-      {ev && <EvalCard ev={ev} />}
+      {ev && <EvalCard ev={ev} claims={run.evaluation_claims} />}
     </div>
   )
 }
 
-function EvalCard({ ev }: { ev: Record<string, unknown> }) {
+function EvalCard({ ev, claims }: { ev: Record<string, unknown>; claims: EvaluationClaim[] | null }) {
   const num = (k: string) => (typeof ev[k] === 'number' ? (ev[k] as number) : undefined)
   const chips: [string, unknown, string][] = [
     ['claims', ev.n_claims, 'var(--text)'],
@@ -92,7 +92,7 @@ function EvalCard({ ev }: { ev: Record<string, unknown> }) {
     ['unsure', ev.n_unsure, 'var(--text-dim)'],
   ]
   const pass = num('n_pass') ?? 0
-  const claims = num('n_claims') ?? 0
+  const nClaims = num('n_claims') ?? 0
   return (
     <div className="card">
       <div className="card-head">
@@ -107,12 +107,55 @@ function EvalCard({ ev }: { ev: Record<string, unknown> }) {
             </div>
           ))}
         </div>
-        {claims > 0 && (
+        {nClaims > 0 && (
           <div style={{ height: 8, borderRadius: 5, overflow: 'hidden', background: '#ef6a6a44', display: 'flex' }}>
-            <div style={{ width: `${(pass / claims) * 100}%`, background: 'var(--ok)' }} />
+            <div style={{ width: `${(pass / nClaims) * 100}%`, background: 'var(--ok)' }} />
           </div>
         )}
+        {claims && claims.length > 0 && <ClaimList claims={claims} />}
       </div>
+    </div>
+  )
+}
+
+const CLAIM_RANK: Record<ClaimStatus, number> = { fail: 0, error: 1, unsure: 2, pass: 3 }
+const CLAIM_CLASS: Record<ClaimStatus, string> = {
+  pass: 'ok', fail: 'bad', error: 'warn', unsure: 'dim',
+}
+
+/** Per-claim pass/fail breakdown, failures first so they're immediately visible. */
+function ClaimList({ claims }: { claims: EvaluationClaim[] }) {
+  const [showPass, setShowPass] = useState(false)
+  const sorted = [...claims].sort(
+    (a, b) =>
+      (CLAIM_RANK[a.status ?? 'pass'] ?? 9) - (CLAIM_RANK[b.status ?? 'pass'] ?? 9) ||
+      b.importance - a.importance,
+  )
+  const passCount = claims.filter((c) => c.status === 'pass').length
+  const shown = showPass ? sorted : sorted.filter((c) => c.status !== 'pass')
+
+  return (
+    <div className="claim-list">
+      {shown.map((c) => (
+        <div key={c.id} className="claim-row">
+          <span className={`claim-status ${CLAIM_CLASS[c.status ?? 'unsure'] ?? 'dim'}`}>
+            {c.status ?? '—'}
+          </span>
+          <div className="claim-body">
+            <div className="claim-desc">{c.description}</div>
+            {c.details && <div className="claim-details">{c.details}</div>}
+            <div className="claim-tags">
+              <span className="muted">importance {c.importance}</span>
+              {c.relevant_files.map((f) => <span key={f} className="claim-file">{f}</span>)}
+            </div>
+          </div>
+        </div>
+      ))}
+      {passCount > 0 && (
+        <button className="claim-toggle" onClick={() => setShowPass((v) => !v)}>
+          {showPass ? 'hide' : 'show'} {passCount} passing claim{passCount === 1 ? '' : 's'}
+        </button>
+      )}
     </div>
   )
 }
