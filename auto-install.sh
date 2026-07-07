@@ -115,6 +115,17 @@ range_open() {
   return 1
 }
 
+# Block until any port in the Toolomics range accepts connections, or time out.
+wait_for_range() {
+  local label="$1" timeout="${2:-300}" waited=0
+  printf '  %s·%s waiting for %s on :%s-%s ' "$DIM" "$RST" "$label" "$TOOLOMICS_PORT_MIN" "$TOOLOMICS_PORT_MAX"
+  while ! range_open; do
+    if [ "$waited" -ge "$timeout" ]; then printf '\n'; return 1; fi
+    printf '.'; sleep 3; waited=$((waited + 3))
+  done
+  printf ' %sup%s\n' "$GRN" "$RST"
+}
+
 # --------------------------------------------------------------------------- #
 # Argument parsing
 # --------------------------------------------------------------------------- #
@@ -275,10 +286,16 @@ if [ "$DO_TOOLOMICS" = 1 ]; then
   if range_open; then
     ok "Something is already listening in :$TOOLOMICS_PORT_MIN-$TOOLOMICS_PORT_MAX — assuming Toolomics is up"
   else
-    info "Starting Toolomics (docker compose, first run can take several minutes)"
-    ( cd "$TOOLOMICS_DIR" && ./start.sh )
-    range_open && ok "Toolomics MCP servers are up" \
-                || warn "No listener detected in :$TOOLOMICS_PORT_MIN-$TOOLOMICS_PORT_MAX yet — containers may still be building; Mimosa will discover them once ready."
+    info "Starting Toolomics in the background (docker compose, first run can take several minutes)"
+    # start.sh supervises its MCP servers forever and never returns on its own —
+    # it must run detached, or every step below would block waiting on it.
+    ( cd "$TOOLOMICS_DIR" && nohup ./start.sh </dev/null > toolomics.log 2>&1 &
+      echo $! > .toolomics.pid )
+    if wait_for_range "Toolomics" 600; then
+      ok "Toolomics MCP servers are up (logs: $TOOLOMICS_DIR/toolomics.log)"
+    else
+      warn "No listener detected in :$TOOLOMICS_PORT_MIN-$TOOLOMICS_PORT_MAX after 10min — containers may still be building; see $TOOLOMICS_DIR/toolomics.log. Mimosa will discover them once ready."
+    fi
   fi
 else
   step "4/6  Toolomics  (skipped — --skip-toolomics)"
