@@ -130,7 +130,7 @@ class AstraExporter:
         filter are looked up per-model so routing matches the rest of the run.
         """
         from sources.core.llm_provider import LLMConfig, extract_model_pattern
-        judge = getattr(self.config, "judge_model", None) or "anthropic/claude-sonnet-4-5"
+        judge = getattr(self.config, "smolagent_model_id", None) or "openrouter/deepseek/deepseek-v4-flash"
         provider, model = extract_model_pattern(judge)
         return LLMConfig(
             model=model,
