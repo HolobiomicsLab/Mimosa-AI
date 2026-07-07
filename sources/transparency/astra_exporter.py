@@ -119,15 +119,25 @@ class AstraExporter:
         return f"python {RECIPE_FILENAME}"
 
     def _build_llm_config(self):
-        """Reuse the project's judge model for cheap structured extraction."""
-        from sources.core.llm_provider import LLMConfig
-        model = getattr(self.config, "judge_model", None) or "anthropic/claude-sonnet-4-5"
-        provider = model.split("/", 1)[0] if "/" in model else "anthropic"
+        """Reuse the project's judge model for cheap structured extraction.
+
+        Splits ``judge_model`` into ``(provider, bare_model)`` the way every
+        other consumer does (e.g. ``sources/cli/memory_chat_cli._build_llm``).
+        This matters: ``LLMProvider.__call__`` re-prefixes the model as
+        ``f"{provider}/{model}"``, so passing the full ``provider/model``
+        string as ``model`` double-prefixes it (``openrouter/openrouter/...``)
+        and every extraction call fails. The OpenRouter routing + quantization
+        filter are looked up per-model so routing matches the rest of the run.
+        """
+        from sources.core.llm_provider import LLMConfig, extract_model_pattern
+        judge = getattr(self.config, "judge_model", None) or "anthropic/claude-sonnet-4-5"
+        provider, model = extract_model_pattern(judge)
         return LLMConfig(
             model=model,
             provider=provider,
             temperature=0.0,
-            openrouter_provider=self.config.openrouter_provider_for(model),
+            openrouter_provider=self.config.openrouter_provider_for(judge),
+            openrouter_quantizations=self.config.openrouter_quantizations_for(judge),
         )
 
     def _resolve_artefacts_dir(self, best_uuid: str, workspace_dir: Path) -> Path:

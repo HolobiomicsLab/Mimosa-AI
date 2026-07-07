@@ -25,7 +25,7 @@ if __name__ == "__main__":
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )
 
-from sources.transparency.decision_extractor import Decision
+from sources.transparency.decision_extractor import Decision, Option
 
 
 _ASTRA_VERSION = "0.1"
@@ -66,7 +66,7 @@ def build_universe(decisions: list[Decision], best_uuid: str) -> dict[str, Any]:
     return {
         "id": _DEFAULT_UNIVERSE_ID,
         "description": f"Configuration realised by Mimosa run {best_uuid}.",
-        "decisions": {d.id: d.option_id for d in decisions},
+        "decisions": {d.id: d.chosen_option_id for d in decisions},
     }
 
 
@@ -125,12 +125,10 @@ def _build_decisions(decisions: list[Decision]) -> dict[str, Any]:
         d.id: {
             "label": d.label,
             "rationale": d.rationale,
-            "default": d.option_id,
+            "default": d.chosen_option_id,
             "options": {
-                d.option_id: {
-                    "label": d.option_label,
-                    "description": d.option_description,
-                }
+                o.id: {"label": o.label, "description": o.description}
+                for o in d.options
             },
         }
         for d in decisions
@@ -155,7 +153,11 @@ if __name__ == "__main__":
     decisions = [
         Decision(
             id="fit_method", label="Fit", rationale="r",
-            option_id="ols", option_label="OLS", option_description="d",
+            chosen_option_id="ols",
+            options=(
+                Option(id="ols", label="OLS", description="Minimises squared residuals."),
+                Option(id="robust", label="Robust regression", description="Down-weights outliers."),
+            ),
             source_step=2,
         ),
     ]
@@ -166,6 +168,7 @@ if __name__ == "__main__":
         assert out.exists() and out.name == "astra.yaml"
         loaded = yaml.safe_load(out.read_text())
         assert loaded["decisions"]["fit_method"]["default"] == "ols"
+        assert set(loaded["decisions"]["fit_method"]["options"]) == {"ols", "robust"}
         uni = yaml.safe_load((Path(tmp) / "universes" / "best.yaml").read_text())
         assert uni["decisions"]["fit_method"] == "ols"
     print("[OK] yaml_writer smoke check passed")
