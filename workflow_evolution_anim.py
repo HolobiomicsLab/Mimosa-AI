@@ -17,6 +17,7 @@ Controls
     SPACE   play / pause
     LEFT  RIGHT  prev / next memory step
     UP    DOWN   jump to previous / next workflow (generation)
+    B       jump to the best-scoring generation
     [ / ]   slow down / speed up
     H       toggle help overlay
     Click on tree node → jump to that workflow
@@ -29,12 +30,12 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import random
 import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame
@@ -43,7 +44,6 @@ from PIL import Image
 # Reuse the trace-parsing helpers from the existing timelapse tool.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from memory_timelapse import StepInfo, load_memory_files, parse_step  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Visual constants — SF / Jarvis vibe: deep navy background, cyan/amber glow.
@@ -84,6 +84,17 @@ EVO_COLORS = {
     "crossover": VIOLET,
 }
 
+# Ambient animation tuning. Every effect is a pure function of an
+# accumulated animation clock, so GUI and --record output stay identical.
+STAR_COUNT = 140          # background starfield particles
+STAR_SEED = 7             # fixed seed keeps record mode deterministic
+SCAN_PERIOD_S = 9.0       # seconds per background scanline sweep
+PULSE_PERIOD_S = 2.2      # breathing period of the active tree node
+FLOW_PERIOD_S = 1.6       # lineage flow-dot travel time per edge
+TYPE_REVEAL_BOOST = 1.35  # typewriter finishes before the frame ends
+RUBRIC_FLASH_FRAMES = 8   # frames a freshly-completed column stays flashed
+BURST_PARTICLES = 10      # radial sparks on transition arrival
+
 
 @dataclass
 class Transition:
@@ -122,7 +133,7 @@ class Evaluation:
     n_fail: int
     n_error: int
     n_unsure: int
-    claims: List[ClaimResult]
+    claims: list[ClaimResult]
 
 
 @dataclass
@@ -130,13 +141,13 @@ class Workflow:
     uuid: str
     iteration: int
     kind: str                # seed / mutation / crossover
-    parents: List[str]
-    steps: List[StepInfo] = field(default_factory=list)
-    evaluation: Optional[Evaluation] = None
-    png_path: Optional[Path] = None
+    parents: list[str]
+    steps: list[StepInfo] = field(default_factory=list)
+    evaluation: Evaluation | None = None
+    png_path: Path | None = None
 
 
-def _parse_evaluation(path: Path) -> Optional[Evaluation]:
+def _parse_evaluation(path: Path) -> Evaluation | None:
     """Extract overall score and per-claim pass/fail from an evaluation.txt."""
     if not path.exists():
         return None
@@ -157,7 +168,7 @@ def _parse_evaluation(path: Path) -> Optional[Evaluation]:
     # Claim blocks always start at column 0 with [name] (importance=…).
     # Anchor there to avoid picking up ANSI escape sequences embedded in
     # stderr traces such as ``[35m"…"[0m``.
-    claims: List[ClaimResult] = []
+    claims: list[ClaimResult] = []
     pattern = re.compile(
         r"^\[(?P<name>[A-Za-z0-9_\- ]+)\]\s*\(importance=(?P<imp>\d+);.*?\n"
         r"(?:.*?\n)*?"
@@ -180,7 +191,7 @@ _CODE_TAG_RE = re.compile(r"<code>(.*?)</code>", re.DOTALL)
 _CODE_FENCE_RE = re.compile(r"```(?:py|python)?\s*\n(.*?)```", re.DOTALL)
 
 
-def _extract_previews(entry: Dict) -> Tuple[str, str, str]:
+def _extract_previews(entry: dict) -> tuple[str, str, str]:
     """Pull thought / code / observation strings out of one raw step dict.
 
     Handles three formats seen in this repo:
@@ -236,7 +247,7 @@ def _extract_previews(entry: Dict) -> Tuple[str, str, str]:
     return thought, code, obs
 
 
-def _load_memory_steps(mem_dir: Path) -> List[StepInfo]:
+def _load_memory_steps(mem_dir: Path) -> list[StepInfo]:
     """Load every agent trace under ``mem_dir`` into a flat StepInfo list.
 
     Handles both layouts seen in this repo:
@@ -245,8 +256,8 @@ def _load_memory_steps(mem_dir: Path) -> List[StepInfo]:
     """
     if not mem_dir.exists():
         return []
-    steps: List[StepInfo] = []
-    raw_pool: List[Tuple[Dict, StepInfo]] = []
+    steps: list[StepInfo] = []
+    raw_pool: list[tuple[dict, StepInfo]] = []
 
     nested = load_memory_files(mem_dir)
     for stage_steps in nested.values():
@@ -288,7 +299,7 @@ def _load_memory_steps(mem_dir: Path) -> List[StepInfo]:
     return steps
 
 
-def _load_workflow(wf_dir: Path, memory_root: Path) -> Optional[Workflow]:
+def _load_workflow(wf_dir: Path, memory_root: Path) -> Workflow | None:
     uuid = wf_dir.name
     lineage = wf_dir / f"lineage_{uuid}.json"
     if not lineage.exists():
@@ -310,9 +321,9 @@ def _load_workflow(wf_dir: Path, memory_root: Path) -> Optional[Workflow]:
     )
 
 
-def load_all(workflows_dir: Path, memory_dir: Path) -> List[Workflow]:
+def load_all(workflows_dir: Path, memory_dir: Path) -> list[Workflow]:
     """Discover every workflow with a lineage file and load it."""
-    out: List[Workflow] = []
+    out: list[Workflow] = []
     for child in sorted(workflows_dir.iterdir()):
         if not child.is_dir():
             continue
@@ -333,20 +344,20 @@ class TreeNode:
     x: float
     y: float
     radius: float
-    color: Tuple[int, int, int]
+    color: tuple[int, int, int]
 
 
 def layout_tree(
-    workflows: List[Workflow],
+    workflows: list[Workflow],
     rect: pygame.Rect,
     pad: int = 26,
-) -> Tuple[Dict[str, TreeNode], List[Tuple[str, str]]]:
+) -> tuple[dict[str, TreeNode], list[tuple[str, str]]]:
     """Place each workflow on a horizontal band keyed by iteration."""
-    nodes: Dict[str, TreeNode] = {}
+    nodes: dict[str, TreeNode] = {}
     if not workflows:
         return nodes, []
 
-    by_iter: Dict[int, List[Workflow]] = {}
+    by_iter: dict[int, list[Workflow]] = {}
     for wf in workflows:
         by_iter.setdefault(wf.iteration, []).append(wf)
     iters = sorted(by_iter)
@@ -372,7 +383,7 @@ def layout_tree(
                 color=EVO_COLORS.get(wf.kind, ACCENT),
             )
 
-    edges: List[Tuple[str, str]] = []
+    edges: list[tuple[str, str]] = []
     for wf in workflows:
         for p in wf.parents:
             if p in nodes:
@@ -383,12 +394,82 @@ def layout_tree(
 # ---------------------------------------------------------------------------
 # Drawing primitives
 # ---------------------------------------------------------------------------
+def edge_curve_point(
+    x0: float, y0: float, x1: float, y1: float, t: float,
+) -> tuple[float, float]:
+    """Point at ``t`` ∈ [0, 1] on a vertical S-curve between two tree nodes.
+
+    Cubic bezier with control points directly below the parent and above
+    the child, so edges leave and arrive vertically like a subway map.
+    """
+    u = 1.0 - t
+    mid_y = (y0 + y1) / 2.0
+    x = (u ** 3 + 3 * u * u * t) * x0 + (3 * u * t * t + t ** 3) * x1
+    y = u ** 3 * y0 + 3 * u * t * mid_y + t ** 3 * y1
+    return x, y
+
+
+def edge_curve(
+    x0: float, y0: float, x1: float, y1: float, segments: int = 18,
+) -> list[tuple[float, float]]:
+    """Polyline approximation of the S-curve edge."""
+    return [
+        edge_curve_point(x0, y0, x1, y1, i / segments)
+        for i in range(segments + 1)
+    ]
+
+
+def glow_circle(surf: pygame.Surface, color, center, radius: int,
+                layers: int = 3, alpha: int = 28):
+    """Soft additive bloom around ``center``.
+
+    BLEND_ADD ignores per-pixel alpha, so the color itself is pre-scaled
+    by ``alpha`` — each layer then adds a dim wash that stacks smoothly.
+    """
+    x, y = int(center[0]), int(center[1])
+    dim = tuple(c * alpha // 255 for c in color)
+    for i in range(layers, 0, -1):
+        r = radius + i * 4
+        halo = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(halo, dim, (r, r), r)
+        surf.blit(halo, (x - r, y - r), special_flags=pygame.BLEND_ADD)
+
+
+def mix_color(a, b, t: float) -> tuple[int, int, int]:
+    """Linear blend of two RGB colors, ``t`` toward ``b``."""
+    t = max(0.0, min(1.0, t))
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def typewriter_slice(
+    lines: list[str], frac: float,
+) -> tuple[list[str], tuple[int, str] | None]:
+    """Truncate ``lines`` to the first ``frac`` of their characters.
+
+    Returns the visible lines plus (row, visible_text_of_row) for the
+    cursor position, or None when everything is already revealed.
+    """
+    if frac >= 1.0:
+        return lines, None
+    total = sum(len(ln) + 1 for ln in lines)
+    budget = int(total * max(0.0, frac))
+    out: list[str] = []
+    for i, ln in enumerate(lines):
+        if budget >= len(ln) + 1:
+            out.append(ln)
+            budget -= len(ln) + 1
+            continue
+        out.append(ln[:budget])
+        return out, (i, ln[:budget])
+    return out, None
+
+
 def draw_panel(
     surf: pygame.Surface,
     rect: pygame.Rect,
     title: str,
     font: pygame.font.Font,
-    accent: Tuple[int, int, int] = ACCENT,
+    accent: tuple[int, int, int] = ACCENT,
 ) -> pygame.Rect:
     """Render a card with title, glowing top accent, return inner area."""
     pygame.draw.rect(surf, BG_PANEL, rect, border_radius=10)
@@ -399,7 +480,20 @@ def draw_panel(
     pygame.draw.line(surf, accent, (rect.x + 14, rect.y + 27),
                      (rect.x + 14 + 4, rect.y + 27), 3)
     label = font.render(title, True, accent)
+    # accent bar before the label (drawn — block glyphs render as tofu)
+    pygame.draw.rect(surf, accent,
+                     (rect.x + 14, rect.y + 8, 4, label.get_height() - 4),
+                     border_radius=2)
     surf.blit(label, (rect.x + 26, rect.y + 7))
+    # HUD corner ticks
+    tick = 10
+    for cx, cy, dx, dy in (
+        (rect.x, rect.y, 1, 1), (rect.right - 1, rect.y, -1, 1),
+        (rect.x, rect.bottom - 1, 1, -1),
+        (rect.right - 1, rect.bottom - 1, -1, -1),
+    ):
+        pygame.draw.line(surf, accent, (cx, cy), (cx + dx * tick, cy), 1)
+        pygame.draw.line(surf, accent, (cx, cy), (cx, cy + dy * tick), 1)
     return pygame.Rect(rect.x + 12, rect.y + 36, rect.width - 24,
                        rect.height - 46)
 
@@ -410,8 +504,8 @@ def draw_chevron(surf: pygame.Surface, x: int, y: int, color, size: int = 10):
 
 
 def text_lines(
-    surf: pygame.Surface, font: pygame.font.Font, lines: List[str],
-    pos: Tuple[int, int], color, line_h: int, max_lines: Optional[int] = None
+    surf: pygame.Surface, font: pygame.font.Font, lines: list[str],
+    pos: tuple[int, int], color, line_h: int, max_lines: int | None = None
 ):
     x, y = pos
     if max_lines is not None:
@@ -429,14 +523,14 @@ def pil_to_surface(im: Image.Image) -> pygame.Surface:
 
 def fit_surface(src: pygame.Surface, max_w: int, max_h: int) -> pygame.Surface:
     sw, sh = src.get_size()
-    if sw == 0 or sh == 0:
+    if sw == 0 or sh == 0 or max_w <= 0 or max_h <= 0:
         return src
     scale = min(max_w / sw, max_h / sh)
     return pygame.transform.smoothscale(src, (int(sw * scale), int(sh * scale)))
 
 
-def wrap_text(text: str, font: pygame.font.Font, max_w: int) -> List[str]:
-    out: List[str] = []
+def wrap_text(text: str, font: pygame.font.Font, max_w: int) -> list[str]:
+    out: list[str] = []
     for para in text.splitlines() or [""]:
         words = para.split(" ")
         line = ""
@@ -455,7 +549,54 @@ def wrap_text(text: str, font: pygame.font.Font, max_w: int) -> List[str]:
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-def draw_header(surf, rect, fonts, wf: Workflow, total_wf: int,
+def _parent_score(wf: Workflow, workflows: list[Workflow]) -> float | None:
+    """Overall score of the first evaluated genetic parent, if any."""
+    by_uuid = {w.uuid: w for w in workflows}
+    for p in wf.parents:
+        parent = by_uuid.get(p)
+        if parent is not None and parent.evaluation is not None:
+            return parent.evaluation.overall
+    return None
+
+
+def _draw_delta_badge(surf, fonts, x: int, y: int, wf: Workflow,
+                      workflows: list[Workflow]) -> None:
+    """Small ▲/▼ score-vs-parent indicator next to the header meta line."""
+    parent = _parent_score(wf, workflows)
+    if parent is None or wf.evaluation is None:
+        return
+    delta = wf.evaluation.overall - parent
+    up = delta >= 0
+    color = SUCCESS if up else ERROR
+    cy = y + 7
+    if up:
+        pts = [(x, cy + 4), (x + 8, cy + 4), (x + 4, cy - 4)]
+    else:
+        pts = [(x, cy - 4), (x + 8, cy - 4), (x + 4, cy + 4)]
+    pygame.draw.polygon(surf, color, pts)
+    label = fonts["small"].render(f"{delta:+.3f} vs parent", True, color)
+    surf.blit(label, (x + 14, y))
+
+
+def _draw_sparkline(surf, rect: pygame.Rect, workflows: list[Workflow],
+                    current_uuid: str) -> None:
+    """Tiny overall-score history polyline for the header's right side."""
+    scores = [w.evaluation.overall if w.evaluation else 0.0
+              for w in workflows]
+    if len(scores) < 2:
+        return
+    pts = []
+    for i, s in enumerate(scores):
+        x = rect.x + rect.width * i / (len(scores) - 1)
+        y = rect.bottom - rect.height * max(0.0, min(s, 1.0))
+        pts.append((int(x), int(y)))
+    pygame.draw.lines(surf, ACCENT_DIM, False, pts, 1)
+    for i, (x, y) in enumerate(pts):
+        if workflows[i].uuid == current_uuid:
+            pygame.draw.circle(surf, AMBER, (x, y), 3)
+
+
+def draw_header(surf, rect, fonts, wf: Workflow, workflows: list[Workflow],
                 step_idx: int, n_steps: int, playing: bool, speed: float):
     pygame.draw.rect(surf, BG_PANEL, rect)
     pygame.draw.line(surf, BORDER_BRIGHT, (rect.x, rect.bottom - 1),
@@ -467,36 +608,112 @@ def draw_header(surf, rect, fonts, wf: Workflow, total_wf: int,
     surf.blit(sub, (rect.x + 24 + title.get_width() + 14, rect.y + 16))
 
     meta = (
-        f"uuid {wf.uuid}    iter {wf.iteration + 1}/{total_wf}    "
+        f"uuid {wf.uuid}    iter {wf.iteration + 1}/{len(workflows)}    "
         f"kind {wf.kind}    step {step_idx + 1}/{max(n_steps, 1)}"
     )
-    surf.blit(fonts["small"].render(meta, True, TEXT_DIM),
-              (rect.x + 24, rect.y + 44))
+    meta_surf = fonts["small"].render(meta, True, TEXT_DIM)
+    surf.blit(meta_surf, (rect.x + 24, rect.y + 44))
+    _draw_delta_badge(surf, fonts, rect.x + 24 + meta_surf.get_width() + 20,
+                      rect.y + 44, wf, workflows)
 
-    badge = " ▶ PLAY " if playing else " ⏸ PAUSED "
     color = SUCCESS if playing else AMBER
-    text = fonts["body"].render(badge, True, color)
-    bw = text.get_width() + 16
+    text = fonts["body"].render("PLAY" if playing else "PAUSED", True, color)
+    bw = text.get_width() + 40
     bx = rect.right - bw - 24
     pygame.draw.rect(surf, BG_PANEL_LIGHT,
                      (bx, rect.y + 14, bw, 30), border_radius=6)
     pygame.draw.rect(surf, color, (bx, rect.y + 14, bw, 30), width=1,
                      border_radius=6)
-    surf.blit(text, (bx + 8, rect.y + 18))
+    # drawn play/pause icon (font glyphs render as tofu on some systems)
+    ix, iy = bx + 11, rect.y + 22
+    if playing:
+        pygame.draw.polygon(surf, color,
+                            [(ix, iy), (ix, iy + 13), (ix + 10, iy + 6)])
+    else:
+        pygame.draw.rect(surf, color, (ix, iy, 4, 13))
+        pygame.draw.rect(surf, color, (ix + 7, iy, 4, 13))
+    surf.blit(text, (bx + 28, rect.y + 18))
 
     speed_txt = fonts["small"].render(f"x{speed:.1f}", True, TEXT_DIM)
     surf.blit(speed_txt, (bx - speed_txt.get_width() - 14, rect.y + 22))
+
+    spark = pygame.Rect(bx - 150, rect.y + 48, 126, 22)
+    _draw_sparkline(surf, spark, workflows, wf.uuid)
 
 
 # ---------------------------------------------------------------------------
 # Lineage tree panel
 # ---------------------------------------------------------------------------
+def _ancestor_uuids(workflows: list[Workflow], current_uuid: str) -> set:
+    """UUIDs on any lineage path from the roots down to the current node."""
+    by_uuid = {w.uuid: w for w in workflows}
+    seen: set = set()
+    frontier = [current_uuid]
+    while frontier:
+        u = frontier.pop()
+        if u in seen or u not in by_uuid:
+            continue
+        seen.add(u)
+        frontier.extend(by_uuid[u].parents)
+    return seen
+
+
+def _draw_tree_edges(surf, nodes, edges, by_uuid, ancestry: set,
+                     anim_t: float) -> None:
+    """Curved edges; the ancestry path glows and carries flow dots."""
+    for ei, (parent, child) in enumerate(edges):
+        a, b = nodes[parent], nodes[child]
+        color = EVO_COLORS.get(by_uuid[child].kind, ACCENT_DIM)
+        on_path = parent in ancestry and child in ancestry
+        pts = edge_curve(a.x, a.y, b.x, b.y)
+        if on_path:
+            pygame.draw.lines(surf, color, False, pts, 2)
+            # two flow dots per edge, phase-shifted, drifting parent → child
+            for k in range(2):
+                t = (anim_t / FLOW_PERIOD_S + ei * 0.37 + k * 0.5) % 1.0
+                px, py = edge_curve_point(a.x, a.y, b.x, b.y, t)
+                glow_circle(surf, color, (px, py), 2, layers=1, alpha=60)
+                pygame.draw.circle(surf, TEXT, (int(px), int(py)), 2)
+        else:
+            pygame.draw.lines(surf, mix_color(color, BG, 0.55), False, pts, 1)
+
+
+def _draw_tree_node(surf, fonts, n: TreeNode, wf: Workflow,
+                    is_current: bool, is_best: bool, anim_t: float) -> None:
+    score = wf.evaluation.overall if wf.evaluation else 0.0
+    score = max(0.0, min(1.0, score))
+    r = n.radius + (4 if is_current else 0)
+    if is_current:
+        breath = 0.5 + 0.5 * math.sin(anim_t * 2 * math.pi / PULSE_PERIOD_S)
+        glow_circle(surf, ACCENT, (n.x, n.y), int(r + 2 + 3 * breath))
+    # outer ring tinted by score
+    ring = (
+        int(60 + 160 * score),
+        int(80 + 140 * score),
+        int(120 + 60 * (1 - score)),
+    )
+    pygame.draw.circle(surf, ring, (int(n.x), int(n.y)), int(r) + 2, 2)
+    pygame.draw.circle(surf, n.color, (int(n.x), int(n.y)), int(r))
+    if is_current:
+        pygame.draw.circle(surf, TEXT, (int(n.x), int(n.y)), int(r), 2)
+    if is_best:
+        dx, dy = int(n.x + r + 7), int(n.y - r - 3)
+        pygame.draw.polygon(surf, AMBER, [
+            (dx, dy - 4), (dx + 4, dy), (dx, dy + 4), (dx - 4, dy)])
+    lbl = fonts["tiny"].render(str(n.iteration), True, BG)
+    surf.blit(lbl, (n.x - lbl.get_width() / 2, n.y - lbl.get_height() / 2))
+
+
 def draw_tree(
     surf, area: pygame.Rect, fonts,
-    workflows: List[Workflow], current_uuid: str,
-) -> Dict[str, TreeNode]:
+    workflows: list[Workflow], current_uuid: str, anim_t: float,
+) -> dict[str, TreeNode]:
     nodes, edges = layout_tree(workflows, area)
     by_uuid = {w.uuid: w for w in workflows}
+    ancestry = _ancestor_uuids(workflows, current_uuid)
+    scored = [w for w in workflows if w.evaluation is not None]
+    best_uuid = (max(scored, key=lambda w: w.evaluation.overall).uuid
+                 if scored else None)
 
     # iteration grid lines
     iters = sorted({n.iteration for n in nodes.values()})
@@ -510,35 +727,10 @@ def draw_tree(
         label = fonts["tiny"].render(f"#{it:02d}", True, TEXT_FAINT)
         surf.blit(label, (area.x + 4, y - label.get_height() // 2))
 
-    # edges
-    for parent, child in edges:
-        a, b = nodes[parent], nodes[child]
-        color = EVO_COLORS.get(by_uuid[child].kind, ACCENT_DIM)
-        pygame.draw.line(surf, color, (a.x, a.y), (b.x, b.y), 1)
-
-    # nodes
+    _draw_tree_edges(surf, nodes, edges, by_uuid, ancestry, anim_t)
     for n in nodes.values():
-        wf = by_uuid[n.uuid]
-        is_current = n.uuid == current_uuid
-        score = wf.evaluation.overall if wf.evaluation else 0.0
-        r = n.radius + (4 if is_current else 0)
-        if is_current:
-            for k in range(3, 0, -1):
-                pygame.draw.circle(surf, (*ACCENT, 0), (int(n.x), int(n.y)),
-                                   int(r + k * 3), 1)
-        # outer ring tinted by score
-        ring = (
-            int(60 + 160 * score),
-            int(80 + 140 * score),
-            int(120 + 60 * (1 - score)),
-        )
-        pygame.draw.circle(surf, ring, (int(n.x), int(n.y)), int(r) + 2, 2)
-        pygame.draw.circle(surf, n.color, (int(n.x), int(n.y)), int(r))
-        if is_current:
-            pygame.draw.circle(surf, TEXT, (int(n.x), int(n.y)), int(r), 2)
-        # iteration number inside
-        lbl = fonts["tiny"].render(str(n.iteration), True, BG)
-        surf.blit(lbl, (n.x - lbl.get_width() / 2, n.y - lbl.get_height() / 2))
+        _draw_tree_node(surf, fonts, n, by_uuid[n.uuid],
+                        n.uuid == current_uuid, n.uuid == best_uuid, anim_t)
 
     # legend
     lx = area.x + 12
@@ -548,6 +740,12 @@ def draw_tree(
         t = fonts["tiny"].render(kind, True, TEXT_DIM)
         surf.blit(t, (lx + 16, ly + 2))
         lx += 18 + t.get_width() + 16
+    if best_uuid is not None:
+        pygame.draw.polygon(surf, AMBER, [
+            (lx + 6, ly + 4), (lx + 10, ly + 8), (lx + 6, ly + 12),
+            (lx + 2, ly + 8)])
+        t = fonts["tiny"].render("best", True, TEXT_DIM)
+        surf.blit(t, (lx + 16, ly + 2))
     return nodes
 
 
@@ -562,12 +760,15 @@ SUB_PANEL_SPECS = (
 
 
 def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
-                    step: Optional[StepInfo], step_idx: int, sub_idx: int):
+                    step: StepInfo | None, step_idx: int, sub_idx: int,
+                    reveal: float, anim_t: float):
     """Render the memory-timelapse panel for one (step, sub_idx) frame.
 
     Minimal: body of the active sub-panel only. A thin left-edge accent
     stripe colors which sub-panel is showing (cyan=thought, green=code,
     amber=observation). The agent name sits as a thin line at the top.
+    While playing, the body types itself out (``reveal`` ∈ [0, 1]) with a
+    blinking cursor; paused/scrubbed frames show the full text at once.
     """
     inner = area
 
@@ -608,17 +809,24 @@ def draw_step_panel(surf, area: pygame.Rect, fonts, wf: Workflow,
     else:
         lines = wrap_text(body, font, max_w)
     max_lines = max(body_rect.height // line_h, 1)
+    lines = lines[:max_lines]
+    lines, cursor = typewriter_slice(lines, reveal)
     text_lines(surf, font, lines, (text_x, body_rect.y + 4),
-               body_color, line_h, max_lines)
+               body_color, line_h)
+    if cursor is not None and (anim_t * 3.0) % 1.0 < 0.65:
+        row, visible = cursor
+        cx = text_x + font.size(visible)[0] + 2
+        cy = body_rect.y + 4 + row * line_h
+        pygame.draw.rect(surf, accent, (cx, cy + 2, 8, line_h - 6))
 
 
 # ---------------------------------------------------------------------------
 # Workflow PNG panel
 # ---------------------------------------------------------------------------
-_PNG_CACHE: Dict[str, pygame.Surface] = {}
+_PNG_CACHE: dict[str, pygame.Surface] = {}
 
 
-def get_workflow_png(path: Path) -> Optional[pygame.Surface]:
+def get_workflow_png(path: Path) -> pygame.Surface | None:
     key = str(path)
     if key in _PNG_CACHE:
         return _PNG_CACHE[key]
@@ -631,10 +839,24 @@ def get_workflow_png(path: Path) -> Optional[pygame.Surface]:
         return None
 
 
-def draw_workflow_png(surf, area, fonts, wf: Workflow):
+def _draw_png_placeholder(surf, area, fonts, anim_t: float):
+    """Rotating radar rings shown when a workflow has no rendered graph."""
+    cx, cy = area.centerx, area.centery - 8
+    max_r = max(min(area.width, area.height) // 4, 24)
+    for r in (max_r, int(max_r * 0.66), int(max_r * 0.33)):
+        pygame.draw.circle(surf, BORDER, (cx, cy), r, 1)
+    box = pygame.Rect(cx - max_r, cy - max_r, max_r * 2, max_r * 2)
+    sweep = anim_t * 2 * math.pi / 4.0
+    for start, span in ((sweep, 1.1), (sweep + math.pi, 0.6)):
+        pygame.draw.arc(surf, ACCENT_DIM, box, start, start + span, 2)
+    pygame.draw.circle(surf, ACCENT_DIM, (cx, cy), 3)
+    msg = fonts["small"].render("NO WORKFLOW GRAPH", True, TEXT_FAINT)
+    surf.blit(msg, (cx - msg.get_width() // 2, cy + max_r + 12))
+
+
+def draw_workflow_png(surf, area, fonts, wf: Workflow, anim_t: float):
     if wf.png_path is None:
-        msg = fonts["small"].render("No workflow_<uuid>.png", True, TEXT_DIM)
-        surf.blit(msg, (area.x + 8, area.y + 8))
+        _draw_png_placeholder(surf, area, fonts, anim_t)
         return
     src = get_workflow_png(wf.png_path)
     if src is None:
@@ -648,10 +870,10 @@ def draw_workflow_png(surf, area, fonts, wf: Workflow):
 # ---------------------------------------------------------------------------
 # Rubric evolution panel
 # ---------------------------------------------------------------------------
-def _claim_summary(workflows: List[Workflow]) -> List[Tuple[str, int]]:
+def _claim_summary(workflows: list[Workflow]) -> list[tuple[str, int]]:
     """Return list of (claim_name, max_importance) ordered first-seen."""
-    order: List[str] = []
-    imp: Dict[str, int] = {}
+    order: list[str] = []
+    imp: dict[str, int] = {}
     for wf in workflows:
         if not wf.evaluation:
             continue
@@ -670,14 +892,17 @@ def _truncate_to_width(text: str, font, max_w: int) -> str:
     return text + "…" if text else ""
 
 
-def draw_rubric(surf, area, fonts, workflows: List[Workflow],
+def draw_rubric(surf, area, fonts, workflows: list[Workflow],
                 current_idx: int,
-                completed_mask: Optional[List[bool]] = None):
+                completed_mask: list[bool] | None = None,
+                col_flash: list[float] | None = None,
+                anim_t: float = 0.0):
     """Heatmap of per-claim pass/fail per generation + overall-score line.
 
     Cells for workflows whose sub-animation has not yet played stay grey
     (``completed_mask[j]`` False) — they reveal pass/fail only after the
-    user has scrubbed past their last frame.
+    user has scrubbed past their last frame. ``col_flash[j]`` ∈ [0, 1]
+    briefly whitens a column right after it completes.
     """
     all_claims = _claim_summary(workflows)
     if not all_claims or not workflows:
@@ -751,6 +976,9 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
                 color = WARN
             else:
                 color = TEXT_FAINT
+            if is_done and col_flash and col_flash[j] > 0:
+                color = mix_color(color, (255, 255, 255),
+                                  col_flash[j] * 0.55)
             x = grid_x + int(j * cell_w)
             y = grid_top + int(i * cell_h)
             pygame.draw.rect(surf, color,
@@ -767,20 +995,43 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
     line_h = line_y1 - line_y0
     pygame.draw.line(surf, BORDER, (grid_x, line_y0),
                      (grid_x + grid_w, line_y0), 1)
-    pts: List[Tuple[int, int]] = []
+    pts: list[tuple[int, int]] = []
     for j, wf in enumerate(workflows):
         s = wf.evaluation.overall if wf.evaluation else 0.0
         x = grid_x + int(j * cell_w + cell_w / 2)
         y = int(line_y1 - line_h * max(0.0, min(s, 1.0)))
         pts.append((x, y))
-    if len(pts) >= 2:
+    if len(pts) >= 2 and grid_w > 0 and line_h > 0:
+        # translucent fill under the score curve
+        overlay = pygame.Surface((grid_w, line_h + 4), pygame.SRCALPHA)
+        local = [(x - grid_x, y - line_y0) for x, y in pts]
+        poly = local + [(local[-1][0], line_h + 4), (local[0][0], line_h + 4)]
+        pygame.draw.polygon(overlay, (*ACCENT, 34), poly)
+        surf.blit(overlay, (grid_x, line_y0))
         pygame.draw.lines(surf, ACCENT, False, pts, 2)
+    breath = 0.5 + 0.5 * math.sin(anim_t * 2 * math.pi / PULSE_PERIOD_S)
+    scored_js = [j for j, w in enumerate(workflows) if w.evaluation]
+    best_j = (max(scored_js,
+                  key=lambda j: workflows[j].evaluation.overall)
+              if scored_js else None)
     for j, (x, y) in enumerate(pts):
-        col = AMBER if j == current_idx else ACCENT
-        pygame.draw.circle(surf, col, (x, y), 3)
-    surf.blit(label_font.render("overall score 0 → 1", True, TEXT_FAINT),
-              (area.x, line_y0 + 4))
-    # rolling stats for the current generation
+        if j == current_idx:
+            glow_circle(surf, AMBER, (x, y), 3, layers=2, alpha=45)
+            pygame.draw.circle(surf, AMBER, (x, y), int(3 + 1.5 * breath))
+        else:
+            pygame.draw.circle(surf, ACCENT, (x, y), 3)
+    if best_j is not None:
+        bx, by = pts[best_j]
+        pygame.draw.polygon(surf, AMBER, [
+            (bx, by - 9), (bx + 5, by - 4), (bx, by + 1), (bx - 5, by - 4)])
+        tag = fonts["tiny"].render(
+            f"BEST {workflows[best_j].evaluation.overall:.2f}", True, AMBER)
+        # place the tag below the marker when the point sits near the top
+        ty = by + 4 if by - 16 < line_y0 else by - 16
+        surf.blit(tag, (min(bx + 8, area.right - tag.get_width()), ty))
+    # one-line footer in the gap between grid and chart: current-gen
+    # stats on the left, claim-count on the right
+    footer_y = grid_bottom + 3
     wf = workflows[current_idx] if 0 <= current_idx < len(workflows) else None
     if wf and wf.evaluation:
         e = wf.evaluation
@@ -788,30 +1039,24 @@ def draw_rubric(surf, area, fonts, workflows: List[Workflow],
             f"gen {wf.iteration:02d}  •  score {e.overall:.3f}  •  "
             f"pass {e.n_pass}  fail {e.n_fail}  err {e.n_error}"
         )
-        t = fonts["small"].render(info, True, TEXT)
-        surf.blit(t, (area.x, line_y1 - t.get_height() - 2))
-    # claim count indicator
+        surf.blit(label_font.render(info, True, TEXT), (area.x, footer_y))
     total_current = len(current_names)
     total_all = len(all_claims)
     if total_current > 0:
-        count_txt = (
-            f"showing {len(claims)}/{total_current} current claims"
-            f"  ({total_all} total)"
-        )
+        count_txt = f"{len(claims)}/{total_current} claims ({total_all} total)"
     else:
-        count_txt = f"showing {len(claims)}/{total_all} claims"
+        count_txt = f"{len(claims)}/{total_all} claims"
     count_surf = label_font.render(count_txt, True, TEXT_FAINT)
-    # place at the right edge of the line-chart area
-    cx = grid_x + grid_w - count_surf.get_width()
-    cy = line_y1 - count_surf.get_height() - 2
-    surf.blit(count_surf, (cx, cy))
+    surf.blit(count_surf,
+              (grid_x + grid_w - count_surf.get_width(), footer_y))
 
 
 # ---------------------------------------------------------------------------
 # Bottom timeline / controls
 # ---------------------------------------------------------------------------
 def draw_timeline(surf, rect, fonts, total_frames, current_frame,
-                  workflows: List[Workflow], frame_to_wf: List[int]):
+                  workflows: list[Workflow], frame_to_wf: list[int],
+                  anim_t: float):
     pygame.draw.rect(surf, BG_PANEL, rect)
     pygame.draw.line(surf, BORDER, (rect.x, rect.y), (rect.right, rect.y), 1)
 
@@ -837,12 +1082,16 @@ def draw_timeline(surf, rect, fonts, total_frames, current_frame,
                                  (x, bar.y + bar.height + 2), 1)
 
     pos_x = bar.x + int(bar.width * current_frame / max(total_frames, 1))
-    pygame.draw.circle(surf, ACCENT, (pos_x, bar.y + bar.height // 2), 8)
-    pygame.draw.circle(surf, BG, (pos_x, bar.y + bar.height // 2), 4)
+    pos_y = bar.y + bar.height // 2
+    breath = 0.5 + 0.5 * math.sin(anim_t * 2 * math.pi / PULSE_PERIOD_S)
+    glow_circle(surf, ACCENT, (pos_x, pos_y), int(6 + 3 * breath),
+                layers=2, alpha=40)
+    pygame.draw.circle(surf, ACCENT, (pos_x, pos_y), 8)
+    pygame.draw.circle(surf, BG, (pos_x, pos_y), 4)
 
     hint = (
-        "SPACE play/pause   ← → step   ↑ ↓ generation   "
-        "[ ] speed   H help   click tree node to jump"
+        "SPACE play/pause   LEFT/RIGHT step   UP/DOWN generation   "
+        "B best   [ ] speed   H help   click tree or timeline to jump"
     )
     t = fonts["tiny"].render(hint, True, TEXT_FAINT)
     surf.blit(t, (rect.x + 24, rect.bottom - 18))
@@ -857,6 +1106,7 @@ HELP_LINES = [
     "  Space          play / pause",
     "  Left / Right   prev / next memory step",
     "  Up / Down      jump to prev / next generation",
+    "  B              jump to the best-scoring generation",
     "  Home / End     first / last frame",
     "  [ / ]          slow down / speed up",
     "  H              toggle this help",
@@ -885,7 +1135,7 @@ def draw_help(surf, fonts):
 # App
 # ---------------------------------------------------------------------------
 class App:
-    def __init__(self, workflows: List[Workflow],
+    def __init__(self, workflows: list[Workflow],
                  size=(1600, 1000), fps: int = 60):
         if not workflows:
             raise SystemExit("No workflows with lineage files found.")
@@ -902,7 +1152,7 @@ class App:
         # expands into one frame per sub-panel (thought/code/observation) so
         # they play one-at-a-time. Workflows with no memory still get a single
         # "intro" frame so they appear in the timeline.
-        self.frames: List[Tuple[int, int, int]] = []
+        self.frames: list[tuple[int, int, int]] = []
         n_sub = len(SUB_PANEL_SPECS)
         for wi, wf in enumerate(workflows):
             if not wf.steps:
@@ -915,7 +1165,7 @@ class App:
         # Last frame index for each workflow — used by the rubric panel to
         # decide which columns are "complete" (cells colored) vs still
         # pending (cells grey).
-        self._last_frame_of_wf: List[int] = [-1] * len(workflows)
+        self._last_frame_of_wf: list[int] = [-1] * len(workflows)
         for fi, (wi, _, _) in enumerate(self.frames):
             self._last_frame_of_wf[wi] = fi
 
@@ -923,14 +1173,27 @@ class App:
         self.playing = True
         self.speed = 2.0     # steps per second at speed 1
         self._acc = 0.0
+        self.anim_t = 0.0    # ambient animation clock (advanced by dt)
         self.show_help = False
-        self._tree_nodes: Dict[str, TreeNode] = {}
-        self._timeline_rect: Optional[pygame.Rect] = None
+        self._tree_nodes: dict[str, TreeNode] = {}
+        self._timeline_rect: pygame.Rect | None = None
         self._prev_wi: int = self.frames[0][0] if self.frames else 0
-        self.transition: Optional[Transition] = None
+        self.transition: Transition | None = None
+
+        # Ambient FX state: fixed-seed starfield + cached overlay surfaces.
+        rng = random.Random(STAR_SEED)
+        self._stars = [
+            (rng.random(), rng.random(),          # position (0..1 space)
+             rng.uniform(0.004, 0.028),           # drift speed (screens/s)
+             rng.choice((1, 1, 2)),               # radius px
+             rng.uniform(0, math.tau))            # twinkle phase
+            for _ in range(STAR_COUNT)
+        ]
+        self._vignette: pygame.Surface | None = None
+        self._scan_band: pygame.Surface | None = None
 
     @staticmethod
-    def _load_fonts() -> Dict[str, pygame.font.Font]:
+    def _load_fonts() -> dict[str, pygame.font.Font]:
         def f(name, size, bold=False):
             try:
                 return pygame.font.SysFont(name, size, bold=bold)
@@ -954,7 +1217,7 @@ class App:
         return self.workflows[wi]
 
     @property
-    def current_step(self) -> Optional[StepInfo]:
+    def current_step(self) -> StepInfo | None:
         wi, si, _ = self.frames[self.cur]
         wf = self.workflows[wi]
         return wf.steps[si] if si >= 0 and si < len(wf.steps) else None
@@ -965,24 +1228,37 @@ class App:
     def current_sub_index(self) -> int:
         return self.frames[self.cur][2]
 
+    def _seek(self, frame: int):
+        """Jump to a frame and restart the typewriter reveal."""
+        self.cur = max(0, min(len(self.frames) - 1, frame))
+        self._acc = 0.0
+
     def jump_workflow(self, delta: int):
         wi = self.frames[self.cur][0]
         new_wi = max(0, min(len(self.workflows) - 1, wi + delta))
         for i, (w, _, _) in enumerate(self.frames):
             if w == new_wi:
-                self.cur = i
+                self._seek(i)
                 return
 
     def jump_to_workflow_uuid(self, uuid: str):
         for i, (wi, _, _) in enumerate(self.frames):
             if self.workflows[wi].uuid == uuid:
-                self.cur = i
+                self._seek(i)
                 return
+
+    def jump_to_best(self):
+        """Jump to the workflow with the highest overall score."""
+        scored = [w for w in self.workflows if w.evaluation is not None]
+        if scored:
+            best = max(scored, key=lambda w: w.evaluation.overall)
+            self.jump_to_workflow_uuid(best.uuid)
 
     # ----- main loop -----------------------------------------------------
     def run(self):
         while True:
             dt = self.clock.tick(self.fps) / 1000.0
+            self.anim_t += dt
             if not self._handle_events():
                 return
             if self.playing:
@@ -1038,8 +1314,10 @@ class App:
         n_video_frames = 0
         self.cur = 0
         self._acc = 0.0
+        self.anim_t = 0.0
         self.playing = True
         while True:
+            self.anim_t += dt
             if self.playing:
                 self._acc += dt * self.speed
                 while self._acc >= 1.0 and self.cur < len(self.frames) - 1:
@@ -1079,6 +1357,7 @@ class App:
         parents = [p for p in new_wf.parents if p in known]
         from_uuid = parents[0] if parents else self.workflows[self._prev_wi].uuid
         if from_uuid == new_wf.uuid:
+            self.transition = None   # drop any stale pulse toward old target
             return
         self.transition = Transition(
             from_uuid=from_uuid,
@@ -1097,21 +1376,23 @@ class App:
                 if ev.key == pygame.K_SPACE:
                     self.playing = not self.playing
                 elif ev.key == pygame.K_RIGHT:
-                    self.cur = min(self.cur + 1, len(self.frames) - 1)
+                    self._seek(self.cur + 1)
                 elif ev.key == pygame.K_LEFT:
-                    self.cur = max(self.cur - 1, 0)
+                    self._seek(self.cur - 1)
                 elif ev.key == pygame.K_DOWN:
                     self.jump_workflow(+1)
                 elif ev.key == pygame.K_UP:
                     self.jump_workflow(-1)
                 elif ev.key == pygame.K_HOME:
-                    self.cur = 0
+                    self._seek(0)
                 elif ev.key == pygame.K_END:
-                    self.cur = len(self.frames) - 1
+                    self._seek(len(self.frames) - 1)
                 elif ev.key in (pygame.K_LEFTBRACKET,):
                     self.speed = max(0.25, self.speed / 1.4)
                 elif ev.key in (pygame.K_RIGHTBRACKET,):
                     self.speed = min(16.0, self.speed * 1.4)
+                elif ev.key == pygame.K_b:
+                    self.jump_to_best()
                 elif ev.key == pygame.K_h:
                     self.show_help = not self.show_help
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -1124,8 +1405,7 @@ class App:
             bar_x = self._timeline_rect.x + 24
             bar_w = self._timeline_rect.width - 48
             t = (pos[0] - bar_x) / max(bar_w, 1)
-            self.cur = max(0, min(len(self.frames) - 1,
-                                  int(t * len(self.frames))))
+            self._seek(int(t * len(self.frames)))
             return
         # tree node click — closest node within its radius
         for n in self._tree_nodes.values():
@@ -1134,7 +1414,7 @@ class App:
                 return
 
     # ----- draw ----------------------------------------------------------
-    def _layout(self) -> Dict[str, pygame.Rect]:
+    def _layout(self) -> dict[str, pygame.Rect]:
         w, h = self.screen.get_size()
         pad = 12
         header = pygame.Rect(0, 0, w, 80)
@@ -1166,62 +1446,121 @@ class App:
         self.screen.fill(BG)
         rects = self._layout()
         wf = self.current_workflow
-
-        # subtle grid pattern over background
         w, h = self.screen.get_size()
-        for x in range(0, w, 48):
-            pygame.draw.line(self.screen, (12, 16, 24), (x, 0), (x, h), 1)
-        for y in range(0, h, 48):
-            pygame.draw.line(self.screen, (12, 16, 24), (0, y), (w, y), 1)
+        self._draw_background(w, h)
 
         # header
         draw_header(self.screen, rects["header"], self.fonts,
-                    wf, len(self.workflows),
+                    wf, self.workflows,
                     self.step_index_in_wf(),
                     len(wf.steps), self.playing, self.speed)
 
         # tree panel
-        inner = draw_panel(self.screen, rects["tree"], "▌ LINEAGE TREE",
+        inner = draw_panel(self.screen, rects["tree"], "LINEAGE TREE",
                            self.fonts["header"])
         self._tree_nodes = draw_tree(self.screen, inner, self.fonts,
-                                     self.workflows, wf.uuid)
+                                     self.workflows, wf.uuid, self.anim_t)
         if self.transition is not None:
             self._draw_transition_overlay(self._tree_nodes)
 
         # workflow png
         inner = draw_panel(self.screen, rects["wfpng"],
-                           "▌ WORKFLOW GRAPH", self.fonts["header"], INFO)
-        if self.transition is not None and self.transition.from_wi != \
+                           "WORKFLOW GRAPH", self.fonts["header"], INFO)
+        has_fade_png = self.transition is not None and (
+            wf.png_path is not None
+            or self.workflows[self.transition.from_wi].png_path is not None
+        )
+        if has_fade_png and self.transition.from_wi != \
                 self.frames[self.cur][0]:
             self._draw_png_crossfade(inner, wf, self.transition)
         else:
-            draw_workflow_png(self.screen, inner, self.fonts, wf)
+            draw_workflow_png(self.screen, inner, self.fonts, wf,
+                              self.anim_t)
 
-        # memory timelapse
+        # memory timelapse — text types itself out while playing
         inner = draw_panel(self.screen, rects["timelapse"],
-                           "▌ MEMORY TIMELAPSE", self.fonts["header"], AMBER)
+                           "MEMORY TIMELAPSE", self.fonts["header"], AMBER)
+        reveal = (min(1.0, self._acc * TYPE_REVEAL_BOOST)
+                  if self.playing else 1.0)
         draw_step_panel(self.screen, inner, self.fonts,
                         wf, self.current_step, self.step_index_in_wf(),
-                        self.current_sub_index())
+                        self.current_sub_index(), reveal, self.anim_t)
 
         # rubric
         inner = draw_panel(self.screen, rects["rubric"],
-                           "▌ RUBRIC EVOLUTION", self.fonts["header"], SUCCESS)
+                           "RUBRIC EVOLUTION", self.fonts["header"], SUCCESS)
         completed_mask = [
             last >= 0 and self.cur >= last
             for last in self._last_frame_of_wf
         ]
+        # flash only during playback — a parked playhead (pause, end of
+        # recording hold) must show true cell colors, not a frozen flash
+        col_flash = [
+            max(0.0, 1.0 - (self.cur - last) / RUBRIC_FLASH_FRAMES)
+            if self.playing and last >= 0 and self.cur >= last else 0.0
+            for last in self._last_frame_of_wf
+        ]
         draw_rubric(self.screen, inner, self.fonts, self.workflows,
-                    self.frames[self.cur][0], completed_mask)
+                    self.frames[self.cur][0], completed_mask,
+                    col_flash, self.anim_t)
 
         # bottom timeline
         self._timeline_rect = rects["timeline"]
         draw_timeline(self.screen, rects["timeline"], self.fonts,
                       len(self.frames), self.cur,
-                      self.workflows, self.frame_to_wf)
+                      self.workflows, self.frame_to_wf, self.anim_t)
 
+        self.screen.blit(self._get_vignette(w, h), (0, 0))
         if self.show_help:
             draw_help(self.screen, self.fonts)
+
+    # ----- ambient background ---------------------------------------------
+    def _draw_background(self, w: int, h: int):
+        """Grid + drifting starfield + slow scanline sweep."""
+        for x in range(0, w, 48):
+            pygame.draw.line(self.screen, (12, 16, 24), (x, 0), (x, h), 1)
+        for y in range(0, h, 48):
+            pygame.draw.line(self.screen, (12, 16, 24), (0, y), (w, y), 1)
+        for sx, sy, spd, size, phase in self._stars:
+            y = ((sy + self.anim_t * spd) % 1.0) * h
+            twinkle = 0.55 + 0.45 * math.sin(self.anim_t * 1.7 + phase)
+            c = int(45 + 65 * twinkle)
+            color = (int(c * 0.55), int(c * 0.75), c)
+            pygame.draw.circle(self.screen, color, (int(sx * w), int(y)),
+                               size)
+        band = self._get_scan_band(w)
+        span = h + band.get_height()
+        scan_y = ((self.anim_t / SCAN_PERIOD_S) % 1.0) * span
+        self.screen.blit(band, (0, int(scan_y) - band.get_height()))
+
+    def _get_scan_band(self, w: int) -> pygame.Surface:
+        """Cached translucent horizontal band for the scanline sweep."""
+        if self._scan_band is not None and \
+                self._scan_band.get_width() == w:
+            return self._scan_band
+        band_h = 44
+        band = pygame.Surface((w, band_h), pygame.SRCALPHA)
+        for i in range(band_h):
+            alpha = int(22 * (1 - abs(i - band_h / 2) / (band_h / 2)))
+            pygame.draw.line(band, (*ACCENT, alpha), (0, i), (w, i))
+        self._scan_band = band
+        return band
+
+    def _get_vignette(self, w: int, h: int) -> pygame.Surface:
+        """Cached radial darkening — built small, smoothscaled up."""
+        if self._vignette is not None and \
+                self._vignette.get_size() == (w, h):
+            return self._vignette
+        sw, sh = 160, 100
+        small = pygame.Surface((sw, sh), pygame.SRCALPHA)
+        for y in range(sh):
+            for x in range(sw):
+                d = math.hypot((x - sw / 2) / (sw / 2),
+                               (y - sh / 2) / (sh / 2))
+                alpha = min(int(max(0.0, d - 0.62) * 150), 120)
+                small.set_at((x, y), (0, 0, 0, alpha))
+        self._vignette = pygame.transform.smoothscale(small, (w, h))
+        return self._vignette
 
     # ----- transition rendering -----------------------------------------
     def _draw_png_crossfade(self, inner: pygame.Rect, new_wf: Workflow,
@@ -1241,7 +1580,7 @@ class App:
             oy = inner.y + (inner.height - fitted.get_height()) // 2
             self.screen.blit(fitted, (ox, oy))
 
-    def _draw_transition_overlay(self, tree_nodes: Dict[str, TreeNode]):
+    def _draw_transition_overlay(self, tree_nodes: dict[str, TreeNode]):
         """Glowing pulse traveling parent → child, then a ring burst on arrival."""
         tr = self.transition
         if tr is None:
@@ -1258,14 +1597,10 @@ class App:
         # Bright trail from source up to current position.
         pygame.draw.line(self.screen, color, (a.x, a.y), (px, py), 2)
         # Layered additive glow around the pulse head.
-        for r in (16, 11, 6):
-            glow = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (*color, 55), (r, r), r)
-            self.screen.blit(glow, (px - r, py - r),
-                             special_flags=pygame.BLEND_ADD)
+        glow_circle(self.screen, color, (px, py), 4, layers=3, alpha=55)
         pygame.draw.circle(self.screen, color, (int(px), int(py)), 4)
         pygame.draw.circle(self.screen, (255, 255, 255), (int(px), int(py)), 2)
-        # Ring burst at destination in the final 40 %.
+        # Ring burst + radial sparks at destination in the final 40 %.
         if tr.t > 0.6:
             bt = (tr.t - 0.6) / 0.4
             rad = int(b.radius + 22 * bt)
@@ -1276,6 +1611,15 @@ class App:
                 pygame.draw.circle(ring, (*color, alpha), (d // 2, d // 2),
                                    rad, 3)
                 self.screen.blit(ring, (b.x - d // 2, b.y - d // 2))
+            spark_r = max(1, int(3 * (1 - bt)))
+            dist = b.radius + 6 + 30 * bt
+            for i in range(BURST_PARTICLES):
+                ang = i * 2 * math.pi / BURST_PARTICLES
+                sx = int(b.x + math.cos(ang) * dist)
+                sy = int(b.y + math.sin(ang) * dist)
+                pygame.draw.circle(self.screen,
+                                   mix_color(color, (255, 255, 255), 0.4),
+                                   (sx, sy), spark_r)
 
 
 # ---------------------------------------------------------------------------
@@ -1305,6 +1649,8 @@ def main():
                              "end of the recorded video (default 1.0).")
     args = parser.parse_args()
 
+    if args.fps <= 0 or args.speed <= 0:
+        sys.exit("--fps and --speed must be positive.")
     if not args.workflows_dir.exists():
         sys.exit(f"workflows dir not found: {args.workflows_dir}")
     workflows = load_all(args.workflows_dir, args.memory_dir)
@@ -1330,6 +1676,16 @@ def main():
 # or invoked with --smoke. Verifies the loaders parse real data.
 # ---------------------------------------------------------------------------
 def _smoke():
+    # Pure-helper checks (no display needed).
+    assert edge_curve_point(0, 0, 10, 10, 0.0) == (0.0, 0.0)
+    assert edge_curve_point(0, 0, 10, 10, 1.0) == (10.0, 10.0)
+    assert len(edge_curve(0, 0, 10, 10, segments=18)) == 19
+    assert mix_color((0, 0, 0), (255, 255, 255), 0.5) == (127, 127, 127)
+    full, cursor = typewriter_slice(["hello", "world"], 1.0)
+    assert full == ["hello", "world"] and cursor is None
+    part, cursor = typewriter_slice(["hello", "world"], 0.5)
+    assert len(part) <= 2 and cursor is not None
+
     here = Path(__file__).resolve().parent
     candidates = [here]
     parent = here
