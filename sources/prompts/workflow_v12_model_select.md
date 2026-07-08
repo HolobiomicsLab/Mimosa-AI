@@ -41,14 +41,7 @@ workflow.add_conditional_edges(
     {"next_node": "executor", "another_round": "proposer", "fallback_node": END, END: END}
 )
 ```
-## Model choice Constraint
-
-Model choice is constrained to the following list:
-
-- openrouter/deepseek/deepseek-v4-pro
-- openrouter/qwen/qwen3.7-plus
-- openrouter/xiaomi/mimo-v2.5
-- openrouter/z-ai/glm-5.2
+## Model choice
 
 You must use different models for different roles.
 
@@ -57,6 +50,8 @@ Thinker -> openrouter/z-ai/glm-5.2
 Coder -> openrouter/qwen/qwen3.7-plus
 Verifier -> openrouter/deepseek/deepseek-v4-pro
 Diagnostician -> openrouter/xiaomi/mimo-v2.5
+
+The list of allowed model will be specified.
 
 ## Prompt Constraint
 

@@ -46,6 +46,7 @@ class SingleAgentFactory(Factory):
         Raises:
             RuntimeError: If MCP tools or the system prompt cannot be loaded.
         """
+        INSTRUCTIONS = goal
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"single_agent_{timestamp}_{short_uuid}"
@@ -68,19 +69,6 @@ class SingleAgentFactory(Factory):
         # Create folder structure for cost tracking (like multi-agent mode)
         workflow_path, memory_path = self.create_folder_structure(uuid_str)
 
-        INSTRUCTIONS = ". ".join([
-            "TASK:",
-            goal,
-            "",
-            "CONSTRAINTS:",
-            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
-            "- Save outputs instead of plotting.",
-            "- Only use execute_command to install packages.",
-            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
-            "",
-            "INITIAL STEP:",
-            "- Assess the workspace by running: ls -la"
-        ])
         # Resolve absolute paths (like craft_workflow does)
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
@@ -92,6 +80,7 @@ class SingleAgentFactory(Factory):
         ))
         mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
 
+        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
         code = f"""
 import os
 import json
@@ -105,8 +94,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = {goal!r}
+MODEL_ID = {default_model!r}
 SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
 INSTRUCTIONS = {INSTRUCTIONS!r}
 MEMORY_PATH = {memory_path_abs!r}
@@ -295,7 +283,7 @@ save_agent_memories(agent, MEMORY_PATH, "single_agent")
 # Save state_result.json for cost tracking and evaluation
 state_result = {{
     "model_id": MODEL_ID,
-    "goal": GOAL,
+    "goal": INSTRUCTIONS,
     "workflow_uuid": "{uuid_str}",
     "single_agent_mode": True,
     "step_name": ["single_agent"],
