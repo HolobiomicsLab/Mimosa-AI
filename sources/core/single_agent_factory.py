@@ -50,9 +50,12 @@ class SingleAgentFactory(Factory):
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"single_agent_{timestamp}_{short_uuid}"
-        model_id = self.config.smolagent_model_id
+        # `smolagent_model_id` may be a list of candidate models; a single agent
+        # runs one model, so resolve to the primary (first) for the engine,
+        # provider lookup and cost tracking below.
+        model_id = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
         max_tokens = getattr(self.config, 'max_tokens', 8192)
-        provider, _ = extract_model_pattern(self.config.smolagent_model_id)
+        provider, _ = extract_model_pattern(model_id)
         token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
 
         try:
@@ -80,7 +83,6 @@ class SingleAgentFactory(Factory):
         ))
         mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
 
-        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
         code = f"""
 import os
 import json
@@ -94,7 +96,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_ID = {default_model!r}
+MODEL_ID = {model_id!r}
 SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
 INSTRUCTIONS = {INSTRUCTIONS!r}
 MEMORY_PATH = {memory_path_abs!r}
@@ -105,7 +107,7 @@ max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
 engine_name = {self.config.engine_name!r}
-openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+openrouter_provider = {self.config.openrouter_provider_for(model_id)!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}
 TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
 

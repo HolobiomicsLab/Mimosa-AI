@@ -319,11 +319,15 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path = str((script_dir / memory_path).resolve())
         workflow_path = str((script_dir / workflow_path).resolve())
+        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        # `WorkflowState.model_id` is a single string and is persisted to
+        # `state_result.json`, where cost accounting reads it back; store the
+        # resolved default rather than the raw (possibly list) config value.
         initial_state = {
             key: (
                 uuid_str
                 if key == "workflow_uuid"
-                else self.config.smolagent_model_id
+                else default_model
                 if key == "model_id"
                 else goal
                 if key == "goal"
@@ -331,8 +335,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             )
             for key in state_schema.WorkflowState.__annotations__
         }
-        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
-        providers = self.config.openrouter_provider_for(self.config.smolagent_model_id) if self.config.orchestrator_choose_model == False else None
+        providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
         return f"""
 import os
 import sys

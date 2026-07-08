@@ -418,7 +418,7 @@ if __name__ == "__main__":
     all_results: dict[str, list[dict]] = {}
     seen: set[str] = set()
     candidates = {
-        "smolagent": cfg.smolagent_model_id,
+        "smolagent": cfg.smolagent_model_id[0] if isinstance(cfg.smolagent_model_id, list) else cfg.smolagent_model_id,
         "judge": getattr(cfg, "judge_model", None),
         "capsule_namer": getattr(cfg, "capsule_namer_model", None),
     }

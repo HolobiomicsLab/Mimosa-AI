@@ -198,6 +198,10 @@ class Config:
         this — passing the shared `openrouter_provider` directly can leave
         the runtime with no routable provider for that specific model.
         """
+        # `smolagent_model_id` may be a list of candidate models; per-model
+        # routing is keyed by a single id, so resolve to the primary (first).
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else None
         if model_id and model_id in self.openrouter_provider_by_model:
             return self.openrouter_provider_by_model[model_id]
         return self.openrouter_provider
@@ -210,6 +214,10 @@ class Config:
         google-ai-studio, etc.). Without precheck data, returns the default
         safety filter which blocks unsafe (int4/fp4) routing.
         """
+        # `smolagent_model_id` may be a list of candidate models; per-model
+        # routing is keyed by a single id, so resolve to the primary (first).
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else None
         if model_id and model_id in self.openrouter_quantizations_by_model:
             return self.openrouter_quantizations_by_model[model_id]
         return self.default_openrouter_quantizations

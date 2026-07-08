@@ -4,9 +4,11 @@ Test script for pricing functionality
 Tests the OpenRouterPricingClient and Config integration
 """
 
+import json
 import os
 import sys
 import tempfile
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 # Add the project root to the Python path
@@ -167,6 +169,62 @@ def test_pricing_data_format():
     print("✅ Pricing data format is compatible with judge.py")
 
 
+def test_calculate_cost_handles_scalar_and_list_model_id():
+    """`calculate_cost` must price a run whether `state_result.json`'s
+    ``model_id`` is a single string or a list of candidate models.
+
+    A list `smolagent_model_id` gets persisted into ``model_id`` and reached the
+    pricing lookup, which does ``model_id in self.model_pricing`` — raising
+    ``unhashable type: 'list'``. Cost is attributed to one model, so a list must
+    be priced against its first element (the default every agent falls back to).
+    Uses ``MockDataGenerator`` for a realistic ``state_result`` payload.
+    """
+    print("\n🧪 Testing calculate_cost with mock scalar/list model_id...")
+
+    from sources.utils.mock_data import MockDataGenerator
+    from sources.utils.pricing import PricingCalculator
+
+    gen = MockDataGenerator(seed=42)
+    model_pricing = {
+        "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},
+        "openrouter/z-ai/glm-5.2": {"input": 0.20, "output": 0.80},
+    }
+    # priced against deepseek/deepseek-chat, the scalar / first-of-list model
+    expected = (1000 * 0.27 + 500 * 1.10) / 1_000_000
+
+    def _cost_for(model_id_value):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory_dir = os.path.join(tmp, "memory")
+            workflow_dir = os.path.join(tmp, "workflow")
+            run_uuid = "run_mock"
+            os.makedirs(os.path.join(memory_dir, run_uuid))
+            os.makedirs(os.path.join(workflow_dir, run_uuid))
+
+            state = gen.generate_state_result(workflow_uuid=run_uuid)
+            state["model_id"] = model_id_value  # the shape under test
+            with open(os.path.join(workflow_dir, run_uuid, "state_result.json"), "w") as fh:
+                json.dump(state, fh)
+
+            # one agent task memory file — the token usage calculate_cost sums
+            steps = [{"token_usage": {"input_tokens": 1000, "output_tokens": 500, "total_tokens": 1500}}]
+            with open(os.path.join(memory_dir, run_uuid, "task_solver.json"), "w") as fh:
+                json.dump(steps, fh)
+
+            config = SimpleNamespace(
+                memory_dir=memory_dir, workflow_dir=workflow_dir, model_pricing=model_pricing
+            )
+            return PricingCalculator(config).calculate_cost(run_uuid)
+
+    scalar_cost = _cost_for("deepseek/deepseek-chat")
+    assert abs(scalar_cost - expected) < 1e-9, f"scalar model_id: got {scalar_cost}, expected {expected}"
+    print("✅ scalar model_id priced correctly")
+
+    # The reported regression: a list must not raise and prices against the first.
+    list_cost = _cost_for(["deepseek/deepseek-chat", "openrouter/z-ai/glm-5.2"])
+    assert abs(list_cost - expected) < 1e-9, f"list model_id: got {list_cost}, expected {expected}"
+    print("✅ list model_id priced against first element (no unhashable crash)")
+
+
 def run_all_tests():
     """Run all pricing tests."""
     print("Starting pricing functionality tests...\n")
@@ -176,6 +234,7 @@ def run_all_tests():
         test_config_pricing_integration()
         test_pricing_fallback_behavior()
         test_pricing_data_format()
+        test_calculate_cost_handles_scalar_and_list_model_id()
 
         print("\n🎉 All pricing tests passed successfully!")
         return True

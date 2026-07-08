@@ -672,7 +672,10 @@ class EvaluationCLI:
         """
         eval_dir = Path("run_notes") / "evaluations"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_tag = spec.config.smolagent_model_id.replace("/", "_")
+        model_id = spec.config.smolagent_model_id
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else ""
+        model_tag = model_id.replace("/", "_")
         filename = f"{ts}_run{spec.run_id}_{model_tag}_{spec.eval_mode}.json"
         notes_path = eval_dir / filename
 

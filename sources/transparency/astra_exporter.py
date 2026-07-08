@@ -131,6 +131,10 @@ class AstraExporter:
         """
         from sources.core.llm_provider import LLMConfig, extract_model_pattern
         judge = getattr(self.config, "smolagent_model_id", None) or "openrouter/deepseek/deepseek-v4-flash"
+        # `smolagent_model_id` may be a list of candidate models; the judge is a
+        # single model, so resolve to the primary (first).
+        if isinstance(judge, list):
+            judge = judge[0] if judge else "openrouter/deepseek/deepseek-v4-flash"
         provider, model = extract_model_pattern(judge)
         return LLMConfig(
             model=model,

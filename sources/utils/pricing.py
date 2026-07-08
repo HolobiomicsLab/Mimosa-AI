@@ -268,6 +268,12 @@ class PricingCalculator:
             with open(workflow_path / "state_result.json") as f:
                 state_results = json.load(f)
                 model_id = state_results.get("model_id", None)
+                # `smolagent_model_id` may be configured as a list of candidate
+                # models (older runs persisted it verbatim). Cost is attributed
+                # to a single model, so price against the first — the default
+                # every agent falls back to.
+                if isinstance(model_id, list):
+                    model_id = model_id[0] if model_id else None
         except FileNotFoundError:
             print(f"⚠️  State result file not found for UUID {uuid} - workflow may have failed during execution.")
             print("📊 Will calculate costs for workflow generation and judge calls only.")
