@@ -193,10 +193,6 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
-        # Hard cap on transient-error retries in __call__. The retry loop is
-        # otherwise unbounded (`while True`), so a persistently overloaded or
-        # rate-limited provider would retry forever, re-sending the full prompt
-        # each time. Both retryable paths raise once this ceiling is reached.
         self.max_retries = 3
         self.logger = logging.getLogger(__name__)
 
