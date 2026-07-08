@@ -98,14 +98,15 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 temperature=0.7,
-                 max_steps=128,
+                 model=None,
+                 temperature=1.0,
+                 max_steps=128
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools
         # variable defined by workflow factory
-        self.model_id = MODEL_ID
+        self.model_id = model or MODEL_ID
         self.memory_folder = MEMORY_PATH
         self.engine_name = ENGINE_NAME
         self.system_prompt = SYSTEM_PROMPT
@@ -147,6 +148,9 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
+                # authorized imports are limited to basic python libraries for action-as-code execution.
+                # More advanced packages such as scientific computing, data analysis, and machine learning libraries are not allowed here.
+                # Advanced package should be installed in the shell MCP of Toolomics. Agent can install packages through the shell MCP if needed.
                 additional_authorized_imports = [
                     'requests', 'json', 'requests.exceptions',
                     # Core Utilities
