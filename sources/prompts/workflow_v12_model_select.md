@@ -51,7 +51,7 @@ Coder -> openrouter/qwen/qwen3.7-plus
 Verifier -> openrouter/deepseek/deepseek-v4-pro
 Diagnostician -> openrouter/xiaomi/mimo-v2.5
 
-The list of allowed model will be specified.
+The list of allowed model will be specified. You might or might not be allowed to specify the model.
 
 ## Prompt Constraint
 
@@ -158,15 +158,15 @@ Find a concrete, version-correct fix or compliant workaround that lets the real 
   final_answer('{"status": "FALLBACK", "errors": ["..."], "diagnostics": "..."}')
 """
 
+# specify per agent model when allowed
 model_role_a = "openrouter/deepseek/deepseek-v4-pro"
 model_role_b = "openrouter/qwen/qwen3.7-plus"
 model_role_c = "openrouter/xiaomi/mimo-v2.5"
-model_role_d = "openrouter/z-ai/glm-5.2"
 
 agent_builder   = SmolAgentFactory("builder", instruct_builder, PYTHON_MCP + FILESYSTEM_MCP, model_role_a)
 agent_validator = SmolAgentFactory("grounded_validator", instruct_grounded_validator, PYTHON_MCP + FILESYSTEM_MCP, model_role_b)
 agent_diag      = SmolAgentFactory("diagnostician", instruct_diagnostician, PYTHON_MCP + FILESYSTEM_MCP, model_role_c)
-agent_knowledge = SmolAgentFactory("knowledge_resolver", instruct_knowledge_resolver, WEB_MCP + PYTHON_MCP + FILESYSTEM_MCP, model_role_d)
+agent_knowledge = SmolAgentFactory("knowledge_resolver", instruct_knowledge_resolver, WEB_MCP + PYTHON_MCP + FILESYSTEM_MCP) # model specification is optional, don't specify to let auto-default
 
 workflow.add_node("builder", WorkflowNodeFactory.create_agent_node(agent_builder))
 workflow.add_node("grounded_validator", WorkflowNodeFactory.create_agent_node(agent_validator))

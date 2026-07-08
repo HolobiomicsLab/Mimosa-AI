@@ -127,7 +127,6 @@ class WorkflowFactory(Factory):
             The raw LLM completion (typically containing one or more
             ```` ```python ``` ```` blocks).
         """
-
         prompt = f"""
 # INSTRUCTIONS:
 
