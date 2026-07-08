@@ -118,10 +118,6 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
-        # Let the Orchestrator factory choose the model for each agent
-        self.orchestrator_choose_model = False
-        # Ground workflow generation with perspicacité
-        self.literrature_grounding = False 
         # Request token logprobs and save them with memory (for ablations).
         # Only the litellm engine forwards the request, and only when the
         # provider accepts the params (litellm raises UnsupportedParamsError

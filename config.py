@@ -61,15 +61,15 @@ class Config:
         ##############
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.2"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.2"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
+        self.smolagent_model_id: str = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/z-ai/glm-5.2", "openrouter/qwen/qwen3.7-plus", "openrouter/xiaomi/mimo-v2.5"]
         self.judge_model = "openrouter/z-ai/glm-5.2"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
 
         #############
         # Orchestrator Workflow generation options
         #############
-        # Let orchestrator choose model
-        self.orchestrator_choose_model = False
+        # Let orchestrator choose model, otherwise default to self.smolagent_model_id[0]
+        self.orchestrator_choose_model = True
         # Ground workflow generation with perspicacité
         self.literrature_grounding = False 
 

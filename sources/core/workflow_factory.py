@@ -332,6 +332,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             for key in state_schema.WorkflowState.__annotations__
         }
         default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        providers = self.config.openrouter_provider_for(self.config.smolagent_model_id) if self.config.orchestrator_choose_model == False else None
         return f"""
 import os
 import sys
@@ -350,7 +351,7 @@ MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {default_model!r}
 ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+OPENROUTER_PROVIDER = {providers!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}

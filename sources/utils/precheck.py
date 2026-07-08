@@ -274,10 +274,7 @@ class PreCheck:
 
         # Final sort: pass-strict first, then drift, then fail.
         # Within each tier: the model's own creator before community
-        # resellers, then higher quant rank, then lower latency.  Only the
-        # actual model creator (e.g. deepseek for deepseek/*) gets the
-        # first-party boost — community resellers with quant=unknown are
-        # demoted below fp8 providers.
+        # resellers, then higher quant rank, then lower latency.
         results.sort(
             key=lambda r: (
                 r["tier"] if r["tier"] != 0 else 99,
@@ -346,13 +343,6 @@ class PreCheck:
 
             if new_list:
                 self.config.openrouter_provider_by_model[model_id] = new_list
-                # Runtime `quantizations` is an exclusion filter — a provider
-                # whose quant isn't in the list gets dropped even when pinned
-                # by `order`. So the filter must include every quant the
-                # precheck actually approved, plus the default-safe set as a
-                # baseline. If any approved provider was untagged ("unknown",
-                # typical for first-party endpoints that don't advertise a
-                # tag), omit the filter entirely.
                 if "unknown" in selected_quants:
                     self.config.openrouter_quantizations_by_model[model_id] = None
                 else:
@@ -374,12 +364,12 @@ class PreCheck:
                 "config, pick a different model, or relax probe strictness."
             )
 
-    def run(self) -> None:
+    def run(self, check_provider=True) -> None:
         print("🚦 Checking LLM providers...")
         required = {
             "planner": self.config.planner_llm_model,
             "workflow": self.config.workflow_llm_model,
-            "smolagent": self.config.smolagent_model_id,
+            "smolagent": self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id,
             "judge": self.config.judge_model,
             "capsule_namer": self.config.capsule_namer_model,
         }
@@ -389,6 +379,9 @@ class PreCheck:
                 raise ValueError(f"⚠️  No model configured for '{name}'.")
             if not self._basic_check(name, model_id):
                 raise RuntimeError(f"Required model '{name}' failed basic check.")
+        
+        if not check_provider:
+            return
 
         providers_ids = {**required}
 

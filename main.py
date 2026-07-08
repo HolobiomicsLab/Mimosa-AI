@@ -348,13 +348,13 @@ async def main():
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await papers_mode(args, config)
         elif (args.science_agent_bench):
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
