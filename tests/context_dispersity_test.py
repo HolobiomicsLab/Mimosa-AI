@@ -44,7 +44,8 @@ def test_dispersity_grows_when_one_agent_hoards_context():
 
 def test_total_concentration_reaches_one():
     """One agent holding everything is the maximum of the measure."""
-    assert _context_dispersity([1000, 0 + 1, 1, 1]) == pytest.approx(1.0, abs=0.01)
+    assert _context_dispersity([1000, 0, 0, 0]) == pytest.approx(1.0)
+    assert _context_dispersity([1000, 1, 1, 1]) == pytest.approx(1.0, abs=0.01)
 
 
 def test_dispersity_keeps_a_gradient_in_the_severe_regime():
