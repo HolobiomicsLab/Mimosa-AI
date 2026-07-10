@@ -622,12 +622,11 @@ Original request:
                 missing_inputs.append(required_input)
         return len(missing_inputs) == 0, missing_inputs
 
-    def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
+    def _verify_expected_outputs(self, step: PlanStep | Task) -> tuple[bool, list[str]]:
         """
         Verify that expected outputs files were produced.
         Args:
-            step: The plan step
-            produced_outputs: List of actually produced outputs
+            step: The plan step, or a completed task, declaring expected_outputs
         Returns:
             Tuple[bool, List[str]]: (all_produced, missing_outputs)
         """
@@ -665,9 +664,8 @@ Original request:
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
                 missing_deps.append(dep_name)
                 continue
-            expected_outputs = getattr(dep_task, "expected_outputs", None)
-            if expected_outputs:
-                outputs_ok, missing_outputs = self._verify_expected_outputs(expected_outputs)
+            if getattr(dep_task, "expected_outputs", None):
+                outputs_ok, missing_outputs = self._verify_expected_outputs(dep_task)
                 if not outputs_ok:
                     missing_deps.append(
                         f"{dep_name}[missing_outputs:{','.join(missing_outputs)}]"
