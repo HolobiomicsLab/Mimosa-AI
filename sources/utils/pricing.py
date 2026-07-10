@@ -282,7 +282,7 @@ class PricingCalculator:
         if model_id:
             try:
                 for file in os.listdir(memory_path):
-                    if (file.startswith("task_") or file.startswith("single_agent")) and file.endswith(".json"):
+                    if file.startswith("task_") and file.endswith(".json"):
                         with open(memory_path / file) as f:
                             steps = json.load(f)
                             token_usage = {
