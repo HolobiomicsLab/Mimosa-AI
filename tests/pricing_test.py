@@ -225,6 +225,44 @@ def test_calculate_cost_handles_scalar_and_list_model_id():
     print("✅ list model_id priced against first element (no unhashable crash)")
 
 
+def test_single_agent_memory_is_priced():
+    """A single-agent run's memory must be summed into the run's cost.
+
+    ``single_agent_factory`` saves its memory as ``task_single_agent.json``
+    (``save_agent_memories(agent, MEMORY_PATH, "single_agent")``), so the
+    ``task_`` prefix matches it. The run folder is named ``single_agent_*``,
+    which is a directory rather than a memory file.
+    """
+    print("\n🧪 Testing single-agent memory is priced...")
+
+    from sources.utils.pricing import PricingCalculator
+
+    model_pricing = {"deepseek/deepseek-chat": {"input": 0.27, "output": 1.10}}
+    expected = (1000 * 0.27 + 500 * 1.10) / 1_000_000
+
+    with tempfile.TemporaryDirectory() as tmp:
+        memory_dir = os.path.join(tmp, "memory")
+        workflow_dir = os.path.join(tmp, "workflow")
+        run_uuid = "single_agent_20260101_abc123"
+        os.makedirs(os.path.join(memory_dir, run_uuid))
+        os.makedirs(os.path.join(workflow_dir, run_uuid))
+
+        with open(os.path.join(workflow_dir, run_uuid, "state_result.json"), "w") as fh:
+            json.dump({"model_id": "deepseek/deepseek-chat"}, fh)
+
+        steps = [{"token_usage": {"input_tokens": 1000, "output_tokens": 500, "total_tokens": 1500}}]
+        with open(os.path.join(memory_dir, run_uuid, "task_single_agent.json"), "w") as fh:
+            json.dump(steps, fh)
+
+        config = SimpleNamespace(
+            memory_dir=memory_dir, workflow_dir=workflow_dir, model_pricing=model_pricing
+        )
+        cost = PricingCalculator(config).calculate_cost(run_uuid)
+
+    assert abs(cost - expected) < 1e-9, f"single-agent memory: got {cost}, expected {expected}"
+    print("✅ task_single_agent.json still priced")
+
+
 def run_all_tests():
     """Run all pricing tests."""
     print("Starting pricing functionality tests...\n")
@@ -235,6 +273,7 @@ def run_all_tests():
         test_pricing_fallback_behavior()
         test_pricing_data_format()
         test_calculate_cost_handles_scalar_and_list_model_id()
+        test_single_agent_memory_is_priced()
 
         print("\n🎉 All pricing tests passed successfully!")
         return True
