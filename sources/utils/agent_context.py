@@ -9,7 +9,9 @@ the context the agent was carrying when it finished.
 import json
 from pathlib import Path
 
-_AGENT_FILE_PREFIXES = ("task_", "single_agent")
+# Both factories save agent memory as ``task_{agent_name}.json``; the
+# single-agent run saves itself as ``task_single_agent.json``.
+_AGENT_FILE_PREFIX = "task_"
 
 
 def _final_input_tokens(steps: list) -> int:
@@ -54,7 +56,7 @@ def read_agent_context_lengths(memory_dir: str, workflow_uuid: str) -> list[int]
 
     lengths = []
     for path in sorted(run_memory.glob("*.json")):
-        if not path.name.startswith(_AGENT_FILE_PREFIXES):
+        if not path.name.startswith(_AGENT_FILE_PREFIX):
             continue
         try:
             steps = json.loads(path.read_text())

@@ -203,6 +203,17 @@ def test_reader_skips_unreadable_and_untokened_agents():
         assert read_agent_context_lengths(root, "uuid-1") == [10]
 
 
+def test_reader_includes_the_single_agent_memory_file():
+    """A single-agent run saves its memory as task_single_agent.json."""
+    with tempfile.TemporaryDirectory() as root:
+        uuid = "single_agent_20260101_abc123"
+        run = Path(root) / uuid
+        run.mkdir()
+        _write_agent(run, "task_single_agent.json", [{"token_usage": {"input_tokens": 77}}])
+
+        assert read_agent_context_lengths(root, uuid) == [77]
+
+
 def test_reader_returns_empty_for_missing_run():
     with tempfile.TemporaryDirectory() as root:
         assert read_agent_context_lengths(root, "absent") == []
