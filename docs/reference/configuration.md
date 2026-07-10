@@ -57,6 +57,7 @@ engine](../concepts/evolution-engine.md), not day-to-day settings.
 | `novelty_previous_n` | `int` | `15` | Window size when `novelty_comparison` is previous-N based. |
 | `length_penalty_baseline_chars` | `int` | `8000` | Genotype size (chars) at which the length penalty starts to grow. |
 | `length_penalty_lambda` | `float` | `0.05` | Length-penalty growth rate. |
+| `context_dispersity_lambda` | `float` | `0.0` | Strength of the context-dispersity penalty subtracted from `qd_score`. `0.0` disables it. See the note below. |
 | `min_improvement_threshold` | `float` | `0.01` | Minimum relative improvement required for admission in greedy mode. |
 | `population_size` | `int` | `20` | Max individuals kept in the QD archive. |
 | `novelty_k_neighbours` | `int` | `15` | `k` for k-nearest-neighbour novelty. |
@@ -67,6 +68,19 @@ engine](../concepts/evolution-engine.md), not day-to-day settings.
 | `n_parents` | `int` | `2` | Number of parents drawn per crossover. |
 | `parent_threshold_similarity` | `float` | `0.8` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
 | `parent_threshold_score` | `float` | `0.01` | Cold-start disk scan / parent draw: minimum score to be considered. |
+
+!!! note "`context_dispersity_lambda` penalises unevenness, not size"
+    The term measures how unevenly the final context is spread across a
+    workflow's agents: it is `0` when every agent ends with the same context
+    and `1` when a single agent holds all of it. It is scale free, so four
+    agents each ending at 900k tokens score `0` and are **not** penalised —
+    only the imbalance is. Setting it above `0` also makes the engine read
+    each agent's memory file once per iteration to recover those lengths.
+
+    A first trial value of `0.05`, matching `length_penalty_lambda`, keeps the
+    term a tie-breaker: the most it can subtract is `0.05`, well below
+    `admit_threshold`, so it cannot by itself gate a workflow out of the
+    archive.
 
 ## OpenRouter routing
 
