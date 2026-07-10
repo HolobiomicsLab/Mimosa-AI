@@ -105,6 +105,72 @@ def test_penalty_is_disabled_unless_the_lambda_is_passed():
     assert SelectionPressure(config={}, strategy="qd").dispersity_lambda == 0.0
 
 
+# ── the wiring: run -> measure -> qd_score ────────────────────────────────
+
+
+def _run(lengths: list[int], uuid: str = "u", descriptor: list[float] | None = None):
+    """A minimal IndividualRun-like stub carrying per-agent context lengths."""
+    return SimpleNamespace(
+        reward=0.9,
+        reward_uncapped=0.9,
+        current_uuid=uuid,
+        iteration_count=1,
+        cost=0.0,
+        code="x" * 100,
+        behaviour_descriptor=descriptor or [1.0, 0.0],
+        agent_context_lengths=lengths,
+    )
+
+
+def test_validation_reads_the_runs_context_lengths():
+    """The selector must derive dispersity from the run, not from a constant."""
+    lengths = [10, 10, 10, 900]
+    result = _pressure(0.0)._validate_open_ended([_run(lengths)], [_run(lengths)], 0.05)
+
+    assert result["context_dispersity"] == pytest.approx(_context_dispersity(lengths))
+    assert result["context_dispersity"] > 0.9
+
+
+def test_concentrated_context_lowers_qd_score_end_to_end():
+    """A run hoarding context on one agent ranks below an evenly spread one."""
+    balanced = _pressure(0.2)._validate_open_ended(
+        [_run([500] * 4)], [_run([500] * 4)], 0.05
+    )
+    concentrated = _pressure(0.2)._validate_open_ended(
+        [_run([1, 1, 1, 900])], [_run([1, 1, 1, 900])], 0.05
+    )
+
+    assert concentrated["qd_score"] < balanced["qd_score"]
+    assert balanced["context_dispersity"] == 0.0
+
+
+def test_a_run_without_context_lengths_is_not_penalised():
+    """Runs predating the feature (no lengths recorded) keep their score."""
+    run = _run([])
+    result = _pressure(0.2)._validate_open_ended([run], [run], 0.05)
+    assert result["context_dispersity"] == 0.0
+
+
+def test_admitted_member_keeps_its_dispersity_through_archive_recompute():
+    """The archive must not silently rescore a member as if it were balanced."""
+    pressure = _pressure(0.2)
+    pressure._validate_open_ended(
+        [_run([1, 1, 1, 900], uuid="a")], [_run([1, 1, 1, 900], uuid="a")], 0.05
+    )
+    pressure._validate_open_ended(
+        [_run([500] * 4, uuid="b", descriptor=[0.0, 1.0])],
+        [_run([500] * 4, uuid="b", descriptor=[0.0, 1.0])],
+        0.05,
+    )
+
+    pressure._refresh_member_metrics()
+    members = {m.uuid: m for m in pressure._archive}
+
+    assert members["a"].context_dispersity > 0.9
+    assert members["b"].context_dispersity == 0.0
+    assert members["a"].qd_score < members["b"].qd_score
+
+
 # ── reading lengths from agent memory ─────────────────────────────────────
 
 
