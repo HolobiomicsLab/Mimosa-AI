@@ -27,6 +27,7 @@ from sources.cli.pretty_print import (
 )
 from sources.evaluators.evaluator import WorkflowEvaluator
 from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
+from sources.utils.agent_context import read_agent_context_lengths
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.run_metrics import append_jsonl, write_run_metrics
@@ -103,6 +104,7 @@ class EvolutionEngine:
             previous_n=getattr(config, "novelty_previous_n", 5),
             length_penalty_baseline_chars=getattr(config, "length_penalty_baseline_chars", 5000),
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
+            context_dispersity_lambda=getattr(config, "context_dispersity_lambda", 0.0),
         )
         self.initial_population = getattr(config, "initial_population", 2) # number of initial random workflows before enabling mutation
 
@@ -532,6 +534,7 @@ class EvolutionEngine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers if wf_info else []
         runs[-1].state_result = wf_info.state_result if wf_info else {}
+        runs[-1].agent_context_lengths = read_agent_context_lengths(self.config.memory_dir, uuid)
         agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
 

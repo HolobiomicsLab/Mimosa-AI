@@ -51,7 +51,10 @@ class PopulationMember:
         genotype_chars: Raw character length of the workflow source —
             used for the length-penalty term in ``qd_score``.
         novelty_score: Mean cosine distance to the current comparison set.
-        qd_score: Combined quality-diversity score with length penalty.
+        qd_score: Combined quality-diversity score, net of the length and
+            context-dispersity penalties.
+        context_dispersity: How unevenly context was spread across the
+            workflow's agents, in ``[0, 1]``.
         reward_uncapped: Base reward with no hard-fail cap.
         created_at: Wall-clock timestamp of construction.
     """
@@ -64,6 +67,7 @@ class PopulationMember:
     novelty_score: float = 0.0
     qd_score: float = 0.0
     reward_uncapped: float = 0.0
+    context_dispersity: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -95,6 +99,7 @@ class SelectionPressure:
         previous_n: int = 5,
         length_penalty_baseline_chars: int = 5000,
         length_penalty_lambda: float = 0.05,
+        context_dispersity_lambda: float = 0.0,
     ) -> None:
         """Configure thresholds and the active selection strategy.
 
@@ -116,6 +121,9 @@ class SelectionPressure:
             length_penalty_lambda: Strength of the length penalty term
                 subtracted from ``qd_score``. Kept conservative so it only
                 breaks near-ties.
+            context_dispersity_lambda: Strength of the context-dispersity term
+                subtracted from ``qd_score``, pressuring workflows to spread
+                context across agents. ``0.0`` disables it.
         """
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -137,6 +145,9 @@ class SelectionPressure:
         self.previous_n = max(1, int(previous_n))
         self.length_baseline_chars = max(1, int(length_penalty_baseline_chars))
         self.length_lambda = float(length_penalty_lambda)
+        # Pressure towards workflows that spread context across agents rather
+        # than piling it onto one. Zero by default: opt in per run.
+        self.dispersity_lambda = float(context_dispersity_lambda)
 
         self._archive: list[PopulationMember] = []
         self._previous_descriptors: list[list[float]] = []
@@ -399,7 +410,8 @@ class SelectionPressure:
         Returns:
             Validation result dict from :meth:`_build_result`, extended with
             ``novelty_score``, ``qd_score``, ``length_penalty``,
-            ``archive_size``, ``admit_rejected`` and ``admit_rejected_total``.
+            ``context_dispersity``, ``archive_size``, ``admit_rejected`` and
+            ``admit_rejected_total``.
         """
         self._last_evicted_uuid = None
 
@@ -416,8 +428,10 @@ class SelectionPressure:
         quality_norm = min(max(new_reward_uncapped, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
+        context_dispersity = _context_dispersity(_agent_context_lengths(best_new))
         qd_score = self._compose_qd_score(
             new_reward_uncapped, novelty, genotype_chars, novelty_range,
+            context_dispersity,
         )
 
         absolute_improvement = new_reward - baseline_reward
@@ -434,6 +448,7 @@ class SelectionPressure:
             novelty_score=novelty,
             qd_score=qd_score,
             reward_uncapped=new_reward_uncapped,
+            context_dispersity=context_dispersity,
         )
         admit_rejected = not self._try_admit(member, is_valid)
         self._record_previous(descriptor)
@@ -449,6 +464,7 @@ class SelectionPressure:
         result["quality_norm"] = quality_norm
         result["novelty_norm"] = novelty_norm
         result["length_penalty"] = length_penalty
+        result["context_dispersity"] = context_dispersity
         result["behaviour_descriptor"] = descriptor or []
         result["archive_size"] = len(self._archive)
         result["admit_rejected"] = admit_rejected
@@ -459,7 +475,7 @@ class SelectionPressure:
         if self.strategy in (SelectionStrategy.NOVELTY, SelectionStrategy.QUALITY_DIVERSITY):
             self.logger.info(
                 f"Open-ended: novelty={novelty:.3f}, qd={qd_score:.3f}, "
-                f"len_pen={length_penalty:.3f}, "
+                f"len_pen={length_penalty:.3f}, ctx_disp={context_dispersity:.3f}, "
                 f"archive={len(self._archive)}/{self.population_size}"
             )
         return result
@@ -604,6 +620,7 @@ class SelectionPressure:
         for m in self._archive:
             m.qd_score = self._compose_qd_score(
                 m.reward_uncapped, m.novelty_score, m.genotype_chars, novelty_range,
+                m.context_dispersity,
             )
 
     def _knn_novelty_against_peers(self, m: PopulationMember) -> float:
@@ -622,8 +639,9 @@ class SelectionPressure:
         novelty: float,
         genotype_chars: int,
         novelty_range: float,
+        context_dispersity: float,
     ) -> float:
-        """``(1-w)·quality + w·novelty − λ·length_penalty`` in one place."""
+        """``(1-w)·quality + w·novelty − λ_len·length_pen − λ_disp·dispersity``."""
         quality_norm = min(max(reward_uncapped, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
@@ -631,6 +649,7 @@ class SelectionPressure:
             (1 - self.novelty_weight) * quality_norm
             + self.novelty_weight * novelty_norm
             - self.length_lambda * length_penalty
+            - self.dispersity_lambda * context_dispersity
         )
 
     # ------------------------------------------------------------------
@@ -792,6 +811,43 @@ def _genotype_chars(run: Any) -> int:
     """Character length of the run's workflow source code, ``0`` when missing."""
     code = _safe_attr(run, "code", None)
     return len(code) if isinstance(code, str) else 0
+
+
+def _agent_context_lengths(run: Any) -> list[int]:
+    """Per-agent final context lengths recorded for the run, ``[]`` when missing."""
+    lengths = _safe_attr(run, "agent_context_lengths", None)
+    if not isinstance(lengths, list):
+        return []
+    return [n for n in lengths if isinstance(n, int) and n > 0]
+
+
+def _context_dispersity(lengths: list[int]) -> float:
+    """How unevenly context is spread across agents, in ``[0, 1]``.
+
+    The coefficient of variation is divided by ``sqrt(n - 1)``, its maximum
+    for ``n`` agents (reached when one agent holds all the context). The
+    result therefore reaches ``1`` only at total concentration and keeps a
+    monotone gradient up to it, rather than saturating early.
+
+    Evenly shared context scores ``0`` at any scale: this term measures
+    concentration, not absolute size. Fewer than two agents carries no
+    dispersion information and scores ``0``.
+
+    Args:
+        lengths: Final context length of each agent, in tokens.
+
+    Returns:
+        ``clip((stdev / mean) / sqrt(n - 1), 0, 1)``, or ``0.0`` when undefined.
+    """
+    n = len(lengths)
+    if n < 2:
+        return 0.0
+    mean = sum(lengths) / n
+    if mean <= 0:
+        return 0.0
+    variance = sum((length - mean) ** 2 for length in lengths) / n
+    coefficient_of_variation = math.sqrt(variance) / mean
+    return max(0.0, min(1.0, coefficient_of_variation / math.sqrt(n - 1)))
 
 
 if __name__ == "__main__":

@@ -94,6 +94,10 @@ class Config:
         # Length penalty: genotype size at which the penalty starts to grow
         self.length_penalty_baseline_chars: int = 8000
         self.length_penalty_lambda: float = 0.05
+        # Context-dispersity penalty: strength of the term subtracted from
+        # qd_score when a workflow concentrates context on one agent instead
+        # of spreading it. 0.0 disables it, which is the default.
+        self.context_dispersity_lambda: float = 0.0
         # Selection pressure / archive settings
         self.min_improvement_threshold: float = 0.01
         self.population_size: int = 20
@@ -295,6 +299,7 @@ class Config:
             "novelty_previous_n": self.novelty_previous_n,
             "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
             "length_penalty_lambda": self.length_penalty_lambda,
+            "context_dispersity_lambda": self.context_dispersity_lambda,
             "min_improvement_threshold": self.min_improvement_threshold,
             "population_size": self.population_size,
             "novelty_k_neighbours": self.novelty_k_neighbours,
@@ -361,6 +366,9 @@ class Config:
         )
         self.length_penalty_lambda = float(
             data.get("length_penalty_lambda", self.length_penalty_lambda)
+        )
+        self.context_dispersity_lambda = float(
+            data.get("context_dispersity_lambda", self.context_dispersity_lambda)
         )
         self.min_improvement_threshold = float(
             data.get("min_improvement_threshold", self.min_improvement_threshold)

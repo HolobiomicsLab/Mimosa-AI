@@ -70,6 +70,10 @@ class IndividualRun:
     # persisted via sources.core.lineage.record_lineage afterwards.
     parent_uuids: list[str] = field(default_factory=list)
     evolution_kind: str = "seed"  # "seed" | "mutation" | "crossover"
+    # Final context length (input tokens) of each agent in the executed
+    # workflow. Read by SelectionPressure to penalise workflows that pile
+    # context onto a single agent instead of distributing it.
+    agent_context_lengths: list[int] = field(default_factory=list)
 
     def __str__(self) -> str:
         """Return a verbose, debug-style summary of the run."""
