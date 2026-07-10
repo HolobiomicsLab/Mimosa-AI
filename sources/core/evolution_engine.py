@@ -534,7 +534,11 @@ class EvolutionEngine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers if wf_info else []
         runs[-1].state_result = wf_info.state_result if wf_info else {}
-        runs[-1].agent_context_lengths = read_agent_context_lengths(self.config.memory_dir, uuid)
+        # Only read the agent memory when the penalty is active: recovering the
+        # lengths costs a full parse of every agent memory file, and those files
+        # are largest for exactly the high-context runs this term targets.
+        if self.selection.dispersity_lambda > 0:
+            runs[-1].agent_context_lengths = read_agent_context_lengths(self.config.memory_dir, uuid)
         agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
 
