@@ -198,6 +198,18 @@ uv sync && uv run web_app_full.py
 
 ---
 
+## Web 介面(Observatory)
+
+Mimosa 本身僅提供 CLI;**Observatory** 是一個選用的本機 Web 介面(FastAPI + React),用於呈現一次執行所產生的內容——演化系譜樹、重播、工作區,以及一套設定/啟動流程——讓你可以直接觀察與檢視演化過程,而不必翻閱記錄檔。它是一個單人使用、僅限本機(localhost)的工具,不含身分驗證;請勿將其公開於共享或公開網路上。
+
+```bash
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+```
+
+詳細說明、環境變數與完整 API 一覽請見:[`webui/README.md`](./webui/README.md)。
+
+---
+
 ## 執行模式
 
 | 模式 | 使用時機 | 指令 |
