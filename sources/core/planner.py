@@ -667,7 +667,7 @@ Original request:
                 continue
             expected_outputs = getattr(dep_task, "expected_outputs", None)
             if expected_outputs:
-                outputs_ok, missing_outputs = self._verify_expected_outputs(expected_outputs)
+                outputs_ok, missing_outputs = self._verify_expected_outputs(dep_task)
                 if not outputs_ok:
                     missing_deps.append(
                         f"{dep_name}[missing_outputs:{','.join(missing_outputs)}]"

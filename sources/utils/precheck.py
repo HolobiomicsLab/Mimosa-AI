@@ -148,6 +148,7 @@ class PreCheck:
         outputs: list[str] = []
         latencies: list[float] = []
         last_err: str | None = None
+        active_quants = quantizations
         for _ in range(N_REPEAT):
             t0 = time.perf_counter()
             try:
@@ -158,7 +159,15 @@ class PreCheck:
                 )
             except Exception as e:
                 latencies.append(time.perf_counter() - t0)
-                last_err = str(e)[:200]
+                if active_quants and LLMProvider._is_quantization_routing_error(e):
+                    # Stale discovery tag: no live endpoint at the pinned
+                    # quantization (404 "No endpoints found ... quantization").
+                    # Drop the filter and keep probing — content-validity and
+                    # determinism checks still gate the endpoint on its merits.
+                    active_quants = None
+                    params["extra_body"]["provider"].pop("quantizations", None)
+                else:
+                    last_err = str(e)[:200]
 
         validations = [_validate_json_code(o) for o in outputs]
         valid_count = sum(1 for ok, _ in validations)
@@ -169,7 +178,7 @@ class PreCheck:
 
         return {
             "provider": or_provider,
-            "quantizations": quantizations,
+            "quantizations": active_quants,
             "n_calls": len(outputs),
             "valid_count": valid_count,
             "deterministic": deterministic,
@@ -204,6 +213,12 @@ class PreCheck:
             # let probe content validity decide.
             quant_filter = None
         r = self._probe(model_id, or_provider, quant_filter)
+        if quant_filter and not r["quantizations"]:
+            # The probe only passed after dropping the quantization filter —
+            # the live endpoint no longer matches its discovery tag. Record it
+            # as untagged so the runtime omits the filter for this model too,
+            # instead of 404ing once per provider before its own fallback.
+            discovered_quant = "unknown"
         r["discovered_quant"] = discovered_quant
         r["tier"] = self._classify(r)
         return r

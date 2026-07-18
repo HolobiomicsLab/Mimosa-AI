@@ -1175,7 +1175,7 @@ class OnboardCLI:
 
         # Lower temperature → more reliable JSON; bigger token budget so long
         # refined_prompts don't get truncated mid-string.
-        llm = _build_llm(self.config, temperature=0.1, max_tokens=1024)
+        llm = _build_llm(self.config, temperature=1.0, max_tokens=1024)
         expected_keys = {
             "is_clear": "bool",
             "question": "str",
@@ -1287,7 +1287,7 @@ class OnboardCLI:
         ))
 
         classification: dict | None = None
-        llm = _build_llm(self.config, temperature=0.0, max_tokens=384)
+        llm = _build_llm(self.config, temperature=1.0, max_tokens=384)
         expected_keys = {
             "mode": "str",
             "confidence": "number",

@@ -354,6 +354,19 @@ class LLMProvider:
         """True when the API rejected ``temperature``, read from ``error.param``."""
         return getattr(error, "param", None) == "temperature"
 
+    @staticmethod
+    def _is_quantization_routing_error(error: Exception) -> bool:
+        """True when OpenRouter found no live endpoint for the requested quantizations.
+
+        OpenRouter answers 404 ("No endpoints found for the request with
+        quantization: ...") when the ``quantizations`` routing filter excludes
+        every provider currently serving the model — e.g. stale precheck data
+        or an endpoint that was requantized. Dropping the filter lets
+        OpenRouter route to any available endpoint.
+        """
+        error_str = str(error).lower()
+        return "no endpoints found" in error_str and "quantization" in error_str
+
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
 
@@ -501,6 +514,19 @@ class LLMProvider:
                         f"falling back to 1.0 and retrying."
                     )
                     effective_temperature = 1.0
+                    continue
+
+                # OpenRouter 404: the `quantizations` routing filter excluded
+                # every live endpoint for this model. Drop the filter once and
+                # retry — subsequent calls on this provider skip it from the
+                # start (config is mutated), avoiding one doomed request per call.
+                if self._is_quantization_routing_error(e) and self.config.openrouter_quantizations:
+                    self.logger.warning(
+                        f"⚠️  OpenRouter found no endpoint matching "
+                        f"quantizations={self.config.openrouter_quantizations}; "
+                        f"dropping the quantization filter and retrying."
+                    )
+                    self.config.openrouter_quantizations = None
                     continue
 
                 # Check if this is a retryable error

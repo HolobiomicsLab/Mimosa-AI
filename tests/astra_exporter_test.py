@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sources.transparency.decision_extractor import (
     Decision,
+    Option,
     _parse_response,
     extract_decisions,
 )
@@ -194,18 +195,38 @@ def test_extract_decisions_dedupes_by_id(monkeypatch, tmp_path: Path) -> None:
     assert decisions[0].source_step == 0
 
 
-def test_build_analysis_emits_required_astra_fields() -> None:
-    decisions = [
-        Decision(
-            id="fit_method", label="Fit", rationale="r",
-            option_id="ols", option_label="OLS", option_description="d",
-            source_step=2,
+def _decision(decision_id: str, chosen: str, alternatives: tuple[str, ...] = ()) -> Decision:
+    """A decision whose options are the chosen one followed by any alternatives."""
+    option_ids = (chosen, *alternatives)
+    return Decision(
+        id=decision_id,
+        label=decision_id.replace("_", " ").title(),
+        rationale="r",
+        chosen_option_id=chosen,
+        options=tuple(
+            Option(id=option_id, label=option_id.upper(), description="d")
+            for option_id in option_ids
         ),
-    ]
+        source_step=0,
+    )
+
+
+def test_build_analysis_emits_required_astra_fields() -> None:
+    decisions = [_decision("fit_method", "ols")]
     analysis = build_analysis("Predict X.", "abc", ["report.md"], decisions)
     for key in ("version", "name", "inputs", "outputs", "decisions"):
         assert key in analysis, f"missing required ASTRA field: {key}"
     assert analysis["decisions"]["fit_method"]["options"]["ols"]["label"] == "OLS"
+
+
+def test_analysis_records_rejected_alternatives_beside_the_chosen_option() -> None:
+    """The capsule exists to show what was chosen over what, and which one won."""
+    decisions = [_decision("fit_method", "ols", alternatives=("ridge", "lasso"))]
+    analysis = build_analysis("g", "abc", ["r.md"], decisions)
+
+    entry = analysis["decisions"]["fit_method"]
+    assert set(entry["options"]) == {"ols", "ridge", "lasso"}
+    assert entry["default"] == "ols"
 
 
 def test_recipe_command_threads_into_every_output() -> None:
@@ -220,31 +241,29 @@ def test_recipe_command_defaults_to_pointer_when_no_code() -> None:
 
 
 def test_universe_pins_every_decision_to_its_chosen_option() -> None:
-    decisions = [
-        Decision(
-            id="fit_method", label="Fit", rationale="r",
-            option_id="ols", option_label="OLS", option_description="d",
-            source_step=0,
-        ),
-        Decision(
-            id="metric", label="Metric", rationale="r",
-            option_id="r2", option_label="R2", option_description="d",
-            source_step=1,
-        ),
-    ]
+    decisions = [_decision("fit_method", "ols"), _decision("metric", "r2")]
     universe = build_universe(decisions, "abc")
     assert universe["decisions"] == {"fit_method": "ols", "metric": "r2"}
     assert universe["id"] == "best"
 
 
-def test_write_export_writes_both_files(tmp_path: Path) -> None:
-    decisions = [
-        Decision(
-            id="fit_method", label="Fit", rationale="r",
-            option_id="ols", option_label="OLS", option_description="d",
-            source_step=0,
+def test_universe_pins_the_chosen_option_even_when_it_is_not_listed_first() -> None:
+    """The realised option is read from chosen_option_id, never from option order."""
+    decision = Decision(
+        id="fit_method", label="Fit", rationale="r",
+        chosen_option_id="lasso",
+        options=(
+            Option(id="ols", label="OLS", description="d"),
+            Option(id="lasso", label="Lasso", description="d"),
         ),
-    ]
+        source_step=0,
+    )
+    universe = build_universe([decision], "abc")
+    assert universe["decisions"] == {"fit_method": "lasso"}
+
+
+def test_write_export_writes_both_files(tmp_path: Path) -> None:
+    decisions = [_decision("fit_method", "ols")]
     analysis = build_analysis("g", "abc", ["x.csv"], decisions)
     universe = build_universe(decisions, "abc")
     path = write_export(tmp_path, analysis, universe)

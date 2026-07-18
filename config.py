@@ -41,7 +41,7 @@ class Config:
         ##############
         # Workspace Configuration
         ##############
-        self.workspace_dir = "/Users/mlg/Documents/CNRS/toolomics/workspace"
+        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
 
         ##############
         # MCP Related
@@ -51,7 +51,7 @@ class Config:
         ]
 
         ##############
-        # AUdit / Export 
+        # AUdit / Export
         ##############
         # When True, writes an ASTRA spec YAML after task completion.
         self.export_astra: bool = False
@@ -61,7 +61,7 @@ class Config:
         ##############
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.2"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.2"
-        self.smolagent_model_id: str = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/z-ai/glm-5.2", "openrouter/qwen/qwen3.7-plus", "openrouter/xiaomi/mimo-v2.5"]
+        self.smolagent_model_id: str = ["openrouter/deepseek/deepseek-v4-pro", "openrouter/z-ai/glm-5.2", "openrouter/qwen/qwen3.7-plus", "openrouter/xiaomi/mimo-v2.5"]
         self.judge_model = "openrouter/z-ai/glm-5.2"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
 
@@ -71,7 +71,7 @@ class Config:
         # Let orchestrator choose model, otherwise default to self.smolagent_model_id[0]
         self.orchestrator_choose_model = True
         # Ground workflow generation with perspicacité
-        self.literrature_grounding = False 
+        self.literrature_grounding = False
 
         ##############
         # ScienceAgentBench Concurrency settings
@@ -79,7 +79,7 @@ class Config:
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
 
         ##############
-        # QD/Novelty / Learning parameters 
+        # QD/Novelty / Learning parameters
         # Touch with caution, for ablation studies and research only.
         ##############
 

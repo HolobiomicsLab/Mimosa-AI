@@ -139,6 +139,7 @@ class _VerifierClaimExtractionMixin:
                 uuid, f"verifier_extract_claims_{label}", prompt
             )
             if err is not None:
+                print_warn(f"Claim extraction source {label} failed for {uuid}: {err}")
                 self.logger.warning(
                     f"Claim extraction source {label} failed for {uuid}: {err}"
                 )
