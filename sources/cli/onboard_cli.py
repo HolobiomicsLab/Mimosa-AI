@@ -351,8 +351,13 @@ def _extract_known_keys(text: str, expected_keys: dict[str, str]) -> dict | None
             val = _extract_number_field(text, key)
         else:
             val = None
-        if val is not None:
-            out[key] = val
+        if val is None:
+            # Partial extraction usually means the response was truncated
+            # (e.g. max_tokens hit mid-string). Refuse it so the caller's
+            # self-correction retry fires instead of silently accepting a
+            # dict with missing keys.
+            return None
+        out[key] = val
     return out or None
 
 
@@ -1284,8 +1289,9 @@ class OnboardCLI:
         ))
 
         # Lower temperature → more reliable JSON; bigger token budget so long
-        # refined_prompts don't get truncated mid-string.
-        llm = _build_llm(self.config, temperature=1.0, max_tokens=1024)
+        # refined_prompts (and reasoning-model thinking tokens) don't get
+        # truncated mid-string.
+        llm = _build_llm(self.config, temperature=0.2, max_tokens=4096)
         expected_keys = {
             "is_clear": "bool",
             "question": "str",
