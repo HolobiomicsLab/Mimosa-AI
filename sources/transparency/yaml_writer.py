@@ -6,9 +6,14 @@ ASTRA fields used (see https://astra-spec.org/latest/specification/#decisions):
 - ``inputs[*]``, ``outputs[*]``
 - universe file with ``id``, ``description``, ``decisions``
 
-One provenance extension beyond the spec: each decision carries ``model`` —
-the model id that produced the source trace step — when the saved memory
-recorded it (older traces predate the field and simply omit it).
+Two provenance extensions beyond the spec:
+- each decision carries ``model`` — the model id that produced the source
+  trace step — when the saved memory recorded it (older traces predate the
+  field and simply omit it);
+- the analysis carries an ``extraction`` block with the decision-extraction
+  health counters, so a capsule produced from a degraded extraction (crashed
+  LLM calls, malformed responses) is self-describing rather than silently
+  thin.
 
 The recipe field is left intentionally minimal: Mimosa runs Python inside
 smolagents rather than a single shell command, so we point reviewers at the
@@ -29,7 +34,7 @@ if __name__ == "__main__":
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )
 
-from sources.transparency.decision_extractor import Decision, Option
+from sources.transparency.decision_extractor import Decision, ExtractionResult, Option
 
 
 _ASTRA_VERSION = "0.1"
@@ -45,14 +50,17 @@ def build_analysis(
     workspace_files: list[str],
     decisions: list[Decision],
     recipe_command: str = _RECIPE_FALLBACK_COMMAND,
+    extraction: ExtractionResult | None = None,
 ) -> dict[str, Any]:
     """Assemble the dict that will be dumped to ``astra.yaml``.
 
     ``recipe_command`` is the POSIX command ASTRA stores per output. Callers
     pass ``python recipe.py`` once the run's code has been reconstructed; the
     default is a pointer used only when no executable code was recovered.
+    ``extraction`` adds the extraction-health block (see module docstring);
+    the exporter always passes it, ``None`` merely keeps old callers working.
     """
-    return {
+    analysis = {
         "version": _ASTRA_VERSION,
         "name": f"Mimosa best run {best_uuid}",
         "description": (
@@ -63,6 +71,14 @@ def build_analysis(
         "outputs": _build_outputs(workspace_files, decisions, recipe_command),
         "decisions": _build_decisions(decisions),
     }
+    if extraction is not None:
+        analysis["extraction"] = {
+            "steps_considered": extraction.steps_total,
+            "decisions_recorded": len(decisions),
+            "llm_call_failures": extraction.crashed,
+            "malformed_responses": extraction.malformed,
+        }
+    return analysis
 
 
 def build_universe(decisions: list[Decision], best_uuid: str) -> dict[str, Any]:
@@ -167,7 +183,13 @@ if __name__ == "__main__":
             model="openrouter/qwen/qwen3.7-plus",
         ),
     ]
-    analysis = build_analysis("Predict X.", "abc-123", ["model.pkl", "report.md"], decisions)
+    extraction = ExtractionResult(
+        decisions=tuple(decisions), steps_total=5, crashed=1, malformed=2
+    )
+    analysis = build_analysis(
+        "Predict X.", "abc-123", ["model.pkl", "report.md"], decisions,
+        extraction=extraction,
+    )
     universe = build_universe(decisions, "abc-123")
     with tempfile.TemporaryDirectory() as tmp:
         out = write_export(Path(tmp), analysis, universe)
@@ -176,6 +198,12 @@ if __name__ == "__main__":
         assert loaded["decisions"]["fit_method"]["default"] == "ols"
         assert set(loaded["decisions"]["fit_method"]["options"]) == {"ols", "robust"}
         assert loaded["decisions"]["fit_method"]["model"] == "openrouter/qwen/qwen3.7-plus"
+        assert loaded["extraction"] == {
+            "steps_considered": 5,
+            "decisions_recorded": 1,
+            "llm_call_failures": 1,
+            "malformed_responses": 2,
+        }, loaded["extraction"]
         uni = yaml.safe_load((Path(tmp) / "universes" / "best.yaml").read_text())
         assert uni["decisions"]["fit_method"] == "ols"
     print("[OK] yaml_writer smoke check passed")

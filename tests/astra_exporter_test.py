@@ -9,6 +9,7 @@ asserting the schema of the emitted YAML files against the ASTRA spec
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -21,7 +22,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sources.transparency.decision_extractor import (
     Decision,
+    ExtractionResult,
     Option,
+    _MALFORMED,
     _parse_response,
     extract_decisions,
 )
@@ -175,7 +178,13 @@ def test_parse_response_rejects_invalid_id() -> None:
         '{"id": "Fit-Method", "label": "x", "rationale": "x",'
         ' "option_id": "ols", "option_label": "x", "option_description": "x"}'
     )
-    assert _parse_response(raw, 0) is None
+    assert _parse_response(raw, 0) is _MALFORMED
+    # $ would match before a trailing newline; ids must be newline-free.
+    trailing_newline = (
+        '{"id": "fit_method\\n", "label": "x", "rationale": "x",'
+        ' "option_id": "ols", "option_label": "x", "option_description": "x"}'
+    )
+    assert _parse_response(trailing_newline, 0) is _MALFORMED
 
 
 def test_parse_response_strips_markdown_fences() -> None:
@@ -185,7 +194,73 @@ def test_parse_response_strips_markdown_fences() -> None:
         ' "option_id": "ols", "option_label": "OLS", "option_description": "d"}\n'
         "```"
     )
-    assert _parse_response(raw, 1) is not None
+    assert isinstance(_parse_response(raw, 1), Decision)
+
+
+def test_parse_response_distinguishes_null_from_garbage() -> None:
+    # A legitimate "no decision" must never be conflated with unusable output.
+    assert _parse_response("null", 0) is None
+    assert _parse_response("```\nnull\n```", 0) is None
+    assert _parse_response("", 0) is _MALFORMED
+    assert _parse_response("The agent clearly chose OLS here because", 0) is _MALFORMED
+    assert _parse_response('{"id": "fit_method", "label": "Fit', 0) is _MALFORMED
+    # litellm yields None content for empty/reasoning-only completions.
+    assert _parse_response(None, 0) is _MALFORMED
+
+
+def test_parse_response_never_guesses_chosen_among_multiple_options() -> None:
+    # Guessing could record a rejected alternative as the realised decision.
+    body = (
+        '{{"id": "fit_method", "label": "Fit", "rationale": "r",{chosen}'
+        ' "options": [{{"id": "robust", "label": "Robust", "description": "d"}},'
+        ' {{"id": "ols", "label": "OLS", "description": "d"}}]}}'
+    )
+    missing = body.format(chosen="")
+    typoed = body.format(chosen=' "chosen_option_id": "olz",')
+    assert _parse_response(missing, 0) is _MALFORMED
+    assert _parse_response(typoed, 0) is _MALFORMED
+
+
+def test_parse_response_rejects_promotion_when_chosen_option_was_dropped() -> None:
+    # The model DID name its chosen option, but option validation drops it
+    # (missing description / bad id). The surviving rejected alternative must
+    # not slip through the single-option resolution as "unambiguous".
+    missing_description = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "chosen_option_id": "robust",'
+        ' "options": [{"id": "robust", "label": "Robust"},'
+        ' {"id": "ols", "label": "OLS", "description": "d"}]}'
+    )
+    bad_id_pattern = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "chosen_option_id": "Robust",'
+        ' "options": [{"id": "Robust", "label": "Robust", "description": "d"},'
+        ' {"id": "ols", "label": "OLS", "description": "d"}]}'
+    )
+    assert _parse_response(missing_description, 0) is _MALFORMED
+    assert _parse_response(bad_id_pattern, 0) is _MALFORMED
+
+
+def test_parse_response_rejects_duplicate_id_collapse_as_single_option() -> None:
+    # Two different alternatives sharing an id dedupe to one surviving option;
+    # that survivor must not be resolved as "the only option listed".
+    raw = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "options": [{"id": "m", "label": "Method A", "description": "d"},'
+        ' {"id": "m", "label": "Method B", "description": "d"}]}'
+    )
+    assert _parse_response(raw, 0) is _MALFORMED
+
+
+def test_parse_response_resolves_single_option_without_chosen_id() -> None:
+    # One option is unambiguous — the schema requires the chosen one listed.
+    raw = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "options": [{"id": "ols", "label": "OLS", "description": "d"}]}'
+    )
+    decision = _parse_response(raw, 0)
+    assert isinstance(decision, Decision)
+    assert decision.chosen_option_id == "ols"
 
 
 def test_extract_decisions_dedupes_by_id(monkeypatch, tmp_path: Path) -> None:
@@ -210,10 +285,11 @@ def test_extract_decisions_dedupes_by_id(monkeypatch, tmp_path: Path) -> None:
         {"index": 0, "reasoning": "a", "code": "c", "observation": "o"},
         {"index": 1, "reasoning": "a", "code": "c", "observation": "o"},
     ]
-    decisions = extract_decisions(steps, "goal", tmp_path, llm_config=None)
-    assert len(decisions) == 1
-    assert decisions[0].id == "fit_method"
-    assert decisions[0].source_step == 0
+    result = extract_decisions(steps, "goal", tmp_path, llm_config=None)
+    assert len(result.decisions) == 1
+    assert result.decisions[0].id == "fit_method"
+    assert result.decisions[0].source_step == 0
+    assert (result.steps_total, result.crashed, result.malformed) == (2, 0, 0)
 
 
 def test_extract_decisions_attaches_step_model(monkeypatch, tmp_path: Path) -> None:
@@ -235,8 +311,68 @@ def test_extract_decisions_attaches_step_model(monkeypatch, tmp_path: Path) -> N
     monkeypatch.setattr(llm_mod, "LLMProvider", _FakeProvider)
     steps = [{"index": 0, "reasoning": "a", "code": "c", "observation": "o",
               "model": "openrouter/qwen/qwen3.7-plus"}]
-    decisions = extract_decisions(steps, "goal", tmp_path, llm_config=None)
-    assert decisions[0].model == "openrouter/qwen/qwen3.7-plus"
+    result = extract_decisions(steps, "goal", tmp_path, llm_config=None)
+    assert result.decisions[0].model == "openrouter/qwen/qwen3.7-plus"
+
+
+def test_extract_decisions_empty_steps_returns_zeroed_result(tmp_path: Path) -> None:
+    # Fully-prefiltered traces reach extract_decisions with []; the early
+    # return must keep the ExtractionResult shape (export() reads .decisions).
+    assert extract_decisions([], "goal", tmp_path) == ExtractionResult((), 0, 0, 0)
+
+
+def test_warn_on_failures_keeps_misconfig_hint_on_total_loss(caplog) -> None:
+    # A judge misrouted to a prose-answering model loses every call to the
+    # malformed bucket — that total loss deserves the misconfiguration hint
+    # just as much as the all-crashed case; partial losses do not.
+    from sources.transparency.decision_extractor import _warn_on_failures
+
+    with caplog.at_level(logging.WARNING):
+        _warn_on_failures(0, 3, 3)
+    assert "misconfigured" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        _warn_on_failures(1, 2, 3)
+    assert "misconfigured" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        _warn_on_failures(1, 1, 3)
+    assert "misconfigured" not in caplog.text
+    assert "malformed" in caplog.text
+
+
+def test_extract_decisions_counts_crashes_and_malformed_output(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # Step 0 crashes, step 1 returns prose, step 2 says null, step 3 succeeds:
+    # the counters must separate all three failure-ish outcomes from "null".
+    pytest.importorskip("litellm")
+    fake_payload = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "option_id": "ols", "option_label": "OLS", "option_description": "d"}'
+    )
+    responses = {
+        "astra_decision_step_1": "Sure! Here is my analysis of this step:",
+        "astra_decision_step_2": "null",
+        "astra_decision_step_3": fake_payload,
+    }
+
+    class _FlakyProvider:
+        def __init__(self, *args, **kwargs):
+            self.agent_name = kwargs.get("agent_name", "")
+
+        def __call__(self, prompt, use_cache=True):
+            if self.agent_name not in responses:
+                raise RuntimeError("provider exploded")
+            return responses[self.agent_name]
+
+    import sources.core.llm_provider as llm_mod
+    monkeypatch.setattr(llm_mod, "LLMProvider", _FlakyProvider)
+    steps = [{"index": i, "reasoning": "a", "code": "c", "observation": "o"}
+             for i in range(4)]
+    result = extract_decisions(steps, "goal", tmp_path, llm_config=None)
+    assert (result.steps_total, result.crashed, result.malformed) == (4, 1, 1)
+    assert [d.id for d in result.decisions] == ["fit_method"]
 
 
 def _decision(decision_id: str, chosen: str, alternatives: tuple[str, ...] = ()) -> Decision:
@@ -285,6 +421,23 @@ def test_analysis_records_decision_model_when_available() -> None:
 def test_analysis_omits_model_for_legacy_traces() -> None:
     analysis = build_analysis("g", "abc", ["r.md"], [_decision("fit_method", "ols")])
     assert "model" not in analysis["decisions"]["fit_method"]
+
+
+def test_analysis_records_extraction_health_block() -> None:
+    # A capsule from a degraded extraction must say so itself.
+    extraction = ExtractionResult(decisions=(), steps_total=7, crashed=2, malformed=3)
+    analysis = build_analysis("g", "abc", ["r.md"], [], extraction=extraction)
+    assert analysis["extraction"] == {
+        "steps_considered": 7,
+        "decisions_recorded": 0,
+        "llm_call_failures": 2,
+        "malformed_responses": 3,
+    }
+
+
+def test_analysis_omits_extraction_block_when_not_provided() -> None:
+    analysis = build_analysis("g", "abc", ["r.md"], [])
+    assert "extraction" not in analysis
 
 
 def test_recipe_command_threads_into_every_output() -> None:
@@ -426,6 +579,53 @@ def test_default_config_has_astra_export_disabled() -> None:
     from config import Config
     config = Config()
     assert config.export_astra is False
+
+
+def test_export_writes_extraction_health_block_and_warns(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    # End-to-end through export(): a degraded extraction must land in the
+    # written astra.yaml AND be announced on stdout — deleting either the
+    # extraction= kwarg or the print_warn block must fail this test.
+    pytest.importorskip("litellm")
+    from sources.transparency import astra_exporter as exporter_mod
+
+    memory = tmp_path / "memory" / "run-x"
+    memory.mkdir(parents=True)
+    (memory / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "code_action": "result = stats.ttest_ind(a, b)"},
+    ]))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "report.md").write_text("x")
+
+    degraded = ExtractionResult(
+        decisions=(_decision("fit_method", "ols"),),
+        steps_total=3, crashed=1, malformed=1,
+    )
+    monkeypatch.setattr(exporter_mod, "extract_decisions", lambda *a, **k: degraded)
+    monkeypatch.setattr(
+        exporter_mod.AstraExporter, "_build_llm_config", lambda self: None
+    )
+    config = SimpleNamespace(
+        memory_dir=str(tmp_path / "memory"),
+        workspace_dir=str(workspace),
+        runs_capsule_dir=str(tmp_path / "capsule"),
+    )
+    exporter = exporter_mod.AstraExporter(config)
+    exporter._SNAPSHOT_ROOT = tmp_path  # no snapshots here → workspace fallback
+
+    path = exporter.export("run-x", "the goal")
+
+    loaded = yaml.safe_load(path.read_text())
+    assert loaded["extraction"] == {
+        "steps_considered": 3,
+        "decisions_recorded": 1,
+        "llm_call_failures": 1,
+        "malformed_responses": 1,
+    }
+    assert loaded["decisions"]["fit_method"]["default"] == "ols"
+    assert "Extraction degraded" in capsys.readouterr().out
 
 
 def test_exporter_skips_when_memory_dir_missing(tmp_path: Path) -> None:

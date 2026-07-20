@@ -64,6 +64,10 @@ Variables that are deliberately **not** passed:
 - `model_input_messages` — re-serialises the entire prior conversation on
   every step. Stripped in [`trace_compaction.compact_step`](../../sources/transparency/trace_compaction.py).
   This is the dominant token-cost saving, usually ≥80% of the raw file.
+- `model` — the per-step model id stamped by `save_memories`
+  (e.g. `openrouter/qwen/qwen3.7-plus`). It rides along on the compact step
+  as provenance for the YAML/recipe outputs but never enters the prompt, so
+  extraction cache keys are unaffected.
 - Workspace file contents — the *names* of output files reach the YAML
   builder, but never the LLM. Decisions live in the reasoning, not the
   artefacts.
@@ -93,19 +97,45 @@ analysis dict:
 | `outputs[i].recipe.command` | `python recipe.py`. The run's executed code is reconstructed by `memory_trace.reconstruct_recipe` (ordered `code_action` of every step) and written to `runs_capsule/<uuid>/recipe.py`. ASTRA's `recipe.command` is a single shell command, so the multi-step transcript lives in the script and the command points at it. Falls back to a memory-trace pointer string when no code was recovered. |
 | `decisions[d.id]`       | One entry per deduped surfaced decision               |
 | `decisions[d.id].rationale` | LLM-extracted from the step's reasoning            |
-| `decisions[d.id].options` | Single-option map keyed by `d.option_id` (Mimosa picks one option, doesn't enumerate alternatives) |
+| `decisions[d.id].default` | The realised option (`Decision.chosen_option_id`)   |
+| `decisions[d.id].options` | Multi-option map: the chosen option plus any alternatives the agent explicitly weighed in the trace (never invented) |
+| `decisions[d.id].model` | Per-step model id from the memory trace, when recorded — provenance extension beyond the spec; omitted for legacy traces |
+| `extraction`            | Extraction-health block (see below) — provenance extension beyond the spec |
 
 The companion universe file
 (`universes/best.yaml`) is a flat `{decision_id: option_id}` map matching
 the realised configuration.
 
+## Extraction health
+
+The extractor refuses to guess. A response whose `chosen_option_id` is
+missing or unresolvable is **dropped and counted as malformed** unless the
+response listed exactly one cleanly-parsed option (then that option is the
+choice by construction; this also covers the legacy single-option shape).
+Prose, truncated JSON, empty/None content, and schema violations are all
+counted as `malformed`; LLM calls that raise are counted as `crashed`. Both
+counters are logged as warnings, echoed by the exporter CLI, and written
+into `astra.yaml`:
+
+```yaml
+extraction:
+  steps_considered: <steps sent to the LLM>
+  decisions_recorded: <deduped decisions kept>
+  llm_call_failures: <crashed calls>
+  malformed_responses: <unusable responses>
+```
+
+A capsule produced from a degraded extraction is therefore self-describing:
+zero decisions with non-zero failure counters reads as "extraction broke",
+never as "the run made no decisions".
+
 ## Deduplication
 
 Decisions are keyed by `Decision.id`. If two steps surface the same
 decision (e.g. the agent re-justifies a choice late in the trace), the
-first occurrence wins and `source_step` records which step it came from.
-This is a deliberate v1 simplification — multi-option enumeration is
-deferred until reviewers actually ask for it.
+first occurrence wins for the core fields (label, rationale, chosen option,
+provenance) while options surfaced by later re-justifications are unioned
+in by `_merge_options`, so alternatives raised later aren't lost.
 
 ## Caching
 
@@ -118,8 +148,5 @@ export on the same best run incurs zero new LLM cost.
 
 - **Cross-decision dependencies** (`requires`, `incompatible_with`) —
   the trace doesn't encode them; would need a second LLM pass.
-- **Alternatives considered** (multi-option `options`) — the agent
-  usually picks one; back-filling alternatives is honest only if grounded
-  in the trace.
 - **`tags`, `when`, `from`** — ASTRA optional fields; not used in v1.
 - **`insights`** — ASTRA's prior-insight links; out of scope.
