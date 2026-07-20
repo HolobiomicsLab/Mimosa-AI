@@ -292,7 +292,7 @@ class PricingCalculator:
         except Exception as e:
             print(f"❌ Error reading workflow steps: {str(e)}")
         else:
-            print("📊 Skipping SmolAgent cost calculation (workflow execution failed)")
+            print("📊 Skipping SmolAgent cost calculation")
 
         total_cost = 0.0
         total_input_tokens = 0

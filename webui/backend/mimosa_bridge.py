@@ -10,6 +10,7 @@ prefixed with ``@@RESULT@@`` so log noise before it is ignored.
 Subcommands:
   refine    stdin {objective, history:[{question,answer}]} -> {is_clear, question, refined_prompt}
   classify  stdin {objective} -> {mode, confidence, reasoning, suggested_label}
+  objective_history  (no payload) -> [{objective, mode, timestamp}], newest first
   run       argv[2]=JSON {objective, mode, learn, judge, workflow_dir, memory_dir, workspace_dir}
 """
 
@@ -145,6 +146,12 @@ def cmd_classify(payload: dict) -> dict:
     }
 
 
+def cmd_objective_history() -> dict:
+    from sources.cli.onboard_cli import _load_objective_history
+
+    return {"entries": _load_objective_history()}
+
+
 def cmd_run(payload: dict) -> None:
     import asyncio
 
@@ -162,6 +169,14 @@ def cmd_run(payload: dict) -> None:
     judge = bool(payload.get("judge", True))
     learn = bool(payload.get("learn", False))
     mode = payload.get("mode", "task")
+
+    # Record the objective the same way the CLI does on launch.
+    try:
+        from sources.cli.onboard_cli import _save_objective_to_history
+
+        _save_objective_to_history(objective, mode)
+    except Exception:
+        pass
 
     print(f"[bridge] launching {mode} mode · learn={learn} · judge={judge}", flush=True)
     print(f"[bridge] workflow_dir={cfg.workflow_dir}", flush=True)
@@ -199,6 +214,8 @@ def main() -> int:
             _emit({"ok": True, "result": cmd_refine(payload)})
         elif cmd == "classify":
             _emit({"ok": True, "result": cmd_classify(payload)})
+        elif cmd == "objective_history":
+            _emit({"ok": True, "result": cmd_objective_history()})
         else:
             _emit({"ok": False, "error": f"unknown command: {cmd}"})
             return 2

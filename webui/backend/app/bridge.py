@@ -61,3 +61,7 @@ def refine(objective: str, history: list[dict[str, str]] | None = None) -> dict[
 
 def classify(objective: str) -> dict[str, Any]:
     return _call("classify", {"objective": objective})
+
+
+def objective_history() -> dict[str, Any]:
+    return _call("objective_history", {})

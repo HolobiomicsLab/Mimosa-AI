@@ -2,7 +2,7 @@ import type {
   RunSummary, RunDetail, Tree, Series, MemoryList, Timeline,
   StepDetail, CallDetail, WorkspaceScopes, WorkspaceListing,
   SetupInfo, SetupConfig, KeyStatus, McpHealth, RefineResult, ClassifyResult,
-  LaunchInfo, RunMode,
+  LaunchInfo, RunMode, ObjectiveHistoryResult,
 } from './types'
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -50,6 +50,7 @@ export const api = {
     request<RefineResult>('POST', '/assist/refine', { objective, history }),
   classify: (objective: string) =>
     request<ClassifyResult>('POST', '/assist/classify', { objective }),
+  objectiveHistory: () => get<ObjectiveHistoryResult>('/assist/objective-history'),
   launch: (params: { objective: string; mode: RunMode; learn: boolean; judge: boolean }) =>
     request<LaunchInfo>('POST', '/launches', params),
   launches: () => get<LaunchInfo[]>('/launches'),

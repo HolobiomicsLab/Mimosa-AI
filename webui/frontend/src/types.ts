@@ -236,6 +236,19 @@ export interface ClassifyResult {
 
 export type RunMode = 'task' | 'goal'
 
+export interface ObjectiveHistoryEntry {
+  objective: string
+  mode?: string | null
+  timestamp?: string | null
+}
+
+export interface ObjectiveHistoryResult {
+  ok: boolean
+  available?: boolean
+  error?: string
+  result?: { entries: ObjectiveHistoryEntry[] }
+}
+
 export interface LaunchInfo {
   id: string
   pid: number

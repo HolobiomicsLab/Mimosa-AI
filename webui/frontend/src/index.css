@@ -287,6 +287,28 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .btn-gold:hover { background: #ffd76b; border-color: transparent; }
 
 .save-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+
+/* Launch page: wider canvas, objective input on the left half, history on the right */
+.page.wide { max-width: 1280px; }
+.objective-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start;
+}
+.objective-split > * { min-width: 0; }
+@media (max-width: 900px) { .objective-split { grid-template-columns: 1fr; } }
+.objective-editor { display: flex; flex-direction: column; gap: 10px; }
+.objective-history {
+  display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto;
+}
+.objective-history-item {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 7px;
+  background: #0c111b; color: var(--text); cursor: pointer; font-size: 13px;
+}
+.objective-history-item:hover { border-color: var(--gold-dim); }
+.objective-history-text {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.45;
+}
 .check-row {
   display: flex; align-items: center; gap: 9px; font-size: 13px;
   margin: 6px 0 12px; cursor: pointer;

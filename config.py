@@ -55,7 +55,7 @@ class Config:
         # AUdit / Export
         ##############
         # When True, writes an ASTRA spec YAML after task completion.
-        self.export_astra: bool = False
+        self.export_astra: bool = True
 
         ##############
         # LLM Configuration
@@ -171,7 +171,7 @@ class Config:
             # avoid optional extras that pull in packages like `helium`/`selenium`
             "pillow>=12.1.0",
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
-            "litellm==1.91.4",
+            "litellm>=1.77.7,<1.92",
             "langgraph>=0.4.7",
             #"matplotlib>=3.9.0",
             "pandas==2.3.2",
@@ -266,7 +266,34 @@ class Config:
     def jsonify(
         self,
     ) -> dict[str, Any]:
-        """Convert configuration to a JSON-serializable dictionary."""
+        """Convert configuration to a JSON-serializable dictionary.
+
+        Read-only resource paths (prompts, module templates) that live under
+        the running package root are written package-relative, so a persisted
+        config stays valid whether Mimosa later runs from a repo checkout or
+        an installed wheel. ``load`` re-anchors them via
+        ``_reanchor_relative_paths``.
+        """
+
+        def portable(value: str) -> str:
+            """Relativize paths under the package root; keep others absolute."""
+            try:
+                rel = os.path.relpath(value, paths.PACKAGE_ROOT)
+            except ValueError:
+                return value
+            if rel == ".." or rel.startswith(f"..{os.sep}") or os.path.isabs(rel):
+                return value
+            return rel
+
+        resource_fields = (
+            "prompt_planner",
+            "prompt_workflow_creator",
+            "schema_code_path",
+            "smolagent_factory_code_path",
+        )
+        portable_resources = {
+            field: portable(getattr(self, field)) for field in resource_fields
+        }
         return {
             "workspace_dir": self.workspace_dir,
             "discovery_addresses": [
@@ -281,8 +308,8 @@ class Config:
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "save_logprobs": self.save_logprobs,
-            "prompt_planner": self.prompt_planner,
-            "prompt_workflow_creator": self.prompt_workflow_creator,
+            "prompt_planner": portable_resources["prompt_planner"],
+            "prompt_workflow_creator": portable_resources["prompt_workflow_creator"],
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
@@ -302,8 +329,8 @@ class Config:
             "n_parents": self.n_parents,
             "parent_threshold_similarity": self.parent_threshold_similarity,
             "parent_threshold_score": self.parent_threshold_score,
-            "schema_code_path": self.schema_code_path,
-            "smolagent_factory_code_path": self.smolagent_factory_code_path,
+            "schema_code_path": portable_resources["schema_code_path"],
+            "smolagent_factory_code_path": portable_resources["smolagent_factory_code_path"],
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,

@@ -222,6 +222,12 @@ def post_classify(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     return bridge.classify(_clean_objective(payload))
 
 
+@router.get("/assist/objective-history")
+def get_objective_history() -> dict[str, Any]:
+    """Past objectives saved by the CLI/webui (newest first)."""
+    return bridge.objective_history()
+
+
 @router.post("/launches")
 def post_launch(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     objective = _clean_objective(payload)

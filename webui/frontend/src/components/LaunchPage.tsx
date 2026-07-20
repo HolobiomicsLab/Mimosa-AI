@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
-import type { ClassifyResult, LaunchInfo, RunMode } from '../types'
+import type { ClassifyResult, LaunchInfo, ObjectiveHistoryEntry, RunMode } from '../types'
 import { Spinner } from '../ui'
 
 const MIN_OBJECTIVE_CHARS = 10
@@ -29,7 +29,7 @@ export default function LaunchPage() {
         <h2>New run</h2>
         <div className="hint">Refine an objective, pick a mode, and launch Mimosa.</div>
       </div>
-      <div className="page">
+      <div className="page wide">
         {others.length > 0 && (
           <div className="pill-row" style={{ marginBottom: 16 }}>
             {others.map((l) => (
@@ -85,18 +85,43 @@ function ObjectiveStep({ objective, setObjective, onNext }: {
   onNext: () => void
 }) {
   const tooShort = objective.trim().length < MIN_OBJECTIVE_CHARS
+  const history = useAsync(() => api.objectiveHistory(), [])
+  const entries: ObjectiveHistoryEntry[] = history.data?.result?.entries ?? []
   return (
     <div className="card setup-card">
       <div className="card-head">what should Mimosa work on?</div>
-      <div className="card-body">
-        <textarea
-          className="input" rows={5} autoFocus
-          placeholder="e.g. Analyse the metabolomics CSV in the workspace and report which pathways separate treated from control samples…"
-          value={objective} onChange={(e) => setObjective(e.target.value)}
-        />
-        <div className="save-row">
-          <button className="btn-gold" disabled={tooShort} onClick={onNext}>Continue</button>
-          {tooShort && <span className="hint">at least {MIN_OBJECTIVE_CHARS} characters</span>}
+      <div className="card-body objective-split">
+        <div className="objective-editor">
+          <textarea
+            className="input" rows={9} autoFocus
+            placeholder="e.g. Analyse the metabolomics CSV in the workspace and report which pathways separate treated from control samples…"
+            value={objective} onChange={(e) => setObjective(e.target.value)}
+          />
+          <div className="save-row">
+            <button className="btn-gold" disabled={tooShort} onClick={onNext}>Continue</button>
+            {tooShort && <span className="hint">at least {MIN_OBJECTIVE_CHARS} characters</span>}
+          </div>
+        </div>
+        <div className="objective-history">
+          <div className="field" style={{ marginBottom: 8 }}>
+            <label>Past objectives</label>
+          </div>
+          {history.loading && <Spinner label="Loading history…" />}
+          {!history.loading && entries.length === 0 && (
+            <div className="hint">No past objectives yet — launched runs are recorded here.</div>
+          )}
+          {entries.map((e, i) => (
+            <button
+              key={i} type="button" className="objective-history-item"
+              title="Click to reuse this objective"
+              onClick={() => setObjective(e.objective)}
+            >
+              <span className="objective-history-text">{e.objective}</span>
+              <span className="hint">
+                {e.timestamp ?? ''}{e.mode ? ` · ${String(e.mode).toUpperCase()}` : ''}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
