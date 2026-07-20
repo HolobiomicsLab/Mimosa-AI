@@ -87,8 +87,16 @@ class AstraExporter:
         )
 
         llm_config = self._build_llm_config()
-        decisions = extract_decisions(compact, goal, memory_path, llm_config)
+        extraction = extract_decisions(compact, goal, memory_path, llm_config)
+        decisions = list(extraction.decisions)
         print_info(f"Decisions extracted: {len(decisions)}.")
+        if extraction.crashed or extraction.malformed:
+            print_warn(
+                f"Extraction degraded: of {extraction.steps_total} steps, "
+                f"{extraction.crashed} LLM calls crashed and "
+                f"{extraction.malformed} returned malformed output; "
+                "counts are recorded in astra.yaml under 'extraction'."
+            )
 
         artefacts_dir = self._resolve_artefacts_dir(best_uuid, workspace_dir)
         if artefacts_dir != workspace_dir:
@@ -97,7 +105,8 @@ class AstraExporter:
 
         recipe_command = self._write_recipe(capsule_dir, memory_path)
         analysis = build_analysis(
-            goal, best_uuid, workspace_files, decisions, recipe_command
+            goal, best_uuid, workspace_files, decisions, recipe_command,
+            extraction=extraction,
         )
         universe = build_universe(decisions, best_uuid)
         path = write_export(capsule_dir, analysis, universe)

@@ -1,10 +1,13 @@
 """Surface methodological decisions from a compact agent trace via the LLM.
 
 Strategy: one LLM call per surviving step (after :mod:`trace_compaction`).
-Each call returns either ``null`` or a single ASTRA decision JSON object
-carrying the chosen option plus any alternatives the agent weighed. Steps are
-extracted concurrently but reduced in trace order, so the dedup below is
-deterministic regardless of which call finishes first.
+Each call is *expected* to return either ``null`` or a single ASTRA decision
+JSON object carrying the chosen option plus any alternatives the agent
+weighed; anything else (prose, truncated JSON, schema violations) is counted
+as malformed in the returned :class:`ExtractionResult` rather than silently
+treated as "no decision". Steps are extracted concurrently but reduced in
+trace order, so the dedup below is deterministic regardless of which call
+finishes first.
 
 Decisions are aggregated by ``id``: the first occurrence wins for the core
 fields (label, rationale, chosen option, provenance), and options surfaced by
@@ -37,14 +40,20 @@ if __name__ == "__main__":
 
 
 _LOGGER = logging.getLogger(__name__)
-_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+# \Z, not $: $ matches before a trailing newline, letting ids like "a\n"
+# leak verbatim into the exported YAML.
+_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\Z")
 _PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "decision_extraction.md"
 _MAX_WORKERS = 6
 
-# Sentinel: the LLM call for this step raised. Distinct from ``None`` (a clean
-# ``null`` / unparseable response) so a broken judge config — every call
-# failing — is visible in the logs instead of masquerading as "no decisions".
+# Sentinels, both distinct from ``None`` (the model's legitimate "no decision
+# here"): _EXTRACT_FAILED marks a step whose LLM call raised; _MALFORMED marks
+# a response that was neither a valid decision JSON nor the literal ``null``
+# (prose, truncated JSON, schema violations). Keeping them apart from ``None``
+# means a degraded extraction is counted and surfaced instead of masquerading
+# as an absence of decisions.
 _EXTRACT_FAILED = object()
+_MALFORMED = object()
 
 
 @dataclass(frozen=True)
@@ -73,22 +82,39 @@ class Decision:
     model: str = ""
 
 
+@dataclass(frozen=True)
+class ExtractionResult:
+    """Extracted decisions plus the extraction-health counters.
+
+    ``crashed`` counts steps whose LLM call raised; ``malformed`` counts steps
+    whose response was neither a decision JSON nor the literal ``null``.
+    Either way that step's decision, if it had one, is missing from
+    ``decisions`` — the counters make the gap visible to the capsule reader.
+    """
+
+    decisions: tuple[Decision, ...]
+    steps_total: int
+    crashed: int
+    malformed: int
+
+
 def extract_decisions(
     steps: list[dict[str, Any]],
     goal: str,
     memory_path: Path,
     llm_config: Any | None = None,
     max_workers: int = _MAX_WORKERS,
-) -> list[Decision]:
+) -> ExtractionResult:
     """Run the per-step extractor over ``steps`` and dedupe by decision id.
 
     Steps are extracted concurrently (bounded by ``max_workers``) but reduced
     in original trace order so the first-occurrence-wins merge is deterministic.
-    A warning is logged when calls fail, so a broken judge model surfaces
-    instead of silently yielding zero decisions.
+    Crashed calls and malformed responses are counted in the returned
+    :class:`ExtractionResult` and logged, so a broken or sloppy judge model
+    surfaces instead of silently yielding zero decisions.
     """
     if not steps:
-        return []
+        return ExtractionResult(decisions=(), steps_total=0, crashed=0, malformed=0)
     template = _PROMPT_PATH.read_text()
     results: list[Any] = [None] * len(steps)
     workers = max(1, min(max_workers, len(steps)))
@@ -105,7 +131,9 @@ def extract_decisions(
                 _LOGGER.warning("ASTRA extraction task crashed at step %s: %s", pos, exc)
                 results[pos] = _EXTRACT_FAILED
 
-    _warn_on_failures(sum(1 for r in results if r is _EXTRACT_FAILED), len(steps))
+    crashed = sum(1 for r in results if r is _EXTRACT_FAILED)
+    malformed = sum(1 for r in results if r is _MALFORMED)
+    _warn_on_failures(crashed, malformed, len(steps))
 
     merged: dict[str, Decision] = {}
     for result in results:
@@ -113,25 +141,35 @@ def extract_decisions(
             continue
         existing = merged.get(result.id)
         merged[result.id] = _merge_options(existing, result) if existing else result
-    return list(merged.values())
+    return ExtractionResult(
+        decisions=tuple(merged.values()),
+        steps_total=len(steps),
+        crashed=crashed,
+        malformed=malformed,
+    )
 
 
-def _warn_on_failures(errors: int, total: int) -> None:
-    """Log a diagnostic when extraction calls failed (aggregate, once)."""
-    if not errors:
+def _warn_on_failures(crashed: int, malformed: int, total: int) -> None:
+    """Log a diagnostic when extraction results were lost (aggregate, once)."""
+    if not crashed and not malformed:
         return
-    if errors == total:
+    if crashed + malformed == total:
         _LOGGER.warning(
-            "ASTRA: all %d decision-extraction calls failed — the judge model "
-            "is likely misconfigured (see AstraExporter._build_llm_config).",
-            errors,
-        )
-    else:
-        _LOGGER.warning(
-            "ASTRA: %d/%d decision-extraction calls failed; those steps were skipped.",
-            errors,
+            "ASTRA: all %d decision-extraction calls were lost (%d crashed, "
+            "%d malformed) — the judge model is likely misconfigured "
+            "(see AstraExporter._build_llm_config).",
             total,
+            crashed,
+            malformed,
         )
+        return
+    _LOGGER.warning(
+        "ASTRA: of %d extraction calls, %d crashed and %d returned malformed "
+        "output; any decision in those steps is missing from the export.",
+        total,
+        crashed,
+        malformed,
+    )
 
 
 def _merge_options(existing: Decision, later: Decision) -> Decision:
@@ -155,7 +193,11 @@ def _extract_one(
     memory_path: Path,
     llm_config: Any | None,
 ) -> Any:
-    """Extract one step's decision. Returns a Decision, None, or _EXTRACT_FAILED."""
+    """Extract one step's decision.
+
+    Returns a Decision, None (model said ``null``), _MALFORMED (unusable
+    response), or _EXTRACT_FAILED (the LLM call raised).
+    """
     from sources.core.llm_provider import LLMConfig, LLMProvider
     prompt = template.format(
         goal=goal,
@@ -184,18 +226,37 @@ def _extract_one(
     return decision
 
 
-def _parse_response(raw: str, source_step: int) -> Decision | None:
+def _parse_response(raw: Any, source_step: int) -> Any:
+    """Parse one extraction response.
+
+    Returns a :class:`Decision`, ``None`` for the literal ``null`` (the model
+    judged the step non-methodological), or :data:`_MALFORMED` for everything
+    else — empty or non-text output, prose, truncated JSON, schema violations.
+    """
+    if not isinstance(raw, str):
+        # litellm yields None content for empty/reasoning-only completions —
+        # an unusable response, not a crashed call.
+        _LOGGER.debug(
+            "ASTRA step %s: non-text extraction response (%s).",
+            source_step,
+            type(raw).__name__,
+        )
+        return _MALFORMED
     body = _strip_fences(raw).strip()
-    if not body or body.lower() == "null":
+    if body.lower() == "null":
         return None
+    if not body:
+        _LOGGER.debug("ASTRA step %s: empty extraction response.", source_step)
+        return _MALFORMED
     try:
         payload = json.loads(body)
     except json.JSONDecodeError:
         _LOGGER.debug("ASTRA step %s: response was not valid JSON.", source_step)
-        return None
+        return _MALFORMED
     decision = _validate(payload, source_step)
     if decision is None:
         _LOGGER.debug("ASTRA step %s: JSON did not match the decision schema.", source_step)
+        return _MALFORMED
     return decision
 
 
@@ -213,8 +274,11 @@ def _validate(payload: Any, source_step: int) -> Decision | None:
     valid_ids = {o.id for o in options}
     chosen = payload.get("chosen_option_id")
     if not (isinstance(chosen, str) and chosen in valid_ids):
-        # Fall back to the first listed option (the prompt lists the chosen one
-        # first) so a missing/typo'd chosen_option_id doesn't drop the decision.
+        # No resolvable chosen_option_id: never guess. Guessing could record
+        # a rejected alternative as the realised decision — a confidently
+        # wrong provenance record. The caller counts this as malformed.
+        if not _sole_option_as_listed(payload, options):
+            return None
         chosen = options[0].id
     return Decision(
         id=payload["id"],
@@ -224,6 +288,25 @@ def _validate(payload: Any, source_step: int) -> Decision | None:
         options=options,
         source_step=source_step,
     )
+
+
+def _sole_option_as_listed(
+    payload: dict[str, Any], options: tuple[Option, ...]
+) -> bool:
+    """True when the response as given listed exactly one option and it parsed.
+
+    Resolving a missing/typo'd ``chosen_option_id`` is only safe when the
+    model never named an alternative. One *surviving* option is not enough:
+    ``_parse_options`` drops invalid entries and dedupes ids, so a
+    multi-option response whose stated chosen option was dropped would
+    otherwise have the surviving rejected alternative promoted to "chosen".
+    The legacy single-option shape (no ``options`` list) qualifies by
+    construction.
+    """
+    if len(options) != 1:
+        return False
+    raw = payload.get("options")
+    return not isinstance(raw, list) or len(raw) == 1
 
 
 def _parse_options(payload: dict[str, Any]) -> tuple[Option, ...]:
@@ -277,12 +360,29 @@ if __name__ == "__main__":
     assert parsed.chosen_option_id == "robust", parsed
     assert {o.id for o in parsed.options} == {"robust", "ols"}, parsed
 
-    # chosen_option_id not among options -> falls back to the first listed option.
+    # Missing/typo'd chosen_option_id with a SINGLE option is unambiguous.
     bad_chosen = (
         '{"id": "d", "label": "x", "rationale": "x", "chosen_option_id": "missing",'
         ' "options": [{"id": "a", "label": "A", "description": "d"}]}'
     )
     assert _parse_response(bad_chosen, 0).chosen_option_id == "a"
+
+    # With SEVERAL options an unresolvable chosen_option_id is never guessed.
+    ambiguous_chosen = (
+        '{"id": "d", "label": "x", "rationale": "x", "chosen_option_id": "typo",'
+        ' "options": [{"id": "a", "label": "A", "description": "d"},'
+        ' {"id": "b", "label": "B", "description": "d"}]}'
+    )
+    assert _parse_response(ambiguous_chosen, 0) is _MALFORMED
+
+    # The chosen option was LISTED but dropped by option validation (missing
+    # description): the surviving rejected alternative must not be promoted.
+    dropped_chosen = (
+        '{"id": "d", "label": "x", "rationale": "x", "chosen_option_id": "a",'
+        ' "options": [{"id": "a", "label": "A"},'
+        ' {"id": "b", "label": "B", "description": "d"}]}'
+    )
+    assert _parse_response(dropped_chosen, 0) is _MALFORMED
 
     # Legacy single-option shape still parses.
     legacy = (
@@ -293,13 +393,16 @@ if __name__ == "__main__":
     assert legacy_parsed.chosen_option_id == "ols", legacy_parsed
     assert legacy_parsed.options[0].label == "OLS", legacy_parsed
 
+    # A legitimate `null` and unusable output are DISTINCT outcomes.
     assert _parse_response("null", 0) is None
-    assert _parse_response("not json at all", 0) is None
+    assert _parse_response("not json at all", 0) is _MALFORMED
+    assert _parse_response("", 0) is _MALFORMED
+    assert _parse_response(None, 0) is _MALFORMED
     bad_id = (
         '{"id": "Fit-Method", "label": "x", "rationale": "x",'
         ' "options": [{"id": "ols", "label": "x", "description": "x"}]}'
     )
-    assert _parse_response(bad_id, 0) is None
+    assert _parse_response(bad_id, 0) is _MALFORMED
     fenced = "```json\n" + good + "\n```"
     assert _parse_response(fenced, 1).chosen_option_id == "robust"
 
