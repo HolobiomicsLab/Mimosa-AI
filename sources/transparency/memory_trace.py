@@ -68,6 +68,17 @@ def extract_observations(step: dict[str, Any]) -> str:
     return obs if isinstance(obs, str) else json.dumps(obs)
 
 
+def extract_model(step: dict[str, Any]) -> str:
+    """Return the model id that produced this step, or "" for legacy traces.
+
+    ``save_memories`` stamps ``step["model"]`` (e.g.
+    ``openrouter/qwen/qwen3.7-plus``) on every saved step; traces written
+    before that field existed simply lack the key.
+    """
+    model = step.get("model")
+    return model.strip() if isinstance(model, str) else ""
+
+
 def load_raw_steps(memory_dir: Path) -> list[dict[str, Any]]:
     """Load every ``task_*.json`` trace under *memory_dir*, in run order.
 
@@ -103,7 +114,9 @@ def reconstruct_recipe(memory_dir: Path) -> str:
             continue
         agent = step.get("_agent_name", "agent")
         number = step.get("step_number", position)
-        blocks.append(f"# ── step {number} · {agent} ──\n{code}")
+        model = extract_model(step)
+        header = f"# ── step {number} · {agent}" + (f" · {model}" if model else "")
+        blocks.append(f"{header} ──\n{code}")
     if not blocks:
         return ""
     header = (
@@ -132,6 +145,7 @@ if __name__ == "__main__":
         "code_action": "from scipy import stats\nstats.ttest_ind(a, b, equal_var=False)",
         "model_output": "Use Welch's t-test.",
         "observations": "pvalue=0.02",
+        "model": "openrouter/qwen/qwen3.7-plus",
     }
     tool_step = {
         "step_number": 2,
@@ -142,6 +156,8 @@ if __name__ == "__main__":
     assert extract_code(code_step).startswith("from scipy"), extract_code(code_step)
     assert extract_code(tool_step) == "model.fit(X, y)", extract_code(tool_step)
     assert extract_output_text(code_step) == "Use Welch's t-test."
+    assert extract_model(code_step) == "openrouter/qwen/qwen3.7-plus"
+    assert extract_model(tool_step) == ""
     assert trim("abcdef", 3) == "abc …[truncated]"
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -149,6 +165,7 @@ if __name__ == "__main__":
         (mem / "task_single_agent.json").write_text(json.dumps([code_step, tool_step]))
         recipe = reconstruct_recipe(mem)
         assert "from scipy" in recipe and "model.fit" in recipe, recipe
-        assert "step 1 · single_agent" in recipe, recipe
+        assert "step 1 · single_agent · openrouter/qwen/qwen3.7-plus" in recipe, recipe
+        assert "step 2 · single_agent ──" in recipe, recipe
         assert reconstruct_recipe(Path(tmp) / "empty") == ""
     print("[OK] memory_trace smoke check passed")

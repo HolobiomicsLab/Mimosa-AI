@@ -69,6 +69,16 @@ def test_compact_step_strips_input_messages() -> None:
     assert "ttest_ind" in compact["code"]
 
 
+def test_compact_step_carries_per_step_model() -> None:
+    step = dict(_METHODOLOGICAL_STEP, model="openrouter/qwen/qwen3.7-plus")
+    assert compact_step(step, index=0)["model"] == "openrouter/qwen/qwen3.7-plus"
+
+
+def test_compact_step_defaults_model_empty_for_legacy_traces() -> None:
+    # Traces saved before save_memories stamped step["model"] lack the key.
+    assert compact_step(_METHODOLOGICAL_STEP, index=0)["model"] == ""
+
+
 def test_prefilter_drops_mechanical_steps() -> None:
     kept = compact_trace([_METHODOLOGICAL_STEP, _MECHANICAL_STEP])
     assert len(kept) == 1
@@ -106,6 +116,17 @@ def test_reconstruct_recipe_orders_real_code(tmp_path: Path) -> None:
     assert "X = load()" in recipe and "model.fit(X)" in recipe
     assert recipe.index("X = load()") < recipe.index("model.fit(X)")
     assert "step 1 · single_agent" in recipe
+
+
+def test_reconstruct_recipe_annotates_step_model_when_available(tmp_path: Path) -> None:
+    (tmp_path / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "code_action": "X = load()",
+         "model": "openrouter/qwen/qwen3.7-plus"},
+        {"step_number": 2, "code_action": "model.fit(X)"},
+    ]))
+    recipe = reconstruct_recipe(tmp_path)
+    assert "step 1 · single_agent · openrouter/qwen/qwen3.7-plus" in recipe
+    assert "step 2 · single_agent ──" in recipe  # no model → no annotation
 
 
 def test_reconstruct_recipe_empty_when_no_code(tmp_path: Path) -> None:
@@ -195,6 +216,29 @@ def test_extract_decisions_dedupes_by_id(monkeypatch, tmp_path: Path) -> None:
     assert decisions[0].source_step == 0
 
 
+def test_extract_decisions_attaches_step_model(monkeypatch, tmp_path: Path) -> None:
+    # The decision's model is trace provenance from the step, never LLM output.
+    pytest.importorskip("litellm")
+    fake_payload = (
+        '{"id": "fit_method", "label": "Fit", "rationale": "r",'
+        ' "option_id": "ols", "option_label": "OLS", "option_description": "d"}'
+    )
+
+    class _FakeProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __call__(self, prompt, use_cache=True):
+            return fake_payload
+
+    import sources.core.llm_provider as llm_mod
+    monkeypatch.setattr(llm_mod, "LLMProvider", _FakeProvider)
+    steps = [{"index": 0, "reasoning": "a", "code": "c", "observation": "o",
+              "model": "openrouter/qwen/qwen3.7-plus"}]
+    decisions = extract_decisions(steps, "goal", tmp_path, llm_config=None)
+    assert decisions[0].model == "openrouter/qwen/qwen3.7-plus"
+
+
 def _decision(decision_id: str, chosen: str, alternatives: tuple[str, ...] = ()) -> Decision:
     """A decision whose options are the chosen one followed by any alternatives."""
     option_ids = (chosen, *alternatives)
@@ -227,6 +271,20 @@ def test_analysis_records_rejected_alternatives_beside_the_chosen_option() -> No
     entry = analysis["decisions"]["fit_method"]
     assert set(entry["options"]) == {"ols", "ridge", "lasso"}
     assert entry["default"] == "ols"
+
+
+def test_analysis_records_decision_model_when_available() -> None:
+    from dataclasses import replace
+
+    decision = replace(_decision("fit_method", "ols"),
+                       model="openrouter/qwen/qwen3.7-plus")
+    analysis = build_analysis("g", "abc", ["r.md"], [decision])
+    assert analysis["decisions"]["fit_method"]["model"] == "openrouter/qwen/qwen3.7-plus"
+
+
+def test_analysis_omits_model_for_legacy_traces() -> None:
+    analysis = build_analysis("g", "abc", ["r.md"], [_decision("fit_method", "ols")])
+    assert "model" not in analysis["decisions"]["fit_method"]
 
 
 def test_recipe_command_threads_into_every_output() -> None:

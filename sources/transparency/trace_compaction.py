@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
 from sources.transparency.memory_trace import (
     extract_code,
+    extract_model,
     extract_observations,
     extract_output_text,
     load_raw_steps,
@@ -57,12 +58,17 @@ def load_trace(memory_dir: Path) -> list[dict[str, Any]]:
 
 
 def compact_step(step: dict[str, Any], index: int) -> dict[str, Any]:
-    """Strip the bulky fields and keep only what an extractor LLM needs."""
+    """Strip the bulky fields and keep only what an extractor LLM needs.
+
+    ``model`` is provenance carried through to the exported decisions, not
+    prompt material — it is "" for traces saved before the field existed.
+    """
     return {
         "index": index,
         "reasoning": extract_output_text(step),
         "code": extract_code(step),
         "observation": _truncate(extract_observations(step), _OBSERVATION_CHAR_LIMIT),
+        "model": extract_model(step),
     }
 
 
@@ -102,6 +108,7 @@ if __name__ == "__main__":
             "code_action": "from scipy import stats\nresult = stats.ttest_ind(a, b, equal_var=False)",
             "observations": "Ttest_indResult(statistic=2.31, pvalue=0.022)",
             "model_input_messages": [{"role": "system", "content": "x" * 50_000}],
+            "model": "openrouter/qwen/qwen3.7-plus",
         },
         {
             "model_output_message": {"content": "List files."},
@@ -113,4 +120,5 @@ if __name__ == "__main__":
     assert len(kept) == 1, f"Expected 1 step, got {len(kept)}"
     assert "Welch" in kept[0]["reasoning"], kept[0]
     assert "ttest_ind" in kept[0]["code"], kept[0]
+    assert kept[0]["model"] == "openrouter/qwen/qwen3.7-plus", kept[0]
     print(f"[OK] trace_compaction smoke check passed (kept {len(kept)} / {len(sample)} steps)")

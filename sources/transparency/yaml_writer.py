@@ -6,6 +6,10 @@ ASTRA fields used (see https://astra-spec.org/latest/specification/#decisions):
 - ``inputs[*]``, ``outputs[*]``
 - universe file with ``id``, ``description``, ``decisions``
 
+One provenance extension beyond the spec: each decision carries ``model`` —
+the model id that produced the source trace step — when the saved memory
+recorded it (older traces predate the field and simply omit it).
+
 The recipe field is left intentionally minimal: Mimosa runs Python inside
 smolagents rather than a single shell command, so we point reviewers at the
 saved trace rather than fabricating a fake command line.
@@ -119,10 +123,9 @@ def _build_outputs(
 
 
 def _build_decisions(decisions: list[Decision]) -> dict[str, Any]:
-    if not decisions:
-        return {}
-    return {
-        d.id: {
+    entries: dict[str, Any] = {}
+    for d in decisions:
+        entry: dict[str, Any] = {
             "label": d.label,
             "rationale": d.rationale,
             "default": d.chosen_option_id,
@@ -131,8 +134,10 @@ def _build_decisions(decisions: list[Decision]) -> dict[str, Any]:
                 for o in d.options
             },
         }
-        for d in decisions
-    }
+        if d.model:
+            entry["model"] = d.model
+        entries[d.id] = entry
+    return entries
 
 
 def _safe_output_id(filename: str, index: int) -> str:
@@ -159,6 +164,7 @@ if __name__ == "__main__":
                 Option(id="robust", label="Robust regression", description="Down-weights outliers."),
             ),
             source_step=2,
+            model="openrouter/qwen/qwen3.7-plus",
         ),
     ]
     analysis = build_analysis("Predict X.", "abc-123", ["model.pkl", "report.md"], decisions)
@@ -169,6 +175,7 @@ if __name__ == "__main__":
         loaded = yaml.safe_load(out.read_text())
         assert loaded["decisions"]["fit_method"]["default"] == "ols"
         assert set(loaded["decisions"]["fit_method"]["options"]) == {"ols", "robust"}
+        assert loaded["decisions"]["fit_method"]["model"] == "openrouter/qwen/qwen3.7-plus"
         uni = yaml.safe_load((Path(tmp) / "universes" / "best.yaml").read_text())
         assert uni["decisions"]["fit_method"] == "ols"
     print("[OK] yaml_writer smoke check passed")

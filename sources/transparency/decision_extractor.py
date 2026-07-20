@@ -58,7 +58,11 @@ class Option:
 
 @dataclass(frozen=True)
 class Decision:
-    """One ASTRA decision surfaced from a single trace step."""
+    """One ASTRA decision surfaced from a single trace step.
+
+    ``model`` is the model id that produced the source step (trace
+    provenance, not LLM output); "" when the trace predates the field.
+    """
 
     id: str
     label: str
@@ -66,6 +70,7 @@ class Decision:
     chosen_option_id: str
     options: tuple[Option, ...]
     source_step: int
+    model: str = ""
 
 
 def extract_decisions(
@@ -172,7 +177,11 @@ def _extract_one(
             "ASTRA decision extraction failed at step %s: %s", step["index"], exc
         )
         return _EXTRACT_FAILED
-    return _parse_response(raw, step["index"])
+    decision = _parse_response(raw, step["index"])
+    model = step.get("model")
+    if isinstance(decision, Decision) and isinstance(model, str) and model.strip():
+        decision = replace(decision, model=model.strip())
+    return decision
 
 
 def _parse_response(raw: str, source_step: int) -> Decision | None:
