@@ -336,6 +336,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                         else None
                     )
                     action_step["logprobs"] = self.extract_logprobs(step)
+                    action_step["model"] = self.model_id
                     memories.append(action_step)
             if self.save_logprobs and memories and all(m["logprobs"] is None for m in memories):
                 print(f"WARNING: logprobs requested but none returned for agent '{self.name}'; check provider support.")

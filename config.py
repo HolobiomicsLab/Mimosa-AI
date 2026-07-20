@@ -40,11 +40,12 @@ class Config:
 
         ##############
         # Workspace Configuration
+        # Must point to Toolomics workspace
         ##############
-        self.workspace_dir = "/home/martin/Projects/CNRS/Toolomics/workspace"
+        self.workspace_dir = "/Users/mlg/Documents/CNRS/Toolomics/workspace"
 
         ##############
-        # MCP Related
+        # MCP Discovery Addresses
         ##############
         self.discovery_addresses: list[AddressMCP] = [
             AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
@@ -57,7 +58,7 @@ class Config:
         self.export_astra: bool = False
 
         ##############
-        # LLM Related
+        # LLM Configuration
         ##############
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.2"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.2"
@@ -69,6 +70,7 @@ class Config:
         # Orchestrator Workflow generation options
         #############
         # Let orchestrator choose model, otherwise default to self.smolagent_model_id[0]
+        # Recommanded: model diversity avoid idea and verifiers collapse.
         self.orchestrator_choose_model = True
         # Ground workflow generation with perspicacité
         self.literrature_grounding = False
@@ -126,13 +128,7 @@ class Config:
              "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
              "groq", "cerebras", "sambanova", "nvidia"
         ]
-        # Request token logprobs and save them with agent memory (for ablations).
-        # litellm engine only. With pinned providers, OpenRouter only routes to
-        # those supporting them; models whose providers all lack logprobs then
-        # fail routing (precheck probes with them too) — disable here if needed.
-        # For direct (non-OpenRouter) providers whose litellm param map lacks
-        # logprobs (e.g. mistral, anthropic), the request is dropped with a
-        # warning instead of raising UnsupportedParamsError at run time.
+        # Request token logprobs and save them with agent memory (for ablations). Litellm only.
         self.save_logprobs: bool = True
 
         ##############
@@ -175,6 +171,7 @@ class Config:
             # avoid optional extras that pull in packages like `helium`/`selenium`
             "pillow>=12.1.0",
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
+            "litellm==1.91.4",
             "langgraph>=0.4.7",
             #"matplotlib>=3.9.0",
             "pandas==2.3.2",
