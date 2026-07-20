@@ -66,6 +66,61 @@ from sources.utils.list_files import list_files
 from sources.utils.transfer_toolomics import LocalTransfer
 
 
+def _truncate(text: str, width: int) -> str:
+    """Truncate *text* to *width* chars, appending '…' when cut."""
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+_OBJECTIVE_HISTORY_LIMIT = 50
+
+
+def _objective_history_path() -> str:
+    """Return the objective-history JSON file location.
+
+    Repo checkouts keep it next to the agent memory
+    (``sources/memory/objective_history.json``); installed runs persist to
+    ``~/.config/mimosa/objective_history.json`` so history survives across
+    working directories.
+    """
+    if paths.is_repo_checkout():
+        return str(paths.PACKAGE_ROOT / "sources" / "memory" / "objective_history.json")
+    return str(paths.config_dir() / "objective_history.json")
+
+
+def _load_objective_history() -> list[dict]:
+    """Load past objectives (newest first); [] on missing/corrupt file."""
+    path = _objective_history_path()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, list):
+            return [e for e in data if isinstance(e, dict) and e.get("objective")]
+    except (OSError, ValueError):
+        pass
+    return []
+
+
+def _save_objective_to_history(objective: str, mode: str) -> None:
+    """Record *objective* at the top of the history file (deduped, capped)."""
+    objective = objective.strip()
+    if not objective:
+        return
+    history = [e for e in _load_objective_history() if e.get("objective") != objective]
+    history.insert(0, {
+        "objective": objective,
+        "mode": mode,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    })
+    history = history[:_OBJECTIVE_HISTORY_LIMIT]
+    path = _objective_history_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(history, fh, indent=2, ensure_ascii=False)
+    except OSError as exc:
+        _warn(f"Could not save objective history: {exc}")
+
+
 def _persisted_config_path() -> str:
     """Return where onboarding loads and saves persistent settings.
 
@@ -1151,19 +1206,74 @@ class OnboardCLI:
             _warn(f"Could not persist model choices to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     def _collect_objective(self) -> None:
-        """Prompt the user for their initial research objective."""
+        """Prompt the user for their initial research objective.
+
+        Shows a preview of the most recent objective (Enter reuses it) and
+        supports ``/history`` for interactive selection among past objectives.
+        """
         print(_wrap(
             "Describe what you want Mimosa to do. This can be a high-level "
             "scientific goal (e.g. 'Reproduce Figure 3 from paper X') or a "
             "focused task (e.g. 'Train a toxicity model on the ClinTox dataset'). "
             "Don't worry about being too vague — we'll refine it together next.",
         ))
+        history = _load_objective_history()
+        if history:
+            last = history[0]
+            print()
+            kv("last objective", _truncate(last["objective"], 100), accent=True)
+            if last.get("mode"):
+                kv("mode", str(last["mode"]).upper())
+            if last.get("timestamp"):
+                kv("recorded", str(last["timestamp"]))
+            print()
+            _info("Press Enter to reuse it, or type /history to pick from past objectives.")
         while True:
             objective = _ask("Your objective")
+            if not objective.strip() and history:
+                self._objective = history[0]["objective"]
+                _ok(f"Reusing last objective: {_truncate(self._objective, 80)}")
+                return
+            if objective.strip().lower() == "/history":
+                chosen = self._pick_from_history(history)
+                if chosen:
+                    self._objective = chosen
+                    _ok(f"Selected: {_truncate(chosen, 80)}")
+                    return
+                continue
             if len(objective.strip()) >= 10:
                 self._objective = objective.strip()
-                break
+                return
             _warn("Please enter a more descriptive objective (at least 10 characters).")
+
+    def _pick_from_history(self, history: list[dict]) -> str | None:
+        """Interactively select a past objective; None to go back to typing."""
+        if not history:
+            _info("No objective history yet.")
+            return None
+        print()
+        print(f"  {WHITE}Past objectives (newest first):{RESET}")
+        shown = history[:10]
+        for idx, entry in enumerate(shown, start=1):
+            stamp = entry.get("timestamp", "")
+            mode = str(entry.get("mode", "")).upper()
+            tag = f"{GREY}{stamp} · {mode}{RESET}" if stamp else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{_truncate(entry['objective'], 90)}{RESET}")
+            if tag:
+                print(f"         {tag}")
+        print()
+        while True:
+            choice = _ask("Pick a number (Enter to type a new objective)").strip()
+            if not choice:
+                return None
+            try:
+                idx = int(choice)
+            except ValueError:
+                _warn(f"Unrecognised input '{choice}' — type 1-{len(shown)} or Enter.")
+                continue
+            if 1 <= idx <= len(shown):
+                return shown[idx - 1]["objective"]
+            _warn(f"Number out of range: {choice}. Pick 1-{len(shown)} or Enter.")
 
     def _clarify_and_refine(self) -> None:
         """LLM conversation loop: clarify missing info, then refine the prompt."""
@@ -1424,6 +1534,8 @@ class OnboardCLI:
 
         section("IGNITION")
         _ok("Config paths validated")
+
+        _save_objective_to_history(self._objective, self._mode)
 
         if self._mode == "goal":
             await self._launch_goal()
