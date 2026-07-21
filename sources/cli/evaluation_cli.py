@@ -72,7 +72,7 @@ from sources.core.tools_manager import ToolManager
 
 _EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
-TOTAL_STEPS = 6  # Updated: Config → Model → Connectivity → Mode → Tasks → Queue/Launch
+TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
 
 # Adaptive parallelism constants
@@ -93,6 +93,8 @@ class EvalRunSpec:
     csv_runs_limit: int
     mcp_list: list[str] = field(default_factory=list)
     notes_path: Path | None = None
+    # Advanced/ablation fields the user changed from defaults (name -> value)
+    overrides: dict = field(default_factory=dict)
     # Populated after execution
     status: str = "pending"
     peak_ram_mb: float = 0.0
@@ -201,12 +203,17 @@ class EvaluationCLI:
         _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
         csv_runs_limit = self._ask_csv_runs_limit()
 
+        # Step 6 – Advanced / ablation options (optional)
+        _print_step(6, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
+        overrides = self._configure_advanced_options(run_config, eval_mode)
+
         return EvalRunSpec(
             run_id=run_id,
             config=run_config,
             eval_mode=eval_mode,
             csv_runs_limit=csv_runs_limit,
             mcp_list=mcp_list,
+            overrides=overrides,
         )
 
     # ------------------------------------------------------------------
@@ -574,6 +581,222 @@ class EvaluationCLI:
                 _warn(f"Invalid number '{raw}'. Please enter a whole number.")
 
     # ------------------------------------------------------------------
+    # Step 6 – Advanced / ablation options (optional)
+    # ------------------------------------------------------------------
+
+    # Selection strategies supported by sources/core/selection.py
+    _SELECTION_STRATEGIES = ("qd", "tournament", "greedy", "novelty")
+
+    def _configure_advanced_options(self, run_config: Config, eval_mode: str) -> dict:
+        """Optionally tweak ablation-level config knobs for this run.
+
+        Returns a dict of ``{field_name: new_value}`` for every field the
+        user changed (used for the queue summary and run notes).
+        """
+        print(_wrap(
+            "Optional: override evolution / orchestration knobs for ablation "
+            "runs (selection strategy, novelty weight, grounding, iteration "
+            "budget, …). Press Enter to keep the defaults from your config.",
+        ))
+        customise = _ask_yn("Customise advanced / ablation options?", default=False)
+        if not customise:
+            _info("Keeping default advanced options.")
+            return {}
+
+        learning_only = eval_mode != "iterative"
+        overrides: dict = {}
+
+        # (key, label, current-value getter, editor, learning_only)
+        options = [
+            (
+                "workflow_llm_model",
+                "Orchestrator backbone (workflow_llm_model)",
+                lambda: run_config.workflow_llm_model,
+                lambda: self._edit_text(
+                    "Orchestrator backbone model ID",
+                    run_config.workflow_llm_model,
+                ),
+                False,
+            ),
+            (
+                "orchestrator_choose_model",
+                "Per-agent model assignment (orchestrator_choose_model)",
+                lambda: run_config.orchestrator_choose_model,
+                lambda: _ask_yn(
+                    "Let the orchestrator assign models per agent?",
+                    default=bool(run_config.orchestrator_choose_model),
+                ),
+                False,
+            ),
+            (
+                "literrature_grounding",
+                "Literature grounding (literrature_grounding)",
+                lambda: run_config.literrature_grounding,
+                lambda: _ask_yn(
+                    "Enable literature grounding (Perspicacité)?",
+                    default=bool(run_config.literrature_grounding),
+                ),
+                False,
+            ),
+            (
+                "selection_strategy",
+                "Selection strategy",
+                lambda: run_config.selection_strategy,
+                lambda: self._edit_selection_strategy(run_config.selection_strategy),
+                True,
+            ),
+            (
+                "novelty_weight",
+                "Novelty weight (QD quality/novelty mix)",
+                lambda: run_config.novelty_weight,
+                lambda: self._edit_float(
+                    "Novelty weight (0.0 = quality-only, 1.0 = novelty-only)",
+                    run_config.novelty_weight, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "max_learning_evolve_iterations",
+                "Max evolve iterations",
+                lambda: run_config.max_learning_evolve_iterations,
+                lambda: self._edit_int(
+                    "Max evolve iterations (1 = evolution off / best-of-N)",
+                    run_config.max_learning_evolve_iterations, lo=1,
+                ),
+                True,
+            ),
+            (
+                "learned_score_threshold",
+                "Early-stop score threshold",
+                lambda: run_config.learned_score_threshold,
+                lambda: self._edit_float(
+                    "Early-stop score threshold",
+                    run_config.learned_score_threshold, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "crossover_rate",
+                "Crossover rate",
+                lambda: run_config.crossover_rate,
+                lambda: self._edit_float(
+                    "Crossover rate (0.0 = off)",
+                    run_config.crossover_rate, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "population_size",
+                "Population / archive size",
+                lambda: run_config.population_size,
+                lambda: self._edit_int(
+                    "Population / archive size",
+                    run_config.population_size, lo=1,
+                ),
+                True,
+            ),
+        ]
+
+        while True:
+            print()
+            for idx, (_, label, getter, _, learn_only) in enumerate(options, start=1):
+                tag = f"  {GREY}(learning only){RESET}" if learn_only else ""
+                print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+                print(f"         {GREY}= {getter()}{RESET}")
+            print()
+
+            choice = _ask("Edit option number, or Enter to finish", default="").strip()
+            if not choice:
+                break
+            try:
+                idx = int(choice) - 1
+                if not (0 <= idx < len(options)):
+                    raise ValueError
+            except ValueError:
+                _warn(f"Unrecognised input '{choice}'. Pick 1-{len(options)} or Enter.")
+                continue
+
+            key, _, getter, editor, learn_only = options[idx]
+            if learn_only and learning_only:
+                _warn(
+                    f"'{key}' only takes effect in iterative learning mode — "
+                    f"this run is '{eval_mode}'. It will be recorded but ignored."
+                )
+            new_value = editor()
+            if new_value is None:
+                continue  # user kept the current value
+            if new_value != getter():
+                setattr(run_config, key, new_value)
+                overrides[key] = new_value
+                _ok(f"{key} = {new_value}")
+            else:
+                _info(f"{key} unchanged.")
+
+        if overrides:
+            _ok(f"Advanced overrides recorded: {len(overrides)}")
+        else:
+            _info("No advanced overrides — defaults kept.")
+        return overrides
+
+    # ------------------------------------------------------------------
+    # Small editors for the advanced menu
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _edit_text(prompt: str, current: str):
+        """Free-text editor; empty input keeps the current value (None)."""
+        raw = _ask(f"{prompt} (Enter to keep '{current}')", default="").strip()
+        return raw or None
+
+    def _edit_selection_strategy(self, current: str):
+        print(f"\n  {WHITE}Selection strategies:{RESET}")
+        for idx, s in enumerate(self._SELECTION_STRATEGIES, start=1):
+            tag = f"  {LOCKED}" if s == current else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{s}{RESET}{tag}")
+        while True:
+            raw = _ask(
+                f"Select 1-{len(self._SELECTION_STRATEGIES)} or Enter to keep '{current}'",
+                default="",
+            ).strip().lower()
+            if not raw:
+                return None
+            if raw in self._SELECTION_STRATEGIES:
+                return raw
+            try:
+                idx = int(raw) - 1
+                if 0 <= idx < len(self._SELECTION_STRATEGIES):
+                    return self._SELECTION_STRATEGIES[idx]
+            except ValueError:
+                pass
+            _warn(f"Invalid choice '{raw}'.")
+
+    @staticmethod
+    def _edit_float(prompt: str, current: float, lo: float, hi: float):
+        while True:
+            raw = _ask(f"{prompt} [{current}]", default=str(current)).strip()
+            try:
+                val = float(raw)
+                if not (lo <= val <= hi):
+                    _warn(f"Must be between {lo} and {hi}.")
+                    continue
+                return val
+            except ValueError:
+                _warn(f"Invalid number '{raw}'.")
+
+    @staticmethod
+    def _edit_int(prompt: str, current: int, lo: int = 1):
+        while True:
+            raw = _ask(f"{prompt} [{current}]", default=str(current)).strip()
+            try:
+                val = int(raw)
+                if val < lo:
+                    _warn(f"Must be at least {lo}.")
+                    continue
+                return val
+            except ValueError:
+                _warn(f"Invalid number '{raw}'.")
+
+    # ------------------------------------------------------------------
     # Queue validation
     # ------------------------------------------------------------------
 
@@ -651,6 +874,9 @@ class EvaluationCLI:
             kv("ports", port_str)
             kv("workspace", spec.config.workspace_dir)
             kv("mcps", str(len(spec.mcp_list)))
+            if spec.overrides:
+                over_str = ", ".join(f"{k}={v}" for k, v in spec.overrides.items())
+                kv("overrides", over_str)
         print()
         frame_bottom()
         if len(self._queue) > 1:
@@ -694,6 +920,17 @@ class EvaluationCLI:
             "workspace_dir": spec.config.workspace_dir,
             "detected_mcps": spec.mcp_list,
             "dataset": "datasets/ScienceAgentBench.csv",
+            "advanced_overrides": spec.overrides,
+            "evolution_config": {
+                "orchestrator_choose_model": spec.config.orchestrator_choose_model,
+                "literrature_grounding": spec.config.literrature_grounding,
+                "selection_strategy": spec.config.selection_strategy,
+                "novelty_weight": spec.config.novelty_weight,
+                "max_learning_evolve_iterations": spec.config.max_learning_evolve_iterations,
+                "learned_score_threshold": spec.config.learned_score_threshold,
+                "crossover_rate": spec.config.crossover_rate,
+                "population_size": spec.config.population_size,
+            },
             "status": "running",
             "queue_size": len(self._queue),
         }
