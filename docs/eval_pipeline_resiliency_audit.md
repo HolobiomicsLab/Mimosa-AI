@@ -194,23 +194,6 @@ and turns the hidden spike real.
 
 ---
 
-#### C2 · Stagger delay can idle workers for ~1 hour
-
-**Status:** confirmed exactly; reachability narrowed.
-
-`csv_mode.py:619-623`: `stagger_delay = launch_index * task_start_delay`
-applies to *all* tasks *before* semaphore acquisition (absolute launch index,
-no cap) — task #102 sleeps ~50.5 min even if workers are free. However, the
-stagger exists only in the concurrent loop, and
-`config.py:81` defaults `max_concurrent_eval_tasks = 1` (the CLI's
-`getattr(..., 4)` fallback is dead — the attribute always exists). So it
-bites only when concurrency is explicitly enabled.
-
-**Fix plan:** stagger only the first `max_concurrent_tasks` launches
-(e.g. `min(launch_index, max_concurrent_tasks - 1) * delay`), or move the
-sleep after semaphore acquisition.
-
----
 
 ### P2 — Correctness hygiene / hardening (fix opportunistically)
 
@@ -228,17 +211,6 @@ sleep after semaphore acquisition.
 | L8 | CLI injects `evaluator._evaluation_cli_notes_path` as a private attribute (`evaluation_cli.py:1107`); `csv_mode` reads via `getattr(..., None)` so failure is silent. Pass through the constructor. | confirmed |
 | L9 | Venv paths assume POSIX (`bin/python`) — unstated platform requirement. | confirmed |
 
----
-
-## Withdrawn findings (kept for the record)
-
-- **M3 (sequential-mode cost inflation) — withdrawn.** Each
-  `start_workflow_evolution` call builds a fresh `IndividualRun`
-  (`cost` defaults to `0.0`, `schema.py:51`) and a local `runs` list
-  (`evolution_engine.py:391-404`); the accumulation at `:567` is scoped to
-  that per-call list and the engine holds no cross-task cost state.
-  `runs[-1].cost` at `csv_mode.py:466` is the correct per-task total in both
-  modes. No fix needed.
 
 ---
 
@@ -263,7 +235,6 @@ sleep after semaphore acquisition.
    (all three retention sites).
 6. **M1** — `start_new_session` + `killpg` on timeout for all sandbox
    subprocess spawns.
-7. **C2** — cap the stagger at the worker count.
 
 ### Phase 2 — hardening, opportunistic (P2)
 
@@ -283,15 +254,3 @@ sleep after semaphore acquisition.
 - Two-run queued CLI smoke (same 2 tasks × 2 seeds): assert distinct
   `runs_capsule/run_{1,2}` trees, distinct note files, no cache-restore
   cross-talk.
-- RSS profile of one 10-task learning-mode preshot before/after C5.
-
----
-
-## Appendix — what was already solid
-
-Patterns worth keeping: the `EvalInfraError` → exclusion design cleanly
-separates harness faults from agent failures; `_prompt_with_default`
-explicitly fixed a prior executor-thread leak; the eval-output parser rejects
-stray "1"/"success" heuristics; venv creation is lock-guarded and
-version-verified; per-task temp dirs are cleaned in `finally`; CBS fallback
-`0.0` is logged distinctly via `CBS_error`.

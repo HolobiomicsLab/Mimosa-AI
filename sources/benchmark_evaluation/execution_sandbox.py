@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import ast
 import atexit
+import hashlib
 import logging
 import os
 import re
+import signal
 import subprocess
 import shutil
 import tempfile
@@ -102,11 +104,16 @@ class ExecutionSandbox:
         "pip-tools",
     ]
 
-    # Process-wide base venv, created once and reused across tasks.
-    _shared_venv_path: Path | None = None
-    _shared_base_dir: str | None = None
-    _constraints_file: str | None = None
+    # Process-wide base venvs, created once per environment fingerprint and
+    # reused across tasks. Keyed by a hash of (base_packages, constraints) so
+    # queued runs with differing environments never share (and drift) a venv.
+    # Entry: {"venv_path": Path, "base_dir": str, "constraints_file": str}
+    _shared_venvs: dict[str, dict] = {}
     _shared_venv_lock = threading.Lock()
+    # Serializes pip installs into shared venvs — after the C1 fix the eval
+    # loop runs sandbox setup from multiple threads (asyncio.to_thread), so
+    # event-loop serialization no longer protects per-task installs.
+    _shared_install_lock = threading.Lock()
 
     def __init__(
         self,
@@ -134,6 +141,7 @@ class ExecutionSandbox:
         self.cpu_only = cpu_only
         self.base_packages = list(base_packages) if base_packages is not None else list(self.BASIC_PACKAGES)
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self._constraints_file: str | None = None  # set by _create_or_reuse_base_venv
 
         # Per-instance temp dir for execution/eval working copies (cleaned per task).
         self._temp_dir_context = tempfile.TemporaryDirectory(prefix="mimosa_sandbox_")
@@ -182,32 +190,80 @@ class ExecutionSandbox:
             f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
         )
 
+    def _venv_fingerprint(self) -> str:
+        """Hash of (base_packages, constraints) — the shared-venv cache key."""
+        h = hashlib.sha256()
+        h.update("\n".join(self.base_packages).encode())
+        h.update(b"\n--constraints--\n")
+        h.update("\n".join(PINNED_CONSTRAINTS).encode())
+        return h.hexdigest()[:16]
+
+    @staticmethod
+    def _run_process(
+        cmd: list[str],
+        timeout: int,
+        cwd: str | None = None,
+        env: dict | None = None,
+    ) -> subprocess.CompletedProcess:
+        """``subprocess.run(capture_output=True, text=True)`` that kills the
+        whole process group on timeout.
+
+        Generated scripts may spawn workers (multiprocessing, DataLoader, TF);
+        ``subprocess.run(timeout=)`` kills only the direct child, orphaning
+        grandchildren that keep burning CPU/RAM (and lose their temp dir when
+        the sandbox cleans up). ``start_new_session`` puts the child in its own
+        process group so a timeout can SIGKILL the entire group before reaping.
+        Raises ``subprocess.TimeoutExpired`` like ``subprocess.run`` does.
+        """
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            stdout, stderr = proc.communicate()  # reap
+            raise subprocess.TimeoutExpired(cmd, timeout, output=stdout, stderr=stderr)
+        return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+
     def _create_or_reuse_base_venv(self) -> Path:
-        """Create the process-wide base venv once, then reuse it across tasks.
+        """Create the process-wide base venv once per env fingerprint, then reuse it.
 
         Building a fresh venv and re-installing heavy packages (torch,
         tensorflow) for every task dominated eval time. The venv is created
-        once, cached on the class, and reused; per-task working directories stay
-        isolated. Creation is lock-guarded. Concurrent per-task installs into the
-        shared venv rely on the eval loop being effectively serialized by its
-        blocking subprocess calls.
+        once per (base_packages, constraints) fingerprint, cached on the
+        class, and reused; per-task working directories stay isolated.
+        Creation is lock-guarded; per-task installs into the shared venv are
+        serialized by _shared_install_lock (see _setup_environment).
         """
         cls = type(self)
+        fingerprint = self._venv_fingerprint()
         with cls._shared_venv_lock:
-            existing = cls._shared_venv_path
-            if existing is not None and (existing / "bin" / "python").exists():
-                self.logger.info(f"[SANDBOX] Reusing shared base venv at {existing}")
-                return existing
+            existing = cls._shared_venvs.get(fingerprint)
+            if existing is not None and (existing["venv_path"] / "bin" / "python").exists():
+                self.logger.info(f"[SANDBOX] Reusing shared base venv at {existing['venv_path']}")
+                self._constraints_file = existing["constraints_file"]
+                return existing["venv_path"]
 
             base_dir = tempfile.mkdtemp(prefix="mimosa_base_venv_")
             venv_path = Path(base_dir) / "venv"
             py = self._resolve_sandbox_python()
             self.logger.info(
-                f"[SANDBOX] Creating shared Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py}"
+                f"[SANDBOX] Creating shared Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py} "
+                f"(fingerprint {fingerprint})"
             )
-            result = subprocess.run(
+            result = self._run_process(
                 [py, "-m", "venv", str(venv_path)],
-                capture_output=True, text=True, timeout=600,
+                timeout=600,
             )
             if result.returncode != 0:
                 shutil.rmtree(base_dir, ignore_errors=True)
@@ -237,40 +293,49 @@ class ExecutionSandbox:
             constraints = Path(base_dir) / "constraints.txt"
             constraints.write_text("\n".join(PINNED_CONSTRAINTS) + "\n")
 
-            cls._shared_venv_path = venv_path
-            cls._shared_base_dir = base_dir
-            cls._constraints_file = str(constraints)
+            cls._shared_venvs[fingerprint] = {
+                "venv_path": venv_path,
+                "base_dir": base_dir,
+                "constraints_file": str(constraints),
+            }
+            self._constraints_file = str(constraints)
             atexit.register(cls.cleanup_shared_venv)
             self.logger.info(f"[SANDBOX] Shared base venv ready at {venv_path} ({got})")
             return venv_path
 
     @classmethod
     def cleanup_shared_venv(cls) -> None:
-        """Remove the process-wide base venv (also registered with atexit)."""
+        """Remove all process-wide base venvs (also registered with atexit)."""
         with cls._shared_venv_lock:
-            base_dir = cls._shared_base_dir
-            if base_dir and Path(base_dir).exists():
-                shutil.rmtree(base_dir, ignore_errors=True)
-            cls._shared_venv_path = None
-            cls._shared_base_dir = None
-            cls._constraints_file = None
+            for entry in cls._shared_venvs.values():
+                base_dir = entry["base_dir"]
+                if base_dir and Path(base_dir).exists():
+                    shutil.rmtree(base_dir, ignore_errors=True)
+            cls._shared_venvs.clear()
 
     def _setup_environment(self) -> None:
         """Ensure base packages and capsule dependencies exist in the shared venv."""
         try:
-            # pip skips already-satisfied packages, so this is cheap after the first task.
-            self.logger.info("[SANDBOX] Ensuring base packages...")
-            self._install_packages(self.base_packages)
+            # Serialize installs into the shared venv across worker threads.
+            with type(self)._shared_install_lock:
+                # pip skips already-satisfied packages, so this is cheap after the first task.
+                self.logger.info("[SANDBOX] Ensuring base packages...")
+                self._install_packages(self.base_packages)
 
-            # Analyze capsule code and install additional dependencies
-            self._install_capsule_dependencies()
+                # Analyze capsule code and install additional dependencies
+                self._install_capsule_dependencies()
 
         except Exception as e:
             self.logger.error(f"[SANDBOX] Failed to setup environment: {e}")
             raise
 
     def _install_packages(self, packages: list[str], best_effort: bool = False) -> None:
-        """Install packages in the venv, capped by the shared constraints file."""
+        """Install packages in the venv, capped by the shared constraints file.
+
+        A non-zero pip return code for required packages raises EvalInfraError
+        (the task is excluded from metrics — a broken env is not an agent
+        failure); best_effort installs keep warning-only behavior.
+        """
         if not packages:
             return
 
@@ -280,15 +345,23 @@ class ExecutionSandbox:
         cmd += packages
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+            result = self._run_process(cmd, timeout=900)
             if result.returncode != 0:
-                self.logger.warning(f"[SANDBOX] Package install warnings: {result.stderr[:500]}")
+                if best_effort:
+                    self.logger.warning(f"[SANDBOX] Package install warnings: {result.stderr[:500]}")
+                else:
+                    raise EvalInfraError(
+                        f"Required package install failed (exit {result.returncode}) "
+                        f"for {packages}: {result.stderr[:500]}"
+                    )
             else:
                 self.logger.info(f"[SANDBOX] Installed: {', '.join(packages)}")
         except subprocess.TimeoutExpired:
             self.logger.error("[SANDBOX] Package installation timed out")
             if not best_effort:
                 raise
+        except EvalInfraError:
+            raise
         except Exception as e:
             self.logger.error(f"[SANDBOX] Package installation failed: {e}")
             if not best_effort:
@@ -320,11 +393,14 @@ class ExecutionSandbox:
         cmd = [str(self.pip_exe), "install", "-r", str(req_file)]
         if self._constraints_file:
             cmd += ["-c", self._constraints_file]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        result = self._run_process(cmd, timeout=900)
         if result.returncode == 0:
             self.logger.info(f"[SANDBOX] Installed deps from {req_file.name}")
         else:
-            self.logger.warning(f"[SANDBOX] Dep install warnings: {result.stderr[:500]}")
+            raise EvalInfraError(
+                f"Required dep install from {req_file.name} failed "
+                f"(exit {result.returncode}): {result.stderr[:500]}"
+            )
 
     def _run_pipreqs(self) -> Path | None:
         """Run pipreqs over the capsule's Python files; return requirements.in or None."""
@@ -340,7 +416,7 @@ class ExecutionSandbox:
             shutil.copy2(py, temp_path / py.name)
         req_in = temp_path / "requirements.in"
         cmd = [str(pipreqs_exe), "--savepath", str(req_in), "--mode", "no-pin", str(temp_path)]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        result = self._run_process(cmd, timeout=600)
         if result.returncode != 0 or not req_in.exists():
             self.logger.warning(f"[SANDBOX] pipreqs found no deps: {result.stderr[:300]}")
             return None
@@ -426,11 +502,9 @@ class ExecutionSandbox:
             # Run the generated script
             cmd = [str(self.python_exe), generated_script.name]
 
-            result = subprocess.run(
+            result = self._run_process(
                 cmd,
                 cwd=str(temp_path),
-                capture_output=True,
-                text=True,
                 timeout=timeout,
                 env=self._subprocess_env()
             )
@@ -689,11 +763,9 @@ class ExecutionSandbox:
             # Use virtual environment's Python executable
             cmd = [str(self.python_exe), eval_script_path.name]
 
-            result = subprocess.run(
+            result = self._run_process(
                 cmd,
                 cwd=str(temp_path),
-                capture_output=True,
-                text=True,
                 timeout=timeout,
                 env=self._subprocess_env()
             )

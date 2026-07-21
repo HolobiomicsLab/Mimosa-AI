@@ -8,9 +8,35 @@ generated code and reference (gold) code.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Module-level lazy singleton for the CodeBERT tokenizer + model. Loading
+# per task dominated CBS time; after the C1 fix scoring runs from multiple
+# worker threads (asyncio.to_thread), so loads are guarded by a lock.
+_model_lock = threading.Lock()
+_tokenizer = None
+_model = None
+
+
+def _load_codebert():
+    """Load (once) and return the cached (tokenizer, model) pair."""
+    global _tokenizer, _model
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                from transformers import AutoTokenizer, AutoModel
+
+                logger.info("[CBS] Loading CodeBERT model...")
+                model_name = "microsoft/codebert-base"
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                model = AutoModel.from_pretrained(model_name)
+                model.eval()
+                _tokenizer = tokenizer
+                _model = model
+    return _tokenizer, _model
 
 def calculate_codebert_score(
     generated_code_path: Path,
@@ -41,14 +67,8 @@ def _calculate_with_codebert(
     """
     import torch
     import torch.nn.functional as F
-    from transformers import AutoTokenizer, AutoModel
 
-    logger.info("[CBS] Loading CodeBERT model...")
-
-    model_name = "microsoft/codebert-base"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name)
-    model.eval()
+    tokenizer, model = _load_codebert()
 
     with open(generated_code_path, encoding='utf-8') as f:
         generated_code = f.read()
@@ -78,7 +98,8 @@ def _calculate_with_codebert(
     )
 
     logger.info("[CBS] Computing embeddings...")
-    with torch.no_grad():
+    # Serialize forward passes: the cached model is shared across worker threads.
+    with _model_lock, torch.no_grad():
         gen_outputs = model(**gen_encoding)
         gold_outputs = model(**gold_encoding)
 
@@ -114,21 +135,14 @@ def _calculate_with_codebert(
 
 def preload_codebert_model() -> tuple | None:
     """
-    Preload CodeBERT model to cache for faster subsequent scoring.
+    Warm the module-level CodeBERT cache so the first scoring call is fast.
     Returns:
         (tokenizer, model) tuple or None if loading fails
     """
     try:
-        from transformers import AutoTokenizer, AutoModel
-
-        logger.info("[CBS] Preloading CodeBERT model...")
-        model_name = "microsoft/codebert-base"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModel.from_pretrained(model_name)
-        model.eval()
-
+        result = _load_codebert()
         logger.info("[CBS] CodeBERT model loaded successfully")
-        return (tokenizer, model)
+        return result
     except ImportError:
         logger.warning("[CBS] transformers library not available for preloading")
         return None

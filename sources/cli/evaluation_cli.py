@@ -95,6 +95,10 @@ class EvalRunSpec:
     notes_path: Path | None = None
     # Advanced/ablation fields the user changed from defaults (name -> value)
     overrides: dict = field(default_factory=dict)
+    # Recovery decisions resolved during the configuration phase, so no stdin
+    # prompt happens after the queue launches (concurrent runs race on stdin).
+    start_row: int = 0          # 0-based first CSV row to process
+    restore_cache: bool = True  # restore stats from previous run notes if found
     # Populated after execution
     status: str = "pending"
     peak_ram_mb: float = 0.0
@@ -202,6 +206,7 @@ class EvaluationCLI:
         # Step 5 – Number of tasks (csv_runs_limit)
         _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
         csv_runs_limit = self._ask_csv_runs_limit()
+        start_row, restore_cache = self._ask_recovery_options()
 
         # Step 6 – Advanced / ablation options (optional)
         _print_step(6, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
@@ -214,6 +219,8 @@ class EvaluationCLI:
             csv_runs_limit=csv_runs_limit,
             mcp_list=mcp_list,
             overrides=overrides,
+            start_row=start_row,
+            restore_cache=restore_cache,
         )
 
     # ------------------------------------------------------------------
@@ -579,6 +586,30 @@ class EvaluationCLI:
                 return val
             except ValueError:
                 _warn(f"Invalid number '{raw}'. Please enter a whole number.")
+
+    def _ask_recovery_options(self) -> tuple[int, bool]:
+        """Resolve start-row and cache-restore decisions at configuration time.
+
+        These used to be prompted by csv_mode when each queued run *started* —
+        concurrent runs then raced on stdin. Resolving them here means no stdin
+        prompt happens after the queue launches.
+        """
+        print(_wrap(
+            "Recovery options: resume from a given CSV row and/or restore "
+            "statistics from a previous run's notes (same model)."
+        ))
+        while True:
+            raw = _ask("Starting row (1 = first task)", default="1")
+            try:
+                start_row = max(0, int(raw.strip()) - 1)
+                break
+            except ValueError:
+                _warn(f"Invalid value '{raw}'. Please enter a whole number.")
+        restore_cache = _ask_yn(
+            "Restore previous run statistics from cache if found?", default=True,
+        )
+        _ok(f"Start row: {start_row + 1}, restore cache: {'yes' if restore_cache else 'no'}")
+        return start_row, restore_cache
 
     # ------------------------------------------------------------------
     # Step 6 – Advanced / ablation options (optional)
@@ -1079,6 +1110,7 @@ class EvaluationCLI:
         run_config.workflow_dir = f"sources/workflows/run_{spec.run_id}"
         run_config.memory_dir = f"sources/memory/run_{spec.run_id}"
         run_config.runner_temp_dir = f"./tmp/run_{spec.run_id}"
+        run_config.runs_capsule_dir = f"runs_capsule/run_{spec.run_id}"
 
         run_config.create_paths()
         try:
@@ -1102,6 +1134,7 @@ class EvaluationCLI:
             csv_runs_limit=spec.csv_runs_limit,
             max_concurrent_tasks=max_concurrent,
             task_start_delay=task_start_delay,
+            run_notes_dir=Path("run_notes") / f"run_{spec.run_id}",
         )
         # Attach the run notes path so csv_mode can write final results there
         evaluator._evaluation_cli_notes_path = spec.notes_path
@@ -1117,6 +1150,8 @@ class EvaluationCLI:
                 learning=learning,
                 single_agent_mode=single_agent,
                 concurrent=max_concurrent > 1,
+                start_row=spec.start_row,
+                restore_cache=spec.restore_cache,
             )
             spec.status = "completed"
             self._update_notes(spec.notes_path, {

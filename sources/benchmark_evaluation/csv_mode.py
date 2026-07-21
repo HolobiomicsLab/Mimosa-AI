@@ -73,7 +73,8 @@ class CsvEvaluationMode:
     Supports concurrent evaluation of multiple tasks.
     """
 
-    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1, task_start_delay: float = 30.0):
+    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1,
+                 task_start_delay: float = 30.0, run_notes_dir: str | Path = "run_notes"):
         """
         Initialize CsvEvaluationMode.
 
@@ -83,14 +84,16 @@ class CsvEvaluationMode:
             max_concurrent_tasks: Maximum number of tasks to run concurrently (default: 1 for sequential)
             task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
                               Staggers agent starts to avoid overwhelming shell/API resources.
+            run_notes_dir: Directory for per-task run notes. Per-run in queued CLI
+                              mode so concurrent runs never restore each other's cache.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
         self.max_concurrent_tasks = max_concurrent_tasks
         self.evolve = EvolutionEngine(config)
         self.planner = Planner(config)
-        self.run_notes_dir = Path("run_notes")
-        self.run_notes_dir.mkdir(exist_ok=True)
+        self.run_notes_dir = Path(run_notes_dir)
+        self.run_notes_dir.mkdir(parents=True, exist_ok=True)
         self.done_rows = []
 
         # Concurrency control
@@ -419,14 +422,14 @@ EXPECTED OUTPUT:
             self.logger.error(f"Error generating task for row: {row}, error: {e}")
             return "Error generating task", None, None
 
-    def sab_files_transfer(self, sab_loader, file_transfer, row):
+    async def sab_files_transfer(self, sab_loader, file_transfer, row):
         """Transfer dataset files to workspace with validation."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
         self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
         print_info(f"📁 Transferring dataset: {task_dataset_path.name}")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        time.sleep(0.5)  # Give filesystem a moment to sync
+        await asyncio.sleep(0.5)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print_ok(f"Transferred {files_transferred} file(s) to workspace")
         print_info(f"Verification: {workspace_files_after} file(s) present in workspace")
@@ -655,7 +658,7 @@ EXPECTED OUTPUT:
                 runs = None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
-                    self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
+                    await self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
 
                     runs = await isolated_dgm.start_workflow_evolution(
                         goal=goal,
@@ -673,13 +676,16 @@ EXPECTED OUTPUT:
 
                 print(f"\033[96m[Worker {task_id}] 📊 Transferring results files...\033[0m")
 
-                # Transfer results to capsule (uses shared capsule dir)
+                # Transfer results to capsule (uses shared capsule dir).
+                # Offloaded: the capsule namer is a blocking sync LLM call.
                 trs = LocalTransfer(
                     config=isolated_config,
                     workspace_path=isolated_config.workspace_dir,
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
-                capsule_name = trs.transfer_workspace_files_to_capsule(goal)
+                capsule_name = await asyncio.to_thread(
+                    trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
+                )
 
                 print(f"\033[96m[Worker {task_id}] 📊 Analyzing results...\033[0m")
                 execution_time = time.time() - iteration_start_time
@@ -692,7 +698,9 @@ EXPECTED OUTPUT:
                 }
 
                 if dataset_type == "science_agent_bench" and sab_loader and runs:
-                    execution_data = self._evaluate_with_science_agent_bench(
+                    # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
+                    execution_data = await asyncio.to_thread(
+                        self._evaluate_with_science_agent_bench,
                         capsule_name=capsule_name,
                         row=row,
                         runs=runs,
@@ -728,14 +736,14 @@ EXPECTED OUTPUT:
                 # Cleanup isolated workspace
                 self._cleanup_isolated_workspace(task_id)
 
-    def _sab_files_transfer_isolated(self, sab_loader, file_transfer, row, task_id: str):
+    async def _sab_files_transfer_isolated(self, sab_loader, file_transfer, row, task_id: str):
         """Transfer dataset files to isolated workspace with validation."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
         self.logger.info(f"[Worker {task_id}] Transferring dataset from: {task_dataset_path}")
         print(f"\033[96m[Worker {task_id}] 📁 Transferring dataset: {task_dataset_path.name}\033[0m")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        time.sleep(0.3)  # Give filesystem a moment to sync
+        await asyncio.sleep(0.3)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[96m[Worker {task_id}] ✓ Transferred {files_transferred} files to workspace\033[0m")
 
@@ -752,7 +760,9 @@ EXPECTED OUTPUT:
         dataset_type: str,
         dataset_path: str,
         learning: bool,
-        single_agent_mode: bool = False
+        single_agent_mode: bool = False,
+        start_row: int | None = None,
+        restore_cache: bool | None = None
     ) -> None:
         """
         Concurrent execution loop that processes multiple tasks in parallel.
@@ -763,27 +773,35 @@ EXPECTED OUTPUT:
             dataset_path: Path to the CSV dataset file
             learning: Whether learning mode is enabled
             single_agent_mode: Whether to use single agent mode
+            start_row: 0-based first CSV row to process. None = prompt the user
+                (interactive mode only; queued CLI runs must pass a value so no
+                stdin prompt happens after the queue launches).
+            restore_cache: Whether to restore stats from previous run notes.
+                None = prompt the user when a cache is found.
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
-        while True:
-            user_input = await _prompt_with_default("Enter starting row", default="0")
-            try:
-                start_row = max(0, int(user_input) - 1)
-                break
-            except ValueError:
-                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        # Get starting row (pre-resolved by the caller, or prompt interactively)
+        if start_row is None:
+            while True:
+                user_input = await _prompt_with_default("Enter starting row", default="0")
+                try:
+                    start_row = max(0, int(user_input) - 1)
+                    break
+                except ValueError:
+                    print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
         print(f"  → starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _prompt_with_default(
-                "Restore previous run statistics from cache? (y/n)", default="y"
-            )
-            if restore_input.lower() != 'n':
+            if restore_cache is None:
+                restore_input = await _prompt_with_default(
+                    "Restore previous run statistics from cache? (y/n)", default="y"
+                )
+                restore_cache = restore_input.lower() != 'n'
+            if restore_cache:
                 self._restore_execution_history_from_cache(cached_notes)
 
         # Initialize semaphore for concurrency control
@@ -868,31 +886,41 @@ EXPECTED OUTPUT:
         self._print_final_summary()
         self._send_email_report(status="completed")
 
-    async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
+    async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool,
+                                          single_agent_mode: bool = False,
+                                          start_row: int | None = None,
+                                          restore_cache: bool | None = None) -> None:
         """
         Main autonomous execution loop.
         Generates goals from CSV entries, executes them, analyzes results, and learns.
+
+        Args:
+            start_row: 0-based first CSV row; None = prompt interactively.
+            restore_cache: Whether to restore previous run stats; None = prompt.
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
-        while True:
-            user_input = await _prompt_with_default("Enter starting row", default="0")
-            try:
-                start_row = max(0, int(user_input) - 1)
-                break
-            except ValueError:
-                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        # Get starting row (pre-resolved by the caller, or prompt interactively)
+        if start_row is None:
+            while True:
+                user_input = await _prompt_with_default("Enter starting row", default="0")
+                try:
+                    start_row = max(0, int(user_input) - 1)
+                    break
+                except ValueError:
+                    print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
         print_info(f"→ starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _prompt_with_default(
-                "Restore previous run statistics from cache? (y/n)", default="y"
-            )
-            if restore_input.lower() != 'n':
+            if restore_cache is None:
+                restore_input = await _prompt_with_default(
+                    "Restore previous run statistics from cache? (y/n)", default="y"
+                )
+                restore_cache = restore_input.lower() != 'n'
+            if restore_cache:
                 self._restore_execution_history_from_cache(cached_notes)
 
         sab_loader = None
@@ -926,7 +954,7 @@ EXPECTED OUTPUT:
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
                     if dataset_type == "science_agent_bench" and sab_loader:
-                        self.sab_files_transfer(sab_loader, file_transfer, row)
+                        await self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
                                                         enable_evolution=learning,
@@ -939,18 +967,24 @@ EXPECTED OUTPUT:
                                     max_task_retry=3
                                    )
                     print_info("📦 Transferring results files…")
+                    # Offloaded: the capsule namer is a blocking sync LLM call.
                     trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
-                    capsule_name = trs.transfer_workspace_files_to_capsule(goal)
+                    task_id = self._extract_workspace_name_from_row(row)
+                    capsule_name = await asyncio.to_thread(
+                        trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
+                    )
                     print_info("📊 Analyzing results…")
                     execution_time = time.time() - iteration_start_time
                     execution_data = {
                         "iteration": i + 1,
                         "goal": goal,
                         "execution_time": execution_time,
-                        "task_id": self._extract_workspace_name_from_row(row),
+                        "task_id": task_id,
                     }
                     if dataset_type == "science_agent_bench" and sab_loader:
-                        execution_data = self._evaluate_with_science_agent_bench(
+                        # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
+                        execution_data = await asyncio.to_thread(
+                            self._evaluate_with_science_agent_bench,
                             capsule_name=capsule_name,
                             row=row,
                             runs=runs,
@@ -1151,7 +1185,9 @@ EXPECTED OUTPUT:
         dataset_path: str = "datasets/our_benchmark.csv",
         learning: bool = False,
         single_agent_mode: bool = False,
-        concurrent: bool = False
+        concurrent: bool = False,
+        start_row: int | None = None,
+        restore_cache: bool | None = None
     ) -> None:
         """
         Public method to start the evaluation mode.
@@ -1162,6 +1198,8 @@ EXPECTED OUTPUT:
             learning: Whether to enable learning mode
             single_agent_mode: Whether to use single agent mode
             concurrent: Whether to run tasks concurrently (uses max_concurrent_tasks from init)
+            start_row: 0-based first CSV row to process; None = prompt interactively
+            restore_cache: Whether to restore previous run stats; None = prompt when a cache is found
         """
         # Snapshot the run-level args so the email report can describe what ran.
         self._dataset_type = dataset_type
@@ -1173,11 +1211,13 @@ EXPECTED OUTPUT:
         try:
             if concurrent and self.max_concurrent_tasks > 1:
                 print(f"\033[95mStarting CONCURRENT evaluation with {self.max_concurrent_tasks} workers\033[0m")
-                await self.run_concurrent_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+                await self.run_concurrent_eval_loop(dataset_type, dataset_path, learning, single_agent_mode,
+                                                    start_row=start_row, restore_cache=restore_cache)
             else:
                 if concurrent and self.max_concurrent_tasks <= 1:
                     print("\033[93m⚠️ Concurrent mode requested but max_concurrent_tasks <= 1, falling back to sequential\033[0m")
-                await self.run_single_thread_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+                await self.run_single_thread_eval_loop(dataset_type, dataset_path, learning, single_agent_mode,
+                                                       start_row=start_row, restore_cache=restore_cache)
         except KeyboardInterrupt:
             print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
