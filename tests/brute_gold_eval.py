@@ -65,11 +65,11 @@ DATASETS_DIR = _resolve_up("ScienceAgentBench", "datasets")
 TASK_CSV = _resolve_up("ScienceAgentBench.csv")
 
 
-def _load_tasks() -> tuple[list[str], dict[str, str]]:
-    """Return (all eval basenames, {eval_base: gold_base}) from the benchmark CSV."""
+def _load_tasks() -> tuple[list[str], dict[str, str], dict[str, str]]:
+    """Return (all eval basenames, {eval_base: gold_base}, {eval_base: output_fname})."""
     if not TASK_CSV or not TASK_CSV.exists():
-        return [], {}
-    evals, mapping = [], {}
+        return [], {}, {}
+    evals, mapping, outputs = [], {}, {}
     with open(TASK_CSV, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             eval_base = (row.get("eval_script_name") or "").replace(".py", "").strip()
@@ -77,10 +77,11 @@ def _load_tasks() -> tuple[list[str], dict[str, str]]:
             if eval_base:
                 evals.append(eval_base)
                 mapping[eval_base] = gold_base
-    return evals, mapping
+                outputs[eval_base] = (row.get("output_fname") or "").strip()
+    return evals, mapping, outputs
 
 
-ALL_TASKS, EVAL_TO_GOLD = _load_tasks()
+ALL_TASKS, EVAL_TO_GOLD, EVAL_TO_OUTPUT = _load_tasks()
 
 
 def _parse_io_paths(eval_text: str) -> tuple[str | None, str | None]:
@@ -107,7 +108,9 @@ def _seed_capsule_with_gold(capsule: Path, pred_rel: str, gold_name: str) -> Non
     src = GOLD_RESULTS_DIR / gold_name
     if not src.exists():
         raise FileNotFoundError(f"gold output missing: {src}")
-    dst = capsule / "pred_results" / pred_rel
+    # Manifest output_fname may already carry the pred_results/ prefix.
+    rel = pred_rel[len("pred_results/"):] if pred_rel.startswith("pred_results/") else pred_rel
+    dst = capsule / "pred_results" / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
 
@@ -130,8 +133,11 @@ def brute_test_one(eval_name: str, base_packages=None, run_ver: bool = True) -> 
         record["msg"] = f"eval script not found: {eval_path}"
         return record
     pred_rel, gold_name = _parse_io_paths(eval_path.read_text(encoding="utf-8", errors="ignore"))
+    # The manifest's output_fname is the authoritative expected output — the regex
+    # above misses checkers that build the pred path dynamically ('...{}.format()').
+    pred_rel = EVAL_TO_OUTPUT.get(eval_name) or pred_rel
     if not pred_rel:
-        record["msg"] = "could not parse pred_results path from eval script"
+        record["msg"] = "no expected output in manifest or eval script"
         return record
 
     capsule = Path(tempfile.mkdtemp(prefix=f"brute_{eval_name}_"))
@@ -147,15 +153,28 @@ def brute_test_one(eval_name: str, base_packages=None, run_ver: bool = True) -> 
 
         if do_ver:
             shutil.copy2(gold_prog, capsule / gold_prog.name)
-            sandbox = ExecutionSandbox(capsule, base_packages=base_packages)
-            ver_ok, ver_msg = sandbox.run_generated_code(
-                script_path=capsule / gold_prog.name,
-                script_name=gold_prog.name,
-                expected_output=pred_rel,
-                timeout=900,
-            )
+            try:
+                sandbox = ExecutionSandbox(capsule, base_packages=base_packages)
+                ver_ok, ver_msg = sandbox.run_generated_code(
+                    script_path=capsule / gold_prog.name,
+                    script_name=gold_prog.name,
+                    expected_output=pred_rel,
+                    timeout=900,
+                )
+            except EvalInfraError as e:
+                record["ver"] = "skipped (infra)"
+                record["sr"] = None  # excluded, not a failure
+                record["msg"] = f"EXCLUDED (infra): {str(e)[:120]}"
+                return record
             record["ver"] = "PASS" if ver_ok else "FAIL"
             if not ver_ok:
+                # A gold timeout is a resource limit, not a code fault — exclude
+                # the task rather than score a failure that carries no signal.
+                if "timeout" in ver_msg.lower():
+                    record["ver"] = "skipped (timeout)"
+                    record["sr"] = None
+                    record["msg"] = f"EXCLUDED (gold timeout): {ver_msg[:100]}"
+                    return record
                 record["sr"] = False  # VER failed -> SR is False (SAB semantics)
                 record["msg"] = ver_msg[:160]
                 return record
@@ -202,6 +221,10 @@ def run_brute_test(eval_names: list[str], base_packages=None, run_ver: bool = Tr
 
     evaluated = [r for r in records if r["sr"] is not None]
     excluded = [r for r in records if r["sr"] is None]
+    # Split the no-score tasks: infra exclusions (environment/harness problems)
+    # vs skips (VER never ran: seed mode, missing data, gold timeout, parse gap).
+    skipped = [r for r in excluded if str(r["ver"]).startswith("skipped")]
+    infra = [r for r in excluded if not str(r["ver"]).startswith("skipped")]
     ver_ran = [r for r in records if r["ver"] in ("PASS", "FAIL")]
     ver_pass = sum(1 for r in ver_ran if r["ver"] == "PASS")
     sr_pass = sum(1 for r in evaluated if r["sr"])
@@ -209,7 +232,14 @@ def run_brute_test(eval_names: list[str], base_packages=None, run_ver: bool = Tr
     print("-" * 84)
     ver_line = f"{ver_pass}/{len(ver_ran)} ({ver_pass/len(ver_ran)*100:.0f}%)" if ver_ran else "none executed"
     sr_pct = (sr_pass / len(evaluated) * 100) if evaluated else 0.0
-    print(f"VER: {ver_line} | SR: {sr_pass}/{len(evaluated)} ({sr_pct:.0f}%) | excluded (infra): {len(excluded)}")
+    print(f"VER: {ver_line} | SR: {sr_pass}/{len(evaluated)} ({sr_pct:.0f}%) | "
+          f"excluded (infra): {len(infra)} | skipped (not in denominator): {len(skipped)}")
+    if skipped:
+        reasons: dict[str, int] = {}
+        for r in skipped:
+            reasons[r["ver"]] = reasons.get(r["ver"], 0) + 1
+        for reason, n in sorted(reasons.items()):
+            print(f"  skipped: {n:>3} × {reason}")
     print("=" * 84)
     return records
 

@@ -40,6 +40,21 @@ PINNED_CONSTRAINTS = [
     "rdkit<=2023.09.5",
     "pymatgen<=2024.5.1",
     "oggm<=1.6.1",
+    # Beyond the authors' list: transitive deps they leave floating, pinned here
+    # because their drift breaks the gold programs at runtime.
+    # tensorflow<=2.17 holds ml_dtypes<0.5 while newer jax needs >=0.5
+    # (AttributeError: module 'ml_dtypes' has no attribute 'float8_e3m4' at any
+    # tensorflow import). pip can't catch it — specs are satisfied either way.
+    "jax<=0.4.34",
+    "jaxlib<=0.4.34",
+    "ml_dtypes<0.5.0",
+    # phonopy v3/v4 removed the legacy set_* API (set_force_constants,
+    # set_band_structure) the gold programs call; 2.29.x is the benchmark era.
+    "phonopy<2.30",
+    # chemprop v2 renamed the chemprop_train/chemprop_predict CLIs gold shells
+    # out to (a no-op on py3.10 — v2 requires >=3.11 — but pins the era in case
+    # the sandbox interpreter moves).
+    "chemprop<2.0",
 ]
 
 # pipreqs import name -> PyPI package name (authors' handcrafted remaps).
@@ -59,7 +74,8 @@ EXTRA_DEPS = {
     "scanpy": ["scikit-misc", "leidenalg"],
 }
 
-# Libraries needing bespoke install commands (keyed lowercase); best-effort.
+# Libraries needing bespoke install commands (keyed lowercase); failures are
+# treated as infra errors (task excluded), never as generated-code failures.
 SPECIAL_CASE_INSTALLS = {
     "deepchem": [["dgl", "-f", "https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html"]],
     "deeppurpose": [["git+https://github.com/bp-kelley/descriptastorus"]],
@@ -313,28 +329,75 @@ class ExecutionSandbox:
                     shutil.rmtree(base_dir, ignore_errors=True)
             cls._shared_venvs.clear()
 
+    # Small tools that must be installed before per-task dep discovery can run.
+    _DISCOVERY_TOOLS = ("pipreqs", "pip-tools")
+
     def _setup_environment(self) -> None:
-        """Ensure base packages and capsule dependencies exist in the shared venv."""
+        """Ensure base packages and capsule dependencies exist in the shared venv.
+
+        Install order: the pipreqs/pip-tools discovery tools first (needed to
+        analyze the capsule), then the rest of the base stack and the per-task
+        deps in ONE pip transaction — pip co-resolves the full graph instead of
+        drifting across separate installs (matching the authors' merged
+        ``pip install -r`` in config_conda_env.py).
+        """
         try:
             # Serialize installs into the shared venv across worker threads.
             with type(self)._shared_install_lock:
-                # pip skips already-satisfied packages, so this is cheap after the first task.
-                self.logger.info("[SANDBOX] Ensuring base packages...")
-                self._install_packages(self.base_packages)
+                tools = [p for p in self.base_packages if p in self._DISCOVERY_TOOLS]
+                if tools:
+                    self._install_packages(tools)
 
-                # Analyze capsule code and install additional dependencies
-                self._install_capsule_dependencies()
+                per_task, present = self._discover_capsule_dependencies()
+
+                rest = [p for p in self.base_packages if p not in self._DISCOVERY_TOOLS]
+                # Drop per-task entries already covered (pinned) by the base set —
+                # pip errors on a requirement named twice in one command.
+                rest_names = {self._req_name(p) for p in rest}
+                merged = rest + [p for p in per_task if self._req_name(p) not in rest_names]
+                # pip skips already-satisfied packages, so this is cheap after the first task.
+                self.logger.info("[SANDBOX] Ensuring base + per-program packages...")
+                self._install_packages(merged)
+                self._run_special_case_installs(present)
 
         except Exception as e:
             self.logger.error(f"[SANDBOX] Failed to setup environment: {e}")
             raise
 
-    def _install_packages(self, packages: list[str], best_effort: bool = False) -> None:
+    @staticmethod
+    def _req_name(req: str) -> str:
+        """Canonical package name of a requirement specifier (for de-dup)."""
+        return re.split(r"[=<>!~\[; ]", req.strip(), 1)[0].strip().lower().replace("_", "-")
+
+    def _discover_capsule_dependencies(self) -> tuple[list[str], list[str]]:
+        """Return (per-program packages, present names) via pipreqs + SAB rules.
+
+        A capsule-provided requirements.txt wins: it is installed as-is (still
+        constraint-capped) and discovery stops there.
+        """
+        # A capsule-provided requirements.txt wins (still constraint-capped).
+        capsule_reqs = self.capsule_path / "requirements.txt"
+        if capsule_reqs.exists():
+            self._pip_install_requirements(capsule_reqs)
+            return [], []
+
+        if not list(self.capsule_path.glob("*.py")):
+            self.logger.info("[SANDBOX] No Python files in capsule")
+            return [], []
+
+        requirements_in = self._run_pipreqs()
+        if requirements_in is None:
+            return [], []
+        packages, present = self._apply_dependency_rules(requirements_in.read_text())
+        if packages:
+            self.logger.info(f"[SANDBOX] Per-program deps: {', '.join(packages)}")
+        return packages, present
+
+    def _install_packages(self, packages: list[str]) -> None:
         """Install packages in the venv, capped by the shared constraints file.
 
-        A non-zero pip return code for required packages raises EvalInfraError
-        (the task is excluded from metrics — a broken env is not an agent
-        failure); best_effort installs keep warning-only behavior.
+        A non-zero pip return code raises EvalInfraError: a broken environment
+        is not an agent failure, so the task is excluded from metrics.
         """
         if not packages:
             return
@@ -347,46 +410,19 @@ class ExecutionSandbox:
         try:
             result = self._run_process(cmd, timeout=900)
             if result.returncode != 0:
-                if best_effort:
-                    self.logger.warning(f"[SANDBOX] Package install warnings: {result.stderr[:500]}")
-                else:
-                    raise EvalInfraError(
-                        f"Required package install failed (exit {result.returncode}) "
-                        f"for {packages}: {result.stderr[:500]}"
-                    )
-            else:
-                self.logger.info(f"[SANDBOX] Installed: {', '.join(packages)}")
+                raise EvalInfraError(
+                    f"Required package install failed (exit {result.returncode}) "
+                    f"for {packages}: {result.stderr[:500]}"
+                )
+            self.logger.info(f"[SANDBOX] Installed: {', '.join(packages)}")
         except subprocess.TimeoutExpired:
             self.logger.error("[SANDBOX] Package installation timed out")
-            if not best_effort:
-                raise
+            raise
         except EvalInfraError:
             raise
         except Exception as e:
             self.logger.error(f"[SANDBOX] Package installation failed: {e}")
-            if not best_effort:
-                raise
-
-    def _install_capsule_dependencies(self) -> None:
-        """Install per-program deps via pipreqs + the authors' handcrafted rules."""
-        # A capsule-provided requirements.txt wins (still constraint-capped).
-        capsule_reqs = self.capsule_path / "requirements.txt"
-        if capsule_reqs.exists():
-            self._pip_install_requirements(capsule_reqs)
-            return
-
-        if not list(self.capsule_path.glob("*.py")):
-            self.logger.info("[SANDBOX] No Python files in capsule")
-            return
-
-        requirements_in = self._run_pipreqs()
-        if requirements_in is None:
-            return
-        packages, present = self._apply_dependency_rules(requirements_in.read_text())
-        if packages:
-            self.logger.info(f"[SANDBOX] Installing per-program deps: {', '.join(packages)}")
-            self._install_packages(packages)
-        self._run_special_case_installs(present)
+            raise
 
     def _pip_install_requirements(self, req_file: Path) -> None:
         """pip install -r req_file, capped by the shared constraints file."""
@@ -442,15 +478,23 @@ class ExecutionSandbox:
         return out, present
 
     def _run_special_case_installs(self, present: list[str]) -> None:
-        """Run bespoke installs for libs pipreqs can't fully provision (best-effort)."""
+        """Run bespoke installs for libs pipreqs can't fully provision.
+
+        A failure raises EvalInfraError: a dependency that cannot be provisioned
+        is an infra problem (task excluded), not a generated-code failure.
+        """
         for name in present:
             for extra in SPECIAL_CASE_INSTALLS.get(name.lower(), []):
                 self.logger.info(f"[SANDBOX] Special-case install for {name}: {' '.join(extra)}")
-                self._install_packages(extra, best_effort=True)
+                self._install_packages(extra)
 
     def _subprocess_env(self) -> dict:
         """Build the env dict for spawned scripts, applying cpu_only if set."""
         env = os.environ.copy()
+        # Put the venv's bin/ first on PATH so console scripts installed into the
+        # sandbox (e.g. chemprop_train) resolve when generated code shells out to
+        # them by name.
+        env["PATH"] = str(self.venv_path / "bin") + os.pathsep + env.get("PATH", "")
         if self.cpu_only:
             env["CUDA_VISIBLE_DEVICES"] = ""
             env["TF_CPP_MIN_LOG_LEVEL"] = env.get("TF_CPP_MIN_LOG_LEVEL", "2")
@@ -460,7 +504,7 @@ class ExecutionSandbox:
         self,
         script_path: Path = None,
         script_name: str = None,
-        expected_output: str = "",
+        expected_output: str | list[str] = "",
         timeout: int = 3600
     ) -> tuple[bool, str]:
         """
@@ -468,11 +512,16 @@ class ExecutionSandbox:
 
         Args:
             eval_script_path: Path to evaluation script (used for smart file selection)
-            expected_output: Expected output filename to check for
+            expected_output: Expected output filename(s) to check for — a single
+                name or the full list of files the task's checker consumes
             timeout: Execution timeout in seconds
 
         Returns:
             (success: bool, message: str)
+
+        Raises:
+            EvalInfraError: if the program dies on a missing/broken import —
+                that is a provisioning gap (task excluded), not invalid code.
         """
         try:
             self.logger.info("[SANDBOX] Running generated code for VER evaluation")
@@ -510,23 +559,40 @@ class ExecutionSandbox:
             )
 
             if result.returncode != 0:
+                # A missing/broken import means provisioning failed, not that the
+                # code is invalid — exclude the task instead of failing VER.
+                import_error = re.search(
+                    r"(?:ModuleNotFoundError|ImportError):[^\n]*", result.stderr or ""
+                )
+                if import_error:
+                    raise EvalInfraError(
+                        f"Generated code import failed — provisioning gap: "
+                        f"{import_error.group(0)}"
+                    )
                 error_msg = f"Generated code failed with code {result.returncode}"
                 if result.stderr:
                     error_msg += f": {result.stderr[:100000]}"
                 self.logger.error(f"[SANDBOX] {error_msg}")
                 return False, error_msg
 
-            # Check if expected output was created
-            if expected_output:
-                # Handle case where expected_output already contains 'pred_results/' prefix
-                expected_output_clean = expected_output
-                if expected_output.startswith("pred_results/"):
-                    expected_output_clean = expected_output[len("pred_results/"):]
-                elif expected_output.startswith("pred_results\\"):
-                    expected_output_clean = expected_output[len("pred_results\\"):]
-                expected_path = temp_path / "pred_results" / expected_output_clean
-                if not expected_path.exists():
-                    return False, f"Expected output file not created: {expected_output}"
+            # Check that every expected output was created
+            expected_outputs = (
+                [expected_output] if isinstance(expected_output, str) else list(expected_output)
+            )
+            missing = []
+            for name in expected_outputs:
+                if not name:
+                    continue
+                # Handle case where the name already contains 'pred_results/' prefix
+                clean = name
+                if clean.startswith("pred_results/"):
+                    clean = clean[len("pred_results/"):]
+                elif clean.startswith("pred_results\\"):
+                    clean = clean[len("pred_results\\"):]
+                if not (temp_path / "pred_results" / clean).exists():
+                    missing.append(name)
+            if missing:
+                return False, f"Expected output file(s) not created: {', '.join(missing)}"
 
             # Copy results back to capsule if pred_results was created
             pred_results_src = temp_path / "pred_results"
@@ -541,6 +607,8 @@ class ExecutionSandbox:
             self.logger.info("[SANDBOX] Generated code executed successfully")
             return True, f"Code executed. Output: {output[:100000]}"
 
+        except EvalInfraError:
+            raise  # infra problem — let the caller exclude the task
         except subprocess.TimeoutExpired:
             self.logger.error(f"[SANDBOX] Generated code timeout after {timeout}s")
             return False, f"Code execution timeout after {timeout} seconds"

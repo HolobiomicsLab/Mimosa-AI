@@ -9,6 +9,7 @@ Implements the four key metrics:
 """
 
 import os
+import re
 import sys
 import logging
 from pathlib import Path
@@ -148,6 +149,35 @@ class CapsuleEvaluator:
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")
         return self.metrics
 
+    def _expected_outputs(self) -> list[str]:
+        """Full set of pred_results files VER must check.
+
+        The manifest (output_fname) declares a single output, but a few checkers
+        read additional statically-named files (e.g. mountainLion3,
+        bio_interval_analyze) — augment from the eval script's literal
+        pred_results references. Dynamically-built names (format holes like
+        '{}_{}.csv') can't be derived statically; the manifest entry stays the
+        sole check for those.
+        """
+        outputs = [self.expected_output] if self.expected_output else []
+        if self.eval_script_name:
+            try:
+                eval_path, _ = self.sab_loader.get_eval_script_path(self.task_data)
+            except (FileNotFoundError, ValueError):
+                eval_path = None  # reported as infra error later in evaluate_success_rate
+            if eval_path is not None:
+                try:
+                    text = eval_path.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    text = ""  # unreadable here — reported as infra error downstream
+                for ref in re.findall(r"pred_results/([A-Za-z0-9_.\-/]+)", text):
+                    if any(c in ref for c in "{}%"):
+                        continue  # dynamically-built path — not statically derivable
+                    full = f"pred_results/{ref}"
+                    if full not in outputs:
+                        outputs.append(full)
+        return outputs
+
     def evaluate_success_rate(self) -> tuple[bool, str, bool, str]:
         """
         Evaluate Success Rate (SR) and Valid Execution Rate (VER).
@@ -166,8 +196,8 @@ class CapsuleEvaluator:
             ver_success, ver_message = self.sandbox.run_generated_code(
                 script_path=full_program_path,  # Use generated program (same name as gold program) for execution to check if it runs without error
                 script_name=self.gold_program_name,
-                expected_output=self.expected_output,
-                timeout=300
+                expected_output=self._expected_outputs(),
+                timeout=900  # heavy reference solutions exceed 300s on CPU
             )
 
             if not ver_success:
@@ -188,7 +218,7 @@ class CapsuleEvaluator:
             sr_success, sr_message = self.sandbox.run_eval_script(
                 eval_script_path=eval_script_path,
                 visual_judge_path=judge_path,
-                timeout=180
+                timeout=300  # match the gold harness budget (was 180s)
             )
 
             return sr_success, sr_message, ver_success, ver_message
