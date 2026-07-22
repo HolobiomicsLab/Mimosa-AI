@@ -939,7 +939,7 @@ EXPECTED OUTPUT:
             total_rows = sum(1 for _ in reader)
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
-            self.logger.info(f"[PAPERS DATASET MODE] Starting autonomous loop for {total_rows} CSV entry")
+            self.logger.info(f"[EVALUATION MODE] Starting autonomous loop for {total_rows} CSV entry")
             print_phase("Evaluating on paper datasets...")
             for i, row in enumerate(reader):
                 if i < start_row:
@@ -1001,7 +1001,7 @@ EXPECTED OUTPUT:
                     print_ok(f"Iteration {i + 1} completed")
                     print_info(f"  Time: {execution_time:.2f}s")
                 except Exception as e:
-                    self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
+                    self.logger.error(f"[DATASET EVALUATION] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
                     self.execution_history.append({
                         "iteration": i + 1,

@@ -55,15 +55,15 @@ class Config:
         # AUdit / Export
         ##############
         # When True, writes an ASTRA spec YAML after task completion.
-        self.export_astra: bool = True
+        self.export_astra: bool = False
 
         ##############
         # LLM Configuration
         ##############
-        self.planner_llm_model: str = "openrouter/z-ai/glm-5.2"
-        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.2"
-        self.smolagent_model_id: str = ["openrouter/deepseek/deepseek-v4-pro", "openrouter/z-ai/glm-5.2", "openrouter/qwen/qwen3.7-plus", "openrouter/xiaomi/mimo-v2.5"]
-        self.judge_model = "openrouter/z-ai/glm-5.2"
+        self.planner_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
+        self.workflow_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
 
         #############
@@ -71,9 +71,9 @@ class Config:
         #############
         # Let orchestrator choose model, otherwise default to self.smolagent_model_id[0]
         # Recommanded: model diversity avoid idea and verifiers collapse.
-        self.orchestrator_choose_model = True
+        self.orchestrator_choose_model = False
         # Ground workflow generation with perspicacité
-        self.literrature_grounding = False
+        self.literrature_grounding = True
 
         ##############
         # ScienceAgentBench Concurrency settings
@@ -88,8 +88,8 @@ class Config:
         # strategy: "qd" (default), "tournament", "novelty"
         self.selection_strategy = "qd"
         # learning parameters
-        self.learned_score_threshold = 0.92
-        self.max_learning_evolve_iterations = 25
+        self.learned_score_threshold = 0.9
+        self.max_learning_evolve_iterations = 20
         # KNN settings for novelty
         self.novelty_comparison: str = "archive_knn"
         self.novelty_previous_n: int = 15
@@ -107,7 +107,7 @@ class Config:
         self.crossover_rate: float = 0.4
         self.n_parents: int = 2
         # goal similarity thresholds before even considered by qd (need similar goal to avoid picking parents from a different task)
-        self.parent_threshold_similarity: float = 0.8
+        self.parent_threshold_similarity: float = 0.95
         # bare minimum score for selection (don't pick failed parents)
         self.parent_threshold_score: float = 0.01
 
