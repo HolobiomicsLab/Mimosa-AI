@@ -7,6 +7,7 @@ import copy
 import csv
 import json
 import logging
+import logging.handlers
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,36 @@ from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_summary,
 )
+
+EVAL_LOG_FILE = Path("logs") / "evaluation._csv_mode.log"
+EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
+EVAL_LOG_BACKUP_COUNT = 5
+
+
+def _attach_eval_log_file_handler(logger: logging.Logger) -> None:
+    """
+    Make *logger* write its records to EVAL_LOG_FILE (rotating file).
+
+    Idempotent: all CsvEvaluationMode instances share the module logger, so
+    the handler is attached only once per process. The logger level is forced
+    to DEBUG so records reach the file even when the application never
+    configured the root logger (the eval CLI does not call setup_logging).
+    """
+    if any(isinstance(h, logging.handlers.RotatingFileHandler) for h in logger.handlers):
+        return
+    EVAL_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        EVAL_LOG_FILE,
+        maxBytes=EVAL_LOG_MAX_BYTES,
+        backupCount=EVAL_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
 
 async def _prompt_with_default(prompt: str, default: str = "0") -> str:
@@ -104,6 +135,7 @@ class CsvEvaluationMode:
         # Track execution history
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
+        _attach_eval_log_file_handler(self.logger)
 
         # Run-level context captured by start_evaluation for the email report.
         self._dataset_type: str | None = None
@@ -1259,3 +1291,16 @@ EXPECTED OUTPUT:
             single_agent_mode=single_agent_mode,
             concurrent=True
         )
+
+
+if __name__ == "__main__":
+    # Smoke check: the module logger writes to EVAL_LOG_FILE, exactly one handler.
+    smoke_logger = logging.getLogger(__name__)
+    _attach_eval_log_file_handler(smoke_logger)
+    _attach_eval_log_file_handler(smoke_logger)
+    file_handlers = [h for h in smoke_logger.handlers
+                     if isinstance(h, logging.handlers.RotatingFileHandler)]
+    assert len(file_handlers) == 1, f"expected 1 file handler, got {len(file_handlers)}"
+    smoke_logger.info("[SMOKE] csv_mode file logging OK")
+    assert EVAL_LOG_FILE.is_file(), f"log file not created: {EVAL_LOG_FILE}"
+    print(f"Smoke check OK — log written to {EVAL_LOG_FILE}")
