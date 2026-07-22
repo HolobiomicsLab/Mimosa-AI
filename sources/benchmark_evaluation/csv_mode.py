@@ -28,15 +28,13 @@ from sources.cli.pretty_print import (
     print_phase, print_summary,
 )
 
-EVAL_LOG_FILE = Path("logs") / "evaluation._csv_mode.log"
+EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
 EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
 EVAL_LOG_BACKUP_COUNT = 5
 
 
 def _attach_eval_log_file_handler(logger: logging.Logger) -> None:
     """
-    Make *logger* write its records to EVAL_LOG_FILE (rotating file).
-
     Idempotent: all CsvEvaluationMode instances share the module logger, so
     the handler is attached only once per process. The logger level is forced
     to DEBUG so records reach the file even when the application never
