@@ -1117,7 +1117,14 @@ EXPECTED OUTPUT:
             ("Dataset path", self._dataset_path or "unknown"),
             ("CSV runs limit", str(self.csv_runs_limit)),
             ("Start row", str(self._start_row + 1)),
-            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown"))
+            ("smolagent_model_id", getattr(self.config, "smolagent_model_id", "unknown")),
+            ("orchestrator_choose_model", getattr(self.config, "orchestrator_choose_model", "unknown")),
+            ("literrature_grounding", getattr(self.config, "literrature_grounding", "unknown")),
+            ("selection_strategy", getattr(self.config, "selection_strategy", "unknown")),
+            ("learned_score_threshold", getattr(self.config, "learned_score_threshold", "unknown")),
+            ("max_learning_evolve_iterations", getattr(self.config, "max_learning_evolve_iterations", "unknown")),
+            ("parent_threshold_similarity", getattr(self.config, "parent_threshold_similarity", "unknown")),
+            ("crossover_rate", getattr(self.config, "crossover_rate", "unknown"))
         ]
 
     def _build_task_table(self) -> dict | None:
