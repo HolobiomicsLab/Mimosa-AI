@@ -42,7 +42,7 @@ class Config:
         # Workspace Configuration
         # Must point to Toolomics workspace
         ##############
-        self.workspace_dir = "/Users/mlg/Documents/CNRS/Toolomics/workspace"
+        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
 
         ##############
         # MCP Discovery Addresses

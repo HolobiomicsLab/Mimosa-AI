@@ -192,10 +192,10 @@ TOTAL_STEPS = 9
 # (env_key, display_label, litellm_model_id)
 # ---------------------------------------------------------------------------
 _MODEL_PRESETS: list[tuple[str, str, str]] = [
-    ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5"),
-    ("ANTHROPIC_API_KEY",  "Claude Opus 4.7  (Anthropic)",  "anthropic/claude-opus-4-7"),
-    ("DEEPSEEK_API_KEY",   "DeepSeek Chat      (DeepSeek)",   "deepseek/deepseek-chat"),
-    ("OPENAI_API_KEY",     "GPT-4o             (OpenAI)",     "openai/gpt-4o"),
+    ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5.2"),
+    ("ANTHROPIC_API_KEY",  "Claude Opus 4.8  (Anthropic)",  "anthropic/claude-opus-4-8"),
+    ("DEEPSEEK_API_KEY",   "DeepSeek V4      (DeepSeek)",   "deepseek/deepseek-v4-pro"),
+    ("OPENAI_API_KEY",     "GPT-5        (OpenAI)",     "openai/gpt-5.6-terra"),
     ("MISTRAL_API_KEY",    "Mistral Large      (Mistral)",    "mistral/mistral-large-latest"),
 ]
 # Config keys that share the orchestration LLM selection

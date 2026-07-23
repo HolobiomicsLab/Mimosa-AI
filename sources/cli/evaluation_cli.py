@@ -228,8 +228,6 @@ class EvaluationCLI:
     # ------------------------------------------------------------------
 
     def _choose_agent_model(self, run_config: Config) -> None:
-        run_config.workflow_llm_model = "openrouter/z-ai/glm-5.2"
-
         available: list[tuple[str, str]] = [
             (label, model_id)
             for env_key, label, model_id in _MODEL_PRESETS
