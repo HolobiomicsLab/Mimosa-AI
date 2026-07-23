@@ -123,13 +123,6 @@ class EvaluationCLI:
             self._queue.append(run_spec)
             _ok(f"Run #{run_spec.run_id} added to queue.")
 
-            # Validate entire queue so far
-            ok = self._validate_queue()
-            if not ok:
-                _err("Queue validation failed. Removing last run – please reconfigure.")
-                self._queue.pop()
-                continue
-
             add_more = _ask_yn("Add another evaluation run to the queue?", default=False)
             if not add_more:
                 break
@@ -398,53 +391,6 @@ class EvaluationCLI:
                     "Evaluation may fail at runtime."
                 )
                 break
-
-        # ---- Workspace -------------------------------------------------
-        suggested_ws = self._suggest_workspace(run_config, run_id)
-        ws_is_new_suggestion = (os.path.realpath(run_config.workspace_dir) != suggested_ws)
-
-        print(_wrap(
-            "Workspace directory — the Toolomics folder where Mimosa reads "
-            "and writes task artifacts. Each queued run must use a unique workspace.",
-        ))
-
-        if ws_is_new_suggestion:
-            _info(f"Suggested workspace (avoids conflict): {suggested_ws}")
-
-        while True:
-            new_ws = _ask("Workspace directory path", default=suggested_ws)
-            new_ws = os.path.expanduser(new_ws.strip()) if new_ws.strip() else suggested_ws
-            resolved = os.path.realpath(new_ws)
-
-            # Check uniqueness against queue
-            conflict = False
-            for rid, qws in self._queued_workspaces():
-                if resolved == qws:
-                    _err(f"Workspace already used by Run #{rid}: {qws}")
-                    conflict = True
-                    break
-            if conflict:
-                _warn("Please choose a different workspace directory.")
-                continue
-
-            if os.path.isdir(new_ws):
-                run_config.workspace_dir = new_ws
-                _ok(f"Workspace: {new_ws}")
-                break
-
-            # Directory doesn't exist — offer to create it
-            _warn(f"Directory does not exist: {new_ws}")
-            create = _ask_yn("Create it now?", default=True)
-            if create:
-                try:
-                    os.makedirs(new_ws, exist_ok=True)
-                    run_config.workspace_dir = new_ws
-                    _ok(f"Created & set workspace: {new_ws}")
-                    break
-                except OSError as exc:
-                    _err(f"Could not create directory: {exc}")
-            else:
-                _info("Please enter a different path.")
 
         return mcp_list
 
@@ -743,37 +689,6 @@ class EvaluationCLI:
             except ValueError:
                 _warn(f"Invalid number '{raw}'.")
 
-    # ------------------------------------------------------------------
-    # Queue validation
-    # ------------------------------------------------------------------
-
-    def _validate_queue(self) -> bool:
-        """
-        Validate that all queued runs use unique (resolved) workspace paths.
-
-        Port ranges may overlap freely: runs execute sequentially, so no
-        two runs ever listen at the same time.
-
-        Returns True if valid, False otherwise.
-        """
-        ok = True
-
-        workspaces = self._queued_workspaces()
-        for i in range(len(workspaces)):
-            for j in range(i + 1, len(workspaces)):
-                rid_a, ws_a = workspaces[i]
-                rid_b, ws_b = workspaces[j]
-                if ws_a == ws_b:
-                    _err(
-                        f"Workspace conflict: Run #{rid_a} and Run #{rid_b} "
-                        f"share the same workspace: {ws_a}"
-                    )
-                    ok = False
-
-        if ok and len(self._queue) > 1:
-            _ok(f"Queue validated: {len(self._queue)} runs, unique workspaces.")
-
-        return ok
 
     # ------------------------------------------------------------------
     # Queue summary
