@@ -114,7 +114,7 @@ class CsvEvaluationMode:
             task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
                               Staggers agent starts to avoid overwhelming shell/API resources.
             run_notes_dir: Directory for per-task run notes. Per-run in queued CLI
-                              mode so concurrent runs never restore each other's cache.
+                              mode so queued runs never restore each other's cache.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit

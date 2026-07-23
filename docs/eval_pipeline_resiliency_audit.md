@@ -200,7 +200,7 @@ and turns the hidden spike real.
 | # | Finding | Status / notes |
 |---|---------|----------------|
 | M5 | `theme.ask` (`theme.py:204-212`) catches `EOFError` **and** `KeyboardInterrupt` → silent `sys.exit(0)`: `--evaluation_cli` dies silently when stdin isn't a TTY, and `main.py`'s own "Interrupted. Goodbye!" handler is unreachable from all ~20 wizard prompts. Inconsistent with `csv_mode._prompt_with_default`, which handles non-TTY gracefully. | confirmed, broadened |
-| M6 | `_launch_queue` RAM adaptation (`evaluation_cli.py:973-1064`, `:1141-1148`): whole-process RSS (no per-run attribution), sampled after the batch exits. `ram_estimate = max(delta, RSS)` is never ~0 (the `>0` guard *holds* concurrency on zero) — real failure modes: floored at process baseline (overstates → can permanently refuse to scale) while child-subprocess work is invisible to RSS and has exited before the snapshot (understates true peak). | confirmed, direction corrected |
+| M6 | `_launch_queue` RAM adaptation (`evaluation_cli.py:973-1064`, `:1141-1148`): whole-process RSS (no per-run attribution), sampled after the batch exits. `ram_estimate = max(delta, RSS)` is never ~0 (the `>0` guard *holds* concurrency on zero) — real failure modes: floored at process baseline (overstates → can permanently refuse to scale) while child-subprocess work is invisible to RSS and has exited before the snapshot (understates true peak). | confirmed, direction corrected; **resolved 2026-07-23** — adaptive scaling removed, queue now sequential |
 | L1 | `csv_mode.py:719`: `'goal' in dir()` trick in the exception path — initialize `goal = None` before `try`. | confirmed |
 | L2 | `csv_runs_limit` is compared against the absolute row index (`csv_mode.py:818, 920`) — with `start_row > 0` you get fewer tasks than the limit suggests (index bound, not count). | confirmed |
 | L3 | `_cleanup_isolated_workspace` (`csv_mode.py:562`): `rmtree(ignore_errors=True)` inside a `try/except` that can never fire — partial cleanups fully silent. | confirmed |
@@ -240,8 +240,9 @@ and turns the hidden spike real.
 
 8. **M5** — unify headless/interrupt policy in `theme.ask` (propagate
    `KeyboardInterrupt`; explicit non-TTY default or loud error).
-9. **M6** — remove or properly instrument adaptive RAM scaling
-   (per-worker `resource.getrusage` peaks, including children).
+9. **M6** — ~~remove or properly instrument adaptive RAM scaling~~
+   **done 2026-07-23:** removed — `_launch_queue` executes runs sequentially;
+   port-overlap validation dropped with it (sequential runs may share ports).
 10. **L1–L9** — small hardening batch (atomic JSON writes, constructor
     injection for notes path, file-redirected subprocess output, etc.).
 

@@ -4,9 +4,8 @@ Interactive evaluation CLI for Mimosa-AI.
 Guides the user through evaluation setup: model selection (smolagent only),
 port range, workspace folder, evaluation mode, then launches CsvEvaluationMode
 on the ScienceAgentBench dataset.  Supports queuing multiple evaluation runs
-with different configurations, validates non-overlapping port ranges and unique
-workspaces, and executes them with adaptive parallelism (starts with 2
-concurrent runs, doubles when RAM allows).
+with different configurations, validates unique workspaces, and executes them
+sequentially in queue order.
 
 Saves run metadata (including detected MCPs) to ``run_notes/evaluations/``
 at start and appends final results at the end.
@@ -14,13 +13,11 @@ at start and appends final results at the end.
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import json
 import os
 import re
 import sys
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -75,10 +72,6 @@ _EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
 
-# Adaptive parallelism constants
-_INITIAL_CONCURRENCY = 2
-_RAM_SAFETY_FACTOR = 2  # ram_used_last_batch * 2 < available_ram
-
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -95,13 +88,12 @@ class EvalRunSpec:
     notes_path: Path | None = None
     # Advanced/ablation fields the user changed from defaults (name -> value)
     overrides: dict = field(default_factory=dict)
-    # Recovery decisions resolved during the configuration phase, so no stdin
-    # prompt happens after the queue launches (concurrent runs race on stdin).
+    # Recovery decisions resolved during the configuration phase, so the
+    # queue can execute unattended — no stdin prompts after launch.
     start_row: int = 0          # 0-based first CSV row to process
     restore_cache: bool = True  # restore stats from previous run notes if found
     # Populated after execution
     status: str = "pending"
-    peak_ram_mb: float = 0.0
 
 
 class EvaluationCLI:
@@ -158,7 +150,7 @@ class EvaluationCLI:
         for spec in self._queue:
             self._save_start_notes(spec)
 
-        # Launch with adaptive parallelism
+        # Execute runs one after another
         await self._launch_queue()
 
     # ------------------------------------------------------------------
@@ -300,72 +292,6 @@ class EvaluationCLI:
         _ok(f"Agent model: {model}")
 
     # ------------------------------------------------------------------
-    # Step 3 – Toolomics connectivity & workspace
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # Port-range helpers (for auto-suggestion & conflict checking)
-    # ------------------------------------------------------------------
-
-    def _queued_port_sets(self) -> list[tuple[int, set[int]]]:
-        """Return ``(run_id, port_set)`` for every run already in the queue."""
-        result: list[tuple[int, set[int]]] = []
-        for spec in self._queue:
-            ports: set[int] = set()
-            for addr in spec.config.discovery_addresses:
-                ports.update(range(addr.port_min, addr.port_max + 1))
-            result.append((spec.run_id, ports))
-        return result
-
-    def _suggest_port_range(self, run_config: Config) -> tuple[str, str, str]:
-        """
-        Return ``(ip, port_min_str, port_max_str)`` that do not overlap
-        with any run already in the queue.  Falls back to the config
-        defaults when there is no conflict.
-        """
-        if not self._queue:
-            addr = run_config.discovery_addresses[0]
-            return addr.ip, str(addr.port_min), str(addr.port_max)
-
-        # Gather every port already claimed
-        claimed: set[int] = set()
-        for _, pset in self._queued_port_sets():
-            claimed |= pset
-
-        # Use the same IP & range width as the base config
-        base = run_config.discovery_addresses[0]
-        ip = base.ip
-        width = base.port_max - base.port_min  # e.g. 200
-
-        # Walk upward from the last queued range's max+1
-        highest = max(claimed) if claimed else base.port_min
-        candidate_min = highest + 1
-        candidate_max = candidate_min + width
-
-        # Clamp to valid port numbers
-        if candidate_max > 65535:
-            candidate_min = max(1024, base.port_min)
-            candidate_max = candidate_min + width
-
-        return ip, str(candidate_min), str(candidate_max)
-
-    def _ports_conflict_with_queue(self, port_min: int, port_max: int) -> list[str]:
-        """
-        Check whether ``[port_min, port_max]`` overlaps with any queued run.
-        Returns a list of human-readable conflict messages (empty = OK).
-        """
-        new_ports = set(range(port_min, port_max + 1))
-        conflicts: list[str] = []
-        for rid, pset in self._queued_port_sets():
-            overlap = new_ports & pset
-            if overlap:
-                sample = sorted(overlap)[:5]
-                conflicts.append(
-                    f"Run #{rid}: {len(overlap)} overlapping port(s) (e.g. {sample})"
-                )
-        return conflicts
-
-    # ------------------------------------------------------------------
     # Workspace helpers
     # ------------------------------------------------------------------
 
@@ -406,7 +332,11 @@ class EvaluationCLI:
         """Configure port range, discover MCPs, set workspace. Returns MCP list."""
 
         # ---- Port range ------------------------------------------------
-        sug_ip, sug_pmin, sug_pmax = self._suggest_port_range(run_config)
+        if self._queue:
+            # Sequential runs may share ports — default to the previous run's range
+            run_config.discovery_addresses = copy.deepcopy(
+                self._queue[-1].config.discovery_addresses
+            )
 
         current = run_config.discovery_addresses
         _info(
@@ -414,28 +344,18 @@ class EvaluationCLI:
             f"{', '.join(f'{a.ip}:{a.port_min}-{a.port_max}' for a in current)}"
         )
 
-        if self._queue:
-            _info(f"Suggested non-conflicting range: {sug_ip}:{sug_pmin}-{sug_pmax}")
-
-        change = self._queue or _ask_yn("Change port range?", default=False)
-        if change:
+        keep = _ask_yn("Use the same port range?", default=True)
+        if not keep:
             while True:
-                ip = _ask("IP address", default=sug_ip)
-                port_min = _ask("Port min", default=sug_pmin)
-                port_max = _ask("Port max", default=sug_pmax)
+                ip = _ask("IP address (empty to keep current range)")
+                if not ip:
+                    _info("Keeping current port range.")
+                    break
+                port_min = _ask("Port min")
+                port_max = _ask("Port max")
                 try:
-                    pmin_int, pmax_int = int(port_min), int(port_max)
-                    # Validate against queued runs
-                    conflicts = self._ports_conflict_with_queue(pmin_int, pmax_int)
-                    if conflicts:
-                        for c in conflicts:
-                            _err(f"Port conflict with {c}")
-                        _warn("Please choose a different range.")
-                        # Re-suggest
-                        sug_ip, sug_pmin, sug_pmax = ip, str(pmax_int + 1), str(pmax_int + 1 + (pmax_int - pmin_int))
-                        continue
                     run_config.discovery_addresses = [
-                        AddressMCP(ip=ip, port_min=pmin_int, port_max=pmax_int)
+                        AddressMCP(ip=ip, port_min=int(port_min), port_max=int(port_max))
                     ]
                     _ok(f"Discovery: {ip}:{port_min}-{port_max}")
                     break
@@ -587,9 +507,8 @@ class EvaluationCLI:
     def _ask_recovery_options(self) -> tuple[int, bool]:
         """Resolve start-row and cache-restore decisions at configuration time.
 
-        These used to be prompted by csv_mode when each queued run *started* —
-        concurrent runs then raced on stdin. Resolving them here means no stdin
-        prompt happens after the queue launches.
+        csv_mode used to prompt for these when each queued run *started*;
+        resolving them here keeps the queue fully unattended after launch.
         """
         print(_wrap(
             "Recovery options: resume from a given CSV row and/or restore "
@@ -830,44 +749,16 @@ class EvaluationCLI:
 
     def _validate_queue(self) -> bool:
         """
-        Validate the full queue:
-        - No overlapping port ranges between any two runs
-        - All workspace paths are unique (resolved)
+        Validate that all queued runs use unique (resolved) workspace paths.
+
+        Port ranges may overlap freely: runs execute sequentially, so no
+        two runs ever listen at the same time.
 
         Returns True if valid, False otherwise.
         """
         ok = True
 
-        # Collect port ranges and workspaces
-        port_ranges: list[tuple[int, set[int]]] = []  # (run_id, set_of_ports)
-        workspaces: list[tuple[int, str]] = []  # (run_id, resolved_path)
-
-        for spec in self._queue:
-            # Build set of all ports for this run
-            ports: set[int] = set()
-            for addr in spec.config.discovery_addresses:
-                ports.update(range(addr.port_min, addr.port_max + 1))
-            port_ranges.append((spec.run_id, ports))
-
-            # Resolved workspace path
-            ws = os.path.realpath(spec.config.workspace_dir)
-            workspaces.append((spec.run_id, ws))
-
-        # Check port overlaps (pairwise)
-        for i in range(len(port_ranges)):
-            for j in range(i + 1, len(port_ranges)):
-                rid_a, ports_a = port_ranges[i]
-                rid_b, ports_b = port_ranges[j]
-                overlap = ports_a & ports_b
-                if overlap:
-                    sample = sorted(overlap)[:5]
-                    _err(
-                        f"Port conflict between Run #{rid_a} and Run #{rid_b}: "
-                        f"{len(overlap)} overlapping port(s) (e.g. {sample})"
-                    )
-                    ok = False
-
-        # Check workspace uniqueness
+        workspaces = self._queued_workspaces()
         for i in range(len(workspaces)):
             for j in range(i + 1, len(workspaces)):
                 rid_a, ws_a = workspaces[i]
@@ -880,7 +771,7 @@ class EvaluationCLI:
                     ok = False
 
         if ok and len(self._queue) > 1:
-            _ok(f"Queue validated: {len(self._queue)} runs, no port/workspace conflicts.")
+            _ok(f"Queue validated: {len(self._queue)} runs, unique workspaces.")
 
         return ok
 
@@ -908,8 +799,7 @@ class EvaluationCLI:
         print()
         frame_bottom()
         if len(self._queue) > 1:
-            _info(f"Execution: adaptive parallelism (starting with "
-                  f"{min(_INITIAL_CONCURRENCY, len(self._queue))} concurrent)")
+            _info("Execution: sequential — runs launch one at a time in queue order.")
         print()
 
     # ------------------------------------------------------------------
@@ -995,115 +885,51 @@ class EvaluationCLI:
             pass  # best-effort
 
     # ------------------------------------------------------------------
-    # Adaptive parallel launch
+    # Sequential launch
     # ------------------------------------------------------------------
 
     async def _launch_queue(self) -> None:
         """
-        Execute all queued runs with adaptive parallelism.
+        Execute all queued runs sequentially, in queue order.
 
-        Strategy:
-        - Start with min(INITIAL_CONCURRENCY, queue_length) concurrent runs
-        - After each batch completes, measure peak RAM usage
-        - Double concurrency for the next batch if:
-            peak_ram_last_batch * 2 < available_ram
-        - Otherwise keep the same concurrency level
+        Each run finishes before the next one starts.  A failing run is
+        recorded (status + run notes) and does not stop the rest of the
+        queue.
         """
-        try:
-            import psutil
-        except ImportError:
-            _warn("psutil not installed — running all evaluations sequentially.")
-            _info("Install psutil for adaptive parallel execution: pip install psutil")
-            for spec in self._queue:
-                await self._run_single_eval(spec)
-            return
-
-        remaining = list(self._queue)
-        concurrency = min(_INITIAL_CONCURRENCY, len(remaining))
-        batch_num = 0
-
-        section(f"IGNITION · {len(remaining)} EVALUATION(S)")
-        _info(f"Initial concurrency: {concurrency}")
+        total = len(self._queue)
+        section(f"IGNITION · {total} EVALUATION(S)")
         print()
 
-        while remaining:
-            batch_num += 1
-            batch = remaining[:concurrency]
-            remaining = remaining[concurrency:]
-
-            _info(f"Batch #{batch_num}: launching {len(batch)} run(s) "
-                  f"(concurrency={concurrency}, {len(remaining)} remaining)")
-
-            # Snapshot RAM before batch
-            mem_before = psutil.virtual_memory()
-            ram_available_before = mem_before.available / (1024 * 1024)  # MB
-
-            # Launch batch concurrently
-            tasks = [
-                asyncio.create_task(
-                    self._run_single_eval(spec),
-                    name=f"eval_run_{spec.run_id}",
-                )
-                for spec in batch
-            ]
-
-            # Wait for all tasks in this batch, capturing exceptions
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Log results
-            peak_ram_batch = 0.0
-            for spec, result in zip(batch, results):
-                if isinstance(result, Exception):
-                    _err(f"Run #{spec.run_id} failed: {result}")
+        for position, spec in enumerate(self._queue, start=1):
+            _info(f"Run #{spec.run_id} ({position}/{total}) launching…")
+            try:
+                await self._run_single_eval(spec)
+            except Exception as exc:
+                _err(f"Run #{spec.run_id} failed: {exc}")
+                if spec.status == "pending":  # failed before the run recorded anything
                     spec.status = "error"
                     self._update_notes(spec.notes_path, {
                         "status": "error",
-                        "error": str(result),
+                        "error": str(exc),
                         "finished_at": datetime.now().isoformat(),
                     })
-                else:
-                    _ok(f"Run #{spec.run_id} completed.")
-                peak_ram_batch = max(peak_ram_batch, spec.peak_ram_mb)
-
-            # Adaptive scaling: decide concurrency for next batch
-            if remaining:
-                mem_after = psutil.virtual_memory()
-                ram_available_now = mem_after.available / (1024 * 1024)  # MB
-                ram_used_by_batch = max(0, ram_available_before - ram_available_now)
-
-                # Use the larger of measured usage or peak_ram from specs
-                ram_estimate = max(ram_used_by_batch, peak_ram_batch)
-
-                _info(f"Batch #{batch_num} RAM estimate: {ram_estimate:.0f} MB "
-                      f"(available: {ram_available_now:.0f} MB)")
-
-                if ram_estimate > 0 and (ram_estimate * _RAM_SAFETY_FACTOR) < ram_available_now:
-                    new_concurrency = concurrency * 2
-                    _ok(f"RAM headroom OK — scaling concurrency: {concurrency} → {new_concurrency}")
-                    concurrency = new_concurrency
-                else:
-                    _info(f"RAM headroom insufficient — keeping concurrency at {concurrency}")
-
-                # Never exceed remaining count
-                concurrency = min(concurrency, len(remaining))
+                continue
+            if spec.status == "completed":
+                _ok(f"Run #{spec.run_id} completed.")
+            else:
+                _warn(f"Run #{spec.run_id} finished with status: {spec.status}")
 
         print()
-        _ok(f"All {len(self._queue)} evaluation(s) finished.")
+        _ok(f"All {total} evaluation(s) finished.")
         self._print_final_queue_report()
 
     async def _run_single_eval(self, spec: EvalRunSpec) -> None:
         """Execute a single evaluation run from its spec."""
         from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
 
-        try:
-            import psutil
-            process = psutil.Process()
-        except ImportError:
-            process = None
-
         run_config = spec.config
 
-        # Isolate mutable directories per run to prevent race conditions
+        # Isolate mutable directories per run so runs cannot contaminate each other
         run_config.workflow_dir = f"sources/workflows/run_{spec.run_id}"
         run_config.memory_dir = f"sources/memory/run_{spec.run_id}"
         run_config.runner_temp_dir = f"./tmp/run_{spec.run_id}"
@@ -1170,14 +996,6 @@ class EvaluationCLI:
                 "finished_at": datetime.now().isoformat(),
             })
             raise
-        finally:
-            # Record peak RAM for adaptive scaling
-            if process is not None:
-                try:
-                    mem_info = process.memory_info()
-                    spec.peak_ram_mb = mem_info.rss / (1024 * 1024)
-                except Exception:
-                    pass
 
     # ------------------------------------------------------------------
     # Final report
