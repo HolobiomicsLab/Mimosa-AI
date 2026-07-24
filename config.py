@@ -63,7 +63,7 @@ class Config:
         self.planner_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
         self.workflow_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-pro"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
 
         #############
@@ -114,7 +114,7 @@ class Config:
         ##############
         # LLM Related, advanced settings, touch with caution
         ##############
-        self.engine_name: str = "litellm" # for smolagent
+        self.engine_name: str = "litellm"
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "medium"
         # max_tokens: Maximum number of tokens to generate for LLM responses

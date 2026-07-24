@@ -82,6 +82,7 @@ class SingleAgentFactory(Factory):
             re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
         ))
         mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
+        engine = "mlx" if "mlx-community/" in model_id else self.config.engine_name
 
         code = f"""
 import os
@@ -106,7 +107,7 @@ model_id = {model_id!r}
 max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
-engine_name = {self.config.engine_name!r}
+engine_name = {engine!r}
 openrouter_provider = {self.config.openrouter_provider_for(model_id)!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}
 TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
@@ -264,6 +265,7 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                     else None
                 )
                 action_step["logprobs"] = extract_logprobs(step)
+                action_step["model"] = self.model_id
                 memories.append(action_step)
 
         if save_logprobs and memories and all(m["logprobs"] is None for m in memories):

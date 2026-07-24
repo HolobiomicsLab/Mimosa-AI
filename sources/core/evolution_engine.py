@@ -423,12 +423,17 @@ class EvolutionEngine:
                     f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
                 workspace_mgr.restore_best(best_run.current_uuid)
-                self._export_astra(best_run.current_uuid, goal)
+                try:
+                    self._export_astra(best_run.current_uuid, goal)
+                except Exception as e:
+                    print_err(f"Error in Astra Export: {str(e)}")
+                    pass
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
                 workspace_mgr.restore_best("")  # triggers fallback inside WorkspaceManager
-        finally:
-            workspace_mgr.cleanup()
+        except Exception as e:
+            print_err(f"Unknown error in workspace restauration defaulting to latest workspace state.")
+            pass
 
         return runs
 

@@ -39,6 +39,7 @@ from sources.utils.ensure_env import ensure_environment
 from sources.utils.logging import setup_logging
 from sources.utils.precheck import PreCheck
 from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.workspace_management import WorkspaceManager
 
 # Search for .env from the current working directory upward (usecwd is
 # required for installed runs, where main.py lives in site-packages).
@@ -343,6 +344,7 @@ async def main():
     config.create_paths()
     config.validate_paths()
 
+    manager = WorkspaceManager(config)
 
     try:
         if (args.manual):
@@ -359,10 +361,14 @@ async def main():
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
     except KeyboardInterrupt:
+        manager.cleanup()
         raise
     except Exception as e:
+        manager.cleanup()
         print(f"❌ Error during execution: {e}")
         raise
+    print_info("Cleaning up...")
+    manager.cleanup()
 
 def cli_main() -> None:
     """Synchronous console-script entry point (see [project.scripts])."""

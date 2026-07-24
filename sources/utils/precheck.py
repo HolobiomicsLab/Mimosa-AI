@@ -390,6 +390,8 @@ class PreCheck:
         }
 
         for name, model_id in required.items():
+            if "mlx-community" in model_id:
+                continue
             if not model_id:
                 raise ValueError(f"⚠️  No model configured for '{name}'.")
             if not self._basic_check(name, model_id):

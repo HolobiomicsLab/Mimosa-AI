@@ -336,6 +336,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             for key in state_schema.WorkflowState.__annotations__
         }
         providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
+        engine = "mlx" if "mlx-community/" in default_model else self.config.engine_name
         return f"""
 import os
 import sys
@@ -353,7 +354,7 @@ from typing import Annotated
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {default_model!r}
-ENGINE_NAME = {self.config.engine_name!r}
+ENGINE_NAME = {engine!r}
 OPENROUTER_PROVIDER = {providers!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}

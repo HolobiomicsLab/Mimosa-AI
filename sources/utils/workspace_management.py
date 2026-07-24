@@ -117,12 +117,13 @@ class WorkspaceManager:
         Delete every /tmp directory created for this session.
         Safe to call even if begin_session() was never called.
         """
-        if self._session_id is None:
-            return
 
-        candidates = [Path(f"/tmp/mimosa_initial_{self._session_id}")]
+        candidates = []
         candidates.extend(
-            Path("/tmp").glob(f"mimosa_run_{self._session_id}_*")
+            Path("/tmp").glob(f"mimosa_run_*")
+        )
+        candidates.extend(
+            Path("/tmp").glob(f"mimosa_initial_*")
         )
         for p in candidates:
             if p.exists():
