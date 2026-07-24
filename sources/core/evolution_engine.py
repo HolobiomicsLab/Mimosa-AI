@@ -91,6 +91,7 @@ class EvolutionEngine:
         self.orchestrator = WorkflowOrchestrator(config)
         self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
+        self.workspace_mgr = WorkspaceManager(self.config, self.logger)
         self.selection = SelectionPressure(
             config,
             min_improvement_threshold=getattr(config, "min_improvement_threshold", 0.01),
@@ -105,6 +106,14 @@ class EvolutionEngine:
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
         self.initial_population = getattr(config, "initial_population", 2) # number of initial random workflows before enabling mutation
+    
+    def get_workspace_manager_session_id(self) -> str | None:
+        """Session id of the current WorkspaceManager session (None if none started).
+
+        Used by the evaluation harness to locate this run's per-iteration
+        workspace snapshots in /tmp (mimosa_run_<session_id>_<run_uuid>).
+        """
+        return self.workspace_mgr.session_id
 
     async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
         """Use existing workflow data instead of orchestrating a fresh run.
@@ -376,8 +385,7 @@ class EvolutionEngine:
             return await self.mockup(wf, goal)
 
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
-        workspace_mgr = WorkspaceManager(self.config, self.logger)
-        workspace_mgr.begin_session()
+        self.workspace_mgr.begin_session()
 
         craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
@@ -407,7 +415,7 @@ class EvolutionEngine:
             assertion_history=assertion_history,
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
-            workspace_mgr=workspace_mgr,
+            workspace_mgr=self.workspace_mgr,
         )
 
         # ── Restore workspace to the best run's saved state ──────────────────
@@ -422,7 +430,7 @@ class EvolutionEngine:
                     f"Best run: {best_run.current_uuid} "
                     f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
-                workspace_mgr.restore_best(best_run.current_uuid)
+                self.workspace_mgr.restore_best(best_run.current_uuid)
                 try:
                     self._export_astra(best_run.current_uuid, goal)
                 except Exception as e:
@@ -430,7 +438,7 @@ class EvolutionEngine:
                     pass
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
-                workspace_mgr.restore_best("")  # triggers fallback inside WorkspaceManager
+                self.workspace_mgr.restore_best("")  # triggers fallback 
         except Exception as e:
             print_err(f"Unknown error in workspace restauration defaulting to latest workspace state.")
             pass

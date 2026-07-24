@@ -287,7 +287,10 @@ class CsvEvaluationMode:
                 "evolution_costs": self._compute_per_iteration_costs(runs_data),
                 "evolution_total_cost": getattr(runs_data[-1], 'cost', 0.0) if runs_data else 0.0,
                 "evolution_avg_reward": sum(getattr(run, 'reward', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0,
-                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0
+                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0,
+                # Ablation: per-evolution-index benchmark scores over the /tmp
+                # snapshots (empty unless evaluate_snapshot_ablations is on).
+                "ablations": current_task_data.get('ablations', []),
             }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
@@ -566,6 +569,187 @@ EXPECTED OUTPUT:
 
         return execution_data
 
+    def _evaluate_snapshot_ablations(
+        self,
+        session_id: str,
+        row: dict,
+        runs: list,
+        sab_loader,
+        execution_data: dict
+    ) -> list[dict]:
+        """
+        Ablation study: evaluate every per-iteration workspace snapshot saved
+        in /tmp during workflow evolution, to measure whether benchmark success
+        (VER/SR) converges as workflows evolve — and whether the "best" run we
+        ship in the capsule really is the best.
+
+        Snapshots live at /tmp/mimosa_run_<session_id>_<run_uuid> (one per
+        evolution iteration, saved by WorkspaceManager.save_run_snapshot).
+        Each is evaluated with the same CapsuleEvaluator used for the capsule.
+        The best run's snapshot is NOT re-evaluated: the capsule already holds
+        that exact content (restore_best -> workspace -> capsule), so the
+        capsule's VER/SR/CBS are reused for its index.
+
+        Never raises: any failure is logged and recorded as an 'excluded'
+        entry (or aborts the ablation loop with what was collected so far).
+
+        Args:
+            session_id: WorkspaceManager session id for this task's evolution.
+            row: CSV row data with task information.
+            runs: List of IndividualRun objects from the evolution.
+            sab_loader: ScienceAgentBenchLoader instance.
+            execution_data: The task's execution_data, already updated by
+                _evaluate_with_science_agent_bench (capsule VER/SR/CBS reused
+                for the best snapshot).
+
+        Returns:
+            List of entries sorted by evolution_index:
+            {evolution_index, uuid, VER, VER_message, SR, SR_message, CBS,
+             cost, status, source, infra_error?}
+        """
+        try:
+            snapshots = sorted(
+                (p for p in Path("/tmp").glob(f"mimosa_run_{session_id}_*") if p.is_dir()),
+                key=lambda p: p.stat().st_mtime,
+            )
+        except Exception as e:
+            self.logger.warning(f"[ABLATION] Failed to list snapshots for session {session_id}: {e}")
+            return []
+
+        if len(snapshots) <= 1:
+            self.logger.info(
+                f"[ABLATION] Session {session_id}: {len(snapshots)} snapshot(s) — nothing to ablate"
+            )
+            return []
+
+        # Map run uuid -> position in the runs list (= evolution index).
+        uuid_to_index = {
+            getattr(run, 'current_uuid', None): idx
+            for idx, run in enumerate(runs)
+            if getattr(run, 'current_uuid', None)
+        }
+        per_iteration_costs = self._compute_per_iteration_costs(runs)
+
+        # Best run, selected exactly as EvolutionEngine does for restore_best.
+        best_run = max(
+            (r for r in runs if getattr(r, 'current_uuid', None)),
+            key=lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count),
+            default=None,
+        )
+        best_uuid = getattr(best_run, 'current_uuid', None) if best_run else None
+
+        # Order snapshots by evolution index; orphans (uuid not in runs) last,
+        # in mtime order.
+        def _sort_key(path: Path) -> tuple[int, float]:
+            uuid = path.name.rsplit("_", 1)[-1]
+            idx = uuid_to_index.get(uuid)
+            return (idx if idx is not None else len(runs), path.stat().st_mtime)
+
+        snapshots.sort(key=_sort_key)
+
+        print_info(f"🧪 Ablations: evaluating {len(snapshots)} evolution snapshot(s)…")
+        ablations: list[dict] = []
+        next_orphan_index = len(runs)
+
+        for snapshot in snapshots:
+            uuid = snapshot.name.rsplit("_", 1)[-1]
+            idx = uuid_to_index.get(uuid)
+            if idx is None:
+                idx = next_orphan_index
+                next_orphan_index += 1
+            iter_cost = per_iteration_costs[idx] if idx < len(per_iteration_costs) else 0.0
+
+            if uuid == best_uuid:
+                # Capsule content == this snapshot: reuse the capsule metrics.
+                entry = {
+                    "evolution_index": idx,
+                    "uuid": uuid,
+                    "VER": execution_data.get('VER'),
+                    "VER_message": execution_data.get('VER_message', ''),
+                    "SR": execution_data.get('SR'),
+                    "SR_message": execution_data.get('SR_message', ''),
+                    "CBS": execution_data.get('CBS'),
+                    "cost": iter_cost,
+                    "status": execution_data.get('status', 'evaluated'),
+                    "source": "capsule",
+                }
+                if execution_data.get('infra_error'):
+                    entry["infra_error"] = execution_data['infra_error']
+                ablations.append(entry)
+                self.logger.info(f"[ABLATION] idx={idx} uuid={uuid}: reusing capsule metrics (best run)")
+                continue
+
+            try:
+                evaluator = CapsuleEvaluator(
+                    capsule_path=snapshot,
+                    task_data=row,
+                    sab_loader=sab_loader,
+                    api_cost=iter_cost,
+                )
+                eval_results = evaluator.evaluate_all()
+                # No save_results(): keep the /tmp snapshot pristine.
+
+                if eval_results.get('status') == 'excluded':
+                    entry = {
+                        "evolution_index": idx,
+                        "uuid": uuid,
+                        "VER": None,
+                        "SR": None,
+                        "CBS": None,
+                        "cost": eval_results.get('cost', iter_cost),
+                        "status": "excluded",
+                        "source": "snapshot",
+                        "infra_error": eval_results.get('infra_error'),
+                    }
+                    self.logger.warning(
+                        f"[ABLATION] idx={idx} uuid={uuid} EXCLUDED (infra): "
+                        f"{eval_results.get('infra_error')}"
+                    )
+                else:
+                    entry = {
+                        "evolution_index": idx,
+                        "uuid": uuid,
+                        "VER": eval_results['VER'][0],
+                        "VER_message": eval_results['VER'][1],
+                        "SR": eval_results['SR'][0],
+                        "SR_message": eval_results['SR'][1],
+                        "CBS": eval_results['CBS'],
+                        "cost": iter_cost,
+                        "status": "evaluated",
+                        "source": "snapshot",
+                    }
+                    self.logger.info(
+                        f"[ABLATION] idx={idx} uuid={uuid}: "
+                        f"VER={entry['VER']}, SR={entry['SR']}, CBS={entry['CBS']:.3f}"
+                    )
+                ablations.append(entry)
+            except Exception as e:
+                # A harness fault on one snapshot must not abort the ablation
+                # loop nor the task itself.
+                self.logger.error(
+                    f"[ABLATION] Harness error on snapshot idx={idx} uuid={uuid}: {e}",
+                    exc_info=True,
+                )
+                ablations.append({
+                    "evolution_index": idx,
+                    "uuid": uuid,
+                    "VER": None,
+                    "SR": None,
+                    "CBS": None,
+                    "cost": iter_cost,
+                    "status": "excluded",
+                    "source": "snapshot",
+                    "infra_error": f"Unexpected harness error: {e}",
+                })
+
+        ablations.sort(key=lambda e: e["evolution_index"])
+        sr_curve = [
+            (e["evolution_index"], e["SR"]) for e in ablations if e.get("VER") is not None
+        ]
+        print_info(f"🧪 Ablations (index, SR): {sr_curve}")
+        self.logger.info(f"[ABLATION] Session {session_id} SR curve: {sr_curve}")
+        return ablations
+
     def _create_isolated_config(self, task_id: str) -> Any:
         """
         Create a copy of config with an isolated workspace directory for concurrent execution.
@@ -703,6 +887,9 @@ EXPECTED OUTPUT:
                         judge=True,
                         max_task_retry=3
                     )
+                # get session id for artefact in tmp for this run
+                # Kimi you will need to use this
+                session_id = isolated_dgm.get_workspace_manager_session_id()
 
                 print(f"\033[96m[Worker {task_id}] 📊 Transferring results files...\033[0m")
 
@@ -737,6 +924,17 @@ EXPECTED OUTPUT:
                         sab_loader=sab_loader,
                         execution_data=execution_data
                     )
+                    if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
+                        # Ablation: score every evolution snapshot in /tmp.
+                        # Offloaded: per-snapshot VER/SR subprocesses are blocking.
+                        execution_data["ablations"] = await asyncio.to_thread(
+                            self._evaluate_snapshot_ablations,
+                            session_id=session_id,
+                            row=row,
+                            runs=runs,
+                            sab_loader=sab_loader,
+                            execution_data=execution_data
+                        )
 
                 print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
 
@@ -996,6 +1194,9 @@ EXPECTED OUTPUT:
                                     judge=True,
                                     max_task_retry=3
                                    )
+                    # get session id for artefact in tmp for this run
+                    # Kimi you will need to use this
+                    session_id = self.evolve.get_workspace_manager_session_id()
                     print_info("📦 Transferring results files…")
                     # Offloaded: the capsule namer is a blocking sync LLM call.
                     trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
@@ -1003,7 +1204,7 @@ EXPECTED OUTPUT:
                     capsule_name = await asyncio.to_thread(
                         trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
                     )
-                    print_info("📊 Analyzing results…")
+
                     execution_time = time.time() - iteration_start_time
                     execution_data = {
                         "iteration": i + 1,
@@ -1021,6 +1222,17 @@ EXPECTED OUTPUT:
                             sab_loader=sab_loader,
                             execution_data=execution_data
                         )
+                        if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
+                            # Ablation: score every evolution snapshot in /tmp.
+                            # Offloaded: per-snapshot VER/SR subprocesses are blocking.
+                            execution_data["ablations"] = await asyncio.to_thread(
+                                self._evaluate_snapshot_ablations,
+                                session_id=session_id,
+                                row=row,
+                                runs=runs,
+                                sab_loader=sab_loader,
+                                execution_data=execution_data
+                            )
 
                     self.execution_history.append(execution_data)
                     self._print_final_summary()

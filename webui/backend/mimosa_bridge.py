@@ -199,6 +199,10 @@ def cmd_run(payload: dict) -> None:
                 enable_evolution=learn,
             )
         )
+    from sources.utils.workspace_management import WorkspaceManager
+    manager = WorkspaceManager(cfg)
+    manager.cleanup() # cleanup /tmp/ evolution artefact
+
     print("[bridge] run complete", flush=True)
 
 

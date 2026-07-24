@@ -79,6 +79,10 @@ class Config:
         # ScienceAgentBench Concurrency settings
         ##############
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+        # Ablation: also benchmark-score every per-iteration /tmp snapshot
+        # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
+        # convergence across evolution. Multiplies per-task eval wall-clock.
+        self.evaluate_snapshot_ablations: bool = False
 
         ##############
         # QD/Novelty / Learning parameters
@@ -315,6 +319,7 @@ class Config:
             "learned_score_threshold": self.learned_score_threshold,
             "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "evaluate_snapshot_ablations": self.evaluate_snapshot_ablations,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
             "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
@@ -375,6 +380,9 @@ class Config:
         self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
+        )
+        self.evaluate_snapshot_ablations = bool(
+            data.get("evaluate_snapshot_ablations", self.evaluate_snapshot_ablations)
         )
         self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
         self.novelty_previous_n = int(
@@ -507,6 +515,7 @@ class Config:
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
         lines.append(f"  selection_strategy={self.selection_strategy}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
+        lines.append(f"  evaluate_snapshot_ablations={self.evaluate_snapshot_ablations}")
         lines.append(f"  novelty_comparison={self.novelty_comparison}")
         lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
         lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
