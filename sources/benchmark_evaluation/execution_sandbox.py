@@ -116,6 +116,11 @@ class ExecutionSandbox:
         "tf_keras<=2.17.0",
         "rdkit<=2023.09.5",
         "openai==1.54.4",
+        # openai 1.54.4 passes the `proxies` kwarg to httpx.Client, which
+        # httpx>=0.28 removed — leaving the default (transitive) httpx breaks
+        # the GPT-4 visual judge at `OpenAI()` construction. Cap httpx below
+        # 0.28 to keep the authors' exact openai pin while restoring the judge.
+        "httpx<0.28",
         "pipreqs",
         "pip-tools",
     ]
