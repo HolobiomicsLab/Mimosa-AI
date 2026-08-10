@@ -160,6 +160,9 @@ export interface WorkspaceScopes {
   snapshots: string[]
 }
 
+export interface UploadedFile { name: string; size: number; kind: string }
+export interface UploadResult { saved: UploadedFile[] }
+
 export interface LiveEvent {
   type: 'iteration_complete' | 'execution_complete' | 'tree_updated'
     | 'run_finished' | 'archive_appended' | 'workflow_crafted'

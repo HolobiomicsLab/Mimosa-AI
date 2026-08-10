@@ -4,13 +4,17 @@ The live workspace is wiped/restored between runs, so the durable artifacts are
 the per-run snapshots under ``/tmp/mimosa_run_<session>_<uuid>/``. Files are
 ranked by a priority heuristic (figures first, then fresh/large data) so the
 frontend can auto-open the most interesting one.
+
+The live workspace is also the input channel for launches: files uploaded from
+the New-run page land here, and Mimosa snapshots them as the run's "initial
+user-provided state" at launch (see sources/utils/workspace_management.py).
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from .settings import get_settings
 
@@ -129,3 +133,114 @@ def resolve_file(scope: str, rel_path: str) -> tuple[Path, str] | None:
     if not target.is_file():
         return None
     return target, _kind(target)
+
+
+# ── Uploads into the live workspace (run inputs) ──
+
+_UPLOAD_MAX_BYTES = 500 * 1024 * 1024
+_UPLOAD_CHUNK = 1024 * 1024
+
+
+def safe_upload_name(filename: str | None) -> str | None:
+    """Reduce a client-sent filename to a safe basename; None if unusable.
+
+    Rejects empty names, dotfiles, control characters, and names past the
+    255-byte filesystem component limit.
+    """
+    name = Path(filename or "").name.strip()
+    if not name or name.startswith(".") or name in _SKIP:
+        return None
+    if len(name.encode("utf-8", "replace")) > 255 or any(ord(c) < 32 for c in name):
+        return None
+    return name
+
+
+def unique_destination(root: Path, name: str) -> Path:
+    """``data.csv`` -> ``data (1).csv`` … until the name is free under root.
+
+    A symlink — even a dangling one — counts as occupied, so an upload can
+    never write *through* a link left in the workspace by a previous run.
+    """
+    stem, suffix = Path(name).stem, Path(name).suffix
+    dest = root / name
+    counter = 1
+    while dest.exists() or dest.is_symlink():
+        dest = root / f"{stem} ({counter}){suffix}"
+        counter += 1
+    return dest
+
+
+def _reserve_destination(root: Path, name: str) -> Path:
+    """Exclusively create a free destination (no overwrite, no symlink follow)."""
+    while True:
+        dest = unique_destination(root, name)
+        try:
+            dest.open("xb").close()
+            return dest
+        except FileExistsError:
+            continue  # lost a race for this name; try the next suffix
+
+
+def save_upload(name: str, stream: BinaryIO) -> dict[str, Any]:
+    """Stream one uploaded file into the live workspace.
+
+    ``name`` must come from safe_upload_name(). The destination is created
+    exclusively (collisions get a `` (n)`` suffix, symlinks are never
+    followed), and content streams into a dot-prefixed temp file renamed
+    into place — so a launch snapshot racing the upload can't capture a
+    truncated input under its real name. Returns ``{name, size, kind}``;
+    raises ValueError past _UPLOAD_MAX_BYTES (nothing left on disk).
+    """
+    root = get_settings().workspace_dir
+    root.mkdir(parents=True, exist_ok=True)
+    dest = _reserve_destination(root, name)
+    part = root / f".uploading-{dest.name}"
+    size = 0
+    try:
+        part.unlink(missing_ok=True)  # stale temp from a crashed upload
+        with part.open("xb") as out:
+            while chunk := stream.read(_UPLOAD_CHUNK):
+                size += len(chunk)
+                if size > _UPLOAD_MAX_BYTES:
+                    limit_mb = _UPLOAD_MAX_BYTES // (1024 * 1024)
+                    raise ValueError(f"'{name}' exceeds the {limit_mb} MB upload limit")
+                out.write(chunk)
+        part.replace(dest)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        dest.unlink(missing_ok=True)
+        raise
+    return {"name": dest.name, "size": size, "kind": _kind(dest)}
+
+
+def save_uploads(named: list[tuple[str, BinaryIO]]) -> list[dict[str, Any]]:
+    """Save an upload batch all-or-nothing.
+
+    On any failure the files this batch already stored are removed again, so
+    an error response always means "nothing from this request persisted".
+    """
+    root = get_settings().workspace_dir
+    stored: list[Path] = []
+    entries: list[dict[str, Any]] = []
+    try:
+        for name, stream in named:
+            entry = save_upload(name, stream)
+            stored.append(root / entry["name"])
+            entries.append(entry)
+        return entries
+    except BaseException:
+        for path in stored:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def delete_live_file(rel_path: str) -> bool:
+    """Delete one file inside the live workspace; True when removed."""
+    resolved = resolve_file("live", rel_path)
+    if resolved is None:
+        return False
+    try:
+        resolved[0].unlink()
+    except FileNotFoundError:  # raced a concurrent delete — same outcome
+        return False
+    return True
