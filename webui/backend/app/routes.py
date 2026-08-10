@@ -1,7 +1,8 @@
 """HTTP + WebSocket routes for the Observatory API.
 
-All endpoints are read-only. Run ids are validated against the on-disk set
+Run endpoints are read-only; run ids are validated against the on-disk set
 before any filesystem access, so path components can't escape the data roots.
+The setup/launch endpoints and the live-workspace upload write to disk.
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter, Body, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect,
+)
 from fastapi.responses import FileResponse
 
 from . import bridge, config_store, lineage, memory, store, workspace
@@ -163,6 +166,33 @@ def get_workspace_file(scope: str, path: str = Query(...)) -> FileResponse:
     target, kind = resolved
     media = _MEDIA.get(kind) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
     return FileResponse(target, media_type=media)
+
+
+@router.post("/workspace/upload")
+def post_workspace_upload(files: list[UploadFile] = File(...)) -> dict[str, Any]:
+    """Store run-input files in the live workspace (the next launch reads them).
+
+    All-or-nothing: an error response means nothing from this request persisted.
+    """
+    named = [(workspace.safe_upload_name(f.filename), f) for f in files]
+    rejected = [f.filename or "(unnamed)" for name, f in named if name is None]
+    if rejected:
+        raise HTTPException(status_code=422, detail=f"unusable filename(s): {', '.join(rejected)}")
+    try:
+        saved = workspace.save_uploads([(name, f.file) for name, f in named])
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail=f"could not store upload: {exc}")
+    return {"saved": saved}
+
+
+@router.delete("/workspace/live/file")
+def delete_workspace_file(path: str = Query(...)) -> dict[str, Any]:
+    """Remove one file from the live workspace (undo for a mistaken upload)."""
+    if not workspace.delete_live_file(path):
+        raise HTTPException(status_code=404, detail="file not found")
+    return {"deleted": path}
 
 
 # ── Phase 2: setup & launch ──

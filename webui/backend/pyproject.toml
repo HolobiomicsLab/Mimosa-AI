@@ -1,16 +1,17 @@
 [project]
 name = "mimosa-observatory-backend"
 version = "0.1.0"
-description = "Read-only observability API over Mimosa-AI evolution runs"
+description = "Observability and run-launch API over Mimosa-AI evolution runs"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
+    "python-multipart>=0.0.12",
     "uvicorn[standard]>=0.32",
     "watchfiles>=0.24",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "httpx>=0.27"]
 
 [tool.uv]
 package = false

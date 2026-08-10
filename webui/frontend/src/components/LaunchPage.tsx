@@ -3,7 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type { ClassifyResult, LaunchInfo, ObjectiveHistoryEntry, RunMode } from '../types'
-import { Spinner } from '../ui'
+import { fmtBytes, Spinner } from '../ui'
 
 const MIN_OBJECTIVE_CHARS = 10
 const MAX_REFINE_ROUNDS = 5
@@ -85,6 +85,7 @@ function ObjectiveStep({ objective, setObjective, onNext }: {
   onNext: () => void
 }) {
   const tooShort = objective.trim().length < MIN_OBJECTIVE_CHARS
+  const [uploading, setUploading] = useState(false)
   const history = useAsync(() => api.objectiveHistory(), [])
   const entries: ObjectiveHistoryEntry[] = history.data?.result?.entries ?? []
   return (
@@ -98,9 +99,10 @@ function ObjectiveStep({ objective, setObjective, onNext }: {
             value={objective} onChange={(e) => setObjective(e.target.value)}
           />
           <div className="save-row">
-            <button className="btn-gold" disabled={tooShort} onClick={onNext}>Continue</button>
+            <button className="btn-gold" disabled={tooShort || uploading} onClick={onNext}>Continue</button>
             {tooShort && <span className="hint">at least {MIN_OBJECTIVE_CHARS} characters</span>}
           </div>
+          <WorkspaceFilesRow onBusy={setUploading} />
         </div>
         <div className="objective-history">
           <div className="field" style={{ marginBottom: 8 }}>
@@ -123,6 +125,67 @@ function ObjectiveStep({ objective, setObjective, onNext }: {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Upload input files into the live workspace and list what's already there.
+ *  Everything shown is what the next launch snapshots as its initial state.
+ *  ``onBusy`` gates the wizard's Continue button while an upload streams. */
+function WorkspaceFilesRow({ onBusy }: { onBusy: (busy: boolean) => void }) {
+  const listing = useAsync(() => api.workspaceFiles('live'), [])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const upload = (picked: FileList | null) => {
+    if (!picked?.length) return
+    setBusy(true)
+    onBusy(true)
+    setError(null)
+    api.uploadWorkspaceFiles(Array.from(picked))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => {
+        listing.refetch() // also on failure — show what actually persisted
+        setBusy(false)
+        onBusy(false)
+        if (inputRef.current) inputRef.current.value = ''
+      })
+  }
+
+  const remove = (path: string) => {
+    setError(null)
+    api.deleteWorkspaceFile(path)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => listing.refetch())
+  }
+
+  const files = listing.data?.files ?? []
+  return (
+    <div className="field" style={{ marginTop: 14 }}>
+      <label>Files for this run</label>
+      <div className="pill-row" style={{ marginTop: 4 }}>
+        <button className="pill" disabled={busy} onClick={() => inputRef.current?.click()}>
+          {busy ? 'Uploading…' : '＋ Add files'}
+        </button>
+        {files.map((f) => (
+          <span key={f.path} className="pill file-chip" title={f.path}>
+            {f.path} · {fmtBytes(f.size)}
+            <button className="chip-x" title="Remove from workspace" onClick={() => remove(f.path)}>×</button>
+          </span>
+        ))}
+      </div>
+      <input
+        ref={inputRef} type="file" multiple style={{ display: 'none' }}
+        onChange={(e) => upload(e.target.files)}
+      />
+      {error && <div className="bad-text hint" style={{ marginTop: 6 }}>{error}</div>}
+      <div className="hint" style={{ marginTop: 6 }}>
+        {files.length === 0 && !listing.loading
+          ? 'The workspace is empty — the run starts blank unless you add input files. '
+          : 'Mimosa reads these as the run\'s starting workspace. '}
+        {listing.data && <span className="mono">{listing.data.root}</span>}
       </div>
     </div>
   )

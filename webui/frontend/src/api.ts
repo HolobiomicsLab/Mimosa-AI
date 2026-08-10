@@ -2,15 +2,10 @@ import type {
   RunSummary, RunDetail, Tree, Series, MemoryList, Timeline,
   StepDetail, CallDetail, WorkspaceScopes, WorkspaceListing,
   SetupInfo, SetupConfig, KeyStatus, McpHealth, RefineResult, ClassifyResult,
-  LaunchInfo, RunMode, ObjectiveHistoryResult,
+  LaunchInfo, RunMode, ObjectiveHistoryResult, UploadResult,
 } from './types'
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+async function parseResponse<T>(res: Response, path: string): Promise<T> {
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText} — ${path}`
     try {
@@ -20,6 +15,23 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new Error(detail)
   }
   return res.json() as Promise<T>
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return parseResponse<T>(res, path)
+}
+
+/** Multipart POST — the browser sets the boundary header itself. */
+async function uploadFiles(path: string, files: File[]): Promise<UploadResult> {
+  const form = new FormData()
+  files.forEach((f) => form.append('files', f))
+  const res = await fetch(`/api${path}`, { method: 'POST', body: form })
+  return parseResponse<UploadResult>(res, path)
 }
 
 const get = <T,>(path: string) => request<T>('GET', path)
@@ -38,6 +50,9 @@ export const api = {
   workspaceScopes: () => get<WorkspaceScopes>('/workspace/scopes'),
   workspaceFiles: (scope: string) =>
     get<WorkspaceListing>(`/workspace/${encodeURIComponent(scope)}/files`),
+  uploadWorkspaceFiles: (files: File[]) => uploadFiles('/workspace/upload', files),
+  deleteWorkspaceFile: (path: string) =>
+    request<{ deleted: string }>('DELETE', `/workspace/live/file?path=${encodeURIComponent(path)}`),
 
   // ── setup & launch ──
   setup: () => get<SetupInfo>('/setup'),

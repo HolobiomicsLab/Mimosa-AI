@@ -7,13 +7,14 @@ a run produces so you can watch and inspect evolution instead of reading logs.
 Phases 1 and 2 of the agreed build order are done: **observability** (a
 read-only view over the artifacts Mimosa writes to disk, plus a live feed
 derived from filesystem changes) and **setup & launch** (the CLI onboarding as
-a web flow: config, API keys, objective refinement, mode suggestion, and
-subprocess-isolated run launching). Neither changes Mimosa's core. Phase 3
+a web flow: config, API keys, objective refinement, input-file upload into
+the workspace, mode suggestion, and subprocess-isolated run launching).
+Neither changes Mimosa's core. Phase 3
 (in-process event bus, live control) builds on this — see *Roadmap* below.
 
 ```
 webui/
-  backend/   FastAPI read-only API over sources/workflows + sources/memory
+  backend/   FastAPI API over sources/workflows + sources/memory, setup & launch
   frontend/  React + Vite + TypeScript app (lineage tree, replay, workspace…)
 ```
 
@@ -46,9 +47,11 @@ Plus two pages that replace the CLI onboarding:
   knobs, and an MCP port scan.
 - **New run** — a three-step wizard: objective → LLM clarifier loop (same
   prompts as the CLI, executed in the Mimosa venv via the bridge) → goal-vs-task
-  suggestion with manual override, learning/judge toggles, launch. Launched runs
-  are detached subprocesses; the monitor polls status and a plain-text log tail,
-  and can cancel the process group.
+  suggestion with manual override, learning/judge toggles, launch. The objective
+  step can also upload input files straight into the live workspace — the folder
+  Mimosa snapshots as the run's initial state at launch — and lists/removes
+  what's already there. Launched runs are detached subprocesses; the monitor
+  polls status and a plain-text log tail, and can cancel the process group.
 
 A live indicator reflects a WebSocket that emits semantic events
 (`iteration_complete`, `execution_complete`, `tree_updated`, `run_finished`,
@@ -119,9 +122,10 @@ which assume a local Mimosa checkout at the given path.
 
 ### Observability vs. setup & launch
 
-The read-only observability endpoints (runs, tree, series, artifacts, memory,
-workspace, live feed) need only the backend's own dependencies — the backend
-never imports `torch`, `smolagents`, or Mimosa itself.
+The observability endpoints (runs, tree, series, artifacts, memory, workspace
+browsing, live feed) and the live-workspace upload need only the backend's own
+dependencies — the backend never imports `torch`, `smolagents`, or Mimosa
+itself.
 
 The setup and launch endpoints are different: objective refinement, goal/task
 classification, and launching runs shell out to the real Mimosa install via
@@ -178,10 +182,13 @@ POST  /api/assist/classify                  goal-vs-task suggestion {objective}
 POST  /api/launches                         start a run {objective, mode, learn, judge}
 GET   /api/launches[/{id}]                  list / poll (with log tail)
 POST  /api/launches/{id}/cancel             SIGTERM→SIGKILL the process group
+POST  /api/workspace/upload                 multipart run-input upload into the live workspace
+DELETE /api/workspace/live/file?path=…      remove one live-workspace file
 ```
 
-Everything above the break is read-only; the setup/launch block is the only
-part that writes (config file, dotenv, spawned run processes).
+Everything above the break is read-only; the block below it is the only part
+that writes (config file, dotenv, spawned run processes, live-workspace
+uploads).
 
 ## Design notes learned from Mimosa's internals
 

@@ -239,6 +239,13 @@ pre.code.tight { white-space: pre; word-break: normal; }
 }
 .pill.active { color: var(--gold); border-color: var(--gold-dim); background: #f2c14e14; }
 
+.file-chip { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.chip-x {
+  border: none; background: none; padding: 0 2px;
+  color: var(--text-faint); font-size: 13px; line-height: 1;
+}
+.chip-x:hover { color: var(--bad); background: none; }
+
 .muted { color: var(--text-faint); }
 .hint { color: var(--text-faint); font-size: 12px; }
 .spinner { color: var(--text-faint); padding: 30px; text-align: center; }

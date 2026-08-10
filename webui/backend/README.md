@@ -1,8 +1,9 @@
 # Mimosa Observatory — backend
 
-Read-only FastAPI observability API over the artifacts a Mimosa-AI run writes
-to disk (`sources/workflows`, `sources/memory`, the toolomics workspace),
-plus a small setup/launch bridge into the real Mimosa install. See
+FastAPI API over the artifacts a Mimosa-AI run writes to disk — read-only
+observability of `sources/workflows`, `sources/memory`, and the toolomics
+workspace — plus run-input uploads into that workspace and a small
+setup/launch bridge into the real Mimosa install. See
 [`../README.md`](../README.md) for what the Observatory is and the full API
 surface; this file covers only running the backend itself.
 
@@ -46,9 +47,10 @@ what each path is used for.
 
 ## Setup & launch require a real Mimosa install
 
-The read-only observability endpoints (runs, tree, series, artifacts, memory,
-workspace, live feed) work with only the dependencies installed above — no
-Mimosa checkout is required to be functional, just present on disk to read.
+The observability endpoints (runs, tree, series, artifacts, memory, workspace
+browsing, live feed) and the live-workspace upload work with only the
+dependencies installed above — no Mimosa checkout is required to be
+functional, just present on disk to read.
 
 The setup and launch endpoints are different: objective refinement
 (`/api/assist/refine`), goal/task classification (`/api/assist/classify`),
