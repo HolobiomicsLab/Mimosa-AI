@@ -457,7 +457,7 @@ Given the user's current objective (and any additional context they provided), d
    formulate one concise clarifying question.
 3. If CLEAR: produce a polished, detailed, self-contained restatement that an AI agent \
    can act on directly (include dataset names, metrics, file paths, or any specifics \
-   already mentioned).
+   already mentioned). Whenever possible specify extensive visualization to include (e.g. plots, molecular structures, anything that can be rendered visually).
 
 Return ONLY valid JSON (no markdown fences, no prose before or after) in this exact shape:
 {
