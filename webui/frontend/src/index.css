@@ -178,6 +178,14 @@ code, .mono { font-family: var(--mono); }
 }
 .detail-head .rid { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
 .detail-head h2 { font-size: 17px; margin: 6px 0 10px; max-width: 900px; line-height: 1.4; }
+.detail-head h2.objective { font-size: 13px; font-weight: 500; line-height: 1.45; }
+.objective-toggle {
+  margin-left: 8px; padding: 1px 8px;
+  font-size: 10.5px; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 20px;
+  background: transparent; vertical-align: middle;
+}
+.objective-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .detail-head .stats { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
 .stat { display: flex; flex-direction: column; }
 .stat b { font-size: 15px; font-family: var(--mono); }

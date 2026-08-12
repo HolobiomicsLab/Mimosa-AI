@@ -13,7 +13,26 @@ import WorkspacePanel from './WorkspacePanel'
 
 // Scientist-first ordering: outputs → what the agents did → the workflow. The
 // neuroevolution machinery lives under "Evolution", shown only for learning runs.
-type Tab = 'results' | 'replay' | 'workflow' | 'evolution' | 'artifacts'
+type Tab = 'results' | 'verification' | 'replay' | 'workflow' | 'evolution' | 'artifacts'
+
+/** Objective shown truncated (first 512 chars) with a toggle to expand/collapse. */
+const OBJECTIVE_LIMIT = 512
+
+function ObjectiveText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = text.length > OBJECTIVE_LIMIT
+  const shown = expanded || !long ? text : `${text.slice(0, OBJECTIVE_LIMIT)}…`
+  return (
+    <h2 className="objective">
+      {shown}
+      {long && (
+        <button className="objective-toggle" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'show less' : 'show more'}
+        </button>
+      )}
+    </h2>
+  )
+}
 
 export default function RunDetail({ runId }: { runId: string }) {
   const { data: run, loading, error } = useAsync<RunDetailT>(() => api.run(runId), [runId])
@@ -26,24 +45,25 @@ export default function RunDetail({ runId }: { runId: string }) {
 
   const tabs: [Tab, string, number?][] = [
     ['results', 'Results'],
+    ...(run.evaluation_scores ? [['verification', 'Verification'] as [Tab, string]] : []),
     ['replay', 'Replay'],
     ['workflow', 'Workflow'],
     ...(run.learning_mode ? [['evolution', 'Evolution'] as [Tab, string]] : []),
-    ['artifacts', 'Artifacts', run.artifacts.length],
+    ['artifacts', 'Evolution Artifact (Expert)', run.artifacts.length],
   ]
 
   return (
     <>
       <div className="detail-head">
         <div className="rid">{run.id}</div>
-        <h2>{run.goal || 'Untitled run'}</h2>
+        <ObjectiveText text={run.goal || 'Untitled run'} />
         <div className="stats">
-          <div className="stat"><b><StatusBadge status={run.status} /></b><span>status</span></div>
-          <div className="stat"><b><ScoreChip score={run.score} /></b><span>score</span></div>
-          <div className="stat"><b>{fmtCost(run.cost_usd)}</b><span>cost</span></div>
-          <div className="stat"><b>{fmtDuration(run.wall_time_s)}</b><span>wall time</span></div>
-          {run.learning_mode && <div className="stat"><b><KindTag kind={run.evolution_kind} /></b><span>evolution</span></div>}
-          {run.is_single_agent && <div className="stat"><b>single</b><span>agent mode</span></div>}
+          <div className="stat"><b><StatusBadge status={run.status} /></b></div>
+          <div className="stat"><b><ScoreChip score={run.score} /></b></div>
+          <div className="stat"><b>{fmtCost(run.cost_usd)}</b></div>
+          <div className="stat"><b>{fmtDuration(run.wall_time_s)}</b></div>
+          {run.learning_mode && <div className="stat"><b><KindTag kind={run.evolution_kind} /></b></div>}
+          {run.is_single_agent && <div className="stat"><b>single</b></div>}
         </div>
       </div>
 
@@ -57,6 +77,7 @@ export default function RunDetail({ runId }: { runId: string }) {
 
       <div className="tab-body">
         {tab === 'results' && <Results run={run} />}
+        {tab === 'verification' && <Verification run={run} />}
         {tab === 'replay' && <MemoryReplay runId={runId} />}
         {tab === 'workflow' && <Workflow run={run} />}
         {tab === 'evolution' && <Evolution run={run} />}
@@ -68,18 +89,18 @@ export default function RunDetail({ runId }: { runId: string }) {
 
 /** Landing view: what it produced first (the files a scientist wants), then the score. */
 function Results({ run }: { run: RunDetailT }) {
-  const ev = run.evaluation_scores
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <div className="card-head" style={{ padding: '0 0 10px', border: 'none' }}>
-          output files
-        </div>
-        <WorkspacePanel runId={run.id} />
-      </div>
-      {ev && <EvalCard ev={ev} claims={run.evaluation_claims} />}
+      <WorkspacePanel runId={run.id} />
     </div>
   )
+}
+
+/** Verification view: the verifier's score breakdown and per-claim results. */
+function Verification({ run }: { run: RunDetailT }) {
+  const ev = run.evaluation_scores
+  if (!ev) return <div className="empty"><div className="hint">No verification data for this run.</div></div>
+  return <EvalCard ev={ev} claims={run.evaluation_claims} />
 }
 
 function EvalCard({ ev, claims }: { ev: Record<string, unknown>; claims: EvaluationClaim[] | null }) {
@@ -165,25 +186,11 @@ function Workflow({ run }: { run: RunDetailT }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div className="card">
-        <div className="card-head">task</div>
+        <div className="card-head">executed workflow graph · LangGraph</div>
         <div className="card-body">
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{run.original_task || run.goal}</p>
-        </div>
-      </div>
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-head">executed workflow graph · LangGraph</div>
-          <div className="card-body">
-            {hasGraph
-              ? <img className="artifact-img" src={artifactUrl(run.id, 'workflow_graph')} alt="workflow graph" />
-              : <div className="hint">No workflow diagram (run crashed before execution).</div>}
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-head">how it was built · generated source</div>
-          <div className="card-body">
-            {run.genotype ? <pre className="code tight">{run.genotype}</pre> : <div className="hint">No source recorded.</div>}
-          </div>
+          {hasGraph
+            ? <img className="artifact-img" src={artifactUrl(run.id, 'workflow_graph')} alt="workflow graph" />
+            : <div className="hint">No workflow diagram (run crashed before execution).</div>}
         </div>
       </div>
     </div>
@@ -211,20 +218,6 @@ function Evolution({ run }: { run: RunDetailT }) {
         <div className="card-body">
           {series.loading ? <Spinner /> : series.data ? <RewardChart series={series.data} /> : null}
         </div>
-      </div>
-      <div className="grid-2">
-        {run.textual_gradient && (
-          <div className="card">
-            <div className="card-head">textual gradient · steers the next mutation</div>
-            <div className="card-body"><pre className="code">{run.textual_gradient}</pre></div>
-          </div>
-        )}
-        {run.evolution_prompt && (
-          <div className="card">
-            <div className="card-head">evolution prompt</div>
-            <div className="card-body"><pre className="code">{run.evolution_prompt}</pre></div>
-          </div>
-        )}
       </div>
     </div>
   )
