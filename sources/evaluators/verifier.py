@@ -30,6 +30,7 @@ from sources.core.failure_fingerprint import (
     DESCRIPTOR_DIM as _FP_DIM,
     compute_failure_fingerprint,
 )
+from sources.core.llm_provider import LLMConfig
 
 from .base import (
     BaseEvaluator,
@@ -119,6 +120,40 @@ class VerifierEvaluator(
             getattr(config, "temp_dir", None) or self.workflow_dir / "_verifier_tmp"
         )
         self._task_spec: str = ""
+
+        # ---- vision model for Source G ----
+        vision_model = getattr(config, "vision_judge_model", None)
+        if vision_model:
+            provider, model = (
+                vision_model.split("/", 1)
+                if "/" in vision_model
+                else ("openai", vision_model)
+            )
+            self._vision_llm_config = LLMConfig().from_dict({
+                "model": model,
+                "provider": provider,
+                "temperature": 0.1,
+                "reasoning_effort": config.reasoning_effort,
+                "max_tokens": 1024,
+                "openrouter_provider": (
+                    config.openrouter_provider_for(vision_model)
+                    if hasattr(config, "openrouter_provider_for")
+                    else None
+                ),
+                "openrouter_quantizations": (
+                    config.openrouter_quantizations_for(vision_model)
+                    if hasattr(config, "openrouter_quantizations_for")
+                    else None
+                ),
+            })
+            self.logger.info(
+                f"Vision judge configured: {vision_model}"
+            )
+        else:
+            self._vision_llm_config = None
+            self.logger.info(
+                "No vision_judge_model configured; Source G will skip visual checks"
+            )
         self.logger.info(
             f"VerifierEvaluator initialized (workspace={self.workspace_dir}, "
             f"timeout={verifier_timeout}s, claims={self.min_claims}–{max_claims}, "
@@ -858,4 +893,4 @@ if __name__ == "__main__":
     from config import Config
     config = Config()
     verifier = VerifierEvaluator(config, config.workspace_dir)
-    verifier.evaluate("20260619_104434_4261183e")
+    verifier.evaluate("20260812_054206_697f0f45")

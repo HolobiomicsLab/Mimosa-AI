@@ -65,6 +65,8 @@ class Config:
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
         self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        # Vision model for Source G (visual figure inspection).
+        self.vision_judge_model: str | None = "openrouter/moonshot/kimi-k3"
 
         #############
         # Orchestrator Workflow generation options
@@ -308,6 +310,7 @@ class Config:
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
+            "vision_judge_model": self.vision_judge_model,
             "capsule_namer_model": self.capsule_namer_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
@@ -362,6 +365,9 @@ class Config:
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.vision_judge_model = data.get(
+            "vision_judge_model", self.vision_judge_model
+        )
         self.capsule_namer_model = data.get(
             "capsule_namer_model", self.capsule_namer_model
         )
