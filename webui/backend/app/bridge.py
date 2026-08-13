@@ -8,6 +8,7 @@ Long-running launches go through ``launcher.py`` instead.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,22 @@ def bridge_available() -> tuple[bool, str | None]:
     return True, None
 
 
+def bridge_env() -> dict[str, str]:
+    """Process env for bridge subprocesses.
+
+    The bridge script lives in webui/backend, so Python puts *that* dir on
+    sys.path, not the Mimosa root — and ``sources`` isn't installed into the
+    venv. Put the root on PYTHONPATH so ``import sources`` works (as the
+    bridge docstring promises: "with MIMOSA_ROOT on the path").
+    """
+    env = dict(os.environ)
+    root = str(get_settings().root)
+    env["PYTHONPATH"] = (
+        root + os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else root
+    )
+    return env
+
+
 def _call(cmd: str, payload: dict[str, Any], timeout: int = 90) -> dict[str, Any]:
     ok, err = bridge_available()
     if not ok:
@@ -37,6 +54,7 @@ def _call(cmd: str, payload: dict[str, Any], timeout: int = 90) -> dict[str, Any
             [str(settings.mimosa_python), str(BRIDGE_SCRIPT), cmd],
             input=json.dumps(payload),
             cwd=str(settings.root),
+            env=bridge_env(),
             capture_output=True,
             text=True,
             timeout=timeout,
