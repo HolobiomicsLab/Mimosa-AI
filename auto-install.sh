@@ -4,7 +4,7 @@
 #
 # Brings up everything Mimosa needs and then opens the Observatory web UI:
 #
-#   1. Preflight   — git / uv / Node 20+ / Docker present, Docker daemon running
+#   1. Preflight   — git / uv / Python 3.12 / Node 20+ / Docker present, Docker daemon running
 #   2. API key     — make sure at least one LLM provider key is available
 #   3. Toolomics   — clone + ./start.sh (MCP tools, ports 5000-5200, via Docker)
 #   4. Perspicacité— clone + uv run perspicacite serve (literature grounding, :5468)
@@ -182,6 +182,13 @@ if ! have uv; then
 fi
 ok "uv    $(uv --version 2>/dev/null | awk '{print $2}')"
 
+# Python 3.12 — required by Mimosa; uv installs it on demand without root.
+if ! uv python find 3.12 >/dev/null 2>&1; then
+  info "Python 3.12 not found — installing via uv"
+  uv python install 3.12 || die "could not install Python 3.12 — install it manually (https://www.python.org or 'brew install python@3.12')."
+fi
+ok "python $(uv python find 3.12) ($(uv run --python 3.12 python -V 2>/dev/null || echo 3.12))"
+
 have npm || die "npm not found — install Node.js 20+ (https://nodejs.org or 'brew install node')."
 node_major="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
 [ -n "$node_major" ] && [ "$node_major" -ge 20 ] 2>/dev/null \
@@ -331,7 +338,7 @@ fi
 # --------------------------------------------------------------------------- #
 step "6/6  Mimosa core"
 info "Installing Mimosa deps (uv sync — creates .venv for the web UI bridge)"
-( cd "$MIMOSA_DIR" && uv sync )
+( cd "$MIMOSA_DIR" && uv sync --python 3.12 )
 ok "Mimosa environment ready"
 
 case "$INSTALL_CLI" in
