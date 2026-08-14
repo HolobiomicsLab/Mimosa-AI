@@ -25,6 +25,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `smolagent_model_id` | `str` | `openrouter/deepseek/deepseek-v3.2` | Execution agents inside the sandbox. |
 | `judge_model` | `str` | `openai/gpt-5.5` | Verifier soft-claim verdicts. |
 | `capsule_namer_model` | `str` | `deepseek/deepseek-chat` | Generates human-readable capsule names. |
+| `model_tiers` | `dict[str, str]` | `{"heavy": ..., "light": ...}` | Capability tiers. Any `*_model` role above may hold a tier alias (`heavy`/`light`) instead of a concrete id; aliases resolve at load time, so the fleet's cost profile is switched by editing two lines. Defaults are concrete ids, so tiers are inert until a role opts in. |
 | `engine_name` | `str` | `litellm` | SmolAgents engine — keep as `litellm`. |
 | `reasoning_effort` | `str` | `medium` | `minimal | low | medium | high` for models that support it. |
 | `max_tokens` | `int` | `8192` | Token cap on LLM responses. |
