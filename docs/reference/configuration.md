@@ -45,6 +45,16 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `max_learning_evolve_iterations` | `int` | `25` | Hard cap on evolve iterations. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
 
+## Verifier cost
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `verifier_max_claims` | `int \| None` | `None` | Hard cap on claims graded per evaluation. `None` keeps the verifier's own default (100). Lowering it grades only the top-N most important claims, trading coverage of low-priority claims for speed and spend. |
+| `verifier_use_grounding` | `bool \| None` | `None` | Whether the verifier fetches literature grounding per claim. `None` keeps the verifier's own default (`True`). |
+
+Both are omitted from the verifier's constructor when unset, so leaving them at
+`None` reproduces current behaviour exactly.
+
 ## QD / novelty (selection & variation)
 
 Touch with caution — these are ablation-study knobs for the [evolution
