@@ -47,6 +47,30 @@ def test_from_json_resolves_role_aliases():
     assert c.capsule_namer_model == "prov/small"
 
 
+def test_resolve_model_handles_a_list_of_candidate_models():
+    """`smolagent_model_id` may be a list; the dict lookup must not see it.
+
+    A list is unhashable, so resolving it as a single value raises TypeError
+    and makes a supported config unloadable (see single_agent_factory.py:56
+    and workflow_factory.py:322, which both branch on isinstance(..., list)).
+    """
+    c = Config()
+    c.model_tiers = {"heavy": "prov/big", "light": "prov/small"}
+    assert c.resolve_model(["heavy", "light"]) == ["prov/big", "prov/small"]
+    # a list may mix aliases and concrete ids
+    assert c.resolve_model(["heavy", "prov/literal"]) == ["prov/big", "prov/literal"]
+    assert c.resolve_model([]) == []
+
+
+def test_from_json_accepts_a_list_smolagent_model_id():
+    c = Config()
+    c.from_json({
+        "model_tiers": {"heavy": "prov/big", "light": "prov/small"},
+        "smolagent_model_id": ["light", "heavy"],
+    })
+    assert c.smolagent_model_id == ["prov/small", "prov/big"]
+
+
 def test_from_json_without_tiers_leaves_concrete_ids_untouched():
     c = Config()
     c.from_json({"planner_llm_model": "prov/explicit"})

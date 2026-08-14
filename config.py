@@ -369,8 +369,16 @@ class Config:
         which maps via ``model_tiers``. A concrete model id (or None) is
         returned unchanged, so this is a no-op for the default concrete ids.
         """
-        if value is None:
-            return None
+        if isinstance(value, list):
+            # `smolagent_model_id` may hold a list of candidate models (see
+            # single_agent_factory.py and workflow_factory.py); resolve each
+            # entry so a list may mix aliases and concrete ids.
+            return [self.resolve_model(v) for v in value]
+        if not isinstance(value, str):
+            # None, and anything else a role may legitimately hold, passes
+            # through untouched. Guarding on str rather than None keeps
+            # unhashable values out of the dict lookup below.
+            return value
         return self.model_tiers.get(value, value)
 
     def from_json(self, data: dict[str, Any]) -> None:
