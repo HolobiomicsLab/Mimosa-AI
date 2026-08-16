@@ -294,6 +294,7 @@ class Config:
         resource_fields = (
             "prompt_planner",
             "prompt_workflow_creator",
+            "prompt_smolagent",
             "schema_code_path",
             "smolagent_factory_code_path",
         )
@@ -314,14 +315,17 @@ class Config:
             "capsule_namer_model": self.capsule_namer_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
+            "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
             "prompt_planner": portable_resources["prompt_planner"],
             "prompt_workflow_creator": portable_resources["prompt_workflow_creator"],
+            "prompt_smolagent": portable_resources["prompt_smolagent"],
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
             "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "max_concurrent_eval_tasks": self.max_concurrent_eval_tasks,
             "evaluate_snapshot_ablations": self.evaluate_snapshot_ablations,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
@@ -355,10 +359,14 @@ class Config:
     def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workspace_dir = data.get("workspace_dir", self.workspace_dir)
-        self.discovery_addresses = [
-            AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
-            for addr in data.get("discovery_addresses", [])
-        ]
+        # Absent key keeps the default, like every other field below. Falling
+        # back to [] left MCP discovery with no address range to scan.
+        raw_addresses = data.get("discovery_addresses")
+        if raw_addresses is not None:
+            self.discovery_addresses = [
+                AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
+                for addr in raw_addresses
+            ]
         self.planner_llm_model = data.get("planner_llm_model", self.planner_llm_model)
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
@@ -373,8 +381,12 @@ class Config:
         )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
+        self.default_openrouter_quantizations = data.get(
+            "default_openrouter_quantizations", self.default_openrouter_quantizations
+        )
         self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
+        self.prompt_smolagent = data.get("prompt_smolagent", self.prompt_smolagent)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
         )
@@ -384,6 +396,9 @@ class Config:
             "learned_score_threshold", self.learned_score_threshold
         )
         self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
+        self.max_concurrent_eval_tasks = data.get(
+            "max_concurrent_eval_tasks", self.max_concurrent_eval_tasks
+        )
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
         )
@@ -462,6 +477,7 @@ class Config:
         resource_fields = (
             "prompt_planner",
             "prompt_workflow_creator",
+            "prompt_smolagent",
             "schema_code_path",
             "smolagent_factory_code_path",
         )
