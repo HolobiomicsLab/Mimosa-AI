@@ -240,7 +240,8 @@ async def main():
         "--science_agent_bench", action="store_true", help="Papers mode on ScienceAgentBench (Run Mimosa on multiple science agent bench task from a CSV, automatically monitor run, evaluate, save capsules)"
     )
     parser.add_argument(
-        "--csv_runs_limit", type=int, default=200, help="Maximum number of autonomous iterations (for --papers mode)"
+        "--csv_runs_limit", type=int, default=200,
+        help="Maximum number of CSV rows to evaluate, counted from --start_row (for --papers mode)"
     )
     parser.add_argument(
         "--disable_judge", action="store_true", default=False, help="Disable judge for workflow evaluation"
