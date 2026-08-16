@@ -1,4 +1,5 @@
 
+import hashlib
 import shutil
 from pathlib import Path
 from typing import Union
@@ -30,7 +31,10 @@ class LocalTransfer:
         A whitespace-only LLM reply sanitizes to "" — fall back to a
         deterministic name instead of writing into the capsule root.
         """
-        fallback = "capsule_" + (task_token or str(abs(hash(goal))))
+        # `hash()` on a str is salted by PYTHONHASHSEED, so the "deterministic"
+        # fallback above produced a different capsule name on every process.
+        goal_digest = hashlib.sha256((goal or "").encode("utf-8")).hexdigest()[:12]
+        fallback = "capsule_" + (task_token or goal_digest)
         system_prompt = """Generate a concise, unique lowercase folder name (max 7 words, underscore-separated) from the goal sentence. Only output the folder name, nothing else."""
 
         try:
