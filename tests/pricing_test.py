@@ -263,6 +263,97 @@ def test_single_agent_memory_is_priced():
     print("✅ task_single_agent.json still priced")
 
 
+def _calculator_with_one_priced_model():
+    """A PricingCalculator whose table cannot match `some/unlisted-model`."""
+    from sources.utils.pricing import PricingCalculator
+
+    config = SimpleNamespace(
+        memory_dir="/tmp",
+        workflow_dir="/tmp",
+        model_pricing={"deepseek/deepseek-chat": {"input": 0.27, "output": 1.10}},
+    )
+    return PricingCalculator(config)
+
+
+def test_unpriced_model_does_not_prompt_when_stdin_is_not_a_tty():
+    """An unmatched model id must never block an unattended run on stdin.
+
+    `_get_model_pricing_with_fallback` runs on the hot path of every evolution
+    iteration (`evolution_engine._evaluate_and_calculate_cost`). A bare
+    `input()` there hangs a batch or cron run at 0% CPU until it is killed,
+    discarding every paid call the run had already made.
+    """
+    print("\n🧪 Testing headless pricing fallback (non-TTY)...")
+
+    from sources.utils.pricing import PricingCalculator
+
+    calc = _calculator_with_one_priced_model()
+
+    def _explode(*_args, **_kwargs):
+        raise AssertionError("input() must not be called when stdin is not a TTY")
+
+    with patch.object(sys, "stdin", SimpleNamespace(isatty=lambda: False)), \
+            patch("builtins.input", _explode):
+        pricing = calc._get_model_pricing_with_fallback("some/unlisted-model")
+
+    assert pricing == PricingCalculator.DEFAULT_PRICING, (
+        f"Expected default pricing, got {pricing}"
+    )
+    print("✅ Non-TTY run falls back without prompting")
+
+
+def test_unpriced_model_survives_eof_on_stdin():
+    """Closed stdin must fall back, not raise. EOFError was not caught."""
+    print("\n🧪 Testing pricing fallback on EOFError...")
+
+    from sources.utils.pricing import PricingCalculator
+
+    calc = _calculator_with_one_priced_model()
+
+    with patch.object(sys, "stdin", SimpleNamespace(isatty=lambda: True)), \
+            patch("builtins.input", side_effect=EOFError):
+        pricing = calc._get_model_pricing_with_fallback("some/unlisted-model")
+
+    assert pricing == PricingCalculator.DEFAULT_PRICING, (
+        f"Expected default pricing, got {pricing}"
+    )
+    print("✅ EOFError falls back instead of propagating")
+
+
+def test_interactive_manual_pricing_entry_still_works():
+    """The TTY path must keep accepting manual entry — guards over-correction."""
+    print("\n🧪 Testing interactive manual pricing entry...")
+
+    calc = _calculator_with_one_priced_model()
+
+    with patch.object(sys, "stdin", SimpleNamespace(isatty=lambda: True)), \
+            patch("builtins.input", side_effect=["1.5", "6.0"]):
+        pricing = calc._get_model_pricing_with_fallback("some/unlisted-model")
+
+    assert pricing == {"input": 1.5, "output": 6.0}, (
+        f"Manual entry not honoured, got {pricing}"
+    )
+    print("✅ Interactive manual entry preserved")
+
+
+def test_default_pricing_constant_is_not_mutated_by_callers():
+    """The fallback returns a copy — a caller must not corrupt the constant."""
+    print("\n🧪 Testing DEFAULT_PRICING immutability...")
+
+    from sources.utils.pricing import PricingCalculator
+
+    calc = _calculator_with_one_priced_model()
+
+    with patch.object(sys, "stdin", SimpleNamespace(isatty=lambda: False)):
+        pricing = calc._get_model_pricing_with_fallback("some/unlisted-model")
+    pricing["input"] = 999.0
+
+    assert PricingCalculator.DEFAULT_PRICING["input"] == 3.0, (
+        "DEFAULT_PRICING was mutated through the returned dict"
+    )
+    print("✅ DEFAULT_PRICING is returned as a copy")
+
+
 def run_all_tests():
     """Run all pricing tests."""
     print("Starting pricing functionality tests...\n")
@@ -274,6 +365,10 @@ def run_all_tests():
         test_pricing_data_format()
         test_calculate_cost_handles_scalar_and_list_model_id()
         test_single_agent_memory_is_priced()
+        test_unpriced_model_does_not_prompt_when_stdin_is_not_a_tty()
+        test_unpriced_model_survives_eof_on_stdin()
+        test_interactive_manual_pricing_entry_still_works()
+        test_default_pricing_constant_is_not_mutated_by_callers()
 
         print("\n🎉 All pricing tests passed successfully!")
         return True

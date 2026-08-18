@@ -5,6 +5,7 @@ OpenRouter API client for real-time model pricing
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,6 +29,9 @@ class PricingCalculator:
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
+
+    # Used whenever a model id cannot be matched to the pricing table.
+    DEFAULT_PRICING = {"input": 3.0, "output": 15.0}
 
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
@@ -195,6 +199,17 @@ class PricingCalculator:
         if pattern_match:
             return self.model_pricing[pattern_match]
 
+        # Headless-safe: this runs on the hot path of every evolution iteration
+        # (evolution_engine._evaluate_and_calculate_cost), so a batch or cron
+        # run must never block here waiting for a keystroke that cannot arrive.
+        # Same rationale as csv_mode._prompt_with_default.
+        if not sys.stdin.isatty():
+            print(
+                f"⚠️  No pricing match for {model_name} (stdin is not a TTY) — "
+                f"using default pricing. The reported cost is a lower bound."
+            )
+            return dict(self.DEFAULT_PRICING)
+
         print(f"⚠️  No match found for {model_name}, please enter model cost manually:")
         try:
             input_str = input("Input cost per 1M tokens: ")
@@ -206,9 +221,9 @@ class PricingCalculator:
                 "output": output_cost
             }
             return self.model_pricing[model_name]
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError, EOFError) as e:
             print(f"❌ Invalid input: {e}. Using default pricing.")
-            return {"input": 3.0, "output": 15.0}
+            return dict(self.DEFAULT_PRICING)
 
     def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
