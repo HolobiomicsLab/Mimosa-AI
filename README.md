@@ -50,12 +50,21 @@ The workflow is emitted as plain Python — no DSL, no YAML — so any generatio
 Run in a terminal:
 
 ```bash
-curl https://raw.githubusercontent.com/HolobiomicsLab/Mimosa-AI/refs/heads/mimosa_v2/auto-install.sh | auto-install.sh
+curl https://raw.githubusercontent.com/HolobiomicsLab/Mimosa-AI/refs/heads/mimosa_v2/auto-install.sh | bash 
 ```
 
 Note: This will automatically install and spin up our companion projects `Toolomics` and `Perspicacité`.
 
 For manual installation see: [Manual Installation](##Manual-Installation)
+
+## Web Interface
+
+Open `http://localhost:5173/` in your browser to access the web interface.
+
+<p align="center">
+  <img src="./docs/images/interface.png" alt="Mimosa web interface" width="80%">
+</p>
+
 
 ---
 
