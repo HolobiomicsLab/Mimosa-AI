@@ -57,7 +57,7 @@ For manual installation see: [Manual Installation](##Manual-Installation)
 Open `http://localhost:5173/` in your browser to access the web interface.
 
 <p align="center">
-  <img src="./docs/images/interface.png" alt="Mimosa web interface" width="80%">
+  <img src="./docs/images/interface.png" alt="Mimosa web interface" width="95%">
 </p>
 
 
@@ -224,7 +224,11 @@ See: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 
 ## Evaluation
 
-Setup details for each benchmark: [`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md), [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
+Setup details for each benchmark:
+
+[`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md)
+
+[`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)
 
 ---
 
