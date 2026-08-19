@@ -3,11 +3,6 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:  # pragma: no cover - optional at runtime, see _get_model
-    SentenceTransformer = None
-
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config import Config
@@ -66,15 +61,13 @@ class WorkflowSelector:
         if self._model is not None or self._model_load_failed:
             return self._model
         try:
-            if SentenceTransformer is None:
-                raise ImportError("sentence-transformers is not installed")
-            self._model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
+            from sources.core.genotype_embedding import load_sentence_transformer
+            self._model = load_sentence_transformer("all-MiniLM-L6-v2")
         except Exception as exc:
             logger.warning(
                 "MiniLM embedder unavailable (%s); falling back to lexical "
-                "similarity. Set HF_ENDPOINT=https://hf-mirror.com or "
-                "HF_HUB_OFFLINE=1 with a pre-downloaded model to restore "
-                "semantic similarity.",
+                "similarity. Set HF_ENDPOINT=https://hf-mirror.com to "
+                "download through the mirror and restore semantic similarity.",
                 exc,
             )
             self._model_load_failed = True
