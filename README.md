@@ -144,7 +144,7 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 
 > On ScienceAgentBench with DeepSeek-V3.2, iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
-## Benchmark (V1)
+## Benchmark (V2)
 
 **Currently under evaluation**
 
