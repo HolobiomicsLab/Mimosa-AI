@@ -83,6 +83,30 @@ async def _prompt_with_default(prompt: str, default: str = "0") -> str:
     return raw.strip() if raw.strip() else default
 
 
+def rows_to_evaluate(rows, start_row: int, runs_limit: int, on_skip=None) -> list:
+    """Select the CSV rows to evaluate, as ``(index, row)`` pairs.
+
+    Skips the first ``start_row`` rows, then takes at most ``runs_limit`` of
+    what remains. The limit counts *evaluated* rows rather than absolute CSV
+    indices: comparing it to the index made the natural way to re-run one
+    failing task — ``--start_row 5 --csv_runs_limit 1`` — select nothing and
+    report "No tasks to process".
+
+    ``on_skip`` is called with the index of each skipped row, so callers keep
+    their own progress output.
+    """
+    selected: list = []
+    for index, row in enumerate(rows):
+        if index < start_row:
+            if on_skip is not None:
+                on_skip(index)
+            continue
+        if len(selected) >= runs_limit:
+            break
+        selected.append((index, row))
+    return selected
+
+
 def _is_excluded(run: dict) -> bool:
     """True if a run was dropped as an eval-infra failure (not a real VER/SR result)."""
     return run.get("status") == "excluded" or run.get("success_level") == "Excluded"
@@ -109,7 +133,8 @@ class CsvEvaluationMode:
 
         Args:
             config: Mimosa configuration object
-            csv_runs_limit: Maximum number of autonomous iterations
+            csv_runs_limit: Maximum number of CSV rows to evaluate, counted
+                from ``start_row``
             max_concurrent_tasks: Maximum number of tasks to run concurrently (default: 1 for sequential)
             task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
                               Staggers agent starts to avoid overwhelming shell/API resources.
@@ -1057,13 +1082,12 @@ EXPECTED OUTPUT:
             print(f"\033[95mTotal rows in CSV: {total_rows}\033[0m")
             print(f"\033[95m{'=' * 80}\033[0m\n")
 
-            for i, row in enumerate(reader):
-                if i < start_row:
-                    print(f"Skipping evaluation (using cache) for: {i + 1}")
-                    continue
-                if i >= self.csv_runs_limit:
-                    break
-
+            for i, row in rows_to_evaluate(
+                reader,
+                start_row,
+                self.csv_runs_limit,
+                on_skip=lambda idx: print(f"Skipping evaluation (using cache) for: {idx + 1}"),
+            ):
                 task_id = f"{i + 1}_{int(time.time() * 1000) % 10000}"
                 task_contexts.append(TaskContext(
                     row_index=i,
@@ -1169,12 +1193,12 @@ EXPECTED OUTPUT:
             reader = csv.DictReader(csvfile)
             self.logger.info(f"[EVALUATION MODE] Starting autonomous loop for {total_rows} CSV entry")
             print_phase("Evaluating on paper datasets...")
-            for i, row in enumerate(reader):
-                if i < start_row:
-                    print_info(f"Skipping evaluation (using cache) for row {i + 1}")
-                    continue
-                if i >= self.csv_runs_limit:
-                    break
+            for i, row in rows_to_evaluate(
+                reader,
+                start_row,
+                self.csv_runs_limit,
+                on_skip=lambda idx: print_info(f"Skipping evaluation (using cache) for row {idx + 1}"),
+            ):
                 try:
                     iteration_start_time = time.time()
                     goal, scenario_id, scenario_rubric_filename = self._generate_next_task(row, dataset_type)
