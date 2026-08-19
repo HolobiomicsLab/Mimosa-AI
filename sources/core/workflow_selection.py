@@ -1,7 +1,12 @@
 import logging
+import re
 import sys
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:  # pragma: no cover - optional at runtime, see _get_model
+    SentenceTransformer = None
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -49,7 +54,40 @@ class WorkflowSelector:
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
         self.workflows_info = self.discover_workflows()
-        self.model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
+        # Lazy: downloading all-MiniLM-L6-v2 from huggingface.co at startup
+        # crashes the whole app where HF is unreachable (e.g. mainland China
+        # without VPN). Loaded on first similarity call; falls back to a
+        # lexical similarity when the model cannot be loaded.
+        self._model = None
+        self._model_load_failed = False
+
+    def _get_model(self):
+        """Return the MiniLM embedder, or None when it cannot be loaded."""
+        if self._model is not None or self._model_load_failed:
+            return self._model
+        try:
+            if SentenceTransformer is None:
+                raise ImportError("sentence-transformers is not installed")
+            self._model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
+        except Exception as exc:
+            logger.warning(
+                "MiniLM embedder unavailable (%s); falling back to lexical "
+                "similarity. Set HF_ENDPOINT=https://hf-mirror.com or "
+                "HF_HUB_OFFLINE=1 with a pre-downloaded model to restore "
+                "semantic similarity.",
+                exc,
+            )
+            self._model_load_failed = True
+        return self._model
+
+    @staticmethod
+    def _lexical_similarity(a: str, b: str) -> float:
+        """Jaccard similarity over word tokens; offline fallback for MiniLM."""
+        tokens_a = set(re.findall(r"\w+", a.lower()))
+        tokens_b = set(re.findall(r"\w+", b.lower()))
+        if not tokens_a or not tokens_b:
+            return 0.0
+        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
     def discover_workflows(self) -> dict[str, WorkflowInfo]:
         """Scan the workflow folder and return valid, scored workflows.
@@ -92,19 +130,27 @@ class WorkflowSelector:
     def cosine_similarity(self, a: str, b: str) -> float:
         """Calculate cosine similarity between two strings.
 
+        Uses MiniLM embeddings when the model is available; otherwise falls
+        back to lexical (Jaccard) similarity so selection keeps working
+        offline.
+
         Args:
             a: First text to embed.
             b: Second text to embed.
 
         Returns:
-            Cosine similarity between MiniLM embeddings of `a` and `b`.
+            Similarity between 0.0 and 1.0.
         """
+        model = self._get_model()
+        if model is None:
+            return self._lexical_similarity(a, b)
+
         import torch.nn.functional as F
 
-        embeddings_a = self.model.encode(
+        embeddings_a = model.encode(
             a, convert_to_tensor=True, show_progress_bar=False
         )
-        embeddings_b = self.model.encode(
+        embeddings_b = model.encode(
             b, convert_to_tensor=True, show_progress_bar=False
         )
         return F.cosine_similarity(embeddings_a, embeddings_b, dim=0).item()

@@ -193,7 +193,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
-        self.max_retries = 3
+        self.max_retries = 100
         self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:
