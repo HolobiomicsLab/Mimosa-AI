@@ -31,11 +31,6 @@
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
 </p>
 
----
-
-
-https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
-
 
 ---
 
@@ -104,6 +99,8 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 | 4 | **VerifierEvaluator** | Multi-source per-claim verifier. Drives the next mutation. |
 
 ### The evolution loop — what's actually evolving
+
+https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
 Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
 
