@@ -78,6 +78,16 @@ class Config:
         self.literrature_grounding = True
 
         ##############
+        # Verifier cost options
+        ##############
+        # None -> keep the verifier's own defaults (100 claims, grounding on).
+        # Lower verifier_max_claims to grade only the top-N most important
+        # claims for a faster/cheaper run, trading coverage of low-priority
+        # claims for speed.
+        self.verifier_max_claims: int | None = None
+        self.verifier_use_grounding: bool | None = None
+
+        ##############
         # ScienceAgentBench Concurrency settings
         ##############
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
@@ -327,6 +337,8 @@ class Config:
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
             "max_concurrent_eval_tasks": self.max_concurrent_eval_tasks,
             "evaluate_snapshot_ablations": self.evaluate_snapshot_ablations,
+            "verifier_max_claims": self.verifier_max_claims,
+            "verifier_use_grounding": self.verifier_use_grounding,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
             "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
@@ -404,6 +416,12 @@ class Config:
         )
         self.evaluate_snapshot_ablations = bool(
             data.get("evaluate_snapshot_ablations", self.evaluate_snapshot_ablations)
+        )
+        self.verifier_max_claims = data.get(
+            "verifier_max_claims", self.verifier_max_claims
+        )
+        self.verifier_use_grounding = data.get(
+            "verifier_use_grounding", self.verifier_use_grounding
         )
         self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
         self.novelty_previous_n = int(
@@ -538,6 +556,8 @@ class Config:
         lines.append(f"  selection_strategy={self.selection_strategy}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
         lines.append(f"  evaluate_snapshot_ablations={self.evaluate_snapshot_ablations}")
+        lines.append(f"  verifier_max_claims={self.verifier_max_claims}")
+        lines.append(f"  verifier_use_grounding={self.verifier_use_grounding}")
         lines.append(f"  novelty_comparison={self.novelty_comparison}")
         lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
         lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
