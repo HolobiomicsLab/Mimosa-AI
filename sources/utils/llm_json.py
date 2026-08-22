@@ -110,7 +110,11 @@ def strip_trailing_commas(text: str) -> str:
             escaped = True
             continue
         if ch == '"':
-            in_string = not in_string if (not in_string or _closes_string(text, i)) else in_string
+            if not in_string:
+                in_string = True
+            elif _closes_string(text, i):
+                in_string = False
+            # else: an unescaped interior quote — still inside the string.
             out.append(ch)
             continue
         if ch == "," and not in_string:
