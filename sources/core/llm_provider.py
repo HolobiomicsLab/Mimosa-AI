@@ -9,6 +9,12 @@ import random
 
 import litellm
 
+# Highest temperature every supported backend accepts. Some serving stacks
+# refuse anything above this with an opaque 400 rather than a typed error, so
+# it doubles as the value the retry path falls back to.
+_SAFE_MAX_TEMPERATURE = 1.0
+
+
 def extract_model_pattern(llm_model: str) -> tuple[str, str]:
     """Split a model identifier into provider and model components.
 
@@ -350,9 +356,28 @@ class LLMProvider:
         return True
 
     @staticmethod
-    def _is_temperature_error(error: Exception) -> bool:
-        """True when the API rejected ``temperature``, read from ``error.param``."""
-        return getattr(error, "param", None) == "temperature"
+    def _is_temperature_error(error: Exception, temperature: float | None = None) -> bool:
+        """True when the API rejected ``temperature``.
+
+        OpenAI-style backends name the offending field in ``error.param``, so
+        that is checked first. Many gateways do not: OpenRouter forwards an
+        upstream refusal as a bare 400 whose body carries no ``param`` and
+        whose ``metadata.raw`` is often just ``"ERROR"``. For those, the only
+        signal available is the pairing of a 400/bad-request with a request
+        that asked for a temperature above the widely-supported 1.0 ceiling —
+        so treat that combination as a temperature rejection and let the
+        caller retry at 1.0 rather than abort the run.
+        """
+        if getattr(error, "param", None) == "temperature":
+            return True
+        if temperature is None or temperature <= _SAFE_MAX_TEMPERATURE:
+            return False
+        status = getattr(error, "status_code", None)
+        error_str = str(error).lower()
+        looks_bad_request = status == 400 or "badrequest" in type(error).__name__.lower() or (
+            "400" in error_str and "error" in error_str
+        )
+        return bool(looks_bad_request)
 
     @staticmethod
     def _is_quantization_routing_error(error: Exception) -> bool:
@@ -508,12 +533,15 @@ class LLMProvider:
                 attempt += 1
 
             except Exception as e:
-                if self._is_temperature_error(e) and effective_temperature != 1.0:
+                if (
+                    self._is_temperature_error(e, effective_temperature)
+                    and effective_temperature != _SAFE_MAX_TEMPERATURE
+                ):
                     self.logger.warning(
                         f"Provider rejected temperature={effective_temperature:.2f}; "
-                        f"falling back to 1.0 and retrying."
+                        f"falling back to {_SAFE_MAX_TEMPERATURE} and retrying."
                     )
-                    effective_temperature = 1.0
+                    effective_temperature = _SAFE_MAX_TEMPERATURE
                     continue
 
                 # OpenRouter 404: the `quantizations` routing filter excluded
@@ -607,7 +635,16 @@ class LLMProvider:
             "response": res,
             "message": message,
             "temperature": effective_temperature,
-            "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
+            # Record what was actually sent, not what was configured. The
+            # request only carries reasoning_effort when the model is one of
+            # the reasoning families; persisting the configured value for
+            # every other model puts a parameter in the run's provenance that
+            # the provider never saw.
+            "reasoning_effort": (
+                self.config.reasoning_effort
+                if self._supports_reasoning_tokens() and not self._is_claude_model()
+                else None
+            ),
             "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
         }
         if self.memory_path and self.agent_name:
