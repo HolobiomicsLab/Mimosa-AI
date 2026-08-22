@@ -124,6 +124,16 @@ async def papers_mode(args, config):
                                   learning=args.learn,
                                   single_agent_mode=args.single_agent
                                  )
+    # Per-row failures are caught so the batch continues, but they must still
+    # reach the exit code — otherwise a run where every task failed is
+    # indistinguishable from a clean one to any wrapping harness.
+    failed = papers.errored_rows
+    if failed:
+        print_err(
+            f"{len(failed)} of {len(papers.execution_history)} CSV row(s) failed; "
+            "exiting non-zero."
+        )
+        sys.exit(1)
 
 async def science_bench_papers_mode(args, config):
     # Use concurrent evaluation by default for science_agent_bench
