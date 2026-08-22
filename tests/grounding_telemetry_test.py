@@ -85,11 +85,9 @@ def test_mixed_outcomes_produce_a_partial_hit_rate(monkeypatch):
 
 def test_configure_sets_kb_scope_and_is_reported():
     pc.configure(kb_name="asb-paper-example", mode="basic", max_papers=3)
-    assert pc._SETTINGS == {
-        "kb_name": "asb-paper-example",
-        "mode": "basic",
-        "max_papers": 3,
-    }
+    assert pc._SETTINGS["kb_name"] == "asb-paper-example"
+    assert pc._SETTINGS["mode"] == "basic"
+    assert pc._SETTINGS["max_papers"] == 3
     stats = pc.grounding_stats()
     assert stats["kb_name"] == "asb-paper-example"
     assert stats["mode"] == "basic"
@@ -112,3 +110,60 @@ def test_config_without_the_fields_leaves_defaults_untouched():
     pc.configure_from_config(object())
     assert pc._SETTINGS["kb_name"] is None
     assert pc._SETTINGS["mode"] == "agentic"
+
+
+# ---------------------------------------------------------------------------
+# Central on/off gate
+# ---------------------------------------------------------------------------
+# config.literrature_grounding used to be read in exactly one place
+# (orchestrator), while planner.py and the judge's grounding evaluator called
+# query_perspicacite directly. Turning the flag off therefore left two of the
+# four call sites still querying, and the documented workaround was to point
+# PERSPICACITE_API_URL at an unreachable host. The gate now lives in the client
+# so the flag covers every caller.
+
+
+def test_disabled_grounding_short_circuits_before_any_transport(monkeypatch):
+    called = []
+    monkeypatch.setattr(pc, "_read_cache", lambda *a, **k: called.append("cache"))
+    monkeypatch.setattr(
+        pc, "_query_perspicacite_streaming", lambda *a, **k: called.append("stream")
+    )
+    monkeypatch.setattr(
+        pc, "_query_perspicacite_non_streaming", lambda *a, **k: called.append("plain")
+    )
+
+    pc.configure(enabled=False)
+    assert pc.query_perspicacite("some goal") is None
+    assert called == []
+
+
+def test_disabled_calls_are_recorded_but_do_not_count_as_failures():
+    pc.configure(enabled=False)
+    pc.query_perspicacite("a")
+    pc.query_perspicacite("b")
+
+    stats = pc.grounding_stats()
+    assert stats["enabled"] is False
+    assert stats["by_outcome"] == {"disabled": 2}
+    assert stats["grounded"] == 0
+    # Two skips are not a 0% hit rate — nothing was attempted.
+    assert stats["hit_rate"] is None
+
+
+def test_config_flag_drives_the_gate():
+    class _Off:
+        literrature_grounding = False
+
+    class _On:
+        literrature_grounding = True
+
+    pc.configure_from_config(_Off())
+    assert pc._SETTINGS["enabled"] is False
+    pc.configure_from_config(_On())
+    assert pc._SETTINGS["enabled"] is True
+
+
+def test_enabled_is_the_default_so_existing_runs_are_unchanged():
+    pc.configure_from_config(object())
+    assert pc._SETTINGS["enabled"] is True
