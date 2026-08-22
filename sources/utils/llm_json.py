@@ -86,6 +86,41 @@ def repair_json_strings(text: str) -> str:
     return "".join(out)
 
 
+def strip_trailing_commas(text: str) -> str:
+    """Drop a comma that is followed only by ``}`` or ``]``.
+
+    JSON forbids the trailing comma every model has seen a million times in
+    JavaScript and Python. It surfaces as ``Expecting property name enclosed in
+    double quotes``, which reads like a quoting problem and is not — observed
+    six times in a single failed planner run against ``stealth/ox-alpha``.
+
+    Commas inside string values are left alone, so the walk tracks string state
+    the same way :func:`repair_json_strings` does.
+    """
+    out: list[str] = []
+    in_string = False
+    escaped = False
+    for i, ch in enumerate(text):
+        if escaped:
+            out.append(ch)
+            escaped = False
+            continue
+        if ch == "\\" and in_string:
+            out.append(ch)
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string if (not in_string or _closes_string(text, i)) else in_string
+            out.append(ch)
+            continue
+        if ch == "," and not in_string:
+            rest = text[i + 1:].lstrip()
+            if rest[:1] in ("}", "]"):
+                continue  # drop it
+        out.append(ch)
+    return "".join(out)
+
+
 def _decode_leading_value(text: str) -> Any:
     """Decode the first complete JSON value, ignoring anything after it.
 
@@ -108,11 +143,18 @@ def loads_llm_json(raw: str | None) -> Any:
     try:
         return json.loads(stripped)
     except json.JSONDecodeError as first_error:
-        for candidate in (stripped, repair_json_strings(stripped)):
+        # Each repair targets a different observed defect, and they compose:
+        # a response can carry both a pasted multi-line span and a trailing
+        # comma. Try the cheapest first and the combination last.
+        repaired = repair_json_strings(stripped)
+        candidates = (
+            stripped,
+            repaired,
+            strip_trailing_commas(stripped),
+            strip_trailing_commas(repaired),
+        )
+        for candidate in candidates:
             value = _decode_leading_value(candidate)
             if value is not _NO_VALUE:
                 return value
-        try:
-            return json.loads(repair_json_strings(stripped))
-        except json.JSONDecodeError:
-            raise first_error from None
+        raise first_error from None
