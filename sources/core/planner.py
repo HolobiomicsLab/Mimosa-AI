@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import sys
@@ -66,6 +67,7 @@ class Planner:
             raise ValueError("❌ Planner: Configuration cannot be None")
 
         self.config = config
+        self.logger = logging.getLogger(__name__)
         self.workspace_path = config.workspace_dir
         self.evolve = EvolutionEngine(config)
         self.task_history: list[Task] = []
@@ -976,7 +978,19 @@ Original request:
                 except Exception as e:
                     step.status = TaskStatus.FAILED
                     self._update_visualization(total_cost)  # Update to show failed status
-                    raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
+                    # Log the traceback before re-raising. `from e` preserves the
+                    # chain for a Python caller, but the operator only ever sees
+                    # the formatted message — so a bare TypeError like
+                    # "unhashable type: 'slice'" arrives with no file or line and
+                    # is effectively unattributable. Observed on a real run that
+                    # had already produced its deliverable.
+                    self.logger.exception(
+                        "Step '%s' (%d/%d) failed", step_name, step_idx + 1,
+                        len(self.current_plan.steps),
+                    )
+                    raise Exception(
+                        f"❌ Critical error in step execution: {type(e).__name__}: {e}"
+                    ) from e
                 lst_step = step
 
                 if step.status != TaskStatus.COMPLETED:
