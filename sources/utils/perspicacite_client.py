@@ -89,13 +89,23 @@ _GROUNDING_LEDGER: list[dict] = []
 # (literature APIs + PDF download + synthesis). Naming a local knowledge base
 # instead scopes retrieval to that corpus, which is both far faster and
 # reproducible. Left at None so default behaviour is unchanged.
-_SETTINGS: dict = {"kb_name": None, "mode": "agentic", "max_papers": 5}
+_SETTINGS: dict = {
+    "kb_name": None,
+    "mode": "agentic",
+    "max_papers": 5,
+    # config.literrature_grounding used to gate only the orchestrator, so the
+    # planner and the judge kept querying with it switched off and the only
+    # way to actually disable grounding was to point the client at a dead
+    # endpoint. Gating here covers every call site at once.
+    "enabled": True,
+}
 
 
 def configure(
     kb_name: str | None = None,
     mode: str | None = None,
     max_papers: int | None = None,
+    enabled: bool | None = None,
 ) -> None:
     """Set process-wide grounding defaults (call once, after config load)."""
     if kb_name is not None:
@@ -104,6 +114,8 @@ def configure(
         _SETTINGS["mode"] = mode
     if max_papers is not None:
         _SETTINGS["max_papers"] = int(max_papers)
+    if enabled is not None:
+        _SETTINGS["enabled"] = bool(enabled)
     logger.info("[Perspicacite] settings: %s", _SETTINGS)
 
 
@@ -113,6 +125,7 @@ def configure_from_config(config) -> None:
         kb_name=getattr(config, "perspicacite_kb_name", None),
         mode=getattr(config, "perspicacite_mode", None),
         max_papers=getattr(config, "perspicacite_max_papers", None),
+        enabled=getattr(config, "literrature_grounding", None),
     )
 
 
@@ -140,11 +153,15 @@ def grounding_stats() -> dict:
     for e in _GROUNDING_LEDGER:
         by[e["outcome"]] = by.get(e["outcome"], 0) + 1
     grounded = by.get("ok", 0) + by.get("cache_hit", 0)
+    attempted = total - by.get("disabled", 0)
     secs = sum(e["seconds"] for e in _GROUNDING_LEDGER)
     return {
         "attempts": total,
         "grounded": grounded,
-        "hit_rate": round(grounded / total, 4) if total else None,
+        # Skipped-because-disabled calls are not failures, so they are excluded
+        # from the denominator; `by_outcome` still shows them.
+        "hit_rate": round(grounded / attempted, 4) if attempted else None,
+        "enabled": _SETTINGS["enabled"],
         "by_outcome": by,
         "total_seconds": round(secs, 3),
         "mean_seconds": round(secs / total, 3) if total else None,
@@ -211,6 +228,11 @@ def query_perspicacite(
 
     kb_name = _SETTINGS["kb_name"]
     started = _time.perf_counter()
+
+    if not _SETTINGS["enabled"]:
+        logger.info("[Perspicacite] grounding disabled by config; skipping query.")
+        _record("disabled", _time.perf_counter() - started, 0, kb_name)
+        return None
 
     # ---- check the on-disk cache first ----
     cached = _read_cache(science_query, mode)
