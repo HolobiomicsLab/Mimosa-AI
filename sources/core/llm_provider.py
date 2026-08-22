@@ -14,6 +14,12 @@ import litellm
 # it doubles as the value the retry path falls back to.
 _SAFE_MAX_TEMPERATURE = 1.0
 
+# Output-budget escalation. A reasoning model spends its budget on reasoning
+# before emitting content, so a budget that fits the answer can still yield a
+# truncated one. Doubling twice covers that without unbounded spend.
+_MAX_TRUNCATION_RETRIES = 2
+_MAX_OUTPUT_TOKENS = 65536
+
 
 def extract_model_pattern(llm_model: str) -> tuple[str, str]:
     """Split a model identifier into provider and model components.
@@ -380,6 +386,20 @@ class LLMProvider:
         return bool(looks_bad_request)
 
     @staticmethod
+    def _is_truncated(response: Any) -> bool:
+        """True when the provider stopped because the output budget ran out.
+
+        Providers spell it ``length`` (OpenAI-style) or ``max_tokens``
+        (Anthropic-style); litellm surfaces whichever the upstream sent.
+        """
+        try:
+            choice = response.choices[0]
+        except (AttributeError, IndexError, TypeError):
+            return False
+        reason = getattr(choice, "stop_reason", None) or getattr(choice, "finish_reason", None)
+        return reason in ("length", "max_tokens")
+
+    @staticmethod
     def _is_quantization_routing_error(error: Exception) -> bool:
         """True when OpenRouter found no live endpoint for the requested quantizations.
 
@@ -477,6 +497,8 @@ class LLMProvider:
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
         effective_temperature = self.config.temperature
+        effective_max_tokens = self.config.max_tokens
+        truncation_retry_count = 0  # Track output-budget escalations
 
         while True:  # Infinite retry loop
             try:
@@ -484,7 +506,7 @@ class LLMProvider:
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": self._apply_cache_control(message),
                     "timeout": timeout,
-                    "max_tokens": self.config.max_tokens,
+                    "max_tokens": effective_max_tokens,
                     "drop_params": True,
                 }
                 # Anthropic models reject (Opus 4.x) or ignore an explicit
@@ -515,6 +537,26 @@ class LLMProvider:
                     completion_params["extra_body"] = {"provider": provider_routing}
 
                 response = litellm.completion(**completion_params)
+
+                # A response cut off at the budget is not a success: the
+                # caller gets a truncated document (JSON ending mid-string,
+                # code ending mid-function) and no exception. Reasoning models
+                # make this common, because the budget is spent on reasoning
+                # before any content is emitted. Escalate the budget and retry
+                # rather than hand back something unparsable.
+                if (
+                    self._is_truncated(response)
+                    and truncation_retry_count < _MAX_TRUNCATION_RETRIES
+                    and effective_max_tokens < _MAX_OUTPUT_TOKENS
+                ):
+                    truncation_retry_count += 1
+                    effective_max_tokens = min(effective_max_tokens * 2, _MAX_OUTPUT_TOKENS)
+                    self.logger.warning(
+                        f"⚠️  Response truncated at max_tokens; retrying with "
+                        f"max_tokens={effective_max_tokens} "
+                        f"(escalation {truncation_retry_count}/{_MAX_TRUNCATION_RETRIES})."
+                    )
+                    continue
 
                 # Success - break out of retry loop
                 break
@@ -621,13 +663,13 @@ class LLMProvider:
                 f"Total: {total_tokens}{cache_suffix} (max_tokens: {self.config.max_tokens})"
             )
 
-        # Check for truncation due to max_tokens limit
-        stop_reason = getattr(response.choices[0], 'stop_reason', None) or \
-                      getattr(response.choices[0], 'finish_reason', None)
-        if stop_reason == 'max_tokens' or stop_reason == 'length':
+        # Still truncated after every escalation: the caller is about to
+        # receive an incomplete document, so say so loudly.
+        if self._is_truncated(response):
             self.logger.warning(
-                f"⚠️  LLM response was truncated due to max_tokens limit ({self.config.max_tokens}). "
-                f"Consider increasing max_tokens in config for longer outputs."
+                f"⚠️  LLM response still truncated at max_tokens={effective_max_tokens} "
+                f"after {truncation_retry_count} escalation(s). The caller is "
+                f"receiving an incomplete response; raise max_tokens in config."
             )
 
         json_res = {
