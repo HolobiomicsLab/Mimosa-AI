@@ -301,7 +301,8 @@ class VerifierEvaluator(
         t = time.time()
         is_truly_empty = not execution_text or _EMPTY_RUN_MARKER in execution_text
         claims = self._extract_claims(
-            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
+            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding,
+            cache_key_text=wf_info.original_task or wf_info.goal,
         )
         phase_timings.append(("claim extraction + importance", time.time() - t))
         print_ok(
