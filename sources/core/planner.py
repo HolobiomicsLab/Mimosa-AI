@@ -5,7 +5,7 @@ import re
 import sys
 import threading
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from sources.cli.pretty_print import (
@@ -34,6 +34,15 @@ from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
 from .workflow_selection import WorkflowSelector
+
+
+class UserInterventionRequired(Exception):
+    """A decision needs a human, and no human is reachable.
+
+    Raised instead of blocking on ``input()`` when stdin is not a TTY, so an
+    unattended run fails with the question it could not ask rather than with
+    ``EOF when reading a line``.
+    """
 
 
 class PlanValidationError(Exception):
@@ -661,6 +670,17 @@ Original request:
         workspace_files = self._get_workspace_files()
 
         for expected_output in step.expected_outputs:
+            # A plan may declare a *directory* as an output ("/workspace/data/").
+            # The workspace scan yields files only, so such an output could never
+            # be matched and the step stayed permanently "missing outputs" —
+            # which then blocked every dependent step. Observed on p_iimn
+            # 2026-08-22: data_acquisition wrote nine files under data/ and was
+            # still reported as missing /workspace/data/.
+            if str(expected_output).rstrip().endswith(("/", "\\")):
+                if self._directory_output_satisfied(expected_output, workspace_files):
+                    continue
+                missing_outputs.append(expected_output)
+                continue
             # Normalise expected path to forward slashes for cross-platform comparison
             normalised_expected = Path(expected_output).as_posix()
             # Use Path.stem to strip the extension in a platform-agnostic way
@@ -675,6 +695,22 @@ Original request:
                 missing_outputs.append(expected_output)
 
         return len(missing_outputs) == 0, missing_outputs
+
+    @staticmethod
+    def _directory_output_satisfied(expected_output: str, workspace_files: list[str]) -> bool:
+        """True when any workspace file sits inside the declared directory.
+
+        Matches on the trailing directory name rather than the full path: plans
+        declare workspace-absolute paths ("/workspace/data/") while the scan
+        returns paths relative to the workspace root ("data/features.csv").
+        """
+        name = PurePosixPath(str(expected_output).replace("\\", "/").rstrip("/")).name.lower()
+        if not name:
+            return False
+        return any(
+            name in [part.lower() for part in PurePosixPath(actual).parent.parts]
+            for actual in workspace_files
+        )
 
     def _can_execute_step(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
@@ -701,7 +737,19 @@ Original request:
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
-        """Send a notification and prompt the user to continue or exit.
+        """Ask whether to continue — but only when someone can answer.
+
+        On a non-TTY this raises :class:`UserInterventionRequired` instead of
+        reading stdin. The prompt was the last blocking ``input()`` on the
+        benchmark path: on the p_iimn run of 2026-08-22 the planner reached
+        step 4 of 6, asked "Continue ? (y/n)" into a redirected stdout, and
+        died with ``EOF when reading a line`` — a message that names neither
+        the question nor the step it was asked about.
+
+        Raising rather than ``exit(1)`` is deliberate: the CSV harness counts
+        the row as failed and still prints its summary, which a ``SystemExit``
+        from inside the planner would skip. The same rule is already applied in
+        ``pricing.py`` and ``csv_mode._prompt_with_default``.
 
         Args:
             msg: Message shown both in the Pushover notification body and
@@ -712,6 +760,13 @@ Original request:
             title="Mimosa exit request."
         )
         print(msg)
+
+        if not sys.stdin.isatty():
+            self.logger.error("Intervention needed but stdin is not a TTY: %s", msg)
+            raise UserInterventionRequired(
+                f"{msg}\n(stdin is not a TTY — cannot ask whether to continue)"
+            )
+
         choice = input("\nContinue ? (y(yes)/n(no))")
         if choice.lower() == "y" or choice.lower() == "yes":
             return
