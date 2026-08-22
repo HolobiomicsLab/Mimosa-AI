@@ -23,6 +23,7 @@ from sources.cli.pretty_print import (
 from sources.extensibility.text_to_speech import create_tts_service
 from sources.utils.list_files import list_files
 from sources.utils.notify import PushNotifier
+from sources.utils.llm_json import loads_llm_json
 from sources.utils.perspicacite_client import (
     query_perspicacite,
 )
@@ -294,7 +295,9 @@ Important: Every task description should be very detailled and specific with the
             found.
 
         Raises:
-            json.JSONDecodeError: If the extracted block is not valid JSON.
+            json.JSONDecodeError: If the block cannot be parsed even after
+                repairing the defects LLMs emit (raw control characters,
+                bare interior quotes, trailing prose).
         """
         code_blocks = []
         in_code_block = False
@@ -312,7 +315,11 @@ Important: Every task description should be very detailled and specific with the
 
         if code_blocks:
             json_str = "\n".join(code_blocks)
-            return json.loads(json_str)
+            # Tolerant parse: a model that pastes a multi-line span into a
+            # string value produces "Invalid control character" and strict
+            # parsing discards an otherwise complete plan. Valid JSON is
+            # unaffected.
+            return loads_llm_json(json_str)
         return None
 
     @staticmethod
