@@ -30,6 +30,7 @@ from sources.utils.perspicacite_client import (
 )
 from sources.utils.planner_visualization import PlannerVisualizer
 
+from . import declared_outputs
 from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
@@ -773,6 +774,26 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
+    def _record_declared_outputs(self, step: Any, step_task: str) -> None:
+        """Persist ``step.expected_outputs`` where the verifier can find them.
+
+        Best-effort: a failure here must never fail the step, it only means the
+        verifier scores as it did before this existed.
+        """
+        try:
+            outputs = list(getattr(step, "expected_outputs", None) or [])
+            if not outputs:
+                return
+            temp_root = (getattr(self.config, "temp_dir", None)
+                         or Path(getattr(self.config, "workflow_dir", ".")) / "_verifier_tmp")
+            if declared_outputs.record(temp_root, step_task, outputs):
+                self.logger.info(
+                    "Declared outputs recorded for step '%s': %s",
+                    getattr(step, "name", "unknown"), ", ".join(outputs)
+                )
+        except Exception:
+            self.logger.exception("Could not record declared outputs for the verifier")
+
     async def evolve_runs(
         self,
         task: str,
@@ -902,6 +923,11 @@ Original request:
         goal = getattr(step, 'goal_context', '')
         task = getattr(step, 'task', '')
         step_task = f"Broader context:{goal}\n---\nYour task:{task}"
+        # Carry the plan's declared outputs to the verifier, which is handed a
+        # uuid and would otherwise never see them (issue #196). Keyed on the
+        # same task text the verifier keys its rubric cache on, so no signature
+        # between here and there has to change.
+        self._record_declared_outputs(step, step_task)
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
