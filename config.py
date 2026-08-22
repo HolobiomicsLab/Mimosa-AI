@@ -137,6 +137,17 @@ class Config:
         # Request token logprobs and save them with agent memory (for ablations). Litellm only.
         self.save_logprobs: bool = True
 
+        # ── Perspicacite literature grounding ────────────────────────────────
+        # kb_name=None queries Perspicacite's web-search pipeline (literature
+        # APIs + PDF download + synthesis), which is what the client has always
+        # done. Naming a local knowledge base scopes retrieval to that corpus:
+        # far faster and reproducible, but for benchmark runs never point it at
+        # a KB built from the paper under reproduction — that hands the agent
+        # the graded values.
+        self.perspicacite_kb_name: str | None = None
+        self.perspicacite_mode: str = "agentic"
+        self.perspicacite_max_papers: int = 5
+
         ##############
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
@@ -317,6 +328,9 @@ class Config:
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
+            "perspicacite_kb_name": self.perspicacite_kb_name,
+            "perspicacite_mode": self.perspicacite_mode,
+            "perspicacite_max_papers": self.perspicacite_max_papers,
             "prompt_planner": portable_resources["prompt_planner"],
             "prompt_workflow_creator": portable_resources["prompt_workflow_creator"],
             "prompt_smolagent": portable_resources["prompt_smolagent"],
@@ -385,6 +399,13 @@ class Config:
             "default_openrouter_quantizations", self.default_openrouter_quantizations
         )
         self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
+        self.perspicacite_kb_name = data.get(
+            "perspicacite_kb_name", self.perspicacite_kb_name
+        )
+        self.perspicacite_mode = data.get("perspicacite_mode", self.perspicacite_mode)
+        self.perspicacite_max_papers = data.get(
+            "perspicacite_max_papers", self.perspicacite_max_papers
+        )
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
         self.prompt_smolagent = data.get("prompt_smolagent", self.prompt_smolagent)
         self.prompt_workflow_creator = data.get(

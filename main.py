@@ -37,6 +37,7 @@ from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.utils.ensure_env import ensure_environment
 from sources.utils.logging import setup_logging
+from sources.utils import perspicacite_client
 from sources.utils.precheck import PreCheck
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.workspace_management import WorkspaceManager
@@ -283,6 +284,10 @@ async def main():
     # security check
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
+
+    # Apply grounding settings (KB scope / mode / paper budget) before any
+    # component constructs a Perspicacite query.
+    perspicacite_client.configure_from_config(config)
 
     # ── Environment precheck phase ────────────────────────────────────────
     # Ensure the host has Python 3.12 + pip available for Mimosa, auto-installing
