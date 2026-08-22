@@ -47,7 +47,12 @@ def test_step_error_logs_the_traceback():
 
 
 def test_original_exception_is_still_chained():
-    """`from e` must survive — it is what a Python caller unwraps."""
+    """`from e` must survive — it is what a Python caller unwraps.
+
+    Anchored on the ``raise`` itself, not on the message text: the phrase also
+    appears in prose elsewhere in the module, and matching the first occurrence
+    made this test read the wrong block.
+    """
     src = open("sources/core/planner.py").read()
-    handler = src[src.index("Critical error in step execution"):]
+    handler = src[src.index('raise Exception(\n                        f"❌ Critical error in step execution'):]
     assert "from e" in handler[:400]

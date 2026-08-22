@@ -5,6 +5,7 @@ Schema for for storing and managing data in the Mimosa AI system.
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
+from typing import Any
 
 class TaskStatus(Enum):
     """Enumeration for task execution status."""
@@ -59,7 +60,10 @@ class IndividualRun:
     workflow_template: str | None = None
     scenario_rubric: str | None = None
     eval_type: str | None = None
-    answers: list[str] | None = None
+    # Agents answer with a structured object, not a string: every entry of
+    # a real run's state_result.json is a dict. Annotated list[str] until a
+    # consumer sliced one and raised "unhashable type: 'slice'".
+    answers: list[Any] | None = None
     state_result: dict | None = None
     plot: str | None = ""
     original_task: str | None = None  # Original unwrapped task for similarity matching
@@ -151,7 +155,7 @@ class Task:
     description: str
     run_id: int = 0
     evolve_runs: list[IndividualRun] = field(default_factory=list) # evolution run result for task
-    final_answers: list[str] = field(default_factory=list) # last evolution run answers
+    final_answers: list[Any] = field(default_factory=list) # last evolution run answers; entries are usually dicts
     cost: float = 0
     final_uuid: str | None = None # last evolution run uuid
     workflow_uuid: str | None = None # last workflow uuid

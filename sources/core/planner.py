@@ -897,13 +897,51 @@ Original request:
 
         step.cost = attempt_cost
         step.score = attempt_score
-        if self.tts:
-            answer = '. '.join([x[:128] for x in final_answers if x]) if final_answers else "No answers produced."
+        self._narrate_step_completion(step_name, attempt_score, attempt_cost, final_answers)
+        return step
+
+    def _narrate_step_completion(
+        self,
+        step_name: str,
+        attempt_score: float,
+        attempt_cost: float,
+        final_answers: list[Any],
+    ) -> None:
+        """Speak a step's outcome, without ever being able to fail the step.
+
+        Two defects met here on a real run and cost it everything it had
+        produced.
+
+        ``final_answers`` is annotated ``list[str]`` but agents answer with a
+        structured object: every entry of that run's ``state_result.json`` is a
+        dict (``{"status": ..., "approach": ...}``). Slicing one raised
+        ``TypeError: unhashable type: 'slice'`` on Python 3.11 — and on 3.12+,
+        where slices became hashable, the same line degrades to a ``KeyError``
+        instead. Every other consumer already coerces first
+        (``planner.py`` line ~397, ``evolution_engine.py`` line ~245); this one
+        did not.
+
+        And the narration sat inside the step body, so a cosmetic summary
+        propagated out as "Critical error in step execution" — reported after
+        the step had already written its deliverable and its ASTRA capsule, and
+        turning a scored run into a 0% success rate and a non-zero exit. What
+        is spoken aloud must never decide whether the work counts.
+        """
+        if not self.tts:
+            return
+        try:
+            answer = (
+                '. '.join([str(x)[:128] for x in final_answers if x])
+                if final_answers else "No answers produced."
+            )
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
             self.tts.speak(tts_text, voice_index=0)
-        return step
+        except Exception:
+            # Loud, but not fatal: the operator still learns narration broke.
+            self.logger.exception("TTS narration failed for step '%s'", step_name)
+            print_warn(f"Could not narrate completion of step '{step_name}'")
 
     async def start_planner(
         self,
