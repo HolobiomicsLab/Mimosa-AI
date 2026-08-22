@@ -285,14 +285,17 @@ Important: Every task description should be very detailled and specific with the
 
     @staticmethod
     def _extract_json_from_code_block(text: str) -> dict[str, Any] | None:
-        """Extract JSON from markdown code blocks (```json ... ```).
+        """Extract the plan object from an LLM response.
+
+        Accepts a fenced json code block, a bare JSON response, or JSON
+        preceded by a sentence of prose.
 
         Args:
-            text: Raw text potentially containing a fenced JSON code block.
+            text: Raw LLM response.
 
         Returns:
-            The decoded JSON object, or ``None`` when no JSON code block is
-            found.
+            The decoded JSON object, or ``None`` when the response holds no
+            parsable JSON at all.
 
         Raises:
             json.JSONDecodeError: If the block cannot be parsed even after
@@ -320,6 +323,20 @@ Important: Every task description should be very detailled and specific with the
             # parsing discards an otherwise complete plan. Valid JSON is
             # unaffected.
             return loads_llm_json(json_str)
+
+        # No fence. A model told to answer in JSON frequently just answers in
+        # JSON — observed against stealth/ox-alpha, which returned a valid
+        # 7.5 kB plan object with no fence and had it discarded here. Try the
+        # bare response, then from the first brace so a leading sentence
+        # ("Here is the plan:") does not cost the plan either.
+        brace = text.find("{")
+        for candidate in (text, text[brace:] if brace != -1 else ""):
+            if not candidate.strip():
+                continue
+            try:
+                return loads_llm_json(candidate)
+            except json.JSONDecodeError:
+                continue
         return None
 
     @staticmethod
