@@ -181,3 +181,56 @@ def test_trailing_comma_and_raw_newline_together():
 def test_valid_json_is_untouched_by_the_comma_pass():
     encoded = json.dumps({"a": [1, 2], "b": {"c": 3}})
     assert strip_trailing_commas(encoded) == encoded
+
+
+# ---------------------------------------------------------------------------
+# Unfenced responses
+# ---------------------------------------------------------------------------
+# A model told to answer in JSON frequently just answers in JSON. The planner's
+# extractor only scanned for ```json fences and returned None otherwise, which
+# the caller turns into "Failed to extract valid JSON from LLM response".
+# Observed against stealth/ox-alpha: a valid 7558-character plan object,
+# unfenced, discarded — twice, on lane1_t1 and lane2_t0.
+
+def test_planner_accepts_a_bare_json_response():
+    from sources.core.planner import Planner
+
+    response = '{"goal": "reproduce the run", "steps": [{"description": "step one"}]}'
+    got = Planner._extract_json_from_code_block(response)
+    assert got["goal"] == "reproduce the run"
+    assert got["steps"] == [{"description": "step one"}]
+
+
+def test_planner_accepts_json_after_a_leading_sentence():
+    from sources.core.planner import Planner
+
+    response = 'Here is the plan:\n{"goal": "g", "steps": []}'
+    assert Planner._extract_json_from_code_block(response) == {"goal": "g", "steps": []}
+
+
+def test_planner_accepts_a_bare_response_with_a_trailing_comma():
+    from sources.core.planner import Planner
+
+    response = '{"goal": "g", "steps": [{"description": "s"},],}'
+    assert Planner._extract_json_from_code_block(response) == {
+        "goal": "g", "steps": [{"description": "s"}]
+    }
+
+
+def test_planner_still_prefers_the_fenced_block_when_present():
+    from sources.core.planner import Planner
+
+    response = 'Ignore this {"decoy": true}\n```json\n{"goal": "real"}\n```'
+    assert Planner._extract_json_from_code_block(response) == {"goal": "real"}
+
+
+def test_planner_returns_none_for_prose_with_no_json():
+    from sources.core.planner import Planner
+
+    assert Planner._extract_json_from_code_block("I could not produce a plan.") is None
+
+
+def test_planner_returns_none_for_an_empty_response():
+    from sources.core.planner import Planner
+
+    assert Planner._extract_json_from_code_block("") is None
