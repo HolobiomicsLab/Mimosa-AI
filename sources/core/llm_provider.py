@@ -412,6 +412,24 @@ class LLMProvider:
         error_str = str(error).lower()
         return "no endpoints found" in error_str and "quantization" in error_str
 
+    @staticmethod
+    def _is_upstream_provider_failure(error: Exception) -> bool:
+        """True for a gateway reporting that the *upstream* model failed.
+
+        OpenRouter surfaces an upstream fault as HTTP 400 with
+        ``message: "Provider returned error"`` and ``metadata.raw: "ERROR"``.
+        The 400 makes it look like a malformed request, but the request is
+        fine — the same payload succeeds on the next attempt. Measured against
+        stealth/ox-alpha: 6/6 identical calls succeeded in isolation while the
+        same prompt shape was failing intermittently under four concurrent
+        lanes. Semantically this is a 502, so it is retryable; a genuinely
+        malformed request keeps failing and still exhausts the retry ceiling.
+
+        Deliberately narrow: matches the gateway's own wording, not 400s in
+        general, so real client errors are not retried in a loop.
+        """
+        return "provider returned error" in str(error).lower()
+
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
 
@@ -442,6 +460,9 @@ class LLMProvider:
             "context",  # Context window errors
             "token limit",  # Token limit errors
         ]
+
+        if self._is_upstream_provider_failure(error):
+            return True
 
         return any(pattern in error_str for pattern in retryable_patterns)
 
