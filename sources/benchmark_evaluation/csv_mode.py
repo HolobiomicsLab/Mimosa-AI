@@ -1296,6 +1296,18 @@ EXPECTED OUTPUT:
             ]
         return rows, current_runs, sab_runs
 
+    @property
+    def errored_rows(self) -> list[dict]:
+        """Rows whose evaluation raised, recorded as ``success_level == "Error"``.
+
+        The loop catches per-row exceptions and continues, which is right for a
+        batch — one bad row should not abandon the rest. But nothing downstream
+        reflected it, so a run in which every row failed still returned exit 0
+        and any harness reading the exit code scored it as a clean pass.
+        """
+        return [d for d in self.execution_history
+                if d.get("success_level") == "Error"]
+
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
         rows, current_runs, sab_runs = self._build_summary_rows()
