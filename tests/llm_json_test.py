@@ -19,6 +19,7 @@ from sources.utils.llm_json import (
     loads_llm_json,
     repair_json_strings,
     strip_json_fence,
+    strip_trailing_commas,
 )
 
 
@@ -134,3 +135,49 @@ def test_planner_returns_none_when_there_is_no_code_block():
     from sources.core.planner import Planner
 
     assert Planner._extract_json_from_code_block("no fenced block here") is None
+
+
+# ---------------------------------------------------------------------------
+# Trailing commas
+# ---------------------------------------------------------------------------
+# JSON forbids the trailing comma that JavaScript and Python allow. It surfaces
+# as "Expecting property name enclosed in double quotes", which reads like a
+# quoting fault and is not. Observed six times in one failed planner run
+# (lane1_t0 / p_iimn) against stealth/ox-alpha, after the control-character
+# repair had already landed.
+
+
+@pytest.mark.parametrize("broken,expected", [
+    ('{"a": 1,}', {"a": 1}),
+    ('{"a": [1, 2,],}', {"a": [1, 2]}),
+    ('{"steps": [{"n": 1,}, {"n": 2,},],}', {"steps": [{"n": 1}, {"n": 2}]}),
+    ('[1, 2, 3,]', [1, 2, 3]),
+    ('{"a": 1 , }', {"a": 1}),
+    ('{"a": {"b": 2,},}', {"a": {"b": 2}}),
+])
+def test_trailing_commas_are_dropped(broken, expected):
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(broken)
+    assert loads_llm_json(broken) == expected
+
+
+def test_commas_inside_strings_are_preserved():
+    payload = {"note": "one, two, and three,"}
+    assert loads_llm_json(json.dumps(payload)) == payload
+    assert strip_trailing_commas(json.dumps(payload)) == json.dumps(payload)
+
+
+def test_a_comma_before_a_brace_inside_a_string_is_not_dropped():
+    payload = {"code": "d = {'a': 1,}"}
+    assert loads_llm_json(json.dumps(payload)) == payload
+
+
+def test_trailing_comma_and_raw_newline_together():
+    """The repairs compose — a real response can carry both."""
+    broken = '{"code": "import os\nprint(1)",}'
+    assert loads_llm_json(broken) == {"code": "import os\nprint(1)"}
+
+
+def test_valid_json_is_untouched_by_the_comma_pass():
+    encoded = json.dumps({"a": [1, 2], "b": {"c": 3}})
+    assert strip_trailing_commas(encoded) == encoded
