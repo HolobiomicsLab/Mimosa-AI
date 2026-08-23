@@ -47,7 +47,33 @@ For every evolution run under `sources/workflows/<uuid>/`:
   judge layer, which is never merged into the executor score. Directories are
   overridable via `MIMOSA_CAPSULE_DIR` / `MIMOSA_EVAL_DIR` (defaults:
   `runs_capsule/`, `evaluations/`).
+- **Evolution** — the family's search replayed as an animated lineage: nodes
+  reveal in evolution order (play/pause/step/speed/scrub), the best-so-far
+  badge chases the frontier, and the info panel narrates each run — score with
+  delta vs parent, claim counts, QD/novelty, cost, the selection log, and the
+  textual gradient that steered the next mutation
+  (`GET /api/runs/{id}/evolution` joins all of it per node).
 - **Artifacts** — a raw browser over every file in the run dir.
+
+Everywhere text is shown, content renders by type (`frontend/src/render/`):
+shiki syntax highlighting for code, a collapsible JSON tree, GFM markdown,
+CSV/TSV table previews, ANSI-stripped logs — each with a raw toggle.
+
+Two cross-run surfaces:
+
+- **QD Atlas** (`/atlas`, `GET /api/atlas/{space}`) — every run PCA-projected
+  to 2D with parent→child trails, colour by score/family/iteration, family
+  filter, fleet time-replay, zoom/pan, and a per-family **trajectory mode**
+  that steps point-by-point along a comet trail. Two spaces: `qd` (Mimosa's
+  384-dim behaviour descriptor — task-level, so one family's runs coincide)
+  and `genotype` (TF-IDF of the evolved workflow code, where within-family
+  drift is visible).
+- **Live activity** — the backend watches all four artifact roots
+  (workflows, memory, `runs_capsule`, evaluations) and streams semantic
+  events over the existing `/api/live` WebSocket (steps appended, gradient
+  written, ASTRA capsule updated, …). The run page shows a live feed that
+  diffs the ASTRA decision layer on every capsule update and auto-refreshes
+  the workspace and provenance panels.
 
 Plus two pages that replace the CLI onboarding:
 

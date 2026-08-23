@@ -99,6 +99,13 @@ def read_run_metrics(run_id: str) -> dict[str, Any] | None:
     return data
 
 
+def read_qd_descriptor(run_id: str) -> list[float] | None:
+    """The raw QD behaviour embedding ``read_run_metrics`` deliberately strips."""
+    data = _read_json(run_path(run_id) / "run_metrics.json")
+    q = data.get("qd_descriptor") if isinstance(data, dict) else None
+    return q if isinstance(q, list) and q else None
+
+
 def read_lineage(run_id: str) -> dict[str, Any] | None:
     p = _find(run_path(run_id), "lineage_*.json")
     data = _read_json(p) if p else None
