@@ -93,6 +93,10 @@ class PlanStep:
     expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     status: TaskStatus = TaskStatus.PENDING
+    #: Declared outputs the step finished without producing. Empty on success;
+    #: populated by ``Planner.run_attempts`` so a caller can tell a step that
+    #: delivered from one that merely scored well (issue #196).
+    missing_outputs: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate the plan step after initialization.

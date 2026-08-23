@@ -903,13 +903,34 @@ Original request:
                 if evolve_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
-                    step.status = TaskStatus.COMPLETED
                     if outputs_produced:
+                        step.status = TaskStatus.COMPLETED
                         print_ok(f"Task '{step_name}' completed successfully")
                         break
-                    else:
-                        print_warn(f"Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        break
+                    # The declared outputs are missing. Both branches used to mark
+                    # the step COMPLETED and break, differing only in the log line,
+                    # so a step that never produced its deliverable was recorded as
+                    # a success and the failure surfaced one layer later at the next
+                    # step's dependency gate (issue #196). Spend the remaining
+                    # attempts on producing it instead of banking the miss.
+                    step.missing_outputs = list(missing_outputs)
+                    if attempt < max_attempts:
+                        print_warn(
+                            f"Task '{step_name}' scored {attempt_score} but did not produce "
+                            f"its declared outputs: {missing_outputs} — retrying "
+                            f"({attempt}/{max_attempts})"
+                        )
+                        continue
+                    # Out of attempts. Keep COMPLETED so the dependency gate still
+                    # reports precisely which output is missing for which step,
+                    # rather than replacing that with a generic step failure.
+                    step.status = TaskStatus.COMPLETED
+                    print_err(
+                        f"Task '{step_name}' exhausted {max_attempts} attempts with its "
+                        f"declared outputs still missing: {missing_outputs}. Dependent "
+                        f"steps cannot run."
+                    )
+                    break
                 else:
                     print_err(f"Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}")
                     if self.tts:
