@@ -193,13 +193,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
-        # Hard cap on transient-error retries. Previously the retry loop was
-        # `while True` and this value was never read, so a persistently
-        # overloaded/rate-limited provider could retry indefinitely, re-sending
-        # the full prompt each time. 6 attempts with exponential backoff
-        # (capped at 500s) keeps resilience to transient blips while
-        # guaranteeing the call terminates.
-        self.max_retries = 6
+        self.max_retries = 100
         self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:

@@ -195,6 +195,28 @@ node_major="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
   || die "Node.js 20+ required (found $(node -v 2>/dev/null || echo none))."
 ok "node  $(node -v)"
 
+# Hugging Face reachability — mainland-China mirror fallback.
+# Mimosa downloads the all-MiniLM-L6-v2 sentence-transformer on first use;
+# huggingface.co is blocked in mainland China, where hf-mirror.com mirrors it.
+# When the hub is unreachable but the mirror answers, export HF_ENDPOINT so
+# every child process (including the web UI bridge via deploy.sh) downloads
+# through the mirror, and persist it to the project .env for later runs.
+if [ -n "${HF_ENDPOINT:-}" ]; then
+  ok "HF_ENDPOINT already set ($HF_ENDPOINT)"
+elif curl -m 5 -sfI https://huggingface.co >/dev/null 2>&1; then
+  ok "huggingface.co is reachable"
+elif curl -m 5 -sfI https://hf-mirror.com >/dev/null 2>&1; then
+  export HF_ENDPOINT="https://hf-mirror.com"
+  warn "huggingface.co unreachable — using mirror: HF_ENDPOINT=$HF_ENDPOINT"
+  if ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?HF_ENDPOINT=' "$PROJECT_ENV" 2>/dev/null; then
+    printf '\n# Hugging Face mirror (auto-detected: huggingface.co unreachable)\nHF_ENDPOINT=%s\n' "$HF_ENDPOINT" >> "$PROJECT_ENV"
+    chmod 600 "$PROJECT_ENV" 2>/dev/null || true
+    info "Persisted HF_ENDPOINT to $PROJECT_ENV"
+  fi
+else
+  warn "Neither huggingface.co nor hf-mirror.com is reachable — the embedding model cannot be downloaded (Mimosa will fall back to lexical similarity)."
+fi
+
 # --------------------------------------------------------------------------- #
 # 2. Docker
 # --------------------------------------------------------------------------- #

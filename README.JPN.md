@@ -5,7 +5,7 @@
 
 </div>
 
-<h1 align="center">Mimosa-AI 🌼🔬</h1>
+<h1 align="center">Mimosa-AI — 自律的科学研究のための進化型マルチエージェントフレームワーク</h1>
 
 <p align="center">
   <a href="./README.md">English</a> &nbsp;|&nbsp;
@@ -17,13 +17,6 @@
 
 <p align="center">
     <em>自律的科学研究のための自己進化型マルチエージェントフレームワーク —— LLM 駆動のワークフロー合成、Quality-Diversity 進化探索、MCP ツール自動検出。</em>
-</p>
-
-<p align="center">
-  🧬 Quality-Diversity ワークフロー進化 &nbsp;·&nbsp;
-  🔍 MCP ベースのツール自動検出 &nbsp;·&nbsp;
-  🧪 マルチソース・クレーム単位検証 &nbsp;·&nbsp;
-  📦 完全な監査証跡と再現性
 </p>
 
 <p align="center">
@@ -39,19 +32,46 @@
 
 ---
 
-## TL;DR
 
-Mimosa-AI は **自律的科学研究のためのオープンソース Python フレームワーク** です。**タスクごとにカスタムのマルチエージェントワークフローを記述**し、サンドボックスで実行し、エージェントが実際に行った内容を 6 つの独立した視点（文献、ユーザーの目標、エージェントのナラレーション、数学的不変量、計算再現性、統計的フィンガープリント）に照らして検証します。学習を指示された場合は、性能と構造的多様性の両方を維持する **Quality-Diversity**（品質多様性）探索によって、世代を超えてワークフローを進化させます。
+https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
-ワークフローはプレーンな Python として出力されます — DSL なし、YAML なし — そのため、どの世代も検査・差分比較・単独での再実行が可能です。verifier はエージェントが主張する内容を再計算する決定論的な Python チェックを実行します。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
-
-```bash
-uv sync && uv run main.py        # interactive onboarding
-```
 
 ---
 
-## デモ
+## TL;DR
+
+Mimosa-AI は **自律的科学研究のためのオープンソース Python フレームワーク** です。**タスクごとにカスタムのマルチエージェントワークフローを記述**し、サンドボックスで実行し、エージェントが実際に行った内容を独立した視点で検証し、**Quality-Diversity** に着想を得た探索によって世代を超えてワークフローを進化させ、そのタスクに最適なワークフローを見つけ出します。
+
+ワークフローはプレーンな Python として出力されます — DSL なし、YAML なし — そのため、どの世代も検査・差分比較・単独での再実行が可能です。verifier は、エージェントが生成した成果物に対して、文献グラウンディング、非自明性、品質メトリクスを検証する決定論的 Python チェックを実行することでワークフローを採点します。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
+
+## 自動インストール
+
+ターミナルで実行:
+
+```bash
+curl https://raw.githubusercontent.com/HolobiomicsLab/Mimosa-AI/refs/heads/mimosa_v2/auto-install.sh | bash
+```
+
+注意: これにより、関連プロジェクト `Toolomics` と `Perspicacité` も自動的にインストールされ起動します。
+
+手動インストールは [手動インストール](##手動インストール) を参照してください。
+
+---
+
+## Web インターフェース
+
+ブラウザで `http://localhost:5173/` を開くと、Web インターフェースにアクセスできます。
+
+<p align="center">
+  <img src="./docs/images/interface.png" alt="Mimosa web interface" width="80%">
+</p>
+
+
+---
+
+## メタボロミクスにおけるデモ (V1)
+
+このデモは V1 で実行されたものであり、近日中に更新されます。
 
 <p align="center">
     <em>Mimosa-AI は <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> の LC-MS/MS 分子ネットワーキングパイプライン（<code>.mzML</code> ファイルでの特徴検出（MZmine / OpenMS / matchms 系のツールスタック — エージェントが自ら選択）、アラインメント、古典的な分子ネットワーキング（GNPS 形式のコサインクラスタリング））を、固定パイプラインなしの単一コマンドから自律的に再生成しました。</em>
@@ -67,21 +87,6 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ---
 
-## ベンチマーク
-
-**ScienceAgentBench**（102 タスク、`task` モード — 計画レイヤをバイパスしてワークフロー合成と改良を単独で評価）で評価しました:
-
-| モード                                  | 成功率       | Code-BLEU | タスクあたりコスト |
-| --------------------------------------- | ------------ | --------- | ----------- |
-| DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
-| DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
-| **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
-
-> **ScienceAgentBench における DeepSeek-V3.2 反復学習で 43.1% の成功率 — シングルエージェントベースラインに対して +4.9 ポイント、タスクあたりコスト $1.70。**
-
-> ScienceAgentBench 上で DeepSeek-V3.2 を用いた場合、反復学習は GPT-4o を改善しますが、Claude Haiku 4.5 では僅かな劣化をもたらします。モデル依存の挙動については[論文](https://arxiv.org/abs/2603.28986)で分析しています。PaperBench の結果は [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md) を参照してください。
-
----
 
 ## 仕組み
 
@@ -103,10 +108,10 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ワークフローは **完全な Python プログラム** であり、ソースコードとして変異されます。**コードを遺伝子型として扱う方式 (code-as-genotype)** で、遺伝子型はワークフローファイル、表現型はそれがワークスペース上に生成するものです。
 
-- **選択: Quality-Diversity アーカイブ** — **非構造アーカイブ**（離散グリッドではなく単一の名簿）。最大集団サイズ 20、単一のスカラ化スコア `qd_score = (1−w)·quality + w·novelty`（`w=0.25`）で評価し、満杯時は最低 `qd_score` のメンバーを退去させます。**新規性探索 (novelty search)** は **ゲノタイプ埋め込み (genotype embedding)** の行動記述子 — ワークフローの生成ソースコードを L2 正規化した埋め込み（既定はローカルの `all-MiniLM-L6-v2`、オプションで OpenAI `text-embedding-3-small`）— 上のコサイン距離 k-NN（`k=15`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます（`MAX_CHILDREN_PER_PARENT = 8`）。
-- **変異: 停滞駆動のスコープ** — 変異の大胆さは、直近 4 回のプロンプト勾配がどの程度反復しているかの連続関数です。勝者に近い個体は保護されます。スコープ帯域は「プロンプトのみの微調整」から「トポロジー全面再考」まで及びます。
-- **交叉** — 約 30 % の世代で 2 つの親（強いもの優先）を組み合わせます。
-- **コールドスタート** — アーカイブが空の場合、ディスク上の過去実行を類似度フィルタ（MiniLM コサイン ≥ 0.5）でスキャンして探索を播種します。有用なワークフローはタスク間で転移します。
+- **選択: Quality-Diversity アーカイブ** — **非構造アーカイブ**（離散グリッドではなくフラットリスト）。最大集団サイズ 20、単一のスカラ化スコア `qd_score = (1−w)·quality + w·novelty`（`w = novelty_weight = 0.25`）で評価し、満杯時は最低 `qd_score` のメンバーを退去させます。**新規性探索 (novelty search)** は **ゲノタイプ埋め込み (genotype embedding)** の行動記述子 — ワークフローの生成ソースコードを L2 正規化した埋め込み（既定はローカルの `all-MiniLM-L6-v2`、オプションで OpenAI `text-embedding-3-small`）— 上のコサイン距離 k-NN（`k=15`）で測られます。親は子の数の逆数によるルーレット選択で抽出され、アーカイブを拡散させます（`MAX_CHILDREN_PER_PARENT = 8`）。
+- **変異: Rechenberg-1/5 + 停滞駆動スコープ** — 変異の大胆さは、直近 5 世代の採点済み子孫の成功率（Rechenberg 1/5 ルール、閾値 `0.20`）と `iters_since_improvement` 停滞カウンター（忍耐値 `6`）をブレンドします。勝者に近い個体（親スコア > 0.95）にはダンパーがかかります。スコープ帯域は `EXPLOITATION`（点変異）から `RE-SPECIATION`（ゼロからの再設計）まで、実効大胆さ閾値（`< 0.35 / 0.50 / 0.65 / 0.90 / 1.01`）によってゲートされます。
+- **交叉** — デフォルトで約 40% の世代が 2 つの親を（強いもの優先で）組み合わせ、子のエージェント数は最も多い親の数でハードキャップされます。
+- **コールドスタート** — アーカイブが空の場合、ディスク上の過去実行を類似度フィルタ（MiniLM コサイン ≥ 0.8）でスキャンして探索を播種します。有用なワークフローはタスク間で転移します。
 
 詳細な仕組み: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md)。
 
@@ -117,170 +122,106 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | ソース | 視点 |
 |--------|---------|
 | **A** | 査読された実践（Perspicacité による文献グラウンディング経由） |
-| **B** | 目標テキストそのもの — エージェントは依頼通りに成果を出したか? |
-| **C** | エージェントのナラレーション — 主張された数値・成果物はディスクから再現できるか? |
+| **B** | 目標テキストそのもの — エージェントは依頼通りに成果を出したか？ |
+| **C** | エージェントのナラレーション — 主張された数値・成果物はディスクから再現できるか？ |
 | **D** | 数学的不変量 — 確率は [0,1] の範囲、形状の一貫性、NaN なし、保存則 |
 | **E** | 計算再現性 — 宣言された依存関係が使用された import を網羅、絶対パスなし、確率的操作のシード |
 | **F** | 統計的フィンガープリント — ベースラインを上回り、退化した予測がなく、漏洩シグネチャがない |
 
-各クレームは、judge がワークスペースに対して記述する **決定論的 Python プログラム** によって検証されます — LLM にエージェントを信じるかどうかを再質問することはしません。**自己検証 (self-verification)** では、反トートロジーのトリップワイヤがエージェントの出力をそれ自身と比較するプログラムを拒絶します。
+各クレームは、judge がワークスペースに対して記述する **Python プログラム** によって検証されます — LLM にエージェントを信じるかどうかを再質問することはしません。
 
 **ルーブリック盲変異 (rubric-blind mutation) — mutator はルーブリックを決して見ません。** フィードバックされる唯一のシグナルは `abstracted_prompt_gradient` です。これはクレーム、スコア、ソースの名前を含まない、コードネーム化された失敗モードの診断です。構造上、探索は決して見ないルーブリック語彙に過適合できません。
 
 完全なパイプライン: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
+## ベンチマーク (V1)
+
+**ScienceAgentBench**（102 タスク、`task` モード — 計画レイヤをバイパスしてワークフロー合成と改良を単独で評価）で評価しました:
+
+| モード                                  | 成功率       | Code-BLEU | タスクあたりコスト |
+| --------------------------------------- | ------------ | --------- | ----------- |
+| DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
+| DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
+| **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
+
+> **ScienceAgentBench における DeepSeek-V3.2 反復学習で 43.1% の成功率 — シングルエージェントベースラインに対して +4.9 ポイント、タスクあたりコスト $1.70。**
+
+> ScienceAgentBench 上で DeepSeek-V3.2 を用いた場合、反復学習は GPT-4o を改善しますが、Claude Haiku 4.5 では僅かな劣化をもたらします。モデル依存の挙動については[論文](https://arxiv.org/abs/2603.28986)で分析しています。PaperBench の結果は [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md) を参照してください。
+
+## ベンチマーク (V2)
+
+**現在評価中**
+
 ---
 
-## クイックスタート
+## 手動インストール
 
-### 1. インストール
+### 1. MCP ツールの公開
+
+Mimosa は設定のアドレス/ポート範囲（デフォルト `0.0.0.0:5000–5100`）で到達可能な任意の MCP サーバを検出します。
+
+- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — ワークスペースごとに 1 つの MCP shell サンドボックスを提供し、エージェントが必要に応じて科学パッケージをインストールできます。さらに、一般的な科学ツールスタックを公開するビルド済み MCP サーバ、共有ワークスペース管理、新しい MCP の簡単な登録フローも提供します。
+- **持ち込み方式:** `discovery_addresses` を任意の到達可能な MCP サーバに向けてください — `fastmcp` スクリプト、ToolHive、サードパーティ MCP コンテナなど。Toolomics は必須ではありません。詳細は [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics) を参照してください。
+
+### 2. Mimosa のインストール
 
 ```bash
 pip install uv
 git clone https://github.com/HolobiomicsLab/Mimosa-AI.git
 cd Mimosa-AI
 uv sync
+# その後、以下で実行:
+uv run main.py
 ```
 
-### 2. 少なくとも 1 つの LLM キーを追加
-
-プロジェクトのルートに `.env` を作成します。実際に使用するプロバイダのみが必要です。
-
-```env
-ANTHROPIC_API_KEY=...       # Claude — recommended for workflow synthesis
-OPENAI_API_KEY=...
-MISTRAL_API_KEY=...
-DEEPSEEK_API_KEY=...
-HF_TOKEN=...
-OPENROUTER_API_KEY=...      # Any model via OpenRouter
-
-# Optional: Langfuse observability
-LANGFUSE_PUBLIC_KEY=...
-LANGFUSE_PRIVATE_KEY=...
-```
-
-### 3. MCP ツールの公開
-
-Mimosa は設定のアドレス/ポート範囲（デフォルト `0.0.0.0:5000–5100`）で到達可能な任意の MCP サーバを検出します。
-
-- **最も簡単な方法:** 関連プラットフォーム **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** をインストールしてください — ワークスペースごとに 1 つの MCP shell サンドボックスを提供し、エージェントが必要に応じて科学パッケージをインストール（同一ワークスペース内の後続実行ではインストール済みのツールを再利用）できます。さらに、一般的な科学ツールスタックを公開するビルド済み MCP サーバ、共有ワークスペース管理、定型的な登録フローも提供します。
-- **持ち込み方式:** `discovery_addresses` を任意の到達可能な MCP サーバに向けてください — `fastmcp` スクリプト、ToolHive、サードパーティ MCP コンテナなど。Toolomics は必須ではありません。詳細は [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics) を参照してください。
-
-### 4. 実行
+**またはスタンドアロンの `mimosa` コマンドとしてインストール**（任意のディレクトリから使用可能）:
 
 ```bash
-uv run main.py                   # interactive onboarding (recommended first time)
+uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git   # または: uv tool install /path/to/Mimosa-AI
+mimosa
 ```
 
-ウィザードをスキップする場合:
-
-```bash
-uv run main.py --task "Train a multitask model on Clintox to predict toxicity and FDA approval"
-uv run main.py --goal "Reproduce experiments from https://arxiv.org/pdf/2306.00306 and compare results"
-```
-
-ワンショットではなく世代を超えて進化させるには `--learn` を追加します:
-
-```bash
-uv run main.py --task "..." --learn --config my_config.json
-```
+この方法でインストールした場合、設定は `~/.config/mimosa/config.json` に保存され（オンボーディングウィザードによって書き込まれ、毎回の実行で自動的に読み込まれます）、API キーは `~/.config/mimosa/.env` に、実行時状態（メモリ、ワークフロー、実行カプセル）は `~/.local/share/mimosa/` に保存されます。リポジトリチェックアウトでは従来のレイアウト（`config_default.json` と状態ディレクトリがチェックアウト内部）が維持されます。
 
 完全なクイックスタート: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md)。
 
-### 5. （任意）Perspicacité による科学的グラウンディング
+### 3. （任意）Perspicacité による科学的グラウンディング
 
 [Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI) はワークフロー合成とソース A のクレームを文献にグラウンディングします。実行中であれば、Mimosa は自動的に認識します。
 
 ```bash
 git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git && cd Perspicacite-AI
-uv sync && uv run web_app_full.py
+export DEEPSEEK_API_KEY="xxxxx" # API キーをエクスポート; anthropic と openrouter もサポート
+uv run perspicacite -c config.yml serve
 ```
 
 ---
 
-## Web インターフェース(Observatory)
+## Web インターフェース (Observatory)
 
-Mimosa 自体は CLI のみですが、**Observatory** はオプションのローカル Web UI(FastAPI + React)で、あるランが生み出したもの——系統樹、リプレイ、ワークスペース、セットアップ/起動フロー——を可視化し、ログを読む代わりに進化の様子を直接観察・検査できるようにします。これはシングルオペレーター向けのローカルホスト専用ツールで、認証機能はありません。共有ネットワークや公開ネットワークに公開しないでください。
+Mimosa 自体は CLI のみですが、**Observatory** はオプションのローカル Web UI（FastAPI + React）で、あるランが生み出したもの — 系統樹、リプレイ、ワークスペース、セットアップ/起動フロー — を可視化し、ログを読む代わりに進化の様子を直接観察・検査できるようにします。これはシングルオペレーター向けのローカルホスト専用ツールで、認証機能はありません。共有ネットワークや公開ネットワークに公開しないでください。
 
 ```bash
-cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+cd webui && ./deploy.sh    # deps をインストールし、バックエンド + フロントエンドを実行; http://localhost:5173 を開く
 ```
 
-詳細、環境変数、および API の全体像はこちら:[`webui/README.md`](./webui/README.md)。
-
----
-
-## 実行モード
-
-| モード | 使用場面 | コマンド |
-|------|----------|---------|
-| `--task` | 単一の焦点を絞った操作 | `uv run main.py --task "..."` |
-| `--goal` | 計画を要する複数ステップの目標 | `uv run main.py --goal "..."` |
-| `--learn` | いずれかのモードに追加 — 世代を超えて進化 | `... --learn` |
-| `--single_agent` | マルチエージェント合成をスキップ（高速、学習なし） | `... --single_agent` |
-| `--manual` | 個別の MCP ツールをテストする対話的 CLI | `uv run main.py --manual` |
-| バッチ | タスクの CSV を評価 | `... --papers <csv>` |
-| ベンチマーク | ScienceAgentBench | `... --science_agent_bench` |
-
-詳細: [`docs/usage/modes.md`](./docs/usage/modes.md)、[`docs/usage/learning.md`](./docs/usage/learning.md)、[`docs/reference/cli.md`](./docs/reference/cli.md)。
+詳細、環境変数、および API の全体像: [`webui/README.md`](./webui/README.md)。
 
 ---
 
 ## 監査証跡と再生
 
-Mimosa は科学的用途のために構築されており、すべての決定は事後に検査可能です。
-
-| ツール | 役割 |
-|------|--------------|
-| `uv run workflow_evolution_anim.py` | 進化ツリーを辿り、各世代のトレース（思考、ツール呼び出し、ルーブリックの合否）を再生するインタラクティブビューア。 |
-| `uv run main.py --memory_cli` | 完了した実行のメモリに対する RAG ベースの Q&A。「*task_builder が使用した分類器は何か?*」のように、スクロールせずに質問できます。 |
-| `uv run memory_timelapse.py <uuid>` | 反復にわたるメモリ成長のフレーム単位アニメーション表示。 |
-| `sources/workflows/<uuid>/workflow_genotype_<uuid>.py` | エージェントが実行した正確な Python。DSL なし。 |
-| `sources/workflows/<uuid>/lineage_<uuid>.json` | この世代の親と演算子（`seed | mutation | crossover`）。 |
-| `sources/workflows/<uuid>/evolution_prompt_<uuid>.md` | このコードを生成した正確な LLM プロンプト。同じプロンプト + シード = 同じコード。 |
-| `sources/workflows/<uuid>/evolution_tree.png` | `--learn` 実行全体のレンダリングされた系譜ツリー。 |
-| `sources/workflows/<uuid>/reward_progress.png` | 反復に対するスコア曲線。 |
-| `runs_capsule/<capsule_name>/` | 共有または再実行のためにアーカイブされた最終ワークスペースのスナップショット。 |
-
-完全なレイアウト: [`docs/usage/transparency.md`](./docs/usage/transparency.md)、[`docs/usage/workspace.md`](./docs/usage/workspace.md)。
+参照: [`docs/usage/transparency.md`](./docs/usage/transparency.md)、[`docs/usage/workspace.md`](./docs/usage/workspace.md)。
 
 ---
 
 ## 設定
 
-`config_default.json` を `my_config.json` にコピーして編集します。最も頻繁に触れるフィールド:
-
-| フィールド | 制御する内容 |
-|-------|------------------|
-| `workspace_dir` | 共有ワークスペース — 生成されたファイルがすべてここに現れます |
-| `discovery_addresses` | MCP 検出のための IP + ポート範囲 |
-| `workflow_llm_model` | マルチエージェントワークフローを合成（例: `anthropic/claude-opus-4-5`） |
-| `smolagent_model_id` | 実行エージェントが使用するモデル |
-| `judge_model` | verifier プログラムを記述し、ソフト判定を下す LLM |
-| `learned_score_threshold` | `--learn` モードでの早期停止しきい値（デフォルト `0.92`） |
-| `max_learning_evolve_iterations` | 世代数の上限（デフォルト `25`） |
-
-完全なリファレンス: [`docs/reference/configuration.md`](./docs/reference/configuration.md)。
+参照: [`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 
 ---
 
 ## 評価
-
-```bash
-# ScienceAgentBench (download dataset first — see docs)
-uv run main.py --science_agent_bench --learn
-
-# Quick smoke (10 tasks)
-uv run main.py --science_agent_bench --csv_runs_limit 10
-
-# PaperBench
-uv run main.py --papers datasets/paper_bench.csv --csv_runs_limit 20 --learn
-
-# Custom CSV
-uv run main.py --papers datasets/<your_benchmark>.csv --learn
-```
-
-> ⚠️ 偏りのない評価のためには、まず `./cleanup.sh` を実行して Mimosa がキャッシュされたワークフローを再利用しないようにしてください。
 
 各ベンチマークのセットアップ詳細: [`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md)、[`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)。
 
@@ -302,7 +243,7 @@ Mimosa-AI は LLM 駆動のプログラム探索と自律研究システムの�
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | ML におけるエンドツーエンドの論文生成 | Mimosa は **タスクごとのワークフロー合成** を QD + verifier で最適化するもので、論文全体の生成ではありません |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP)（Lange et al. 2024） | LLM 駆動による選好最適化アルゴリズムの発見 | 同じ「コードに対する変異オペレータとしての LLM」パラダイム。Mimosa はこれを損失関数ではなくマルチエージェントワークフローコードに適用します |
 | [FunSearch](https://github.com/google-deepmind/funsearch)（Romera-Paredes et al. 2024） | LLM 誘導による Python 関数の進化的探索 | Mimosa はマルチエージェントプログラム全体を進化させ、単一の適応度関数の代わりにマルチソース・クレーム単位 verifier を追加します |
-| [ELM](https://github.com/CarperAI/OpenELM)（Lehman et al. 2022） | LLM を介したコード上の Quality-Diversity | 最も近い QD 祖先。Mimosa の行動記述子はドメイン固有ではなくワークフロー構造的です |
+| [ELM](https://github.com/CarperAI/OpenELM)（Lehman et al. 2022） | LLM を介したコード上の Quality-Diversity | 最も近い QD 祖先。Mimosa の行動記述子はドメイン固有の手設計記述子ではなく、ワークフローコードのドメイン非依存な埋め込みです |
 | AIDE | Kaggle ライクなタスクでの自動 ML パイプライン | Mimosa はより広範な科学的再現（ScienceAgentBench、PaperBench、実験室データ）を対象とし、監査可能なクレーム単位 verifier を提供します |
 
 比較研究を出版する場合、詳細な位置付けは[論文](https://arxiv.org/abs/2603.28986)に記載されています。
@@ -312,8 +253,8 @@ Mimosa-AI は LLM 駆動のプログラム探索と自律研究システムの�
 ## 完全なドキュメント
 
 ```bash
-uvx --with mkdocs-material mkdocs serve   # live preview at http://localhost:8000
-uvx --with mkdocs-material mkdocs build   # static HTML to ./site
+uvx --with mkdocs-material mkdocs serve   # http://localhost:8000 でライブプレビュー
+uvx --with mkdocs-material mkdocs build   # 静的 HTML を ./site に生成
 ```
 
 サイト設定: [`mkdocs.yml`](./mkdocs.yml)。インデックス: [`docs/index.md`](./docs/index.md)。
