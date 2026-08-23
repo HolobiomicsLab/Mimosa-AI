@@ -84,6 +84,7 @@ class _VerifierClaimExtractionMixin:
         workspace_listing: str,
         is_truly_empty: bool,
         grounding: str = "",
+        cache_key_text: str = "",
     ) -> list[dict[str, Any]]:
         """Extract atomic claims by polling six independent source prompts.
 
@@ -94,6 +95,13 @@ class _VerifierClaimExtractionMixin:
             workspace_listing: Rendered listing of workspace files.
             is_truly_empty: When True, returns a single sentinel "execution succeeded" claim and skips extraction.
             grounding: Optional peer-reviewed literature grounding block.
+            cache_key_text: Text to key the rubric cache on. Defaults to
+                ``goal`` — but ``goal`` is the knowledge-wrapped goal, and the
+                retry loop prepends the previous attempt's answer to it before
+                re-running the same step. Hashing that string therefore mints a
+                fresh rubric per attempt, and the attempts' scores stop being
+                comparable. Pass the unwrapped ``original_task`` to hold the
+                rubric fixed while the prompt still shows the full goal.
 
         Returns:
             Filtered claim list with stable ids, source labels, importance
@@ -108,7 +116,7 @@ class _VerifierClaimExtractionMixin:
                 "likely_relevant_files": [],
             }]
 
-        task_key = self._task_cache_key(goal)
+        task_key = self._task_cache_key(cache_key_text or goal)
         cached = self._load_cached_rubric(task_key)
         if cached is not None:
             adapted = self._adapt_rubric_to_workspace(cached)

@@ -26,6 +26,7 @@ from sources.cli.pretty_print import (
     print_ok,
 )
 
+from sources.core import declared_outputs
 from sources.core.failure_fingerprint import (
     DESCRIPTOR_DIM as _FP_DIM,
     compute_failure_fingerprint,
@@ -304,8 +305,10 @@ class VerifierEvaluator(
         t = time.time()
         is_truly_empty = not execution_text or _EMPTY_RUN_MARKER in execution_text
         claims = self._extract_claims(
-            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding
+            uuid, wf_info.goal, execution_text, workspace_listing, is_truly_empty, grounding,
+            cache_key_text=wf_info.original_task or wf_info.goal,
         )
+        claims = self._prepend_declared_output_claims(claims, wf_info)
         phase_timings.append(("claim extraction + importance", time.time() - t))
         print_ok(
             f"[verifier {uuid}] claim extraction + importance done in "
@@ -577,13 +580,49 @@ class VerifierEvaluator(
         the workflow uuid) is what makes the cache shared between iterations
         of the SAME task and distinct between DIFFERENT tasks.
         """
-        return hashlib.sha256((goal or "").encode("utf-8")).hexdigest()[:16]
+        return declared_outputs.task_key(goal)
 
     def _rubric_cache_path(self, task_key: str) -> Path:
         """On-disk path of the frozen rubric for one task."""
         return self._runner_temp_root / self._RUBRIC_CACHE_FILENAME_FMT.format(
             task_key=task_key
         )
+
+    def _prepend_declared_output_claims(
+        self,
+        claims: list[dict[str, Any]],
+        wf_info: Any,
+    ) -> list[dict[str, Any]]:
+        """Put the plan's declared outputs at the head of the rubric.
+
+        The plan writes these before the step runs, so unlike every extracted
+        claim they cannot have been shaped by what the agent chose to do. They
+        are prepended rather than appended so ``claims[:max_claims]`` cannot
+        drop them, and they are added *after* ``_extract_claims`` has persisted
+        the rubric so they never enter the frozen cache — the cache freezes what
+        a run produced, these belong to the plan and must follow it.
+
+        Absent declaration, unreadable file, or a claim id already present: the
+        list is returned unchanged.
+        """
+        try:
+            task_text = getattr(wf_info, "original_task", "") or getattr(wf_info, "goal", "")
+            outputs = declared_outputs.load(self._runner_temp_root, task_text)
+            if not outputs:
+                return claims
+            existing = {c.get("id") for c in claims}
+            extra = [c for c in declared_outputs.as_claims(outputs)
+                     if c["id"] not in existing]
+            if not extra:
+                return claims
+            self.logger.info(
+                "Declared outputs from the plan added as %d mandatory claim(s): %s",
+                len(extra), ", ".join(o for o in outputs)
+            )
+            return extra + claims
+        except Exception:
+            self.logger.exception("Could not apply declared-output claims")
+            return claims
 
     def _load_cached_rubric(self, task_key: str) -> list[dict[str, Any]] | None:
         """Return the cached rubric claim list, or None when no cache exists.

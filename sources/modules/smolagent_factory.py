@@ -505,6 +505,9 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                 try:
                     result['response'] = self.agent.run(instructions)
                     result['completed'] = True
+                    # Drop any earlier retry's exception — this attempt worked,
+                    # and the caller re-raises whatever is left here.
+                    result['exception'] = None
                     error = False
                     warning = True
                 except Exception as e:
@@ -513,6 +516,12 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                     print("retrying...")
                     error = True
                     count += 1
+                    # Keep the last failure. Without it an agent that exhausts
+                    # its retries leaves completed=False with no exception, the
+                    # thread exits, join() returns at once, and the caller below
+                    # reports a timeout that never happened — discarding the
+                    # real cause.
+                    result['exception'] = e
 
         agent_thread = threading.Thread(target=_run_agent, daemon=True)
         agent_thread.start()
@@ -521,7 +530,18 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
         try:
             if not result['completed']:
                 # no save here: the except branch below saves once for all failures
-                raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
+                if agent_thread.is_alive():
+                    # Still running past the deadline: a genuine timeout.
+                    raise TimeoutError(
+                        f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds"
+                    )
+                # Finished without completing: every retry raised. Surface the
+                # last real exception instead of inventing a timeout.
+                if result['exception'] is not None:
+                    raise result['exception']
+                raise RuntimeError(
+                    f"Agent '{self.name}' exhausted its retries without producing a response"
+                )
             if result['exception']:
                 raise result['exception']
             self.save_memories(workflow_uuid=workflow_uuid)

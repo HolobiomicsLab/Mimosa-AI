@@ -37,6 +37,7 @@ from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
 from sources.utils.ensure_env import ensure_environment
 from sources.utils.logging import setup_logging
+from sources.utils import perspicacite_client
 from sources.utils.precheck import PreCheck
 from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.workspace_management import WorkspaceManager
@@ -124,6 +125,16 @@ async def papers_mode(args, config):
                                   learning=args.learn,
                                   single_agent_mode=args.single_agent
                                  )
+    # Per-row failures are caught so the batch continues, but they must still
+    # reach the exit code — otherwise a run where every task failed is
+    # indistinguishable from a clean one to any wrapping harness.
+    failed = papers.errored_rows
+    if failed:
+        print_err(
+            f"{len(failed)} of {len(papers.execution_history)} CSV row(s) failed; "
+            "exiting non-zero."
+        )
+        sys.exit(1)
 
 async def science_bench_papers_mode(args, config):
     # Use concurrent evaluation by default for science_agent_bench
@@ -283,6 +294,10 @@ async def main():
     # security check
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
+
+    # Apply grounding settings (KB scope / mode / paper budget) before any
+    # component constructs a Perspicacite query.
+    perspicacite_client.configure_from_config(config)
 
     # ── Environment precheck phase ────────────────────────────────────────
     # Ensure the host has Python 3.12 + pip available for Mimosa, auto-installing

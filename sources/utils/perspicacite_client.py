@@ -83,6 +83,106 @@ PERSPICACITE_BASE_URL = os.environ.get(
     "PERSPICACITE_API_URL", "http://localhost:8000"
 )
 
+# ---------------------------------------------------------------------------
+# Runtime settings + telemetry
+# ---------------------------------------------------------------------------
+# Grounding degrades silently by design: every failure path returns ``None``
+# and each caller substitutes a "no context" string, so a run in which every
+# grounding call failed produces the same artifacts as a fully grounded one.
+# The ledger below makes the difference observable — ``grounding_stats()`` is
+# folded into ``run_metrics.json`` so a run can be shown to have been grounded
+# rather than assumed to have been.
+_GROUNDING_LEDGER: list[dict] = []
+
+# ``kb_name=None`` sends the query to Perspicacite's web-search pipeline
+# (literature APIs + PDF download + synthesis). Naming a local knowledge base
+# instead scopes retrieval to that corpus, which is both far faster and
+# reproducible. Left at None so default behaviour is unchanged.
+_SETTINGS: dict = {
+    "kb_name": None,
+    "mode": "agentic",
+    "max_papers": 5,
+    # config.literrature_grounding used to gate only the orchestrator, so the
+    # planner and the judge kept querying with it switched off and the only
+    # way to actually disable grounding was to point the client at a dead
+    # endpoint. Gating here covers every call site at once.
+    "enabled": True,
+}
+
+
+def configure(
+    kb_name: str | None = None,
+    mode: str | None = None,
+    max_papers: int | None = None,
+    enabled: bool | None = None,
+) -> None:
+    """Set process-wide grounding defaults (call once, after config load)."""
+    if kb_name is not None:
+        _SETTINGS["kb_name"] = kb_name
+    if mode is not None:
+        _SETTINGS["mode"] = mode
+    if max_papers is not None:
+        _SETTINGS["max_papers"] = int(max_papers)
+    if enabled is not None:
+        _SETTINGS["enabled"] = bool(enabled)
+    logger.info("[Perspicacite] settings: %s", _SETTINGS)
+
+
+def configure_from_config(config) -> None:
+    """Apply ``perspicacite_*`` fields from a Mimosa ``Config`` object."""
+    configure(
+        kb_name=getattr(config, "perspicacite_kb_name", None),
+        mode=getattr(config, "perspicacite_mode", None),
+        max_papers=getattr(config, "perspicacite_max_papers", None),
+        enabled=getattr(config, "literrature_grounding", None),
+    )
+
+
+def _record(outcome: str, seconds: float, chars: int, kb_name: str | None) -> None:
+    """Append one grounding attempt to the in-process ledger."""
+    _GROUNDING_LEDGER.append({
+        "outcome": outcome,
+        "seconds": round(seconds, 3),
+        "answer_chars": chars,
+        "kb_name": kb_name,
+        "mode": _SETTINGS["mode"],
+    })
+
+
+def grounding_stats() -> dict:
+    """Summarise grounding attempts made so far in this process.
+
+    ``grounded`` is the count of attempts that returned usable context —
+    whether freshly retrieved or served from the on-disk cache. A run with
+    ``attempts > 0`` and ``grounded == 0`` completed with no literature
+    grounding at all, which is otherwise invisible in the artifacts.
+    """
+    total = len(_GROUNDING_LEDGER)
+    by = {}
+    for e in _GROUNDING_LEDGER:
+        by[e["outcome"]] = by.get(e["outcome"], 0) + 1
+    grounded = by.get("ok", 0) + by.get("cache_hit", 0)
+    attempted = total - by.get("disabled", 0)
+    secs = sum(e["seconds"] for e in _GROUNDING_LEDGER)
+    return {
+        "attempts": total,
+        "grounded": grounded,
+        # Skipped-because-disabled calls are not failures, so they are excluded
+        # from the denominator; `by_outcome` still shows them.
+        "hit_rate": round(grounded / attempted, 4) if attempted else None,
+        "enabled": _SETTINGS["enabled"],
+        "by_outcome": by,
+        "total_seconds": round(secs, 3),
+        "mean_seconds": round(secs / total, 3) if total else None,
+        "kb_name": _SETTINGS["kb_name"],
+        "mode": _SETTINGS["mode"],
+    }
+
+
+def reset_grounding_stats() -> None:
+    """Clear the ledger (used between tasks in batch evaluation)."""
+    _GROUNDING_LEDGER.clear()
+
 # Timeout configuration.
 # The agentic pipeline involves multiple LLM calls, literature searches, paper
 # downloads, and answer synthesis — easily taking 1-5+ minutes.
@@ -91,14 +191,14 @@ PERSPICACITE_BASE_URL = os.environ.get(
 #                     this is the gap between SSE events; for non-streaming it
 #                     is the total wall-clock time until the full response body
 #                     arrives.
-# - overall timeout:  hard cap on the total wall-clock time for the request.
 _CONNECT_TIMEOUT = 30       # seconds – TCP connect
 _READ_TIMEOUT = 600         # seconds – between data chunks (10 min)
-_OVERALL_TIMEOUT = 900      # seconds – hard cap (15 min)
+# NOTE: httpx has no single "overall" cap; the read timeout above bounds the
+# gap between SSE events, which is the operative limit for the streaming path.
 
 
 def _build_httpx_timeout():
-    """Build an ``httpx.Timeout`` with separate connect / read / overall caps."""
+    """Build an ``httpx.Timeout`` with separate connect / read / write caps."""
     import httpx
     return httpx.Timeout(
         connect=_CONNECT_TIMEOUT,
@@ -134,15 +234,27 @@ def query_perspicacite(
         A string containing the scientific context retrieved from Perspicacite,
         or ``None`` if the service is unavailable or the query fails.
     """
+    import time as _time
+
+    kb_name = _SETTINGS["kb_name"]
+    started = _time.perf_counter()
+
+    if not _SETTINGS["enabled"]:
+        logger.info("[Perspicacite] grounding disabled by config; skipping query.")
+        _record("disabled", _time.perf_counter() - started, 0, kb_name)
+        return None
+
     # ---- check the on-disk cache first ----
     cached = _read_cache(science_query, mode, kb_name)
     if cached is not None:
+        _record("cache_hit", _time.perf_counter() - started, len(cached), kb_name)
         return cached
 
     # Try streaming first (preferred — keeps connection alive during long ops)
     result = _query_perspicacite_streaming(science_query, mode, base_url, kb_name)
     if result:
         _write_cache(science_query, mode, result, kb_name)
+        _record("ok", _time.perf_counter() - started, len(result), kb_name)
         return result
 
     # Fall back to non-streaming JSON if streaming failed
@@ -150,6 +262,9 @@ def query_perspicacite(
     result = _query_perspicacite_non_streaming(science_query, mode, base_url, kb_name)
     if result:
         _write_cache(science_query, mode, result, kb_name)
+        _record("ok", _time.perf_counter() - started, len(result), kb_name)
+    else:
+        _record("failed", _time.perf_counter() - started, 0, kb_name)
     return result
 
 
@@ -183,8 +298,10 @@ def _query_perspicacite_streaming(
         "query": science_query,
         "mode": mode,
         "stream": True,           # SSE streaming
+        # None → Perspicacite's web-search pipeline; a KB name scopes
+        # retrieval to that local corpus instead (see configure()).
+        "max_papers": _SETTINGS["max_papers"],
         "kb_name": kb_name,       # None -> web-search; a name -> that KB bundle
-        "max_papers": 5,
         "databases": ["semantic_scholar", "openalex", "pubmed"],
     }
 
@@ -286,8 +403,8 @@ def _query_perspicacite_non_streaming(
         "query": science_query,
         "mode": mode,
         "stream": False,
+        "max_papers": _SETTINGS["max_papers"],
         "kb_name": kb_name,
-        "max_papers": 5,
         "databases": ["semantic_scholar", "openalex", "pubmed"],
     }
 
