@@ -217,3 +217,33 @@ def test_the_live_step_2_declaration_yields_one_of_each():
     kinds = ["directory" if "A directory exists" in c["description"] else "file"
              for c in claims]
     assert kinds == ["directory", "file"]
+
+
+# ---- "non-empty" is satisfied by a stub -----------------------------------
+
+
+def test_the_claim_asks_for_content_not_merely_bytes():
+    """Observed live, and it went the wrong way.
+
+    Step `feature_detection_and_processing` declared five outputs. With no raw
+    data reachable, the run wrote each file as a labelled placeholder — line 2
+    of feature_table_qtof.csv reads "# PLACEHOLDER: ... NO REAL DATA
+    AVAILABLE" — and all five claims PASSED at importance 10, one of them on
+    the detail line "File exists and is non-empty (1462 bytes)".
+
+    A claim a placeholder satisfies pushes an agent to create the file without
+    pushing it to fill the file, which is the opposite of the intent.
+    """
+    for output in ("results/table.csv", "results/dir/"):
+        desc = declared_outputs.as_claims([output])[0]["description"]
+        assert "placeholder" in desc.lower()
+        assert "is non-empty" not in desc, (
+            "byte count is not evidence of content")
+
+
+def test_both_kinds_carry_the_substance_requirement():
+    claims = declared_outputs.as_claims(["a/table.csv", "a/dir/"])
+    for c in claims:
+        assert "real content produced by this step" in c["description"]
+    assert "A directory exists" in claims[1]["description"]
+    assert "A file exists" in claims[0]["description"]

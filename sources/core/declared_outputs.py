@@ -104,11 +104,24 @@ def as_claims(outputs: list[str]) -> list[dict]:
         is_directory = raw.rstrip().endswith(("/", "\\"))
         stem = Path(raw.rstrip("/\\")).name or raw
         slug = "".join(c if c.isalnum() else "_" for c in stem.lower()).strip("_")
+        # "Non-empty" is satisfied by a stub. Observed live: under five of
+        # these claims a run that could not obtain its inputs wrote
+        # feature_table_qtof.csv whose second line reads
+        # "# PLACEHOLDER: ... NO REAL DATA AVAILABLE", and all five passed at
+        # importance 10 on "File exists and is non-empty (1462 bytes)". A claim
+        # that a placeholder satisfies applies pressure to create the file
+        # without applying any to fill it, so it must ask for content.
+        substance = (
+            "It contains real content produced by this step — not a placeholder, "
+            "stub, template, or a note recording that the data could not be "
+            "obtained. A file whose body announces missing or unavailable data "
+            "does not satisfy this claim."
+        )
         expectation = (
-            "A directory exists at that path in the workspace and holds at "
-            "least one non-empty file."
+            f"A directory exists at that path in the workspace and holds at "
+            f"least one file. {substance}"
             if is_directory else
-            "A file exists at that path, in the workspace, and is non-empty."
+            f"A file exists at that path in the workspace. {substance}"
         )
         claims.append({
             "id": f"declared_output_{slug}",
