@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from sources.utils import paths
 from sources.utils.pricing import OpenRouterPricingClient
 
 
@@ -37,25 +38,41 @@ class Config:
 
     def __init__(self):
 
-        # workspace configuration
-        self.workspace_dir = "/Users/mlg/Documents/CNRS/toolomics/workspace"
+        ##############
+        # Workspace Configuration
+        # Must point to Toolomics workspace
+        ##############
+        self.workspace_dir = "/Users/cnrs/Documents/repository/Toolomics/workspace"
 
-        # MCPs server discovery
+        ##############
+        # MCP Discovery Addresses
+        ##############
         self.discovery_addresses: list[AddressMCP] = [
             AddressMCP(ip="0.0.0.0", port_min=5000, port_max=5200)
         ]
 
-        # LLMs choices
-        self.planner_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.1"
-        self.smolagent_model_id: str = "deepseek/deepseek-v4-flash"
-        self.judge_model = "openrouter/qwen/qwen3.7-max"
+        ##############
+        # AUdit / Export
+        ##############
+        # When True, writes an ASTRA spec YAML after task completion.
+        self.export_astra: bool = False
+
+        ##############
+        # LLM Configuration
+        ##############
+        self.planner_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
+        self.workflow_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
+        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        # Vision model for Source G (visual figure inspection).
+        self.vision_judge_model: str | None = "openrouter/moonshot/kimi-k3"
+
         # Optional cheaper model for the verifier's *mechanical* calls (claim
         # extraction, dedup, importance rating, file selection, verifier-script
         # generation). None -> reuse judge_model, so behaviour is unchanged
         # unless this is set. Final claim verdicts stay on judge_model.
         self.judge_extraction_model: str | None = None
-        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         # Capability tiers. Any *_model role above may be set to a tier alias
         # ("heavy"/"light") instead of a concrete id; aliases are resolved to
         # the tier's model at load time (see resolve_model). This lets the whole
@@ -80,55 +97,66 @@ class Config:
         # of low-priority claims for speed).
         self.verifier_max_claims: int | None = None
         self.verifier_use_grounding: bool | None = None
-        self.engine_name: str = "litellm" # for smolagent
 
+        #############
+        # Orchestrator Workflow generation options
+        #############
+        # Let orchestrator choose model, otherwise default to self.smolagent_model_id[0]
+        # Recommanded: model diversity avoid idea and verifiers collapse.
+        self.orchestrator_choose_model = False
+        # Ground workflow generation with perspicacité
+        self.literrature_grounding = True
 
-        # prompts for planner / workflow generator
-        self.prompt_planner: str = "sources/prompts/planner_reproduction.md"
-        self.prompt_workflow_creator: str = "sources/prompts/workflow_v11.md"
-        self.prompt_smolagent: str = "sources/prompts/smolagent_sys_prompt.md"
+        ##############
+        # ScienceAgentBench Concurrency settings
+        ##############
+        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+        # Ablation: also benchmark-score every per-iteration /tmp snapshot
+        # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
+        # convergence across evolution. Multiplies per-task eval wall-clock.
+        self.evaluate_snapshot_ablations: bool = False
 
+        ##############
+        # QD/Novelty / Learning parameters
+        # Touch with caution, for ablation studies and research only.
+        ##############
+
+        # strategy: "qd" (default), "tournament", "novelty"
+        self.selection_strategy = "qd"
+        # learning parameters
+        self.learned_score_threshold = 0.9
+        self.max_learning_evolve_iterations = 20
+        # KNN settings for novelty
+        self.novelty_comparison: str = "archive_knn"
+        self.novelty_previous_n: int = 15
+        # Length penalty: genotype size at which the penalty starts to grow
+        self.length_penalty_baseline_chars: int = 8000
+        self.length_penalty_lambda: float = 0.05
+        # Selection pressure / archive settings
+        self.min_improvement_threshold: float = 0.01
+        self.population_size: int = 20
+        self.novelty_k_neighbours: int = 15
+        self.novelty_weight: float = 0.25
+        self.admit_threshold: float = 0.3
+        # Cold-start / parent-selection settings
+        self.initial_population: int = 2
+        self.crossover_rate: float = 0.4
+        self.n_parents: int = 2
+        # goal similarity thresholds before even considered by qd (need similar goal to avoid picking parents from a different task)
+        self.parent_threshold_similarity: float = 0.95
+        # bare minimum score for selection (don't pick failed parents)
+        self.parent_threshold_score: float = 0.01
+
+        ##############
+        # LLM Related, advanced settings, touch with caution
+        ##############
+        self.engine_name: str = "litellm"
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "medium"
-
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 8192
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
-
-        # learning parameters
-        self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 10
-
-        # QD novelty + length penalty (open-ended modes)
-        #  "archive_knn" (default) or "k-NN archive"
-        self.novelty_comparison: str = "archive_knn"
-        self.novelty_previous_n: int = 5
-        # Length penalty: genotype size at which the penalty starts to
-        # grow; lambda is small so it only breaks near-ties.
-        self.length_penalty_baseline_chars: int = 8000
-        self.length_penalty_lambda: float = 0.05
-
-        # evaluation concurrency settings
-        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
-
-        # folder paths for workflow pre-defined code
-        self.schema_code_path: str = "sources/modules/state_schema.py"
-        self.smolagent_factory_code_path: str = "sources/modules/smolagent_factory.py"
-        # folder path for cache
-        self.runs_capsule_dir = "runs_capsule/"
-        self.workflow_dir: str = "sources/workflows"
-        self.memory_dir: str = "sources/memory"
-        # When True, every child workflow's verifier eval anchors on the
-        # earliest ancestor's cached rubric (claims + verify_*.py) so scores
-        # are comparable across an evolved lineage. Disable for ablation.
-        self.reuse_lineage_rubric: bool = True
-
-        # When True, the evolution loop writes an ASTRA spec YAML for the
-        # best run after workspace restore. Off by default — adds an LLM
-        # decision-extraction pass per surviving trace step.
-        self.export_astra: bool = False
-
         # openrouter providers
         self.openrouter_provider: list[str] | None = [
             "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
@@ -136,6 +164,24 @@ class Config:
              "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
              "groq", "cerebras", "sambanova", "nvidia"
         ]
+        # Request token logprobs and save them with agent memory (for ablations). Litellm only.
+        self.save_logprobs: bool = True
+
+        ##############
+        # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
+        ##############
+        self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
+        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v12_model_select.md")
+        self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
+
+        # folder paths for workflow pre-defined code
+        self.schema_code_path: str = paths.resource_path("sources/modules/state_schema.py")
+        self.smolagent_factory_code_path: str = paths.resource_path("sources/modules/smolagent_factory.py")
+        # folder path for cache
+        self.runs_capsule_dir = paths.default_runs_capsule_dir()
+        self.workflow_dir: str = paths.default_workflow_dir()
+        self.memory_dir: str = paths.default_memory_dir()
+
         self.openrouter_provider_by_model: dict[str, list[str]] = {}
         self.openrouter_quantizations_by_model: dict[str, list[str] | None] = {}
         self.default_openrouter_quantizations: list[str] = ["bf16", "fp16", "fp8"]
@@ -150,7 +196,12 @@ class Config:
         self.max_context_tokens: int = 800_000
         self.runner_default_max_memory_mb: int = 10000
         self.runner_default_max_cpu_percent: int = 100
-        self.runner_temp_dir: str = "./tmp"
+        self.runner_temp_dir: str = paths.default_tmp_dir()
+        ######
+        # SmolAgent runner requirements
+        # THIS IS NOT WHERE SCIENTIFIC PACKAGE REQUIREMENTS GO.
+        # Those should be installed by the agent themselves in the dockerized shell MCP.
+        ######
         self.runner_requirements: list[str] = [
             "setuptools>=70.0",
             "python-dotenv",
@@ -159,6 +210,7 @@ class Config:
             # avoid optional extras that pull in packages like `helium`/`selenium`
             "pillow>=12.1.0",
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
+            "litellm>=1.77.7,<1.92",
             "langgraph>=0.4.7",
             #"matplotlib>=3.9.0",
             "pandas==2.3.2",
@@ -185,6 +237,10 @@ class Config:
         this — passing the shared `openrouter_provider` directly can leave
         the runtime with no routable provider for that specific model.
         """
+        # `smolagent_model_id` may be a list of candidate models; per-model
+        # routing is keyed by a single id, so resolve to the primary (first).
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else None
         if model_id and model_id in self.openrouter_provider_by_model:
             return self.openrouter_provider_by_model[model_id]
         return self.openrouter_provider
@@ -197,6 +253,10 @@ class Config:
         google-ai-studio, etc.). Without precheck data, returns the default
         safety filter which blocks unsafe (int4/fp4) routing.
         """
+        # `smolagent_model_id` may be a list of candidate models; per-model
+        # routing is keyed by a single id, so resolve to the primary (first).
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else None
         if model_id and model_id in self.openrouter_quantizations_by_model:
             return self.openrouter_quantizations_by_model[model_id]
         return self.default_openrouter_quantizations
@@ -238,6 +298,9 @@ class Config:
         assert os.path.exists(self.prompt_workflow_creator), (
             f"System prompt file not found: {self.prompt_workflow_creator}"
         )
+        assert os.path.exists(self.prompt_planner), (
+            f"Planner prompt file not found: {self.prompt_planner}"
+        )
         assert os.path.exists(self.workspace_dir), (
             f"Workspace directory not found: {self.workspace_dir}"
         )
@@ -245,7 +308,34 @@ class Config:
     def jsonify(
         self,
     ) -> dict[str, Any]:
-        """Convert configuration to a JSON-serializable dictionary."""
+        """Convert configuration to a JSON-serializable dictionary.
+
+        Read-only resource paths (prompts, module templates) that live under
+        the running package root are written package-relative, so a persisted
+        config stays valid whether Mimosa later runs from a repo checkout or
+        an installed wheel. ``load`` re-anchors them via
+        ``_reanchor_relative_paths``.
+        """
+
+        def portable(value: str) -> str:
+            """Relativize paths under the package root; keep others absolute."""
+            try:
+                rel = os.path.relpath(value, paths.PACKAGE_ROOT)
+            except ValueError:
+                return value
+            if rel == ".." or rel.startswith(f"..{os.sep}") or os.path.isabs(rel):
+                return value
+            return rel
+
+        resource_fields = (
+            "prompt_planner",
+            "prompt_workflow_creator",
+            "schema_code_path",
+            "smolagent_factory_code_path",
+        )
+        portable_resources = {
+            field: portable(getattr(self, field)) for field in resource_fields
+        }
         return {
             "workspace_dir": self.workspace_dir,
             "discovery_addresses": [
@@ -256,6 +346,8 @@ class Config:
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
+            "vision_judge_model": self.vision_judge_model,
+            "capsule_namer_model": self.capsule_namer_model,
             "judge_extraction_model": self.judge_extraction_model,
             "model_tiers": self.model_tiers,
             "perspicacite_agent_grounding_enabled": self.perspicacite_agent_grounding_enabled,
@@ -265,22 +357,34 @@ class Config:
             "verifier_use_grounding": self.verifier_use_grounding,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
-            "prompt_planner": self.prompt_planner,
-            "prompt_workflow_creator": self.prompt_workflow_creator,
+            "save_logprobs": self.save_logprobs,
+            "prompt_planner": portable_resources["prompt_planner"],
+            "prompt_workflow_creator": portable_resources["prompt_workflow_creator"],
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
+            "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "evaluate_snapshot_ablations": self.evaluate_snapshot_ablations,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
             "length_penalty_baseline_chars": self.length_penalty_baseline_chars,
             "length_penalty_lambda": self.length_penalty_lambda,
-            "schema_code_path": self.schema_code_path,
-            "smolagent_factory_code_path": self.smolagent_factory_code_path,
+            "min_improvement_threshold": self.min_improvement_threshold,
+            "population_size": self.population_size,
+            "novelty_k_neighbours": self.novelty_k_neighbours,
+            "novelty_weight": self.novelty_weight,
+            "admit_threshold": self.admit_threshold,
+            "initial_population": self.initial_population,
+            "crossover_rate": self.crossover_rate,
+            "n_parents": self.n_parents,
+            "parent_threshold_similarity": self.parent_threshold_similarity,
+            "parent_threshold_score": self.parent_threshold_score,
+            "schema_code_path": portable_resources["schema_code_path"],
+            "smolagent_factory_code_path": portable_resources["smolagent_factory_code_path"],
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
-            "reuse_lineage_rubric": self.reuse_lineage_rubric,
             "export_astra": self.export_astra,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
@@ -317,10 +421,15 @@ class Config:
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.vision_judge_model = data.get(
+            "vision_judge_model", self.vision_judge_model
+        )
+        self.capsule_namer_model = data.get(
+            "capsule_namer_model", self.capsule_namer_model
+        )
         self.judge_extraction_model = data.get(
             "judge_extraction_model", self.judge_extraction_model
         )
-        self.capsule_namer_model = data.get("capsule_namer_model", self.capsule_namer_model)
         self.perspicacite_agent_grounding_enabled = data.get(
             "perspicacite_agent_grounding_enabled", self.perspicacite_agent_grounding_enabled
         )
@@ -343,6 +452,7 @@ class Config:
             setattr(self, _role, self.resolve_model(getattr(self, _role)))
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
+        self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
@@ -352,8 +462,12 @@ class Config:
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )
+        self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
+        )
+        self.evaluate_snapshot_ablations = bool(
+            data.get("evaluate_snapshot_ablations", self.evaluate_snapshot_ablations)
         )
         self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
         self.novelty_previous_n = int(
@@ -365,6 +479,26 @@ class Config:
         self.length_penalty_lambda = float(
             data.get("length_penalty_lambda", self.length_penalty_lambda)
         )
+        self.min_improvement_threshold = float(
+            data.get("min_improvement_threshold", self.min_improvement_threshold)
+        )
+        self.population_size = int(data.get("population_size", self.population_size))
+        self.novelty_k_neighbours = int(
+            data.get("novelty_k_neighbours", self.novelty_k_neighbours)
+        )
+        self.novelty_weight = float(data.get("novelty_weight", self.novelty_weight))
+        self.admit_threshold = float(data.get("admit_threshold", self.admit_threshold))
+        self.initial_population = int(
+            data.get("initial_population", self.initial_population)
+        )
+        self.crossover_rate = float(data.get("crossover_rate", self.crossover_rate))
+        self.n_parents = int(data.get("n_parents", self.n_parents))
+        self.parent_threshold_similarity = float(
+            data.get("parent_threshold_similarity", self.parent_threshold_similarity)
+        )
+        self.parent_threshold_score = float(
+            data.get("parent_threshold_score", self.parent_threshold_score)
+        )
         self.schema_code_path = data.get("schema_code_path", self.schema_code_path)
         self.smolagent_factory_code_path = data.get(
             "smolagent_factory_code_path", self.smolagent_factory_code_path
@@ -372,9 +506,6 @@ class Config:
         self.runs_capsule_dir = data.get("runs_capsule_dir", self.runs_capsule_dir)
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.memory_dir = data.get("memory_dir", self.memory_dir)
-        self.reuse_lineage_rubric = bool(
-            data.get("reuse_lineage_rubric", self.reuse_lineage_rubric)
-        )
         self.export_astra = bool(
             data.get("export_astra", self.export_astra)
         )
@@ -400,9 +531,46 @@ class Config:
         self.runner_requirements = data.get(
             "runner_requirements", self.runner_requirements
         )
+        self._reanchor_relative_paths()
+
+    def _reanchor_relative_paths(self) -> None:
+        """Resolve relative paths loaded from legacy config files.
+
+        Older config files stored working-directory-relative paths
+        ("sources/prompts/…", "./tmp"). Resolve them the same way the
+        defaults are resolved so a persisted config keeps working when
+        Mimosa is launched from any directory.
+        """
+        resource_fields = (
+            "prompt_planner",
+            "prompt_workflow_creator",
+            "schema_code_path",
+            "smolagent_factory_code_path",
+        )
+        for field in resource_fields:
+            value = getattr(self, field)
+            if value and not os.path.isabs(value):
+                setattr(self, field, paths.resource_path(value))
+        state_fields = ("workflow_dir", "memory_dir", "runs_capsule_dir")
+        for field in state_fields:
+            value = getattr(self, field)
+            if value and not os.path.isabs(value):
+                relative = os.path.normpath(value)
+                setattr(self, field, paths.state_dir(relative, os.path.basename(relative)))
+        tmp = self.runner_temp_dir
+        if tmp and not os.path.isabs(tmp):
+            relative = os.path.normpath(tmp)
+            if paths.is_repo_checkout():
+                self.runner_temp_dir = str(paths.PACKAGE_ROOT / relative)
+            else:
+                # Scratch data belongs in the cache dir, matching the default.
+                self.runner_temp_dir = str(paths.cache_dir() / os.path.basename(relative))
 
     def dump(self, filepath: str) -> None:
-        """Save configuration to a JSON file."""
+        """Save configuration to a JSON file, creating parent dirs as needed."""
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         config_data = self.jsonify()
         with open(filepath, "w") as f:
             json.dump(config_data, f, indent=2)
@@ -433,24 +601,36 @@ class Config:
         lines.append(f"  verifier_max_claims={self.verifier_max_claims}")
         lines.append(f"  verifier_use_grounding={self.verifier_use_grounding}")
         lines.append(f"  engine_name={self.engine_name}")
+        lines.append(f"  save_logprobs={self.save_logprobs}")
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")
         lines.append(f"  prompt_smolagent={self.prompt_smolagent}")
         lines.append(f"  reasoning_effort={self.reasoning_effort}")
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
+        lines.append(f"  selection_strategy={self.selection_strategy}")
         lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
+        lines.append(f"  evaluate_snapshot_ablations={self.evaluate_snapshot_ablations}")
         lines.append(f"  novelty_comparison={self.novelty_comparison}")
         lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
         lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
         lines.append(f"  length_penalty_lambda={self.length_penalty_lambda}")
+        lines.append(f"  min_improvement_threshold={self.min_improvement_threshold}")
+        lines.append(f"  population_size={self.population_size}")
+        lines.append(f"  novelty_k_neighbours={self.novelty_k_neighbours}")
+        lines.append(f"  novelty_weight={self.novelty_weight}")
+        lines.append(f"  admit_threshold={self.admit_threshold}")
+        lines.append(f"  initial_population={self.initial_population}")
+        lines.append(f"  crossover_rate={self.crossover_rate}")
+        lines.append(f"  n_parents={self.n_parents}")
+        lines.append(f"  parent_threshold_similarity={self.parent_threshold_similarity}")
+        lines.append(f"  parent_threshold_score={self.parent_threshold_score}")
         lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
         lines.append(f"  schema_code_path={self.schema_code_path}")
         lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")
         lines.append(f"  runs_capsule_dir={self.runs_capsule_dir}")
         lines.append(f"  workflow_dir={self.workflow_dir}")
         lines.append(f"  memory_dir={self.memory_dir}")
-        lines.append(f"  reuse_lineage_rubric={self.reuse_lineage_rubric}")
         lines.append(f"  openrouter_provider={self.openrouter_provider}")
         lines.append(f"  openrouter_provider_by_model={self.openrouter_provider_by_model}")
         lines.append(f"  openrouter_quantizations_by_model={self.openrouter_quantizations_by_model}")

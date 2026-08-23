@@ -11,6 +11,7 @@ import threading
 import time
 from collections.abc import Callable, Coroutine
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, TypeVar
 
 if __name__ == "__main__":
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     )
 
 from sources.cli.pretty_print import CYAN, DIM, GREEN, RED, YELLOW, print_box
+from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.workflow_runner import (
     ExecutionResult,
     ExecutionStatus,
@@ -291,6 +293,11 @@ class _VerifierPerClaimMixin:
         grounding: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Dispatch to executable or soft branch; return ``(final_spec, scored)``."""
+        # Source G claims → visual branch (vision LLM inspects the figure)
+        if (claim.get("source") or "").endswith("_g"):
+            return spec, self._run_visual_branch(
+                uuid, claim, spec, execution_text, workspace_listing, grounding
+            )
         if spec.get("executable") and spec.get("code"):
             spec, exec_result = self._run_verifier_with_recovery(
                 uuid, claim, spec
@@ -347,6 +354,233 @@ class _VerifierPerClaimMixin:
             title=f"Soft check · {cid}", color=verdict_color,
         )
         return scored
+
+    # ------------------------------------------------------------------
+    # Visual branch — vision-LLM inspection of figures (Source G)
+    # ------------------------------------------------------------------
+
+    def _run_visual_branch(
+        self,
+        uuid: str,
+        claim: dict[str, Any],
+        spec: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> dict[str, Any]:
+        """Run visual verification: send image + claim to a vision-capable LLM.
+
+        Finds the relevant image files in the workspace, encodes them as
+        base64 data URIs, and sends a multimodal prompt to a vision model
+        (e.g., Kimi K3) configured via ``config.vision_judge_model``.
+
+        Args:
+            uuid: Workflow identifier.
+            claim: The claim dict with ``description``, ``likely_relevant_files``, etc.
+            spec: The verifier spec dict (unused for visual branch, kept for
+                interface consistency).
+            execution_text: Agent narration / produced output.
+            workspace_listing: Rendered listing of workspace files.
+            grounding: Optional literature grounding block.
+
+        Returns:
+            Scored result dict with ``score``, ``verifier_kind`` = ``"visual"``,
+            ``status``, ``details``, and ``rationale``.
+        """
+        import base64
+        import mimetypes
+
+        cid = claim.get("id", "unknown")
+
+        # ---- locate image files ----
+        relevant_files = claim.get("likely_relevant_files") or []
+        image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".svg"}
+        image_paths = [
+            p for p in relevant_files
+            if Path(p).suffix.lower() in image_exts
+        ]
+
+        # Broad fallback: scan workspace for any image if claim lists none
+        if not image_paths:
+            ws = Path(self.workspace_dir)
+            if ws.exists():
+                for root, dirs, files in os.walk(str(ws)):
+                    dirs[:] = [
+                        d for d in dirs
+                        if d not in {".git", "__pycache__", ".venv", "node_modules"}
+                    ]
+                    for fname in files:
+                        if Path(fname).suffix.lower() in image_exts:
+                            image_paths.append(
+                                str(Path(root, fname).relative_to(ws))
+                            )
+                    if image_paths:
+                        break
+
+        if not image_paths:
+            print_box(
+                f"No image files found in workspace for claim {cid}.",
+                title=f"Visual check · {cid}", color=YELLOW,
+            )
+            return {
+                "score": 0.0, "verifier_kind": "visual", "status": "error",
+                "details": "No image files found in workspace to visually inspect",
+                "rationale": "",
+            }
+
+        # Use the first (most relevant) image
+        image_path = str(Path(self.workspace_dir) / image_paths[0])
+        try:
+            with open(image_path, "rb") as fh:
+                image_bytes = fh.read()
+        except OSError as exc:
+            return {
+                "score": 0.0, "verifier_kind": "visual", "status": "error",
+                "details": f"Cannot read image file {image_paths[0]}: {exc}",
+                "rationale": "",
+            }
+
+        mime, _ = mimetypes.guess_type(image_path)
+        if not mime or not mime.startswith("image/"):
+            mime = "image/png" if image_path.endswith(".png") else "image/jpeg"
+        data_uri = f"data:{mime};base64,{base64.b64encode(image_bytes).decode('ascii')}"
+
+        # ---- build multimodal prompt ----
+        prompt = self._build_visual_check_prompt(
+            claim, execution_text, workspace_listing, grounding
+        )
+        print_box(
+            f"claim: {claim.get('description', '')[:200]}\nimage: {image_paths[0]} ({len(image_bytes)} bytes)",
+            title=f"Visual check · {cid}", color=CYAN,
+        )
+
+        # ---- call vision model ----
+        verdict_data, err = self._call_vision_judge(
+            uuid, f"verifier_visual_{cid}", prompt, images=[data_uri]
+        )
+        if err is not None or not isinstance(verdict_data, dict):
+            print_box(
+                f"Vision judge call failed: {err or 'non-dict response'}",
+                title=f"Visual error · {cid}", color=RED,
+            )
+            return {
+                "score": 0.0, "verifier_kind": "visual", "status": "error",
+                "details": f"vision model call failed: {err or 'verdict JSON not an object'}",
+                "rationale": "",
+            }
+
+        verdict = verdict_data.get("verdict", "unsure")
+        rationale = str(verdict_data.get("rationale", ""))
+        score = self._SOFT_VERDICT_SCORE.get(verdict, 0.5)
+        color = GREEN if score >= 0.5 else RED
+        print_box(
+            f"verdict:   {verdict}\nrationale: {rationale}",
+            title=f"Visual verdict · {cid}", color=color,
+        )
+        return {
+            "score": score,
+            "verifier_kind": "visual",
+            "status": verdict,
+            "details": rationale,
+            "rationale": rationale,
+        }
+
+    def _build_visual_check_prompt(
+        self,
+        claim: dict[str, Any],
+        execution_text: str,
+        workspace_listing: str,
+        grounding: str,
+    ) -> str:
+        """Prompt for the vision model to judge a scientific figure.
+
+        The vision model receives this text prompt alongside the image as a
+        data URI. The prompt asks for a targeted scientific judgment, not a
+        general description.
+        """
+        grounding_block = (
+            grounding.strip()[:1500] if grounding else "(no literature grounding)"
+        )
+        goal_snippet = (execution_text or "")[:2500]
+        return f"""You are a scientific figure reviewer with domain expertise across chemistry, biology, and physics. Examine the attached image carefully.
+
+CLAIM TO VERIFY:
+{claim.get('description', '')}
+
+SCIENTIFIC CONTEXT (workflow goal):
+{goal_snippet}
+
+LITERATURE GROUNDING:
+{grounding_block}
+
+YOUR TASK:
+Judge whether the CLAIM is visibly TRUE or FALSE based solely on what you SEE in the image. Focus on scientific correctness and physical plausibility — not aesthetics.
+
+GUIDANCE:
+- "pass" = the figure VISIBLY satisfies the claim. The structure/pattern/property the claim describes is clearly present and scientifically plausible.
+- "fail" = the figure VISIBLY contradicts the claim. Something is wrong that a domain expert would immediately notice (impossible bond geometry, overlapping atoms, broken topology, physically nonsensical values or scale).
+- "unsure" = the image resolution is too low, the relevant detail is ambiguous, or the figure type is unrecognizable. Default to "unsure" rather than guessing.
+
+Return STRICT JSON only, no markdown, no prose outside the JSON:
+{{"verdict": "pass"|"fail"|"unsure", "rationale": "<one-sentence explanation of what you saw that supports your verdict>"}}
+"""
+
+    def _call_vision_judge(
+        self,
+        uuid: str,
+        agent_name: str,
+        prompt: str,
+        images: list[str],
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Call a vision-capable LLM with an image-attached prompt.
+
+        Uses ``self._vision_llm_config`` (configured in ``VerifierEvaluator``).
+        Falls back gracefully when no vision model is configured.
+
+        Args:
+            uuid: Workflow identifier.
+            agent_name: Short slug for the judge call (used in memory persistence).
+            prompt: Text prompt to send alongside the image.
+            images: List of base64 data URIs (e.g. ``"data:image/png;base64,..."``).
+
+        Returns:
+            Tuple ``(parsed_json_dict, error_string)``. One is always ``None``.
+        """
+        if not hasattr(self, "_vision_llm_config") or self._vision_llm_config is None:
+            return None, "No vision model configured (set config.vision_judge_model)"
+
+        # Lazy import: ``base`` pulls in the evaluator package at module load
+        # time, so a top-level import here would create a circular import.
+        from sources.evaluators.base import extract_json_payload
+
+        try:
+            # Build a multimodal message: text prompt + image(s)
+            content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+            for img in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": img, "detail": "high"},
+                })
+
+            # Create a fresh LLM provider for this call; it persists the
+            # call in memory under ``<memory_dir>/<uuid>/<agent_name>.json``.
+            memory_path = Path(self.memory_dir) / uuid
+            memory_path.mkdir(parents=True, exist_ok=True)
+            provider = LLMProvider(
+                agent_name=agent_name,
+                memory_path=str(memory_path),
+                config=self._vision_llm_config,
+            )
+            raw = provider(content)
+
+            parsed = extract_json_payload(raw or "")
+            if not parsed:
+                return None, f"vision judge returned non-JSON: {raw[:300]}"
+            return json.loads(parsed), None
+
+        except Exception as exc:
+            self.logger.warning(f"Vision judge call failed for {uuid}/{agent_name}: {exc}")
+            return None, str(exc)
 
     # ------------------------------------------------------------------
     # File selection (which workspace files the verifier should open)

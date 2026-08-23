@@ -23,10 +23,14 @@ class LocalTransfer:
             "max_tokens": 256,
         })
 
-    def create_capsule_name(self, goal: str) -> str:
+    def create_capsule_name(self, goal: str, task_token: str | None = None) -> str:
         """
         Generate a unique lowercase folder name from goal using LLM.
+
+        A whitespace-only LLM reply sanitizes to "" — fall back to a
+        deterministic name instead of writing into the capsule root.
         """
+        fallback = "capsule_" + (task_token or str(abs(hash(goal))))
         system_prompt = """Generate a concise, unique lowercase folder name (max 7 words, underscore-separated) from the goal sentence. Only output the folder name, nothing else."""
 
         try:
@@ -36,16 +40,22 @@ class LocalTransfer:
                 config=self.config_llm
             )(f"generate a unique folder name for sentence: {goal}")
             if not raw_output:
-                return "capsule_" + str(abs(hash(goal)))
+                return fallback
             name = raw_output.strip().lower()
             name = re.sub(r'^["\']|["\']$', '', name)  # Remove quotes
             name = re.sub(r'[^a-z0-9_]', '_', name)    # Sanitize
             name = re.sub(r'_+', '_', name)             # Collapse multiple underscores
-            return name.strip('_')                      # Remove leading/trailing
+            name = name.strip('_')                      # Remove leading/trailing
+            return name if name else fallback
         except Exception as e:
-            return "capsule_" + str(abs(hash(goal)))
+            return fallback
 
     def create_capsule_folder(self, capsule_name) -> str:
+        if not capsule_name or not str(capsule_name).strip():
+            raise ValueError(
+                "capsule_name must be non-empty — an empty name would target "
+                "the capsule root itself and contaminate every other capsule"
+            )
         path = f"{self.runs_capsule_dir}/{capsule_name}"
         os.makedirs(path, exist_ok=True)
         return path
@@ -157,8 +167,12 @@ class LocalTransfer:
 
         return files_copied
 
-    def transfer_workspace_files_to_capsule(self, goal) -> str:
-        capsule_name = self.create_capsule_name(goal)
+    def transfer_workspace_files_to_capsule(self, goal, task_token: str | None = None) -> str:
+        capsule_name = self.create_capsule_name(goal, task_token=task_token)
+        # Belt-and-braces: suffix with a run/task token so same-goal queued
+        # runs (multi-seed) never collide on the LLM-generated name.
+        if task_token:
+            capsule_name = f"{capsule_name}_{task_token}"
         path_capsule = Path(self.create_capsule_folder(capsule_name))
         path_workspace = Path(self.workspace_path)
         self.copy_files_recursive(path_workspace, path_capsule)

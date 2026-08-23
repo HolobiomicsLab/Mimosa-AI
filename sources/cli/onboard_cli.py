@@ -10,124 +10,242 @@ or Task-mode, then hands off to the appropriate execution entry-point
 
 from __future__ import annotations
 
-import asyncio
 import json
-import re
-import time
 import os
+import re
 import sys
 import textwrap
+import time
 from typing import Literal
 
 from config import Config
+from sources.cli.theme import (
+    AMBER,
+    EMBER,
+    GREY,
+    LOCKED,
+    RESET,
+    WHITE,
+    banner,
+    frame_bottom,
+    frame_top,
+    kv,
+    leader,
+    section,
+    substep,
+    term_width,
+)
+from sources.cli.theme import (
+    ask as _ask,
+)
+from sources.cli.theme import (
+    ask_yn as _ask_yn,
+)
+from sources.cli.theme import (
+    fail as _err,
+)
+from sources.cli.theme import (
+    info as _info,
+)
+from sources.cli.theme import (
+    ok as _ok,
+)
+from sources.cli.theme import (
+    step_header as _print_step,
+)
+from sources.cli.theme import (
+    warn as _warn,
+)
+from sources.cli.theme import (
+    wrap as _wrap,
+)
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.core.tools_manager import ToolManager
+from sources.utils import paths
 from sources.utils.list_files import list_files
 from sources.utils.transfer_toolomics import LocalTransfer
 
 
+def _truncate(text: str, width: int) -> str:
+    """Truncate *text* to *width* chars, appending '…' when cut."""
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+_OBJECTIVE_HISTORY_LIMIT = 50
+
+
+def _objective_history_path() -> str:
+    """Return the objective-history JSON file location.
+
+    Repo checkouts keep it next to the agent memory
+    (``sources/memory/objective_history.json``); installed runs persist to
+    ``~/.config/mimosa/objective_history.json`` so history survives across
+    working directories.
+    """
+    if paths.is_repo_checkout():
+        return str(paths.PACKAGE_ROOT / "sources" / "memory" / "objective_history.json")
+    return str(paths.config_dir() / "objective_history.json")
+
+
+def _load_objective_history() -> list[dict]:
+    """Load past objectives (newest first); [] on missing/corrupt file."""
+    path = _objective_history_path()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, list):
+            return [e for e in data if isinstance(e, dict) and e.get("objective")]
+    except (OSError, ValueError):
+        pass
+    return []
+
+
+def _save_objective_to_history(objective: str, mode: str) -> None:
+    """Record *objective* at the top of the history file (deduped, capped)."""
+    objective = objective.strip()
+    if not objective:
+        return
+    history = [e for e in _load_objective_history() if e.get("objective") != objective]
+    history.insert(0, {
+        "objective": objective,
+        "mode": mode,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    })
+    history = history[:_OBJECTIVE_HISTORY_LIMIT]
+    path = _objective_history_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(history, fh, indent=2, ensure_ascii=False)
+    except OSError as exc:
+        _warn(f"Could not save objective history: {exc}")
+
+
+def _persisted_config_path() -> str:
+    """Return where onboarding loads and saves persistent settings.
+
+    Repo checkouts keep the historical ``config_default.json`` in the
+    working directory; installed (uv tool / pip) runs persist to
+    ``~/.config/mimosa/config.json`` so onboarding works from any path.
+    """
+    if os.path.isfile("config_default.json") or paths.is_repo_checkout():
+        return "config_default.json"
+    return str(paths.user_config_file())
+
+
+def _parse_indices(text: str, max_index: int) -> tuple[set[int], bool]:
+    """Parse a '1,3' / '2-5' selection string.
+
+    Args:
+        text: Raw user input.
+        max_index: Highest valid 1-based index.
+
+    Returns:
+        A tuple of (valid selected indices, whether any token was invalid).
+    """
+    selected: set[int] = set()
+    had_bad_token = False
+    for part in text.replace(" ", "").split(","):
+        if not part:
+            continue
+        bounds = part.split("-", 1) if "-" in part else [part, part]
+        try:
+            lo, hi = int(bounds[0]), int(bounds[1])
+        except ValueError:
+            had_bad_token = True
+            continue
+        selected.update(range(lo, hi + 1))
+    return {i for i in selected if 1 <= i <= max_index}, had_bad_token
+
+
+def _list_subdirectories(root: str) -> list[str]:
+    """Return sorted, non-hidden subdirectory names of *root* ([] on error)."""
+    try:
+        return sorted(
+            entry.name for entry in os.scandir(root)
+            if entry.is_dir(follow_symlinks=False) and not entry.name.startswith(".")
+        )
+    except OSError:
+        return []
+
+
+def _upsert_env_file(env_file, values: dict[str, str]) -> None:
+    """Create or update *env_file* (a Path), replacing entries listed in *values*."""
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    lines = env_file.read_text().splitlines() if env_file.is_file() else []
+    kept = [ln for ln in lines if ln.split("=", 1)[0].strip() not in values]
+    kept.extend(f"{key}={value}" for key, value in values.items())
+    env_file.write_text("\n".join(kept) + "\n")
+    env_file.chmod(0o600)
+
+
 # ---------------------------------------------------------------------------
-# Terminal helpers
+# Banner (chrome helpers live in sources.cli.theme)
 # ---------------------------------------------------------------------------
 
-CYAN   = "\033[96m"
-GREEN  = "\033[92m"
-YELLOW = "\033[93m"
-RED    = "\033[91m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
-RESET  = "\033[0m"
-
-MIMOSA_BANNER = f"""
-{CYAN}{BOLD}
-  ███╗   ███╗██╗███╗   ███╗ ██████╗ ███████╗ █████╗
-  ████╗ ████║██║████╗ ████║██╔═══██╗██╔════╝██╔══██╗
-  ██╔████╔██║██║██╔████╔██║██║   ██║███████╗███████║
-  ██║╚██╔╝██║██║██║╚██╔╝██║██║   ██║╚════██║██╔══██║
-  ██║ ╚═╝ ██║██║██║ ╚═╝ ██║╚██████╔╝███████║██║  ██║
-  ╚═╝     ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
-{RESET}
-{DIM}  Self-evolving AI Framework for Autonomous Scientific Research{RESET}
-"""
-
-MIMOSA_START_BANNER = f"""
-{GREEN}{BOLD}
-  ╔══════════════════════════════════════════════════════════════╗
-  ║                                                              ║
-  ║    🌱  M I M O S A   —   S T A R T I N G   U P  🌱           ║
-  ║                                                              ║
-  ╚══════════════════════════════════════════════════════════════╝
-{RESET}
-"""
+MIMOSA_BANNER = banner("Flight console", "Self-evolving AI · autonomous science")
 
 TOTAL_STEPS = 9
 
 # ---------------------------------------------------------------------------
-# Model presets — ordered by quality/preference
+# Flat model presets used by the evaluation CLI.
 # (env_key, display_label, litellm_model_id)
 # ---------------------------------------------------------------------------
 _MODEL_PRESETS: list[tuple[str, str, str]] = [
-    ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5"),
-    ("ANTHROPIC_API_KEY",  "Claude Opus 4.7  (Anthropic)",  "anthropic/claude-opus-4-7"),
-    ("DEEPSEEK_API_KEY",   "DeepSeek Chat      (DeepSeek)",   "deepseek/deepseek-chat"),
-    ("OPENAI_API_KEY",     "GPT-4o             (OpenAI)",     "openai/gpt-4o"),
+    ("OPENROUTER_API_KEY", "GLM-5 via OpenRouter (z-ai)",     "openrouter/z-ai/glm-5.2"),
+    ("ANTHROPIC_API_KEY",  "Claude Opus 4.8  (Anthropic)",  "anthropic/claude-opus-4-8"),
+    ("DEEPSEEK_API_KEY",   "DeepSeek V4      (DeepSeek)",   "deepseek/deepseek-v4-pro"),
+    ("OPENAI_API_KEY",     "GPT-5        (OpenAI)",     "openai/gpt-5.6-terra"),
     ("MISTRAL_API_KEY",    "Mistral Large      (Mistral)",    "mistral/mistral-large-latest"),
 ]
-# Config keys that all share the same "main" LLM selection
-_MODEL_CFG_KEYS = [
+# Config keys that share the orchestration LLM selection
+_ORCHESTRATION_CFG_KEYS = [
     "planner_llm_model",
     "workflow_llm_model",
-    "judge_model",
 ]
 
-
-def _print_step(step: int, total: int, title: str, no_count: bool = False) -> None:
-    bar = "─" * 60
-    print(f"\n{CYAN}{bar}{RESET}")
-    if not no_count:
-        print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
-    else:
-        print(f"{CYAN}  {title}{RESET}")
-    print(f"{CYAN}{bar}{RESET}")
-
-
-def _ok(msg: str) -> None:
-    print(f"{GREEN}  ✅  {msg}{RESET}")
-
-
-def _warn(msg: str) -> None:
-    print(f"{YELLOW}  ⚠️   {msg}{RESET}")
-
-
-def _err(msg: str) -> None:
-    print(f"{RED}  ❌  {msg}{RESET}")
-
-
-def _info(msg: str) -> None:
-    print(f"{DIM}  ℹ️   {msg}{RESET}")
-
-
-def _ask(prompt: str, default: str = "") -> str:
-    """Print a prompt and return stripped user input.  Empty → *default*."""
-    suffix = f" [{default}]" if default else ""
-    try:
-        answer = input(f"\n{BOLD}  ➤  {prompt}{suffix}: {RESET}").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        sys.exit(0)
-    return answer if answer else default
+# ---------------------------------------------------------------------------
+# Per-provider recommended models, keyed by API-key env var.
+# Providers absent from this table (e.g. OPENAI_API_KEY, HF_TOKEN) have no
+# preset: the user must enter a model ID for each role.
+# ---------------------------------------------------------------------------
+_PROVIDER_LABELS: dict[str, str] = {
+    "ANTHROPIC_API_KEY": "Anthropic",
+    "DEEPSEEK_API_KEY": "DeepSeek",
+    "MISTRAL_API_KEY": "Mistral",
+    "OPENROUTER_API_KEY": "OpenRouter",
+}
+_RECOMMENDED_MODELS: dict[str, dict[str, str]] = {
+    "ANTHROPIC_API_KEY": {
+        "orchestration": "anthropic/claude-opus-4-8",
+        "agent": "anthropic/claude-sonnet-5",
+        "judge": "anthropic/claude-sonnet-5",
+    },
+    "DEEPSEEK_API_KEY": {
+        "orchestration": "deepseek/deepseek-v4-pro",
+        "agent": "deepseek/deepseek-v4-flash",
+        "judge": "deepseek/deepseek-v4-flash",
+    },
+    "MISTRAL_API_KEY": {
+        "orchestration": "mistral/mistral-medium-3-5",
+        "agent": "mistral/mistral-small-2603",
+        "judge": "mistral/mistral-medium-3-5",
+    },
+    "OPENROUTER_API_KEY": {
+        "orchestration": "openrouter/z-ai/glm-5.2",
+        "agent": "openrouter/deepseek/deepseek-v4-flash",
+        "judge": "openrouter/qwen/qwen3.7-plus",
+    },
+}
 
 
-def _ask_yn(prompt: str, default: bool = True) -> bool:
-    """Ask a yes/no question and return a boolean."""
-    hint = "Y/n" if default else "y/N"
-    raw = _ask(f"{prompt} ({hint})", default="y" if default else "n").lower()
-    return raw in ("y", "yes", "1", "true")
-
-
-def _wrap(text: str, width: int = 72, indent: int = 4) -> str:
-    return textwrap.fill(text, width=width, initial_indent=" " * indent,
-                         subsequent_indent=" " * indent)
+def _recommended_presets(role: str) -> list[tuple[str, str]]:
+    """Return (label, model_id) presets for *role* from available API keys."""
+    return [
+        (f"{_PROVIDER_LABELS[env_key]} recommended", models[role])
+        for env_key, models in _RECOMMENDED_MODELS.items()
+        if os.getenv(env_key)
+    ]
 
 
 def _build_llm(config: Config, temperature: float = 0.0,
@@ -233,8 +351,13 @@ def _extract_known_keys(text: str, expected_keys: dict[str, str]) -> dict | None
             val = _extract_number_field(text, key)
         else:
             val = None
-        if val is not None:
-            out[key] = val
+        if val is None:
+            # Partial extraction usually means the response was truncated
+            # (e.g. max_tokens hit mid-string). Refuse it so the caller's
+            # self-correction retry fires instead of silently accepting a
+            # dict with missing keys.
+            return None
+        out[key] = val
     return out or None
 
 
@@ -334,7 +457,7 @@ Given the user's current objective (and any additional context they provided), d
    formulate one concise clarifying question.
 3. If CLEAR: produce a polished, detailed, self-contained restatement that an AI agent \
    can act on directly (include dataset names, metrics, file paths, or any specifics \
-   already mentioned).
+   already mentioned). Whenever possible specify extensive visualization to include (e.g. plots, molecular structures, anything that can be rendered visually).
 
 Return ONLY valid JSON (no markdown fences, no prose before or after) in this exact shape:
 {
@@ -410,9 +533,8 @@ class OnboardCLI:
         """Run the full onboarding flow, then launch the selected mode."""
         print(MIMOSA_BANNER)
         print(_wrap(
-            "Welcome to Mimosa-AI!"
+            "Welcome to Mimosa-AI! "
             "Press Ctrl-C at any time to quit.",
-            width=70, indent=2,
         ))
 
         # Step 1 – API keys
@@ -439,20 +561,21 @@ class OnboardCLI:
         while True:
             # Infine loop for conversation to continue
             # Step 6 – Initial objective
-            step_6_text = "Your Research Objective" if first_pass else "Keep working on the same objective"
-            _print_step(6, TOTAL_STEPS, "Your Research Objective", no_count=not first_pass)
+            step_6_text = ("Your Research Objective" if first_pass
+                           else "Keep working on the same objective")
+            _print_step(6, TOTAL_STEPS, step_6_text, show_progress=first_pass)
             self._collect_objective()
 
             # Step 7 – LLM clarification + prompt refinement loop
-            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", no_count=not first_pass)
+            _print_step(7, TOTAL_STEPS, "Objective Clarification & Refinement", show_progress=first_pass)
             self._clarify_and_refine()
 
             # Step 8 – Mode classification
-            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", no_count=not first_pass)
+            _print_step(8, TOTAL_STEPS, "Mode Selection (Goal vs Task)", show_progress=first_pass)
             self._classify_and_confirm()
 
             # Step 9 – Extra options then launch
-            _print_step(9, TOTAL_STEPS, "Options & Launch", no_count=not first_pass)
+            _print_step(9, TOTAL_STEPS, "Options & Launch", show_progress=first_pass)
             self._collect_options()
 
             await self._launch()
@@ -462,39 +585,77 @@ class OnboardCLI:
     # Step implementations
     # ------------------------------------------------------------------
 
-    def _check_api_keys(self) -> None:
-        """Check for at least one known LLM API key in the environment."""
-        known_keys = [
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "MISTRAL_API_KEY",
-            "HF_TOKEN",
-            "OPENROUTER_API_KEY",
-        ]
-        found = [k for k in known_keys if os.getenv(k)]
+    _KNOWN_API_KEYS = [
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "MISTRAL_API_KEY",
+        "HF_TOKEN",
+        "OPENROUTER_API_KEY",
+    ]
 
+    def _check_api_keys(self) -> None:
+        """Check for known LLM API keys; ask which providers the user has."""
+        found = [k for k in self._KNOWN_API_KEYS if os.getenv(k)]
         if found:
             for k in found:
-                _ok(f"Found {k}")
+                _ok(leader(k, "found"))
             return
 
         _warn("No LLM API key found in environment.")
+        selected = self._select_api_key_names()
+        if not selected:
+            _warn("Continuing without API keys — only locally served models will work.")
+            return
+        entered = self._prompt_key_values(selected)
+        if entered:
+            self._offer_env_file_save(entered)
+        else:
+            _warn("No key entered — only locally served models will work.")
+
+    def _select_api_key_names(self) -> list[str]:
+        """Show the supported providers and return the key names the user has."""
         print(_wrap(
-            "Mimosa needs at least one API key to call an LLM. "
-            "Supported variables: " + ", ".join(known_keys),
-            width=70, indent=2,
+            "Mimosa needs at least one API key to call a hosted LLM. "
+            "Which of these do you have?",
         ))
         print()
-        for k in known_keys:
-            value = _ask(f"Enter {k} (leave blank to skip)")
+        for idx, key in enumerate(self._KNOWN_API_KEYS, start=1):
+            print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{key}{RESET}")
+        print()
+        while True:
+            choice = _ask("Your keys (e.g. 1,3 — or 'none' for local models only)")
+            choice = choice.strip().lower()
+            if choice in ("", "none") and _ask_yn(
+                "Continue without any API key (local models only)?", default=False,
+            ):
+                return []
+            indices, _ = _parse_indices(choice, len(self._KNOWN_API_KEYS))
+            if indices:
+                return [self._KNOWN_API_KEYS[i - 1] for i in sorted(indices)]
+            _warn("No valid selection — type numbers like '1,3', or 'none'.")
+
+    def _prompt_key_values(self, key_names: list[str]) -> dict[str, str]:
+        """Prompt for each selected key's value and export it for this session."""
+        entered: dict[str, str] = {}
+        for key in key_names:
+            value = _ask(f"Enter {key} (leave blank to skip)")
             if value:
-                os.environ[k] = value
-                _ok(f"{k} set for this session.")
-                break
-        else:
-            _err("No API key provided. Mimosa cannot run without one.")
-            sys.exit(1)
+                os.environ[key] = value
+                entered[key] = value
+                _ok(f"{key} set for this session.")
+        return entered
+
+    def _offer_env_file_save(self, entered: dict[str, str]) -> None:
+        """Offer to persist entered keys to the user env file for future runs."""
+        env_file = paths.user_env_file()
+        if not _ask_yn(f"Save key(s) to {env_file} for future runs?", default=True):
+            return
+        try:
+            _upsert_env_file(env_file, entered)
+            _ok(f"Saved {len(entered)} key(s) to {env_file}")
+        except OSError as exc:
+            _warn(f"Could not save keys: {exc}")
 
     def _load_config(self) -> None:
         """Optionally load a JSON config file.
@@ -507,38 +668,52 @@ class OnboardCLI:
             "A config file lets you override LLM models, workspace paths, "
             "port ranges, etc. (see config_default.json for reference)."
         )
-        path = _ask(
-            f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
-        )
-        if path:
+        while True:
+            path = _ask(
+                f"Path to config file (leave blank to auto-load {self._CONFIG_DEFAULT_PATH})"
+            )
+            if not path:
+                self._load_default_config()
+                break
             if not os.path.isfile(path):
-                _warn(f"File not found: {path}. Using default configuration.")
-            else:
-                try:
-                    self.config.load(path)
-                    _ok(f"Configuration loaded from {path}")
-                except Exception as exc:
-                    _warn(f"Failed to load config ({exc}). Using defaults.")
-        else:
-            # Auto-load config_default.json if it exists
-            if os.path.isfile(self._CONFIG_DEFAULT_PATH):
-                try:
-                    self.config.load(self._CONFIG_DEFAULT_PATH)
-                    _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
-                except Exception as exc:
-                    _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
-            else:
-                _info("Using built-in default configuration.")
+                _err(f"File not found: {path}. Try again, or leave blank for the default.")
+                continue
+            try:
+                self.config.load(path)
+                _ok(f"Configuration loaded from {path}")
+                break
+            except Exception as exc:
+                _err(f"Failed to load config ({exc}). Try again, or leave blank for the default.")
 
         # Ensure internal directories exist before later steps need them
         self.config.create_paths()
+
+    def _load_default_config(self) -> None:
+        """Auto-load the persisted config; fall back to built-in defaults."""
+        if not os.path.isfile(self._CONFIG_DEFAULT_PATH):
+            _info("Using built-in default configuration.")
+            self._dump_full_config_default()
+            return
+        try:
+            self.config.load(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Loaded {self._CONFIG_DEFAULT_PATH} (workspace: {self.config.workspace_dir})")
+        except Exception as exc:
+            _warn(f"Failed to load {self._CONFIG_DEFAULT_PATH} ({exc}). Using built-in defaults.")
+            self._dump_full_config_default()
+
+    def _dump_full_config_default(self) -> None:
+        """Write the full current configuration to *config_default.json*."""
+        try:
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved full default configuration to {self._CONFIG_DEFAULT_PATH}")
+        except Exception as exc:
+            _warn(f"Could not save default configuration to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     async def _check_toolomics(self) -> None:
         """Discover MCP servers; loop until at least one is found or user skips."""
         print(_wrap(
             "Mimosa requires Toolomics (the companion MCP server) to be running "
             "before execution. Scanning your configured discovery addresses …",
-            width=70, indent=2,
         ))
 
         tool_manager = ToolManager(config=self.config)
@@ -549,7 +724,7 @@ class OnboardCLI:
             if mcps:
                 tool_manager.mcps = mcps
                 for mcp in mcps:
-                    _ok(f"MCP server online: {mcp}")
+                    _ok(leader(str(mcp), "online"))
                 bash_ok = await tool_manager.verify_tools()
                 if not bash_ok:
                     _warn(
@@ -571,12 +746,11 @@ class OnboardCLI:
             print(_wrap(
                 "Please start Toolomics on the configured port range "
                 f"({self.config.discovery_addresses}).",
-                width=70, indent=2,
             ))
-            print(f"\n  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter{RESET}   – retry scan")
-            print(f"    {CYAN}skip{RESET}    – continue without Toolomics "
-                  f"(execution will fail later)")
+            print(f"\n  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter{RESET}   {GREY}– retry scan{RESET}")
+            print(f"    {AMBER}skip{RESET}    {GREY}– continue without Toolomics "
+                  f"(execution will fail later){RESET}")
             choice = _ask("Retry or skip?").lower()
             if choice == "skip":
                 _warn("Skipping Toolomics check. Execution may fail at runtime.")
@@ -591,7 +765,7 @@ class OnboardCLI:
             _warn(f"Discovery error: {exc}")
             return []
 
-    _CONFIG_DEFAULT_PATH = "config_default.json"
+    _CONFIG_DEFAULT_PATH = _persisted_config_path()
 
     def _verify_workspace_dir(self) -> None:
         """Check that config.workspace_dir exists; prompt the user until it does.
@@ -603,6 +777,7 @@ class OnboardCLI:
             workspace = self.config.workspace_dir
             if os.path.isdir(workspace):
                 _ok(f"Workspace directory found: {workspace}")
+                self._warn_if_workspace_not_in_toolomics(workspace)
                 return
 
             _err(f"Workspace directory not found: {workspace}")
@@ -610,7 +785,6 @@ class OnboardCLI:
                 "This path must point to the Toolomics workspace folder — the shared "
                 "directory where Mimosa reads and writes task artifacts. "
                 "Please enter the correct absolute path, or press Enter to skip.",
-                width=70, indent=2,
             ))
             new_path = _ask("Workspace directory path (Enter to skip)")
             if not new_path:
@@ -624,29 +798,30 @@ class OnboardCLI:
                 self.config.workspace_dir = new_path
                 _ok(f"Workspace directory set to: {new_path}")
                 self._persist_workspace_dir(new_path)
+                self._warn_if_workspace_not_in_toolomics(new_path)
                 return
             _err(f"Directory does not exist: {new_path}. Please try again.")
 
+    def _warn_if_workspace_not_in_toolomics(self, path: str) -> None:
+        """Warn when the workspace path is not inside a Toolomics directory."""
+        if "toolomics" not in os.path.abspath(path).lower():
+            _warn(
+                "The workspace path does not contain a 'toolomics' directory. "
+                "If you wish to use Toolomics, execution will fail; "
+                "otherwise, if you are bringing your own MCP, ensure they are "
+                "configured to the same path as the file mount."
+            )
+
     def _persist_workspace_dir(self, path: str) -> None:
-        """Write *path* as workspace_dir into config_default.json."""
-        cfg_path = self._CONFIG_DEFAULT_PATH
+        """Write *path* as workspace_dir into config_default.json.
+
+        The full configuration is written so that other settings are not lost.
+        """
         try:
-            # Read existing config (or start from empty dict)
-            if os.path.isfile(cfg_path):
-                with open(cfg_path, encoding="utf-8") as fh:
-                    data = json.load(fh)
-            else:
-                data = {}
-
-            data["workspace_dir"] = path
-
-            with open(cfg_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=2)
-                fh.write("\n")
-
-            _ok(f"Saved workspace_dir to {cfg_path}")
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved workspace_dir to {self._CONFIG_DEFAULT_PATH}")
         except Exception as exc:
-            _warn(f"Could not persist workspace path to {cfg_path}: {exc}")
+            _warn(f"Could not persist workspace path to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     # ------------------------------------------------------------------
     # Workspace file setup
@@ -681,20 +856,20 @@ class OnboardCLI:
             print(_wrap(
                 f"The workspace ({workspace}) currently contains "
                 f"{len(file_list)} file(s):",
-                width=70, indent=2,
             ))
             print()
 
             # Show numbered file list
             for idx, fname in enumerate(file_list, start=1):
-                print(f"    {CYAN}[{idx}]{RESET}  {fname}")
+                print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{fname}{RESET}")
 
             print()
-            print(f"  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter numbers{RESET}  – comma-separated list of files to "
-                  f"{GREEN}keep{RESET} (others will be deleted)")
-            print(f"    {CYAN}all{RESET}           – keep all files")
-            print(f"    {CYAN}none{RESET}          – {RED}delete all{RESET} files in the workspace")
+            print(f"  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter numbers{RESET}  {GREY}– comma-separated list of "
+                  f"files to keep (others will be deleted){RESET}")
+            print(f"    {AMBER}all{RESET}            {GREY}– keep all files{RESET}")
+            print(f"    {AMBER}none{RESET}           {GREY}– delete all files in the "
+                  f"workspace{RESET}")
             print()
 
             while True:
@@ -718,32 +893,12 @@ class OnboardCLI:
                     _warn("Empty input — please type numbers, 'all', or 'none'.")
                     continue
 
-                # Parse comma-separated indices
-                selected_indices: set[int] = set()
-                had_bad_token = False
-                for part in choice.replace(" ", "").split(","):
-                    if not part:
-                        continue
-                    # Support ranges like "1-5"
-                    if "-" in part:
-                        bounds = part.split("-", 1)
-                        try:
-                            lo, hi = int(bounds[0]), int(bounds[1])
-                            selected_indices.update(range(lo, hi + 1))
-                        except ValueError:
-                            _warn(f"Invalid range: {part}")
-                            had_bad_token = True
-                    else:
-                        try:
-                            selected_indices.add(int(part))
-                        except ValueError:
-                            _warn(f"Invalid number: {part}")
-                            had_bad_token = True
-
+                # Parse comma-separated indices and ranges like "1-5"
+                selected_indices, had_bad_token = _parse_indices(
+                    choice, len(file_list),
+                )
                 kept_files = [
-                    file_list[idx - 1]
-                    for idx in sorted(selected_indices)
-                    if 1 <= idx <= len(file_list)
+                    file_list[idx - 1] for idx in sorted(selected_indices)
                 ]
 
                 if kept_files:
@@ -814,29 +969,59 @@ class OnboardCLI:
                 _info("Workspace will remain empty — agents can create files at runtime.")
 
     def _import_files_to_workspace(self) -> None:
-        """Ask for a source directory and copy its contents into the workspace
+        """Copy one or more source directories into the workspace
         using ``LocalTransfer.transfer_files_to_workspace``.
-        """
-        while True:
-            src_path = _ask("Path to source directory")
-            if not src_path:
-                _info("No path provided — skipping import.")
-                return
-            src_path = os.path.expanduser(src_path.strip())
-            if os.path.isdir(src_path):
-                break
-            _err(f"Directory not found: {src_path}. Please try again.")
 
-        try:
-            transfer = LocalTransfer(
-                config=self.config,
-                workspace_path=self.config.workspace_dir,
-                runs_capsule_dir=self.config.runs_capsule_dir,
-            )
-            copied = transfer.transfer_files_to_workspace(src_path)
-            _ok(f"Copied {copied} file(s) into workspace.")
-        except Exception as exc:
-            _err(f"File transfer failed: {exc}")
+        Failed transfers loop back to the folder selection (Enter skips).
+        """
+        transfer = LocalTransfer(
+            config=self.config,
+            workspace_path=self.config.workspace_dir,
+            runs_capsule_dir=self.config.runs_capsule_dir,
+        )
+        while True:
+            sources = self._select_import_sources()
+            if not sources:
+                _info("No source selected — skipping import.")
+                return
+            failed = False
+            for src in sources:
+                try:
+                    copied = transfer.transfer_files_to_workspace(src)
+                    _ok(f"Copied {copied} file(s) from {src} into workspace.")
+                except Exception as exc:
+                    _err(f"File transfer failed for {src}: {exc}")
+                    failed = True
+            if not failed:
+                return
+            _warn("Import failed — choose again, or press Enter to skip.")
+
+    def _select_import_sources(self) -> list[str]:
+        """List folders under the current directory and/or accept a typed path.
+
+        Returns:
+            Absolute source directory paths to import ([] to skip).
+        """
+        cwd = os.getcwd()
+        folders = _list_subdirectories(cwd)
+        if folders:
+            print(_wrap(f"Folders in {cwd}:"))
+            print()
+            for idx, name in enumerate(folders, start=1):
+                print(f"    {AMBER}[{idx}]{RESET}  {WHITE}{name}/{RESET}")
+            print()
+            _info("Type numbers like '1,3', a directory path, or Enter to skip.")
+        while True:
+            choice = _ask("Folder(s) to import")
+            if not choice:
+                return []
+            indices, _ = _parse_indices(choice.strip().lower(), len(folders))
+            if indices:
+                return [os.path.join(cwd, folders[i - 1]) for i in sorted(indices)]
+            path = os.path.abspath(os.path.expanduser(choice.strip()))
+            if os.path.isdir(path):
+                return [path]
+            _err(f"Directory not found: {choice}. Type numbers, a valid path, or Enter to skip.")
 
     @staticmethod
     def _prune_empty_dirs(root: str) -> None:
@@ -878,20 +1063,27 @@ class OnboardCLI:
         if current_value:
             _info(f"Current value (from config): {current_value}")
 
-        print(_wrap(prompt_desc, width=70, indent=2))
+        print(_wrap(prompt_desc))
         print()
 
-        if available:
-            print(f"  {BOLD}Available presets:{RESET}")
-            for idx, (label, model_id) in enumerate(available, start=1):
-                is_default = (model_id == suggested)
-                tag = f"{GREEN}← default{RESET}" if is_default else ""
-                num_color = GREEN if is_default else CYAN
-                print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
-                print(f"         {DIM}{model_id}{RESET}")
-            print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
-        else:
-            _warn("No matching API key found — enter a model ID manually.")
+        if not available:
+            _warn(
+                "No recommended preset for your API key(s) — "
+                "a model ID must be entered for this role."
+            )
+            while True:
+                custom = _ask("Enter model ID (e.g. openai/gpt-4o)").strip()
+                if custom:
+                    return custom
+                _warn("A model ID is required for this role.")
+
+        print(f"  {WHITE}Available presets:{RESET}")
+        for idx, (label, model_id) in enumerate(available, start=1):
+            is_default = (model_id == suggested)
+            tag = f"  {LOCKED}" if is_default else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+            print(f"         {GREY}{model_id}{RESET}")
+        print(f"  {AMBER}[c]{RESET}  {GREY}Enter a custom model ID{RESET}")
 
         print()
         while True:
@@ -905,7 +1097,7 @@ class OnboardCLI:
 
             if not choice and suggested:
                 return suggested
-            if choice.lower() == "c" or (not available):
+            if choice.lower() == "c":
                 custom = _ask(
                     "Enter model ID  (e.g. openai/gpt-4o, "
                     "anthropic/claude-3-5-sonnet-20241022)"
@@ -937,99 +1129,156 @@ class OnboardCLI:
     def _choose_models(self) -> None:
         """Step 3 – model selection.
 
-        Sub-step 3a: orchestration model (planner, prompts, workflow, judge).
-        Sub-step 3b: agent execution model (smolagent_model_id).
+        Sub-step 3a: orchestration model (planner + workflow generation).
+        Sub-step 3b: agent execution model; the capsule-namer model follows it.
+        Sub-step 3c: judge model (workflow evaluation).
 
-        Both choices are persisted to *config_default.json*.
+        Each role offers per-provider recommended presets based on the API
+        keys present; all choices are persisted.
         """
-        available: list[tuple[str, str]] = [
-            (label, model_id)
-            for env_key, label, model_id in _MODEL_PRESETS
-            if os.getenv(env_key)
-        ]
+        self._choose_orchestration_model()
+        self._choose_agent_model()
+        self._choose_judge_model()
+        self._persist_models()
 
-        # ── 3a · Orchestration model ──────────────────────────────────
-        print(f"\n{BOLD}  3a · Orchestration model{RESET}")
-        print(f"  {DIM}Used for planning, workflow generation, and evaluation.{RESET}")
+    def _choose_orchestration_model(self) -> None:
+        """Sub-step 3a – select the planner / workflow-generation model."""
+        substep("3a", "Orchestration model",
+                "Used for planning and workflow generation.")
         orch_model = self._model_menu(
             prompt_desc=(
                 "Choose the main LLM Mimosa will use for orchestration "
-                "(planning, workflow generation, and evaluation). Applied to "
-                "planner, prompts, workflow, and judge roles."
+                "(planning and workflow generation)."
             ),
             current_value=self.config.planner_llm_model or "",
-            available=available,
+            available=_recommended_presets("orchestration"),
         )
-
         if orch_model:
-            for key in _MODEL_CFG_KEYS:
+            for key in _ORCHESTRATION_CFG_KEYS:
                 setattr(self.config, key, orch_model)
             _ok(f"Orchestration model: {orch_model}")
         else:
             _warn("No orchestration model chosen — keeping existing config values.")
 
-        # ── 3b · Agent execution model (smolagent_model_id) ──────────
-        print(f"\n{BOLD}  3b · Agent execution model (SmolAgents){RESET}")
-        print(f"  {DIM}Used by the code-executing agents inside each workflow.{RESET}")
-        print(f"  {DIM}Can be the same as the orchestration model or a faster/cheaper one.{RESET}")
+    def _choose_agent_model(self) -> None:
+        """Sub-step 3b – select the SmolAgents execution model."""
+        substep("3b", "Agent execution model (SmolAgents)",
+                "Used by the code-executing agents inside each workflow — "
+                "the orchestration model or a faster/cheaper one.")
         agent_model = self._model_menu(
             prompt_desc=(
                 "Choose the LLM for agent execution (SmolAgents tasks). "
                 "A fast, cost-effective model works well here."
             ),
             current_value=self.config.smolagent_model_id or "",
-            available=available,
+            available=_recommended_presets("agent"),
         )
-
         if agent_model:
             self.config.smolagent_model_id = agent_model
+            # Cheap auxiliary role — always follows the agent model.
+            self.config.capsule_namer_model = agent_model
             _ok(f"Agent execution model: {agent_model}")
         else:
             _warn("No agent model chosen — keeping existing config values.")
 
-        # Persist both choices at once
-        self._persist_models(orch_model or "", agent_model or "")
+    def _choose_judge_model(self) -> None:
+        """Sub-step 3c – select the workflow evaluation (judge) model."""
+        substep("3c", "Judge model",
+                "Used to evaluate and score workflow results.")
+        judge_model = self._model_menu(
+            prompt_desc=(
+                "Choose the LLM that judges workflow outputs "
+                "(rubric scoring and claim verification)."
+            ),
+            current_value=self.config.judge_model or "",
+            available=_recommended_presets("judge"),
+        )
+        if judge_model:
+            self.config.judge_model = judge_model
+            _ok(f"Judge model: {judge_model}")
+        else:
+            _warn("No judge model chosen — keeping existing config values.")
 
-    def _persist_models(self, orch_model_id: str, agent_model_id: str) -> None:
-        """Write both model choices to config_default.json."""
-        cfg_path = self._CONFIG_DEFAULT_PATH
+    def _persist_models(self) -> None:
+        """Write the selected models to the persisted config file.
+
+        The full configuration is written so that other settings are not lost.
+        """
         try:
-            if os.path.isfile(cfg_path):
-                with open(cfg_path, encoding="utf-8") as fh:
-                    data = json.load(fh)
-            else:
-                data = {}
-
-            if orch_model_id:
-                for key in _MODEL_CFG_KEYS:
-                    data[key] = orch_model_id
-
-            if agent_model_id:
-                data["smolagent_model_id"] = agent_model_id
-
-            with open(cfg_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=2)
-                fh.write("\n")
-
-            _ok(f"Saved model choices to {cfg_path}")
+            self.config.dump(self._CONFIG_DEFAULT_PATH)
+            _ok(f"Saved model choices to {self._CONFIG_DEFAULT_PATH}")
         except Exception as exc:
-            _warn(f"Could not persist model choices to {cfg_path}: {exc}")
+            _warn(f"Could not persist model choices to {self._CONFIG_DEFAULT_PATH}: {exc}")
 
     def _collect_objective(self) -> None:
-        """Prompt the user for their initial research objective."""
+        """Prompt the user for their initial research objective.
+
+        Shows a preview of the most recent objective (Enter reuses it) and
+        supports ``/history`` for interactive selection among past objectives.
+        """
         print(_wrap(
             "Describe what you want Mimosa to do. This can be a high-level "
             "scientific goal (e.g. 'Reproduce Figure 3 from paper X') or a "
             "focused task (e.g. 'Train a toxicity model on the ClinTox dataset'). "
             "Don't worry about being too vague — we'll refine it together next.",
-            width=70, indent=2,
         ))
+        history = _load_objective_history()
+        if history:
+            last = history[0]
+            print()
+            kv("last objective", _truncate(last["objective"], 100), accent=True)
+            if last.get("mode"):
+                kv("mode", str(last["mode"]).upper())
+            if last.get("timestamp"):
+                kv("recorded", str(last["timestamp"]))
+            print()
+            _info("Press Enter to reuse it, or type /history to pick from past objectives.")
         while True:
             objective = _ask("Your objective")
+            if not objective.strip() and history:
+                self._objective = history[0]["objective"]
+                _ok(f"Reusing last objective: {_truncate(self._objective, 80)}")
+                return
+            if objective.strip().lower() == "/history":
+                chosen = self._pick_from_history(history)
+                if chosen:
+                    self._objective = chosen
+                    _ok(f"Selected: {_truncate(chosen, 80)}")
+                    return
+                continue
             if len(objective.strip()) >= 10:
                 self._objective = objective.strip()
-                break
+                return
             _warn("Please enter a more descriptive objective (at least 10 characters).")
+
+    def _pick_from_history(self, history: list[dict]) -> str | None:
+        """Interactively select a past objective; None to go back to typing."""
+        if not history:
+            _info("No objective history yet.")
+            return None
+        print()
+        print(f"  {WHITE}Past objectives (newest first):{RESET}")
+        shown = history[:10]
+        for idx, entry in enumerate(shown, start=1):
+            stamp = entry.get("timestamp", "")
+            mode = str(entry.get("mode", "")).upper()
+            tag = f"{GREY}{stamp} · {mode}{RESET}" if stamp else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{_truncate(entry['objective'], 90)}{RESET}")
+            if tag:
+                print(f"         {tag}")
+        print()
+        while True:
+            choice = _ask("Pick a number (Enter to type a new objective)").strip()
+            if not choice:
+                return None
+            try:
+                idx = int(choice)
+            except ValueError:
+                _warn(f"Unrecognised input '{choice}' — type 1-{len(shown)} or Enter.")
+                continue
+            if 1 <= idx <= len(shown):
+                return shown[idx - 1]["objective"]
+            _warn(f"Number out of range: {choice}. Pick 1-{len(shown)} or Enter.")
 
     def _clarify_and_refine(self) -> None:
         """LLM conversation loop: clarify missing info, then refine the prompt."""
@@ -1037,12 +1286,12 @@ class OnboardCLI:
             "The assistant will now check whether your objective is clear enough "
             "for Mimosa to execute and may ask one or more follow-up questions. "
             "Once complete, it will produce a refined, actionable prompt.",
-            width=70, indent=2,
         ))
 
         # Lower temperature → more reliable JSON; bigger token budget so long
-        # refined_prompts don't get truncated mid-string.
-        llm = _build_llm(self.config, temperature=0.1, max_tokens=1024)
+        # refined_prompts (and reasoning-model thinking tokens) don't get
+        # truncated mid-string.
+        llm = _build_llm(self.config, temperature=0.2, max_tokens=4096)
         expected_keys = {
             "is_clear": "bool",
             "question": "str",
@@ -1056,7 +1305,7 @@ class OnboardCLI:
         for round_num in range(max_clarification_rounds):
             full_context = "\n".join(context_lines)
 
-            print(f"\n{DIM}  [Clarification round {round_num + 1}/{max_clarification_rounds}]{RESET}")
+            print(f"\n  {EMBER}[ROUND {round_num + 1}/{max_clarification_rounds}]{RESET}")
 
             try:
                 result = _call_llm_json(
@@ -1080,7 +1329,7 @@ class OnboardCLI:
             if not is_clear and question:
                 # Ask the clarifying question
                 print()
-                print(f"  {BOLD}Assistant:{RESET}  {question}")
+                print(f"  {AMBER}ASSISTANT{RESET} {EMBER}▏{RESET}{WHITE}{question}{RESET}")
                 answer = _ask("Your answer (or 'skip' to stop clarifying)")
                 if answer.lower() in ("skip", "stop", "done"):
                     _info("Stopping clarification — using current objective.")
@@ -1095,12 +1344,12 @@ class OnboardCLI:
             if is_clear and refined_prompt:
                 # Show the refined prompt and ask for confirmation
                 print()
-                print(f"  {BOLD}Refined objective:{RESET}")
+                frame_top("REFINED OBJECTIVE")
                 print()
-                # Print wrapped refined prompt with colour
-                for line in textwrap.wrap(refined_prompt, width=64):
-                    print(f"    {CYAN}{line}{RESET}")
+                for line in textwrap.wrap(refined_prompt, width=term_width() - 6):
+                    print(f"    {WHITE}{line}{RESET}")
                 print()
+                frame_bottom()
                 confirmed = _ask_yn("Accept this refined objective?", default=True)
                 if confirmed:
                     self._objective = refined_prompt
@@ -1151,11 +1400,10 @@ class OnboardCLI:
         print(_wrap(
             "Asking the LLM to classify your objective as Goal-mode "
             "(multi-step planning) or Task-mode (single focused operation) …",
-            width=70, indent=2,
         ))
 
         classification: dict | None = None
-        llm = _build_llm(self.config, temperature=0.0, max_tokens=384)
+        llm = _build_llm(self.config, temperature=1.0, max_tokens=384)
         expected_keys = {
             "mode": "str",
             "confidence": "number",
@@ -1197,15 +1445,17 @@ class OnboardCLI:
             )
 
             print()
-            print(f"  {BOLD}Suggested mode:{RESET}  {CYAN}{mode.upper()}{RESET}  "
-                  f"(confidence: {confidence:.0%})")
-            print(f"  {BOLD}Reasoning:{RESET}      {reasoning}")
-            print(f"  {BOLD}Label:{RESET}          {label}")
+            kv("suggested mode", f"{mode.upper()}  ({confidence:.0%} confidence)",
+               accent=True)
+            kv("reasoning", reasoning)
+            kv("label", label)
             print()
             _info(
-                "Goal mode  → Mimosa decomposes the objective into a plan of tasks "
-                "and executes them sequentially (planner).\n"
-                "  ℹ️    Task mode  → Mimosa directly synthesises and runs a single "
+                "Goal mode → Mimosa decomposes the objective into a plan of "
+                "tasks and executes them sequentially (planner)."
+            )
+            _info(
+                "Task mode → Mimosa directly synthesises and runs a single "
                 "multi-agent workflow for the objective (evolution engine)."
             )
 
@@ -1216,9 +1466,11 @@ class OnboardCLI:
 
         # Manual fallback / override — loop until the user picks a valid mode.
         print()
-        print(f"  {BOLD}Available modes:{RESET}")
-        print(f"    {CYAN}goal{RESET}  – high-level research objective (planner + evolution engine)")
-        print(f"    {CYAN}task{RESET}  – single focused operation (evolution engine only)")
+        print(f"  {WHITE}Available modes:{RESET}")
+        print(f"    {AMBER}goal{RESET}  {GREY}– high-level research objective "
+              f"(planner + evolution engine){RESET}")
+        print(f"    {AMBER}task{RESET}  {GREY}– single focused operation "
+              f"(evolution engine only){RESET}")
         while True:
             choice = _ask("Choose mode (goal/task)", default="task").lower().strip()
             if choice in ("goal", "g"):
@@ -1236,7 +1488,6 @@ class OnboardCLI:
             "Learning mode enables Mimosa to iteratively improve its workflow "
             "through Darwinian self-evolution until a quality threshold is met "
             "(recommended for first-time runs on a new objective).",
-            width=70, indent=2,
         ))
         self._learn = _ask_yn("Enable learning mode?", default=False)
         if self._learn:
@@ -1251,7 +1502,6 @@ class OnboardCLI:
             "ASTRA export writes a standards-compliant YAML "
             "(https://astra-spec.org) describing the scientific decisions "
             "the best run made — useful for audit and reproducibility.",
-            width=70, indent=2,
         ))
         _warn("This adds an extra LLM pass after evolution and takes a bit more time.")
         self.config.export_astra = _ask_yn("Save the best run as ASTRA?", default=False)
@@ -1262,15 +1512,15 @@ class OnboardCLI:
 
         # Summary
         print()
-        print(f"  {BOLD}{'─'*54}{RESET}")
-        print(f"  {BOLD}LAUNCH SUMMARY{RESET}")
-        print(f"  {'─'*54}")
-        print(f"  Mode:      {CYAN}{self._mode.upper()}{RESET}")
-        print(f"  Learning:  {'Yes' if self._learn else 'No'}")
-        print(f"  ASTRA:     {'Yes' if self.config.export_astra else 'No'}")
-        print(f"  Objective: {self._objective[:60]}{'…' if len(self._objective) > 60 else ''}")
-        print(f"  {'─'*54}")
+        frame_top("PRE-FLIGHT")
         print()
+        kv("mode", self._mode.upper(), accent=True)
+        kv("learning", "ENABLED" if self._learn else "OFF", accent=self._learn)
+        kv("astra export", "ENABLED" if self.config.export_astra else "OFF",
+           accent=self.config.export_astra)
+        kv("objective", self._objective)
+        print()
+        frame_bottom()
         go = _ask_yn("Launch Mimosa now?", default=True)
         if not go:
             print("\n  Exiting without launching. Run again when ready.\n")
@@ -1288,7 +1538,10 @@ class OnboardCLI:
             )
             sys.exit(1)
 
-        print(MIMOSA_START_BANNER)
+        section("IGNITION")
+        _ok("Config paths validated")
+
+        _save_objective_to_history(self._objective, self._mode)
 
         if self._mode == "goal":
             await self._launch_goal()
@@ -1301,14 +1554,15 @@ class OnboardCLI:
             runs_capsule_dir=self.config.runs_capsule_dir,
         )
         capsule = trs.transfer_workspace_files_to_capsule(self._objective)
-        print(f"\n{GREEN}{BOLD}  Workspace files archived to capsule: {capsule}{RESET}\n")
+        print()
+        _ok(f"Workspace files archived to capsule: {capsule}")
+        print()
 
     async def _launch_goal(self) -> None:
         """Start planner mode (multi-step goal)."""
         from sources.core.planner import Planner
-        from sources.utils.transfer_toolomics import LocalTransfer
 
-        print(f"\n{GREEN}{BOLD}  Launching in GOAL mode …{RESET}\n")
+        _ok(f"Planner engaged {EMBER}·{RESET} {AMBER}GOAL MODE{RESET}\n")
         planner = Planner(self.config)
         await planner.start_planner(
             goal=self._objective,
@@ -1319,7 +1573,7 @@ class OnboardCLI:
         """Start evolution engine task mode (single operation)."""
         from sources.core.evolution_engine import EvolutionEngine
 
-        print(f"\n{GREEN}{BOLD}  Launching in TASK mode …{RESET}\n")
+        _ok(f"Evolution engine engaged {EMBER}·{RESET} {AMBER}TASK MODE{RESET}\n")
         evolve = EvolutionEngine(self.config)
         await evolve.start_workflow_evolution(
             goal=self._objective,

@@ -7,7 +7,7 @@ import copy
 import csv
 import json
 import logging
-import os
+import logging.handlers
 import shutil
 import subprocess
 import sys
@@ -18,18 +18,43 @@ from pathlib import Path
 from typing import Any
 
 from sources.core.evolution_engine import EvolutionEngine
-from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.core.planner import Planner
-from sources.core.schema import Task, IndividualRun
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.utils.transfer_toolomics import LocalTransfer
-from sources.utils.list_files import list_files
 from sources.utils.email_reporter import send_evaluation_report
 from sources.cli.pretty_print import (
     print_ok, print_warn, print_err, print_info,
     print_phase, print_summary,
 )
+
+EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
+EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
+EVAL_LOG_BACKUP_COUNT = 5
+
+
+def _attach_eval_log_file_handler(logger: logging.Logger) -> None:
+    """
+    Idempotent: all CsvEvaluationMode instances share the module logger, so
+    the handler is attached only once per process. The logger level is forced
+    to DEBUG so records reach the file even when the application never
+    configured the root logger (the eval CLI does not call setup_logging).
+    """
+    if any(isinstance(h, logging.handlers.RotatingFileHandler) for h in logger.handlers):
+        return
+    EVAL_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        EVAL_LOG_FILE,
+        maxBytes=EVAL_LOG_MAX_BYTES,
+        backupCount=EVAL_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(funcName)s() - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
 
 async def _prompt_with_default(prompt: str, default: str = "0") -> str:
@@ -58,6 +83,11 @@ async def _prompt_with_default(prompt: str, default: str = "0") -> str:
     return raw.strip() if raw.strip() else default
 
 
+def _is_excluded(run: dict) -> bool:
+    """True if a run was dropped as an eval-infra failure (not a real VER/SR result)."""
+    return run.get("status") == "excluded" or run.get("success_level") == "Excluded"
+
+
 @dataclass
 class TaskContext:
     """Context for a single concurrent task evaluation."""
@@ -72,7 +102,8 @@ class CsvEvaluationMode:
     Supports concurrent evaluation of multiple tasks.
     """
 
-    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1, task_start_delay: float = 30.0):
+    def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1,
+                 task_start_delay: float = 30.0, run_notes_dir: str | Path = "run_notes"):
         """
         Initialize CsvEvaluationMode.
 
@@ -82,14 +113,16 @@ class CsvEvaluationMode:
             max_concurrent_tasks: Maximum number of tasks to run concurrently (default: 1 for sequential)
             task_start_delay: Delay in seconds between launching consecutive tasks (default: 30s).
                               Staggers agent starts to avoid overwhelming shell/API resources.
+            run_notes_dir: Directory for per-task run notes. Per-run in queued CLI
+                              mode so queued runs never restore each other's cache.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
         self.max_concurrent_tasks = max_concurrent_tasks
         self.evolve = EvolutionEngine(config)
         self.planner = Planner(config)
-        self.run_notes_dir = Path("run_notes")
-        self.run_notes_dir.mkdir(exist_ok=True)
+        self.run_notes_dir = Path(run_notes_dir)
+        self.run_notes_dir.mkdir(parents=True, exist_ok=True)
         self.done_rows = []
 
         # Concurrency control
@@ -97,24 +130,10 @@ class CsvEvaluationMode:
         self._semaphore: asyncio.Semaphore | None = None
         self._base_workspace_dir = config.workspace_dir
 
-        model_name = config.judge_model
-        provider, model = model_name.split("/", 1) if "/" in model_name else ("openai", model_name)
-
-        self.llm_config = LLMConfig(
-            model=model,
-            provider=provider,
-            temperature=1.0,
-            max_tokens=8192
-        )
-        self.result_analyzer = LLMProvider(
-            agent_name="result_analyzer",
-            memory_path=None,
-            system_msg=self._get_result_analyzer_system_prompt(),
-            config=self.llm_config
-        )
         # Track execution history
         self.execution_history: list[dict] = []
         self.logger = logging.getLogger(__name__)
+        _attach_eval_log_file_handler(self.logger)
 
         # Run-level context captured by start_evaluation for the email report.
         self._dataset_type: str | None = None
@@ -123,39 +142,6 @@ class CsvEvaluationMode:
         self._single_agent_mode: bool = False
         self._concurrent: bool = False
         self._start_row: int = 0
-
-    def _get_result_analyzer_system_prompt(self) -> str:
-        """System prompt for the result analysis LLM."""
-        return """You are an autonomous AI scientist result analyzer for Mimosa-AI.
-
-Mimosa-AI is a multi-agent system designed to autonomously conduct scientific goals.
-
-Your role is to analyze workflow execution results and provide insights for the next goal generation.
-You must be strict and harsh in your analysis.
-
-ANALYSIS FOCUS:
-1. Assess goal completion quality and success level
-2. Identify strengths and weaknesses in the execution
-3. Note any errors, limitations, or areas for improvement
-
-EVALUATION CRITERIA:
-- Task completion: Was the full goal achieved? An incomplete goal should be considered as failed.
-- Quality: How well was the goal executed?
-- Scalability: Could this approach work for similar goals?
-
-INPUT FORMAT:
-You will receive a list of agent name and their corresponding answers from the workflow execution.
-The answers will be in the format:
-agent 1: <answer from agent 1>
-agent 2: <answer from agent 2>
-agent 3: <answer from agent 3>
-...
-
-OUTPUT FORMAT:
-Provide a structured analysis with:
-1. SUCCESS_LEVEL: (High/Medium/Low/Incomplete/Failed/Error)
-2. COMMENTS: Comments on what the multi-agents workflow tried to do, what worked, what failed and why.
-"""
 
     def _load_previous_run_notes(self) -> dict | None:
         """
@@ -244,7 +230,6 @@ Provide a structured analysis with:
         self,
         capsule_name: str,
         goal: str,
-        analysis: dict,
         execution_time: float,
         current_execution_data: dict | None = None
     ) -> None:
@@ -254,7 +239,6 @@ Provide a structured analysis with:
         Args:
             capsule_name: Name of the capsule directory
             goal: The task goal
-            analysis: Analysis results dictionary
             execution_time: Time taken for execution
             current_execution_data: Optional current task execution data (for concurrent mode).
                                    If provided, this task's data is included even if not yet
@@ -262,11 +246,12 @@ Provide a structured analysis with:
         """
         timestamp = datetime.now().isoformat()
 
-        # Build the list of SAB runs, including current task if provided
-        sab_runs = [exec_data for exec_data in self.execution_history if 'VER' in exec_data]
+        # Build the list of evaluated SAB runs (VER is None for infra-excluded tasks).
+        sab_runs = [exec_data for exec_data in self.execution_history
+                    if exec_data.get('VER') is not None]
 
-        # For concurrent mode: include current_execution_data if it has SAB metrics
-        if current_execution_data and 'VER' in current_execution_data:
+        # For concurrent mode: include current_execution_data if it was evaluated
+        if current_execution_data and current_execution_data.get('VER') is not None:
             # Check if this task is not already in execution_history (concurrent mode)
             if current_execution_data not in sab_runs:
                 sab_runs = sab_runs + [current_execution_data]
@@ -276,7 +261,6 @@ Provide a structured analysis with:
             "model": self.config.smolagent_model_id,
             "goal": goal,
             "execution_time_seconds": execution_time,
-            "analysis": analysis["full_analysis"],
             "total_eval": len(sab_runs),
             "start_row": self._start_row + 1,
             "git": self._get_git_info()
@@ -284,7 +268,7 @@ Provide a structured analysis with:
 
         if sab_runs:
             # Use current_execution_data if provided, otherwise use last from sab_runs
-            current_task_data = current_execution_data if current_execution_data and 'VER' in current_execution_data else sab_runs[-1]
+            current_task_data = current_execution_data if current_execution_data and current_execution_data.get('VER') is not None else sab_runs[-1]
             runs_data = current_task_data.get('runs', [])
 
             notes = {
@@ -303,7 +287,10 @@ Provide a structured analysis with:
                 "evolution_costs": self._compute_per_iteration_costs(runs_data),
                 "evolution_total_cost": getattr(runs_data[-1], 'cost', 0.0) if runs_data else 0.0,
                 "evolution_avg_reward": sum(getattr(run, 'reward', 0.0) for run in runs_data) / len(runs_data) if runs_data else 0,
-                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0
+                "evolution_avg_cost": (getattr(runs_data[-1], 'cost', 0.0) / len(runs_data)) if runs_data else 0,
+                # Ablation: per-evolution-index benchmark scores over the /tmp
+                # snapshots (empty unless evaluate_snapshot_ablations is on).
+                "ablations": current_task_data.get('ablations', []),
             }
 
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
@@ -479,55 +466,14 @@ EXPECTED OUTPUT:
             self.logger.error(f"Error generating task for row: {row}, error: {e}")
             return "Error generating task", None, None
 
-    def _format_goal_mode_results(self, tasks_data: Task) -> str:
-        """Format task results for analysis."""
-        return '\n\n'.join(
-            f"Task {task.name}:\n"
-            f"  UUID: {task.evolve_runs[-1].current_uuid}\n"
-            f"  Description: {task.description}\n"
-            f"  Agent Chain: {' -> '.join(task.final_answers)}"
-            for task in tasks_data
-        )
-
-    def _format_task_mode_results(self, run: IndividualRun) -> str:
-        state_result = run.state_result
-        if isinstance(state_result.get("answers", None), list) and "step_name" in state_result:
-            return "\n".join(
-                f"agent {n}: {x}"
-                for (n, x) in zip(state_result["step_name"], state_result["answers"], strict=True)
-            )
-        return "No answers found in workflow execution."
-
-    def _analyze_results(self, goal: str, results_str: str, execution_time: float) -> dict[str, str]:
-        """Analyze execution results using LLM."""
-        files = list_files(self.config.workspace_dir, max_depth=3)
-        prompt = f"""Analyze the following Mimosa-AI execution:
-TASK: {goal}
-EXECUTION TIME: {execution_time:.2f} seconds
-FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
-{files}
-EXECUTION RESULTS:
-{results_str}
-Provide your analysis following the specified output format."""
-
-        analysis_text = self.result_analyzer(prompt)
-        import re as _re
-        _sl = _re.search(r'SUCCESS_LEVEL:\s*(High|Medium|Low|Incomplete|Failed|Error)', analysis_text, _re.IGNORECASE)
-        analysis = {
-            "full_analysis": analysis_text,
-            "success_level": _sl.group(1) if _sl else "Medium",
-            "key_insight": "Analysis completed"
-        }
-        return analysis
-
-    def sab_files_transfer(self, sab_loader, file_transfer, row):
+    async def sab_files_transfer(self, sab_loader, file_transfer, row):
         """Transfer dataset files to workspace with validation."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
         self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
         print_info(f"📁 Transferring dataset: {task_dataset_path.name}")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        time.sleep(0.5)  # Give filesystem a moment to sync
+        await asyncio.sleep(0.5)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print_ok(f"Transferred {files_transferred} file(s) to workspace")
         print_info(f"Verification: {workspace_files_after} file(s) present in workspace")
@@ -574,37 +520,246 @@ Provide your analysis following the specified output format."""
 
             eval_results = evaluator.evaluate_all()
             evaluator.save_results()
-            execution_data.update({
-                'VER': eval_results['VER'][0],
-                'VER_message': eval_results['VER'][1],
-                'SR': eval_results['SR'][0],
-                'SR_message': eval_results['SR'][1],
-                'CBS': eval_results['CBS'],
-                'eval_cost': eval_results['cost'],
-                'runs': runs
-            })
-            print_ok(eval_results['summary'])
 
-            self.logger.info(
-                f"[SAB EVAL] Task {row.get('instance_id')}: "
-                f"VER={eval_results['VER'][0]}, "
-                f"SR={eval_results['SR'][0]}, "
-                f"CBS={eval_results['CBS']:.3f}, "
-                f"eval_cost={eval_results['cost']:.3f}"
-            )
+            if eval_results.get('status') == 'excluded':
+                infra_error = eval_results.get('infra_error')
+                execution_data.update({
+                    'status': 'excluded',
+                    'infra_error': infra_error,
+                    'VER': None,
+                    'SR': None,
+                    'CBS': None,
+                    'eval_cost': eval_results['cost'],
+                    'runs': runs,
+                    'success_level': "Excluded",
+                })
+                print_warn(f"Task {row.get('instance_id')} EXCLUDED (infra): {infra_error}")
+                self.logger.warning(
+                    f"[SAB EVAL] Task {row.get('instance_id')} EXCLUDED (infra): {infra_error}"
+                )
+            else:
+                execution_data.update({
+                    'status': 'evaluated',
+                    'VER': eval_results['VER'][0],
+                    'VER_message': eval_results['VER'][1],
+                    'SR': eval_results['SR'][0],
+                    'SR_message': eval_results['SR'][1],
+                    'CBS': eval_results['CBS'],
+                    'eval_cost': eval_results['cost'],
+                    'runs': runs,
+                    'success_level': "Success" if eval_results['VER'][0] else "Failed"
+                })
+                print_ok(eval_results['summary'])
+                self.logger.info(
+                    f"[SAB EVAL] Task {row.get('instance_id')}: "
+                    f"VER={eval_results['VER'][0]}, "
+                    f"SR={eval_results['SR'][0]}, "
+                    f"CBS={eval_results['CBS']:.3f}, "
+                    f"eval_cost={eval_results['cost']:.3f}"
+                )
 
         except Exception as eval_error:
-            self.logger.error(f"[SAB EVAL] Evaluation error: {str(eval_error)}")
-            print_err(f"Evaluation failed: {str(eval_error)}")
+            # An exception escaping the evaluator is a harness fault, not the
+            # agent's — exclude it (loudly) rather than counting it as SR=0.
+            self.logger.error(
+                f"[SAB EVAL] Unexpected harness error — EXCLUDING task "
+                f"{row.get('instance_id')}: {eval_error}",
+                exc_info=True,
+            )
+            print_warn(f"Task {row.get('instance_id')} EXCLUDED (harness error): {eval_error}")
             execution_data.update({
-                'VER': False,
-                'SR': False,
-                'CBS': 0.0,
+                'status': 'excluded',
+                'infra_error': f"Unexpected harness error: {eval_error}",
+                'VER': None,
+                'SR': None,
+                'CBS': None,
                 'eval_error': str(eval_error),
-                'runs': runs
+                'runs': runs,
+                'success_level': "Excluded",
             })
 
         return execution_data
+
+    def _evaluate_snapshot_ablations(
+        self,
+        session_id: str,
+        row: dict,
+        runs: list,
+        sab_loader,
+        execution_data: dict
+    ) -> list[dict]:
+        """
+        Ablation study: evaluate every per-iteration workspace snapshot saved
+        in /tmp during workflow evolution, to measure whether benchmark success
+        (VER/SR) converges as workflows evolve — and whether the "best" run we
+        ship in the capsule really is the best.
+
+        Snapshots live at /tmp/mimosa_run_<session_id>_<run_uuid> (one per
+        evolution iteration, saved by WorkspaceManager.save_run_snapshot).
+        Each is evaluated with the same CapsuleEvaluator used for the capsule.
+        The best run's snapshot is NOT re-evaluated: the capsule already holds
+        that exact content (restore_best -> workspace -> capsule), so the
+        capsule's VER/SR/CBS are reused for its index.
+
+        Never raises: any failure is logged and recorded as an 'excluded'
+        entry (or aborts the ablation loop with what was collected so far).
+
+        Args:
+            session_id: WorkspaceManager session id for this task's evolution.
+            row: CSV row data with task information.
+            runs: List of IndividualRun objects from the evolution.
+            sab_loader: ScienceAgentBenchLoader instance.
+            execution_data: The task's execution_data, already updated by
+                _evaluate_with_science_agent_bench (capsule VER/SR/CBS reused
+                for the best snapshot).
+
+        Returns:
+            List of entries sorted by evolution_index:
+            {evolution_index, uuid, VER, VER_message, SR, SR_message, CBS,
+             cost, status, source, infra_error?}
+        """
+        try:
+            snapshots = sorted(
+                (p for p in Path("/tmp").glob(f"mimosa_run_{session_id}_*") if p.is_dir()),
+                key=lambda p: p.stat().st_mtime,
+            )
+        except Exception as e:
+            self.logger.warning(f"[ABLATION] Failed to list snapshots for session {session_id}: {e}")
+            return []
+
+        if len(snapshots) <= 1:
+            self.logger.info(
+                f"[ABLATION] Session {session_id}: {len(snapshots)} snapshot(s) — nothing to ablate"
+            )
+            return []
+
+        # Map run uuid -> position in the runs list (= evolution index).
+        uuid_to_index = {
+            getattr(run, 'current_uuid', None): idx
+            for idx, run in enumerate(runs)
+            if getattr(run, 'current_uuid', None)
+        }
+        per_iteration_costs = self._compute_per_iteration_costs(runs)
+
+        # Best run, selected exactly as EvolutionEngine does for restore_best.
+        best_run = max(
+            (r for r in runs if getattr(r, 'current_uuid', None)),
+            key=lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count),
+            default=None,
+        )
+        best_uuid = getattr(best_run, 'current_uuid', None) if best_run else None
+
+        # Order snapshots by evolution index; orphans (uuid not in runs) last,
+        # in mtime order.
+        def _sort_key(path: Path) -> tuple[int, float]:
+            uuid = path.name.rsplit("_", 1)[-1]
+            idx = uuid_to_index.get(uuid)
+            return (idx if idx is not None else len(runs), path.stat().st_mtime)
+
+        snapshots.sort(key=_sort_key)
+
+        print_info(f"🧪 Ablations: evaluating {len(snapshots)} evolution snapshot(s)…")
+        ablations: list[dict] = []
+        next_orphan_index = len(runs)
+
+        for snapshot in snapshots:
+            uuid = snapshot.name.rsplit("_", 1)[-1]
+            idx = uuid_to_index.get(uuid)
+            if idx is None:
+                idx = next_orphan_index
+                next_orphan_index += 1
+            iter_cost = per_iteration_costs[idx] if idx < len(per_iteration_costs) else 0.0
+
+            if uuid == best_uuid:
+                # Capsule content == this snapshot: reuse the capsule metrics.
+                entry = {
+                    "evolution_index": idx,
+                    "uuid": uuid,
+                    "VER": execution_data.get('VER'),
+                    "VER_message": execution_data.get('VER_message', ''),
+                    "SR": execution_data.get('SR'),
+                    "SR_message": execution_data.get('SR_message', ''),
+                    "CBS": execution_data.get('CBS'),
+                    "cost": iter_cost,
+                    "status": execution_data.get('status', 'evaluated'),
+                    "source": "capsule",
+                }
+                if execution_data.get('infra_error'):
+                    entry["infra_error"] = execution_data['infra_error']
+                ablations.append(entry)
+                self.logger.info(f"[ABLATION] idx={idx} uuid={uuid}: reusing capsule metrics (best run)")
+                continue
+
+            try:
+                evaluator = CapsuleEvaluator(
+                    capsule_path=snapshot,
+                    task_data=row,
+                    sab_loader=sab_loader,
+                    api_cost=iter_cost,
+                )
+                eval_results = evaluator.evaluate_all()
+                # No save_results(): keep the /tmp snapshot pristine.
+
+                if eval_results.get('status') == 'excluded':
+                    entry = {
+                        "evolution_index": idx,
+                        "uuid": uuid,
+                        "VER": None,
+                        "SR": None,
+                        "CBS": None,
+                        "cost": eval_results.get('cost', iter_cost),
+                        "status": "excluded",
+                        "source": "snapshot",
+                        "infra_error": eval_results.get('infra_error'),
+                    }
+                    self.logger.warning(
+                        f"[ABLATION] idx={idx} uuid={uuid} EXCLUDED (infra): "
+                        f"{eval_results.get('infra_error')}"
+                    )
+                else:
+                    entry = {
+                        "evolution_index": idx,
+                        "uuid": uuid,
+                        "VER": eval_results['VER'][0],
+                        "VER_message": eval_results['VER'][1],
+                        "SR": eval_results['SR'][0],
+                        "SR_message": eval_results['SR'][1],
+                        "CBS": eval_results['CBS'],
+                        "cost": iter_cost,
+                        "status": "evaluated",
+                        "source": "snapshot",
+                    }
+                    self.logger.info(
+                        f"[ABLATION] idx={idx} uuid={uuid}: "
+                        f"VER={entry['VER']}, SR={entry['SR']}, CBS={entry['CBS']:.3f}"
+                    )
+                ablations.append(entry)
+            except Exception as e:
+                # A harness fault on one snapshot must not abort the ablation
+                # loop nor the task itself.
+                self.logger.error(
+                    f"[ABLATION] Harness error on snapshot idx={idx} uuid={uuid}: {e}",
+                    exc_info=True,
+                )
+                ablations.append({
+                    "evolution_index": idx,
+                    "uuid": uuid,
+                    "VER": None,
+                    "SR": None,
+                    "CBS": None,
+                    "cost": iter_cost,
+                    "status": "excluded",
+                    "source": "snapshot",
+                    "infra_error": f"Unexpected harness error: {e}",
+                })
+
+        ablations.sort(key=lambda e: e["evolution_index"])
+        sr_curve = [
+            (e["evolution_index"], e["SR"]) for e in ablations if e.get("VER") is not None
+        ]
+        print_info(f"🧪 Ablations (index, SR): {sr_curve}")
+        self.logger.info(f"[ABLATION] Session {session_id} SR curve: {sr_curve}")
+        return ablations
 
     def _create_isolated_config(self, task_id: str) -> Any:
         """
@@ -730,7 +885,7 @@ Provide your analysis following the specified output format."""
                 runs = None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
-                    self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
+                    await self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
 
                     runs = await isolated_dgm.start_workflow_evolution(
                         goal=goal,
@@ -739,56 +894,67 @@ Provide your analysis following the specified output format."""
                         scenario_rubric=scenario_rubric_filename,
                         single_agent_mode=single_agent_mode
                     )
-                    results_str = self._format_task_mode_results(runs[-1])
                 else:
-                    tasks_data = await isolated_planner.start_planner(
+                    _ = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
                         max_task_retry=3
                     )
-                    results_str = self._format_goal_mode_results(tasks_data)
+                # get session id for artefact in tmp for this run
+                # Kimi you will need to use this
+                session_id = isolated_dgm.get_workspace_manager_session_id()
 
                 print(f"\033[96m[Worker {task_id}] 📊 Transferring results files...\033[0m")
 
-                # Transfer results to capsule (uses shared capsule dir)
+                # Transfer results to capsule (uses shared capsule dir).
+                # Offloaded: the capsule namer is a blocking sync LLM call.
                 trs = LocalTransfer(
                     config=isolated_config,
                     workspace_path=isolated_config.workspace_dir,
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
-                capsule_name = trs.transfer_workspace_files_to_capsule(goal)
+                capsule_name = await asyncio.to_thread(
+                    trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
+                )
 
                 print(f"\033[96m[Worker {task_id}] 📊 Analyzing results...\033[0m")
                 execution_time = time.time() - iteration_start_time
-
-                # Analyze results using isolated workspace path
-                analysis = self._analyze_results_isolated(goal, results_str, execution_time, isolated_config.workspace_dir)
 
                 execution_data = {
                     "iteration": i + 1,
                     "goal": goal,
                     "execution_time": execution_time,
-                    "success_level": analysis.get("success_level", "Unknown"),
-                    "key_insight": analysis.get("full_analysis", "Unknown"),
                     "task_id": task_id
                 }
 
                 if dataset_type == "science_agent_bench" and sab_loader and runs:
-                    execution_data = self._evaluate_with_science_agent_bench(
+                    # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
+                    execution_data = await asyncio.to_thread(
+                        self._evaluate_with_science_agent_bench,
                         capsule_name=capsule_name,
                         row=row,
                         runs=runs,
                         sab_loader=sab_loader,
                         execution_data=execution_data
                     )
+                    if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
+                        # Ablation: score every evolution snapshot in /tmp.
+                        # Offloaded: per-snapshot VER/SR subprocesses are blocking.
+                        execution_data["ablations"] = await asyncio.to_thread(
+                            self._evaluate_snapshot_ablations,
+                            session_id=session_id,
+                            row=row,
+                            runs=runs,
+                            sab_loader=sab_loader,
+                            execution_data=execution_data
+                        )
 
                 print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
-                print(f"\033[96m[Worker {task_id}]    Success Level: {analysis.get('success_level', 'Unknown')}\033[0m")
 
                 # Save run notes (thread-safe via file system)
                 # Pass current execution_data for concurrent mode since execution_history isn't updated yet
                 self._save_run_notes(
-                    capsule_name, goal, analysis, execution_time,
+                    capsule_name, goal, execution_time,
                     current_execution_data=execution_data
                 )
 
@@ -811,14 +977,14 @@ Provide your analysis following the specified output format."""
                 # Cleanup isolated workspace
                 self._cleanup_isolated_workspace(task_id)
 
-    def _sab_files_transfer_isolated(self, sab_loader, file_transfer, row, task_id: str):
+    async def _sab_files_transfer_isolated(self, sab_loader, file_transfer, row, task_id: str):
         """Transfer dataset files to isolated workspace with validation."""
         file_transfer.clean_workspace()
         task_dataset_path = sab_loader.get_dataset_path(row)
         self.logger.info(f"[Worker {task_id}] Transferring dataset from: {task_dataset_path}")
         print(f"\033[96m[Worker {task_id}] 📁 Transferring dataset: {task_dataset_path.name}\033[0m")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        time.sleep(0.3)  # Give filesystem a moment to sync
+        await asyncio.sleep(0.3)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[96m[Worker {task_id}] ✓ Transferred {files_transferred} files to workspace\033[0m")
 
@@ -829,34 +995,15 @@ Provide your analysis following the specified output format."""
             )
         self.logger.info(f"[Worker {task_id}] Successfully transferred {files_transferred} files")
 
-    def _analyze_results_isolated(self, goal: str, results_str: str, execution_time: float, workspace_dir: str) -> dict[str, str]:
-        """Analyze execution results using LLM with isolated workspace."""
-        files = list_files(workspace_dir, max_depth=3)
-        prompt = f"""Analyze the following Mimosa-AI execution:
-TASK: {goal}
-EXECUTION TIME: {execution_time:.2f} seconds
-FILES USED, GENERATED OR MODIFIED (up to 3 levels deep):
-{files}
-EXECUTION RESULTS:
-{results_str}
-Provide your analysis following the specified output format."""
-
-        analysis_text = self.result_analyzer(prompt)
-        import re as _re
-        _sl = _re.search(r'SUCCESS_LEVEL:\s*(High|Medium|Low|Incomplete|Failed|Error)', analysis_text, _re.IGNORECASE)
-        analysis = {
-            "full_analysis": analysis_text,
-            "success_level": _sl.group(1) if _sl else "Medium",
-            "key_insight": "Analysis completed"
-        }
-        return analysis
 
     async def run_concurrent_eval_loop(
         self,
         dataset_type: str,
         dataset_path: str,
         learning: bool,
-        single_agent_mode: bool = False
+        single_agent_mode: bool = False,
+        start_row: int | None = None,
+        restore_cache: bool | None = None
     ) -> None:
         """
         Concurrent execution loop that processes multiple tasks in parallel.
@@ -867,27 +1014,35 @@ Provide your analysis following the specified output format."""
             dataset_path: Path to the CSV dataset file
             learning: Whether learning mode is enabled
             single_agent_mode: Whether to use single agent mode
+            start_row: 0-based first CSV row to process. None = prompt the user
+                (interactive mode only; queued CLI runs must pass a value so no
+                stdin prompt happens after the queue launches).
+            restore_cache: Whether to restore stats from previous run notes.
+                None = prompt the user when a cache is found.
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
-        while True:
-            user_input = await _prompt_with_default("Enter starting row", default="0")
-            try:
-                start_row = max(0, int(user_input) - 1)
-                break
-            except ValueError:
-                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        # Get starting row (pre-resolved by the caller, or prompt interactively)
+        if start_row is None:
+            while True:
+                user_input = await _prompt_with_default("Enter starting row", default="0")
+                try:
+                    start_row = max(0, int(user_input) - 1)
+                    break
+                except ValueError:
+                    print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
         print(f"  → starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _prompt_with_default(
-                "Restore previous run statistics from cache? (y/n)", default="y"
-            )
-            if restore_input.lower() != 'n':
+            if restore_cache is None:
+                restore_input = await _prompt_with_default(
+                    "Restore previous run statistics from cache? (y/n)", default="y"
+                )
+                restore_cache = restore_input.lower() != 'n'
+            if restore_cache:
                 self._restore_execution_history_from_cache(cached_notes)
 
         # Initialize semaphore for concurrency control
@@ -972,31 +1127,41 @@ Provide your analysis following the specified output format."""
         self._print_final_summary()
         self._send_email_report(status="completed")
 
-    async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool, single_agent_mode: bool = False) -> None:
+    async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool,
+                                          single_agent_mode: bool = False,
+                                          start_row: int | None = None,
+                                          restore_cache: bool | None = None) -> None:
         """
         Main autonomous execution loop.
         Generates goals from CSV entries, executes them, analyzes results, and learns.
+
+        Args:
+            start_row: 0-based first CSV row; None = prompt interactively.
+            restore_cache: Whether to restore previous run stats; None = prompt.
         """
         papers_csv_path = Path(dataset_path)
 
-        # Get starting row from user
-        while True:
-            user_input = await _prompt_with_default("Enter starting row", default="0")
-            try:
-                start_row = max(0, int(user_input) - 1)
-                break
-            except ValueError:
-                print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
+        # Get starting row (pre-resolved by the caller, or prompt interactively)
+        if start_row is None:
+            while True:
+                user_input = await _prompt_with_default("Enter starting row", default="0")
+                try:
+                    start_row = max(0, int(user_input) - 1)
+                    break
+                except ValueError:
+                    print(f"  ⚠️  Invalid value '{user_input}' – please enter a whole number.")
         self._start_row = start_row
         print_info(f"→ starting at row {start_row + 1}")
 
         # Load and restore from cache if available
         cached_notes = self._load_previous_run_notes()
         if cached_notes:
-            restore_input = await _prompt_with_default(
-                "Restore previous run statistics from cache? (y/n)", default="y"
-            )
-            if restore_input.lower() != 'n':
+            if restore_cache is None:
+                restore_input = await _prompt_with_default(
+                    "Restore previous run statistics from cache? (y/n)", default="y"
+                )
+                restore_cache = restore_input.lower() != 'n'
+            if restore_cache:
                 self._restore_execution_history_from_cache(cached_notes)
 
         sab_loader = None
@@ -1015,8 +1180,8 @@ Provide your analysis following the specified output format."""
             total_rows = sum(1 for _ in reader)
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
-            self.logger.info(f"[PAPERS DATASET MODE] Starting autonomous loop for {total_rows} CSV entry")
-            print_phase("🤖 RUN ON PAPERS DATASETS")
+            self.logger.info(f"[EVALUATION MODE] Starting autonomous loop for {total_rows} CSV entry")
+            print_phase("Evaluating on paper datasets...")
             for i, row in enumerate(reader):
                 if i < start_row:
                     print_info(f"Skipping evaluation (using cache) for row {i + 1}")
@@ -1030,55 +1195,68 @@ Provide your analysis following the specified output format."""
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
                     if dataset_type == "science_agent_bench" and sab_loader:
-                        self.sab_files_transfer(sab_loader, file_transfer, row)
+                        await self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                         judge=True,
                                                         enable_evolution=learning,
                                                         scenario_rubric=scenario_rubric_filename,
                                                         single_agent_mode=single_agent_mode
                                                        )
-                        results_str = self._format_task_mode_results(runs[-1])
                     else:
-                        tasks_data = await self.planner.start_planner(goal=goal,
+                        _ = await self.planner.start_planner(goal=goal,
                                     judge=True,
                                     max_task_retry=3
                                    )
-                        results_str = self._format_goal_mode_results(tasks_data)
+                    # get session id for artefact in tmp for this run
+                    # Kimi you will need to use this
+                    session_id = self.evolve.get_workspace_manager_session_id()
                     print_info("📦 Transferring results files…")
+                    # Offloaded: the capsule namer is a blocking sync LLM call.
                     trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
-                    capsule_name = trs.transfer_workspace_files_to_capsule(goal)
-                    print_info("📊 Analyzing results…")
+                    task_id = self._extract_workspace_name_from_row(row)
+                    capsule_name = await asyncio.to_thread(
+                        trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
+                    )
+
                     execution_time = time.time() - iteration_start_time
-                    analysis = self._analyze_results(goal, results_str, execution_time)
                     execution_data = {
                         "iteration": i + 1,
                         "goal": goal,
                         "execution_time": execution_time,
-                        "success_level": analysis.get("success_level", "Unknown"),
-                        "key_insight": analysis.get("full_analysis", "Unknown"),
-                        "task_id": self._extract_workspace_name_from_row(row),
+                        "task_id": task_id,
                     }
                     if dataset_type == "science_agent_bench" and sab_loader:
-                        execution_data = self._evaluate_with_science_agent_bench(
+                        # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
+                        execution_data = await asyncio.to_thread(
+                            self._evaluate_with_science_agent_bench,
                             capsule_name=capsule_name,
                             row=row,
                             runs=runs,
                             sab_loader=sab_loader,
                             execution_data=execution_data
                         )
+                        if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
+                            # Ablation: score every evolution snapshot in /tmp.
+                            # Offloaded: per-snapshot VER/SR subprocesses are blocking.
+                            execution_data["ablations"] = await asyncio.to_thread(
+                                self._evaluate_snapshot_ablations,
+                                session_id=session_id,
+                                row=row,
+                                runs=runs,
+                                sab_loader=sab_loader,
+                                execution_data=execution_data
+                            )
 
                     self.execution_history.append(execution_data)
                     self._print_final_summary()
                     self._save_run_notes(
-                        capsule_name, goal,
-                        analysis, execution_time
+                        capsule_name, goal, execution_time
                     )
 
                     print_ok(f"Iteration {i + 1} completed")
-                    print_info(f"  Success Level: {analysis.get('success_level', 'Unknown')}")
                     print_info(f"  Time: {execution_time:.2f}s")
                 except Exception as e:
-                    self.logger.error(f"[PAPERS DATASET MODE] Error in csv row {i + 1}: {str(e)}")
+                    self.logger.error(f"[DATASET EVALUATION] Error in csv row {i + 1}: {str(e)}")
                     print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
                     self.execution_history.append({
                         "iteration": i + 1,
@@ -1098,20 +1276,24 @@ Provide your analysis following the specified output format."""
         current_runs = [exec_data for exec_data in self.execution_history
                        if exec_data.get("success_level") != "Cached"]
 
-        successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") in ["High", "Medium"]]
+        # Infra-excluded runs are neither pass nor fail — drop from denominators.
+        excluded_runs = [d for d in current_runs if _is_excluded(d)]
+        evaluable = [d for d in current_runs if not _is_excluded(d)]
+        successful_runs = [d for d in evaluable
+                          if d.get("success_level") == "Success"]
 
         success_rate = (
-            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
-            if current_runs else "N/A"
+            f"{len(successful_runs)/len(evaluable)*100:.1f}%"
+            if evaluable else "N/A"
         )
         rows: list[tuple[str, str]] = [
-            ("Steps evaluated", str(len(current_runs))),
+            ("Steps evaluated", str(len(evaluable))),
+            ("Excluded (infra)", str(len(excluded_runs))),
             ("Successful runs", str(len(successful_runs))),
             ("Success rate", success_rate),
         ]
 
-        sab_runs = [exec_data for exec_data in current_runs if 'VER' in exec_data]
+        sab_runs = [d for d in current_runs if d.get('VER') is not None]
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
             sr_success = sum(1 for run in sab_runs if run.get('SR', False))
@@ -1132,11 +1314,12 @@ Provide your analysis following the specified output format."""
         rows, current_runs, sab_runs = self._build_summary_rows()
 
         # Recompute the values needed for the cli-notes side-effect below.
-        successful_runs = [exec_data for exec_data in current_runs
-                          if exec_data.get("success_level") in ["High", "Medium"]]
+        evaluable = [d for d in current_runs if not _is_excluded(d)]
+        successful_runs = [d for d in evaluable
+                          if d.get("success_level") == "Success"]
         success_rate = (
-            f"{len(successful_runs)/len(current_runs)*100:.1f}%"
-            if current_runs else "N/A"
+            f"{len(successful_runs)/len(evaluable)*100:.1f}%"
+            if evaluable else "N/A"
         )
         if sab_runs:
             ver_success = sum(1 for run in sab_runs if run.get('VER', False))
@@ -1189,8 +1372,14 @@ Provide your analysis following the specified output format."""
             ("Dataset path", self._dataset_path or "unknown"),
             ("CSV runs limit", str(self.csv_runs_limit)),
             ("Start row", str(self._start_row + 1)),
-            ("Smolagent model", getattr(self.config, "smolagent_model_id", "unknown")),
-            ("Judge model", f"{self.llm_config.provider}/{self.llm_config.model}"),
+            ("smolagent_model_id", getattr(self.config, "smolagent_model_id", "unknown")),
+            ("orchestrator_choose_model", getattr(self.config, "orchestrator_choose_model", "unknown")),
+            ("literrature_grounding", getattr(self.config, "literrature_grounding", "unknown")),
+            ("selection_strategy", getattr(self.config, "selection_strategy", "unknown")),
+            ("learned_score_threshold", getattr(self.config, "learned_score_threshold", "unknown")),
+            ("max_learning_evolve_iterations", getattr(self.config, "max_learning_evolve_iterations", "unknown")),
+            ("parent_threshold_similarity", getattr(self.config, "parent_threshold_similarity", "unknown")),
+            ("crossover_rate", getattr(self.config, "crossover_rate", "unknown"))
         ]
 
     def _build_task_table(self) -> dict | None:
@@ -1202,10 +1391,13 @@ Provide your analysis following the specified output format."""
         if not current_runs:
             return None
 
-        has_sab = any("VER" in d for d in current_runs)
+        has_sab = any(d.get("VER") is not None for d in current_runs)
         headers = ["#", "Task", "Time (s)", "Success"]
         if has_sab:
             headers += ["VER", "SR", "CBS", "Cost ($)"]
+
+        def mark(value) -> str:
+            return "—" if value is None else ("✓" if value else "✗")
 
         rows: list[list[str]] = []
         for d in current_runs:
@@ -1217,10 +1409,11 @@ Provide your analysis following the specified output format."""
                 str(d.get("success_level", "?")),
             ]
             if has_sab:
+                cbs = d.get("CBS")
                 row += [
-                    "✓" if d.get("VER") else "✗",
-                    "✓" if d.get("SR") else "✗",
-                    f"{d.get('CBS', 0.0):.3f}",
+                    mark(d.get("VER")),
+                    mark(d.get("SR")),
+                    "—" if cbs is None else f"{cbs:.3f}",
                     f"{d.get('eval_cost', 0.0):.4f}",
                 ]
             rows.append(row)
@@ -1254,7 +1447,9 @@ Provide your analysis following the specified output format."""
         dataset_path: str = "datasets/our_benchmark.csv",
         learning: bool = False,
         single_agent_mode: bool = False,
-        concurrent: bool = False
+        concurrent: bool = False,
+        start_row: int | None = None,
+        restore_cache: bool | None = None
     ) -> None:
         """
         Public method to start the evaluation mode.
@@ -1265,6 +1460,8 @@ Provide your analysis following the specified output format."""
             learning: Whether to enable learning mode
             single_agent_mode: Whether to use single agent mode
             concurrent: Whether to run tasks concurrently (uses max_concurrent_tasks from init)
+            start_row: 0-based first CSV row to process; None = prompt interactively
+            restore_cache: Whether to restore previous run stats; None = prompt when a cache is found
         """
         # Snapshot the run-level args so the email report can describe what ran.
         self._dataset_type = dataset_type
@@ -1276,11 +1473,13 @@ Provide your analysis following the specified output format."""
         try:
             if concurrent and self.max_concurrent_tasks > 1:
                 print(f"\033[95mStarting CONCURRENT evaluation with {self.max_concurrent_tasks} workers\033[0m")
-                await self.run_concurrent_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+                await self.run_concurrent_eval_loop(dataset_type, dataset_path, learning, single_agent_mode,
+                                                    start_row=start_row, restore_cache=restore_cache)
             else:
                 if concurrent and self.max_concurrent_tasks <= 1:
                     print("\033[93m⚠️ Concurrent mode requested but max_concurrent_tasks <= 1, falling back to sequential\033[0m")
-                await self.run_single_thread_eval_loop(dataset_type, dataset_path, learning, single_agent_mode)
+                await self.run_single_thread_eval_loop(dataset_type, dataset_path, learning, single_agent_mode,
+                                                       start_row=start_row, restore_cache=restore_cache)
         except KeyboardInterrupt:
             print_warn("Autonomous mode interrupted by user")
             self._print_final_summary()
@@ -1315,3 +1514,16 @@ Provide your analysis following the specified output format."""
             single_agent_mode=single_agent_mode,
             concurrent=True
         )
+
+
+if __name__ == "__main__":
+    # Smoke check: the module logger writes to EVAL_LOG_FILE, exactly one handler.
+    smoke_logger = logging.getLogger(__name__)
+    _attach_eval_log_file_handler(smoke_logger)
+    _attach_eval_log_file_handler(smoke_logger)
+    file_handlers = [h for h in smoke_logger.handlers
+                     if isinstance(h, logging.handlers.RotatingFileHandler)]
+    assert len(file_handlers) == 1, f"expected 1 file handler, got {len(file_handlers)}"
+    smoke_logger.info("[SMOKE] csv_mode file logging OK")
+    assert EVAL_LOG_FILE.is_file(), f"log file not created: {EVAL_LOG_FILE}"
+    print(f"Smoke check OK — log written to {EVAL_LOG_FILE}")

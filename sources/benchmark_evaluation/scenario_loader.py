@@ -2,6 +2,10 @@
 """
 Scenario loader for managing evaluation test scenarios.
 Loads JSON scenario definitions with assertions and test configurations.
+Used for evaluation on custom benchmarks. Supports both legacy and new rubric formats.
+ScienceAgentBench notes:
+- Not used for evaluations on SAB, we use VER/SR/CBS instead.
+- But can provide rubrics to compare to Mimosa judge rubrics for ablation studies.
 """
 
 import json

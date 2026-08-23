@@ -48,34 +48,39 @@ class Factory:
         tools_code = ""
         existing_tool_prompt = ""
         import asyncio as _asyncio
+        import time as _time
         tool_manager = ToolManager(self.config)
-        _max_retries = 5
-        _backoff = 1.0
+        # MCP servers can take minutes to come up (Docker image builds, cold
+        # starts, a server brought up by hand). Bound on total wait, not on a
+        # fixed attempt count. Exponential backoff capped at 30 s per wait.
+        max_wait_seconds = 300.0
+        backoff = 1.0
+        deadline = _time.monotonic() + max_wait_seconds
+        attempt = 0
         mcps = []
-        for _attempt in range(_max_retries):
+        while True:
+            attempt += 1
             try:
                 mcps = await tool_manager.discover_mcp_servers()
                 tool_setup = await tool_manager.verify_tools()
                 if tool_setup and mcps:
                     break
+                reason = "MCP servers not ready yet"
             except Exception as e:
-                if _attempt == _max_retries - 1:
-                    self.logger.error(
-                        f"load_tools_code: MCP discovery failed after {_max_retries} attempts: {e}"
-                    )
-                    raise RuntimeError(
-                        f"MCP discovery failed after {_max_retries} attempts: {e}"
-                    ) from e
-                self.logger.warning(
-                    f"MCP discovery attempt {_attempt + 1}/{_max_retries} failed: {e}. "
-                    f"Retrying in {_backoff:.1f}s…"
+                reason = str(e)
+            if _time.monotonic() >= deadline:
+                self.logger.error(
+                    f"load_tools_code: MCP discovery failed after {max_wait_seconds:.0f}s "
+                    f"({attempt} attempts): {reason}"
                 )
-                await _asyncio.sleep(_backoff)
-                _backoff = min(_backoff * 2, 30.0)
-        else:
-            raise RuntimeError(
-                f"MCP servers did not become ready after {_max_retries} attempts."
+                raise RuntimeError(
+                    f"MCP servers did not become ready within {max_wait_seconds:.0f}s: {reason}"
+                )
+            self.logger.warning(
+                f"MCP discovery attempt {attempt} failed ({reason}). Retrying in {backoff:.1f}s…"
             )
+            await _asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
         if not mcps:
             raise ValueError(
                 "\n" + "=" * 80 +

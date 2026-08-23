@@ -1,8 +1,8 @@
-"""Claim-extraction source registry: the five prompts and their dispatch table.
+"""Claim-extraction source registry: the six prompts and their dispatch table.
 
 Each source = a labelled prompt that elicits a different *kind* of claim
 (literature requirements, user goal, math sanity, reproducibility, statistical
-fingerprint). Adding a sixth source = define one builder and append one entry
+fingerprint, visual scientific correctness). Adding a seventh source = define one builder and append one entry
 to ``SOURCES`` — no edits in the extraction loop.
 
 The shared rules block (``_CLAIM_RULES_BLOCK``) is defined here so all five
@@ -66,10 +66,6 @@ class ClaimContext:
             source A only. Empty string when unavailable.
         execution_text: Agent narration / produced output; consumed by
             source E only.
-        prior_claims: Rendered text of claims produced for this source on
-            an earlier workflow for the same task. The builder appends it
-            so the LLM is steered to reproduce the same ids and descriptions
-            where they still apply. Empty string when no prior cache exists.
     """
 
     goal: str
@@ -78,41 +74,6 @@ class ClaimContext:
     target_max: int
     grounding: str = ""
     execution_text: str = ""
-    prior_claims: str = ""
-
-
-# Rendered when prior claims for this source exist. The instruction keeps the
-# claim_id set stable across iterations of the same task so verifier scores
-# are comparable, while still permitting adaptation when the current workspace
-# legitimately diverges from the seed (e.g. a referenced file no longer
-# exists, or the workflow now produces a different artefact type).
-_PRIOR_CLAIMS_INSTRUCTION = """
-PRIOR CLAIMS — REPRODUCE THE SAME LIST WHERE STILL APPLICABLE
-The list below was extracted from a prior workflow attempt for THIS SAME
-task. Reproduce this list as closely as possible:
-- KEEP the same `id` verbatim for any prior claim that still applies to the
-  current workspace; reusing the id is how downstream scoring stays
-  comparable across iterations.
-- KEEP the description if it still describes a true success condition; adapt
-  it only when the current artefact's shape or naming makes the old wording
-  wrong (e.g. a referenced file is gone, the workflow now produces a PNG
-  where it previously produced a CSV).
-- DROP a prior claim only when no artefact in the current workspace could
-  plausibly let it be checked (the file is gone and nothing replaces it).
-- ADD new claims only when the current workflow exposes a success condition
-  not covered by any prior claim. Do not duplicate intents already covered.
-
-PRIOR CLAIMS (id — description; likely_relevant_files):
-{prior_claims}
-"""
-
-
-def _render_prior_claims_block(prior_claims: str) -> str:
-    """Return the prior-claims instruction block, or empty when no cache exists."""
-    text = (prior_claims or "").strip()
-    if not text:
-        return ""
-    return _PRIOR_CLAIMS_INSTRUCTION.format(prior_claims=text)
 
 
 @dataclass(frozen=True)
@@ -169,7 +130,6 @@ quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
 must encode that bar — not merely "a result exists". Phrase it so a
 workflow that skipped, faked, or left the deliverable empty FAILS it.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims.
@@ -250,7 +210,6 @@ short list — DO NOT pad with claims the user did not write. It is fine
 to return fewer than {ctx.target_min} claims when the goal is terse; do not
 invent constraints.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for up to {ctx.target_max} Source-B claims, but only as many as the goal
@@ -307,7 +266,6 @@ Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
 suboptimal — it is incorrect.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims, but only ones grounded
@@ -354,7 +312,6 @@ EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
 This source verifies non-negotiable computer-science PRACTICE — not
 engineering aesthetics.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for up to {ctx.target_max} Source-D claims, but only as many as the
@@ -426,11 +383,124 @@ scientific success — claims that target the headline result deserve
 extraction. Skip baseline claims for tasks with no obvious null to
 compare against — do not invent one.
 
-{_render_prior_claims_block(ctx.prior_claims)}
 {_CLAIM_RULES_BLOCK}
 
 Aim for {ctx.target_min}–{ctx.target_max} claims, only as many as the
 on-disk artefacts can actually support.
+"""
+
+
+def _build_source_g(ctx: ClaimContext) -> str:
+    """Source G — visual scientific correctness judged by a vision-capable model."""
+    return f"""You are extracting claims for a verification rubric: SCIENTIFIC CORRECTNESS of figure deliverables, judged by visual inspection.
+
+WORKFLOW GOAL:
+{ctx.goal}
+
+WORKSPACE FILES (relative to workspace root):
+{ctx.workspace_listing}
+
+TASK:
+If the goal does NOT ask for a visual deliverable (figure, chart, plot,
+diagram, network, tree, molecular render, structure), emit an EMPTY
+claims list. Skip this source entirely — it only activates for visual
+deliverables.
+
+When the workspace contains PNG/PDF/SVG files matching the goal's
+expected output, extract claims that test whether the figure is
+SCIENTIFICALLY PLAUSIBLE, not just visually tidy. A vision model will
+LOOK at the figure and verify each claim. Do not extract claims that
+can be checked by code (file existence, dimensions, pixel variance) —
+those are covered by Source D.
+
+PRIORITY — extract domain-specific correctness claims. The claims
+below are examples by domain; adapt to whatever discipline the goal
+belongs to:
+
+CHEMISTRY / MOLECULAR STRUCTURE (3D renders, ball-and-stick, space-filling):
+- ATOMIC CONNECTIVITY: "hydrogen atoms are each bonded to exactly one
+  heavier atom (C, N, O, S, P), never to another hydrogen"
+- BOND GEOMETRY: "carbon atoms show approximately tetrahedral (~109°),
+  trigonal planar (~120°), or linear (~180°) geometry consistent with
+  their hybridization; no carbon has five bonds"
+- VAN DER WAALS CONTACT: "non-bonded atoms do not interpenetrate each
+  other's van der Waals radii (no fused/overlapping atom spheres)"
+- VALENCE: "no atom exceeds its standard valence (C=4, N=3 or 4,
+  O=2, H=1, S=2/4/6, P=3/5) in the displayed connectivity"
+- RING PLAUSIBILITY: "any ring system shown is chemically feasible
+  (no triangle of sp² carbons at 60°, no planar cyclooctyne without
+  visible distortion, aromatic rings are flat)"
+- CHIRALITY: "if the goal names a specific enantiomer or chiral center,
+  the 3D arrangement of substituents around that center matches the
+  named configuration (R/S, D/L)"
+- COORDINATION: "any metal center shows a recognizable coordination
+  geometry (octahedral, tetrahedral, square-planar, etc.) with
+  plausible bond lengths to its ligands"
+- CONFORMATION: "the displayed conformer does not show impossible
+  torsional strain (e.g., two methyl groups eclipsed at 0° without
+  visible distortion, a peptide bond in cis unless glycine/proline)"
+- HYDROGEN BONDING: "hydrogen bond donors and acceptors are positioned
+  at plausible distances and angles (H···A distance ~1.5–2.5 Å,
+  D–H···A angle > 120°)"
+
+BIOLOGY (phylogenetic trees, molecular networks, protein structures):
+- TREE TOPOLOGY: "the phylogenetic tree shows a rooted hierarchy with
+  no cycles, no disconnected components, and leaf labels matching the
+  taxa named in the goal"
+- NETWORK CLUSTERS: "the molecular network displays visually distinct
+  clusters of connected nodes, not a single hairball or random scatter"
+- PROTEIN FOLD: "the displayed protein structure shows recognizable
+  secondary structure elements (alpha-helices as coils/cylinders,
+  beta-strands as arrows) in a physically plausible arrangement —
+  no helices passing through each other, no impossibly tangled loops"
+- BINDING POCKET: "if the goal describes a ligand binding mode, the
+  ligand is positioned within a surface pocket of the protein, not
+  floating in solvent or buried in the protein core without a cavity"
+
+PHYSICS / MATERIALS (crystal structures, phase diagrams, band structures):
+- CRYSTAL LATTICE: "the unit cell shows atoms at physically plausible
+  positions — no atomic overlap, reasonable coordination numbers,
+  symmetry consistent with the space group if stated"
+- PHASE BOUNDARIES: "phase boundaries in the diagram are continuous
+  curves, not crossing each other in thermodynamically impossible ways
+  (no three-phase coexistence lines meeting at a point that is not a
+  triple point)"
+- BAND GAP: "if the goal asks for a band structure, the valence and
+  conduction bands are visually distinguishable and the gap is not
+  negative (bands do not cross the Fermi level in an insulator)"
+
+GENERAL (applies across disciplines):
+- PHYSICAL UNITS: "any numerical labels, axis ticks, or annotations
+  on the figure use physically plausible magnitudes (e.g., a bond
+  length labeled '1.4 Å', not '140 Å' or '0.001 Å')"
+- SCALE CONSISTENCY: "objects drawn to scale are consistent with each
+  other — you cannot have a sodium ion drawn larger than a protein
+  domain unless it's an explicit close-up"
+- COLOR-TO-VALUE: "if a color scale/colorbar is shown, the mapping from
+  color to numeric value is monotonic and the range endpoints make
+  physical sense for the quantity being plotted (e.g., a probability
+  colormap ranges 0–1, not 0–350)"
+- 3D PERSPECTIVE: "in a 3D rendering, occlusion and depth ordering are
+  physically consistent — a background object does not appear in front
+  of a foreground object at the same pixel"
+
+WHAT NOT TO EXTRACT:
+- File-existence claims ("the PNG file exists and is non-empty")
+- Pixel-statistic claims ("the image has non-zero standard deviation")
+- Code-property claims ("the workflow used matplotlib")
+- Aesthetic claims ("the font is readable", "colors are colorblind-safe")
+- Generic chart-quality claims unless the goal literally specifies them
+
+Every claim you extract must answer: "Could a trained scientist looking
+at this figure conclude the claim is FALSE?" If a code-based check or a
+text-parsing check could verify it instead, skip it — this source exists
+BECAUSE those checks cannot see what a figure actually shows.
+
+{_CLAIM_RULES_BLOCK}
+
+Aim for {ctx.target_min}–{ctx.target_max} claims, but only as many as the
+actual figures in the workspace can support. If the workspace has no image
+files matching the goal's expected output, emit an EMPTY claims list.
 """
 
 
@@ -440,6 +510,7 @@ SOURCES: tuple[ClaimSource, ...] = (
     ClaimSource("c", _build_source_c),
     ClaimSource("d", _build_source_d),
     ClaimSource("e", _build_source_e),
+    ClaimSource("g", _build_source_g),
 )
 
 

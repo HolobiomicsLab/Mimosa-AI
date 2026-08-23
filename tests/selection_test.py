@@ -65,7 +65,7 @@ def _run(
 
 
 def test_first_run_admitted():
-    sp = SelectionPressure(strategy="qd", population_size=50)
+    sp = SelectionPressure(config={}, strategy="qd", population_size=50)
     sp._validate_open_ended(
         [_run(reward=0.0)],
         [_run(reward=0.97, uuid="seed", descriptor=[0.3, -0.2, 0.0, 0.0, -0.1, 0.0])],
@@ -80,7 +80,7 @@ def test_distinct_genotype_embedding_sibling_is_admitted():
     Quality-only selection would Pareto-reject it; the cosine-distance
     novelty signal compensates.
     """
-    sp = SelectionPressure(strategy="qd", population_size=50, novelty_k_neighbours=25)
+    sp = SelectionPressure(config={}, strategy="qd", population_size=50, novelty_k_neighbours=25)
     seed = PopulationMember(
         iteration=1, reward=0.97, cost=0.0, uuid="seed", reward_uncapped=1.05,
         behaviour_descriptor=_unit([0.3, -0.2, 0.0, 0.0, -0.1, 0.0]),
@@ -100,7 +100,7 @@ def test_distinct_genotype_embedding_sibling_is_admitted():
 
 def test_invalid_candidate_rejected():
     sp = SelectionPressure(
-        strategy="qd", population_size=50, min_improvement_threshold=0.01, admit_threshold=0.3,
+        config={}, strategy="qd", population_size=50, min_improvement_threshold=0.01, admit_threshold=0.3,
     )
     sp._validate_open_ended([_run(reward=0.0)], [_run(reward=0.97, uuid="seed")], threshold=0.01)
     assert len(sp._archive) == 1
@@ -111,7 +111,7 @@ def test_invalid_candidate_rejected():
 
 
 def test_capacity_eviction_keeps_highest_qd():
-    sp = SelectionPressure(strategy="qd", population_size=2, novelty_weight=0.4)
+    sp = SelectionPressure(config={}, strategy="qd", population_size=2, novelty_weight=0.4)
     for i, score in enumerate([0.9, 0.8, 0.95]):
         sp._validate_open_ended(
             [_run(reward=0.0)], [_run(reward=score, uuid=f"u{i}")], threshold=0.01,
@@ -125,7 +125,7 @@ def test_capacity_eviction_keeps_highest_qd():
 def test_length_penalty_reduces_qd_for_bloated_genotype():
     """A genotype far above baseline pays a penalty in qd_score."""
     sp = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         length_penalty_baseline_chars=1000, length_penalty_lambda=0.1,
     )
     descriptor = [0.7, 0.7, 0.0, 0.0, 0.0, 0.0]
@@ -133,7 +133,7 @@ def test_length_penalty_reduces_qd_for_bloated_genotype():
     long = _run(reward=0.9, uuid="long", descriptor=descriptor, code_len=10000)
     short_result = sp._validate_open_ended([short], [short], threshold=0.01)
     sp_long = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         length_penalty_baseline_chars=1000, length_penalty_lambda=0.1,
     )
     long_result = sp_long._validate_open_ended([long], [long], threshold=0.01)
@@ -145,7 +145,7 @@ def test_length_penalty_reduces_qd_for_bloated_genotype():
 def test_previous_n_mode_uses_recent_window():
     """``previous_n`` populates the sliding buffer instead of touching the archive."""
     sp = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         novelty_comparison="previous_n", previous_n=3,
     )
     a = _run(reward=0.5, uuid="a", descriptor=[1.0, 0.0, 0.0, 0.0, 0.0, 0.0])

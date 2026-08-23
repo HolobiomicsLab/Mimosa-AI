@@ -138,10 +138,17 @@ class PreCheck:
             "num_retries": 0,
             "extra_body": {"provider": provider_routing},
         }
+        if getattr(self.config, "save_logprobs", False):
+            # Probe under the same params the runtime sends: with
+            # require_parameters, providers lacking logprobs must fail
+            # here rather than pass precheck and 404 at run time.
+            params["logprobs"] = True
+            params["top_logprobs"] = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
 
         outputs: list[str] = []
         latencies: list[float] = []
         last_err: str | None = None
+        active_quants = quantizations
         for _ in range(N_REPEAT):
             t0 = time.perf_counter()
             try:
@@ -152,7 +159,15 @@ class PreCheck:
                 )
             except Exception as e:
                 latencies.append(time.perf_counter() - t0)
-                last_err = str(e)[:200]
+                if active_quants and LLMProvider._is_quantization_routing_error(e):
+                    # Stale discovery tag: no live endpoint at the pinned
+                    # quantization (404 "No endpoints found ... quantization").
+                    # Drop the filter and keep probing — content-validity and
+                    # determinism checks still gate the endpoint on its merits.
+                    active_quants = None
+                    params["extra_body"]["provider"].pop("quantizations", None)
+                else:
+                    last_err = str(e)[:200]
 
         validations = [_validate_json_code(o) for o in outputs]
         valid_count = sum(1 for ok, _ in validations)
@@ -163,7 +178,7 @@ class PreCheck:
 
         return {
             "provider": or_provider,
-            "quantizations": quantizations,
+            "quantizations": active_quants,
             "n_calls": len(outputs),
             "valid_count": valid_count,
             "deterministic": deterministic,
@@ -198,6 +213,12 @@ class PreCheck:
             # let probe content validity decide.
             quant_filter = None
         r = self._probe(model_id, or_provider, quant_filter)
+        if quant_filter and not r["quantizations"]:
+            # The probe only passed after dropping the quantization filter —
+            # the live endpoint no longer matches its discovery tag. Record it
+            # as untagged so the runtime omits the filter for this model too,
+            # instead of 404ing once per provider before its own fallback.
+            discovered_quant = "unknown"
         r["discovered_quant"] = discovered_quant
         r["tier"] = self._classify(r)
         return r
@@ -268,10 +289,7 @@ class PreCheck:
 
         # Final sort: pass-strict first, then drift, then fail.
         # Within each tier: the model's own creator before community
-        # resellers, then higher quant rank, then lower latency.  Only the
-        # actual model creator (e.g. deepseek for deepseek/*) gets the
-        # first-party boost — community resellers with quant=unknown are
-        # demoted below fp8 providers.
+        # resellers, then higher quant rank, then lower latency.
         results.sort(
             key=lambda r: (
                 r["tier"] if r["tier"] != 0 else 99,
@@ -340,13 +358,6 @@ class PreCheck:
 
             if new_list:
                 self.config.openrouter_provider_by_model[model_id] = new_list
-                # Runtime `quantizations` is an exclusion filter — a provider
-                # whose quant isn't in the list gets dropped even when pinned
-                # by `order`. So the filter must include every quant the
-                # precheck actually approved, plus the default-safe set as a
-                # baseline. If any approved provider was untagged ("unknown",
-                # typical for first-party endpoints that don't advertise a
-                # tag), omit the filter entirely.
                 if "unknown" in selected_quants:
                     self.config.openrouter_quantizations_by_model[model_id] = None
                 else:
@@ -368,21 +379,26 @@ class PreCheck:
                 "config, pick a different model, or relax probe strictness."
             )
 
-    def run(self) -> None:
+    def run(self, check_provider=True) -> None:
         print("🚦 Checking LLM providers...")
         required = {
             "planner": self.config.planner_llm_model,
             "workflow": self.config.workflow_llm_model,
-            "smolagent": self.config.smolagent_model_id,
+            "smolagent": self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id,
             "judge": self.config.judge_model,
             "capsule_namer": self.config.capsule_namer_model,
         }
 
         for name, model_id in required.items():
+            if "mlx-community" in model_id:
+                continue
             if not model_id:
                 raise ValueError(f"⚠️  No model configured for '{name}'.")
             if not self._basic_check(name, model_id):
                 raise RuntimeError(f"Required model '{name}' failed basic check.")
+        
+        if not check_provider:
+            return
 
         providers_ids = {**required}
 
@@ -419,7 +435,7 @@ if __name__ == "__main__":
     all_results: dict[str, list[dict]] = {}
     seen: set[str] = set()
     candidates = {
-        "smolagent": cfg.smolagent_model_id,
+        "smolagent": cfg.smolagent_model_id[0] if isinstance(cfg.smolagent_model_id, list) else cfg.smolagent_model_id,
         "judge": getattr(cfg, "judge_model", None),
         "capsule_namer": getattr(cfg, "capsule_namer_model", None),
     }

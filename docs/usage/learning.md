@@ -42,8 +42,8 @@ Without `--learn`, the engine still runs the verifier but never iterates
 
 Mimosa stops the moment either condition is met:
 
-- `overall_score >= learned_score_threshold` (config field, default `0.9`).
-- `iteration ≥ max_learning_evolve_iterations` (default `20`).
+- `overall_score >= learned_score_threshold` (config field, default `0.92`).
+- `iteration ≥ max_learning_evolve_iterations` (default `25`).
 
 The "best" workflow at termination — the one with the highest
 `reward_uncapped` in the archive — has its workspace snapshot restored as
@@ -54,7 +54,7 @@ the run's final state.
       stops early; you'll always hit `max_learning_evolve_iterations`.
     - Setting it too low (e.g. `0.7`) means the loop stops after one lucky
       generation that *happens* to fool the judge.
-    - The default `0.9` is a reasonable balance — adjust based on observed
+    - The default `0.92` is a reasonable balance — adjust based on observed
       score distributions for your task family.
 
 ## What evolves between generations
@@ -76,8 +76,8 @@ the parent's absolute score re-enter, as a near-finish damper, so
 near-winners aren't gambled away one generation before early-stop. The
 agent budget grows with boldness up to a hard ceiling of `7`.
 
-By default `~10 %` of generations do **crossover** instead of mutation
-(`crossover_rate = 0.1`) — two parents combined, best-parent-first, with
+By default `~40 %` of generations do **crossover** instead of mutation
+(`crossover_rate = 0.4`) — two parents combined, best-parent-first, with
 the offspring hard-capped at the highest parent agent count.
 
 ## What you'll see on disk

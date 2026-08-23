@@ -4,9 +4,8 @@ Interactive evaluation CLI for Mimosa-AI.
 Guides the user through evaluation setup: model selection (smolagent only),
 port range, workspace folder, evaluation mode, then launches CsvEvaluationMode
 on the ScienceAgentBench dataset.  Supports queuing multiple evaluation runs
-with different configurations, validates non-overlapping port ranges and unique
-workspaces, and executes them with adaptive parallelism (starts with 2
-concurrent runs, doubles when RAM allows).
+with different configurations, validates unique workspaces, and executes them
+sequentially in queue order.
 
 Saves run metadata (including detected MCPs) to ``run_notes/evaluations/``
 at start and appends final results at the end.
@@ -14,63 +13,64 @@ at start and appends final results at the end.
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import json
 import os
 import re
 import sys
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from config import Config, AddressMCP
-from sources.core.tools_manager import ToolManager
-from sources.cli.onboard_cli import (
-    _MODEL_PRESETS,
-    _print_step,
-    _ok,
-    _warn,
-    _err,
-    _info,
-    _ask,
-    _ask_yn,
-    _wrap,
-    CYAN,
-    GREEN,
-    BOLD,
-    DIM,
+from config import AddressMCP, Config
+from sources.cli.onboard_cli import _MODEL_PRESETS
+from sources.cli.theme import (
+    AMBER,
+    EMBER,
+    GREY,
+    LOCKED,
     RESET,
+    WHITE,
+    banner,
+    frame_bottom,
+    frame_top,
+    kv,
+    section,
 )
-
+from sources.cli.theme import (
+    ask as _ask,
+)
+from sources.cli.theme import (
+    ask_yn as _ask_yn,
+)
+from sources.cli.theme import (
+    fail as _err,
+)
+from sources.cli.theme import (
+    info as _info,
+)
+from sources.cli.theme import (
+    ok as _ok,
+)
+from sources.cli.theme import (
+    step_header as _print_step,
+)
+from sources.cli.theme import (
+    warn as _warn,
+)
+from sources.cli.theme import (
+    wrap as _wrap,
+)
+from sources.core.tools_manager import ToolManager
 
 # ---------------------------------------------------------------------------
 # Banner
 # ---------------------------------------------------------------------------
 
-_EVAL_BANNER = f"""
-{CYAN}{BOLD}
-  ███╗   ███╗██╗███╗   ███╗ ██████╗ ███████╗ █████╗
-  ████╗ ████║██║████╗ ████║██╔═══██╗██╔════╝██╔══██╗
-  ██╔████╔██║██║██╔████╔██║██║   ██║███████╗███████║
-  ██║╚██╔╝██║██║██║╚██╔╝██║██║   ██║╚════██║██╔══██║
-  ██║ ╚═╝ ██║██║██║ ╚═╝ ██║╚██████╔╝███████║██║  ██║
-  ╚═╝     ╚═╝╚═╝╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
-{RESET}
-{DIM}  Evaluation CLI  ·  ScienceAgentBench{RESET}
-"""
+_EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
-YELLOW = "\033[93m"
-RED = "\033[91m"
-MAGENTA = "\033[95m"
-
-TOTAL_STEPS = 6  # Updated: Config → Model → Connectivity → Mode → Tasks → Queue/Launch
+TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
-
-# Adaptive parallelism constants
-_INITIAL_CONCURRENCY = 2
-_RAM_SAFETY_FACTOR = 2  # ram_used_last_batch * 2 < available_ram
 
 
 # ---------------------------------------------------------------------------
@@ -86,9 +86,14 @@ class EvalRunSpec:
     csv_runs_limit: int
     mcp_list: list[str] = field(default_factory=list)
     notes_path: Path | None = None
+    # Advanced/ablation fields the user changed from defaults (name -> value)
+    overrides: dict = field(default_factory=dict)
+    # Recovery decisions resolved during the configuration phase, so the
+    # queue can execute unattended — no stdin prompts after launch.
+    start_row: int = 0          # 0-based first CSV row to process
+    restore_cache: bool = True  # restore stats from previous run notes if found
     # Populated after execution
     status: str = "pending"
-    peak_ram_mb: float = 0.0
 
 
 class EvaluationCLI:
@@ -118,13 +123,6 @@ class EvaluationCLI:
             self._queue.append(run_spec)
             _ok(f"Run #{run_spec.run_id} added to queue.")
 
-            # Validate entire queue so far
-            ok = self._validate_queue()
-            if not ok:
-                _err("Queue validation failed. Removing last run – please reconfigure.")
-                self._queue.pop()
-                continue
-
             add_more = _ask_yn("Add another evaluation run to the queue?", default=False)
             if not add_more:
                 break
@@ -145,7 +143,7 @@ class EvaluationCLI:
         for spec in self._queue:
             self._save_start_notes(spec)
 
-        # Launch with adaptive parallelism
+        # Execute runs one after another
         await self._launch_queue()
 
     # ------------------------------------------------------------------
@@ -172,10 +170,7 @@ class EvaluationCLI:
         run_id = self._next_run_id
         self._next_run_id += 1
 
-        print()
-        print(f"  {MAGENTA}{BOLD}{'═' * 54}{RESET}")
-        print(f"  {MAGENTA}{BOLD}  CONFIGURING RUN #{run_id}{RESET}")
-        print(f"  {MAGENTA}{BOLD}{'═' * 54}{RESET}")
+        section(f"CONFIGURING RUN #{run_id}")
         print()
 
         # Deep-copy the base config so each run is independent
@@ -196,6 +191,11 @@ class EvaluationCLI:
         # Step 5 – Number of tasks (csv_runs_limit)
         _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
         csv_runs_limit = self._ask_csv_runs_limit()
+        start_row, restore_cache = self._ask_recovery_options()
+
+        # Step 6 – Advanced / ablation options (optional)
+        _print_step(6, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
+        overrides = self._configure_advanced_options(run_config, eval_mode)
 
         return EvalRunSpec(
             run_id=run_id,
@@ -203,6 +203,9 @@ class EvaluationCLI:
             eval_mode=eval_mode,
             csv_runs_limit=csv_runs_limit,
             mcp_list=mcp_list,
+            overrides=overrides,
+            start_row=start_row,
+            restore_cache=restore_cache,
         )
 
     # ------------------------------------------------------------------
@@ -210,9 +213,6 @@ class EvaluationCLI:
     # ------------------------------------------------------------------
 
     def _choose_agent_model(self, run_config: Config) -> None:
-        _info("workflow_llm_model is fixed to openrouter/z-ai/glm-5.1 for evaluations.")
-        run_config.workflow_llm_model = "openrouter/z-ai/glm-5.1"
-
         available: list[tuple[str, str]] = [
             (label, model_id)
             for env_key, label, model_id in _MODEL_PRESETS
@@ -222,7 +222,6 @@ class EvaluationCLI:
         print(_wrap(
             "Choose the LLM for agent execution (SmolAgents). "
             "This is the only model you can change for evaluations.",
-            width=70, indent=2,
         ))
 
         suggested = run_config.smolagent_model_id or (
@@ -233,14 +232,13 @@ class EvaluationCLI:
             _info(f"Current value: {run_config.smolagent_model_id}")
 
         if available:
-            print(f"\n  {BOLD}Available presets:{RESET}")
+            print(f"\n  {WHITE}Available presets:{RESET}")
             for idx, (label, model_id) in enumerate(available, start=1):
                 is_default = model_id == suggested
-                tag = f"{GREEN}← default{RESET}" if is_default else ""
-                num_color = GREEN if is_default else CYAN
-                print(f"  {num_color}[{idx}]{RESET}  {label}  {tag}")
-                print(f"         {DIM}{model_id}{RESET}")
-            print(f"  {CYAN}[c]{RESET}  Enter a custom model ID")
+                tag = f"  {LOCKED}" if is_default else ""
+                print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+                print(f"         {GREY}{model_id}{RESET}")
+            print(f"  {AMBER}[c]{RESET}  {GREY}Enter a custom model ID{RESET}")
         else:
             _warn("No matching API key found – enter a model ID manually.")
 
@@ -287,72 +285,6 @@ class EvaluationCLI:
         _ok(f"Agent model: {model}")
 
     # ------------------------------------------------------------------
-    # Step 3 – Toolomics connectivity & workspace
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # Port-range helpers (for auto-suggestion & conflict checking)
-    # ------------------------------------------------------------------
-
-    def _queued_port_sets(self) -> list[tuple[int, set[int]]]:
-        """Return ``(run_id, port_set)`` for every run already in the queue."""
-        result: list[tuple[int, set[int]]] = []
-        for spec in self._queue:
-            ports: set[int] = set()
-            for addr in spec.config.discovery_addresses:
-                ports.update(range(addr.port_min, addr.port_max + 1))
-            result.append((spec.run_id, ports))
-        return result
-
-    def _suggest_port_range(self, run_config: Config) -> tuple[str, str, str]:
-        """
-        Return ``(ip, port_min_str, port_max_str)`` that do not overlap
-        with any run already in the queue.  Falls back to the config
-        defaults when there is no conflict.
-        """
-        if not self._queue:
-            addr = run_config.discovery_addresses[0]
-            return addr.ip, str(addr.port_min), str(addr.port_max)
-
-        # Gather every port already claimed
-        claimed: set[int] = set()
-        for _, pset in self._queued_port_sets():
-            claimed |= pset
-
-        # Use the same IP & range width as the base config
-        base = run_config.discovery_addresses[0]
-        ip = base.ip
-        width = base.port_max - base.port_min  # e.g. 200
-
-        # Walk upward from the last queued range's max+1
-        highest = max(claimed) if claimed else base.port_min
-        candidate_min = highest + 1
-        candidate_max = candidate_min + width
-
-        # Clamp to valid port numbers
-        if candidate_max > 65535:
-            candidate_min = max(1024, base.port_min)
-            candidate_max = candidate_min + width
-
-        return ip, str(candidate_min), str(candidate_max)
-
-    def _ports_conflict_with_queue(self, port_min: int, port_max: int) -> list[str]:
-        """
-        Check whether ``[port_min, port_max]`` overlaps with any queued run.
-        Returns a list of human-readable conflict messages (empty = OK).
-        """
-        new_ports = set(range(port_min, port_max + 1))
-        conflicts: list[str] = []
-        for rid, pset in self._queued_port_sets():
-            overlap = new_ports & pset
-            if overlap:
-                sample = sorted(overlap)[:5]
-                conflicts.append(
-                    f"Run #{rid}: {len(overlap)} overlapping port(s) (e.g. {sample})"
-                )
-        return conflicts
-
-    # ------------------------------------------------------------------
     # Workspace helpers
     # ------------------------------------------------------------------
 
@@ -393,7 +325,11 @@ class EvaluationCLI:
         """Configure port range, discover MCPs, set workspace. Returns MCP list."""
 
         # ---- Port range ------------------------------------------------
-        sug_ip, sug_pmin, sug_pmax = self._suggest_port_range(run_config)
+        if self._queue:
+            # Sequential runs may share ports — default to the previous run's range
+            run_config.discovery_addresses = copy.deepcopy(
+                self._queue[-1].config.discovery_addresses
+            )
 
         current = run_config.discovery_addresses
         _info(
@@ -401,28 +337,18 @@ class EvaluationCLI:
             f"{', '.join(f'{a.ip}:{a.port_min}-{a.port_max}' for a in current)}"
         )
 
-        if self._queue:
-            _info(f"Suggested non-conflicting range: {sug_ip}:{sug_pmin}-{sug_pmax}")
-
-        change = self._queue or _ask_yn("Change port range?", default=False)
-        if change:
+        keep = _ask_yn("Use the same port range?", default=True)
+        if not keep:
             while True:
-                ip = _ask("IP address", default=sug_ip)
-                port_min = _ask("Port min", default=sug_pmin)
-                port_max = _ask("Port max", default=sug_pmax)
+                ip = _ask("IP address (empty to keep current range)")
+                if not ip:
+                    _info("Keeping current port range.")
+                    break
+                port_min = _ask("Port min")
+                port_max = _ask("Port max")
                 try:
-                    pmin_int, pmax_int = int(port_min), int(port_max)
-                    # Validate against queued runs
-                    conflicts = self._ports_conflict_with_queue(pmin_int, pmax_int)
-                    if conflicts:
-                        for c in conflicts:
-                            _err(f"Port conflict with {c}")
-                        _warn("Please choose a different range.")
-                        # Re-suggest
-                        sug_ip, sug_pmin, sug_pmax = ip, str(pmax_int + 1), str(pmax_int + 1 + (pmax_int - pmin_int))
-                        continue
                     run_config.discovery_addresses = [
-                        AddressMCP(ip=ip, port_min=pmin_int, port_max=pmax_int)
+                        AddressMCP(ip=ip, port_min=int(port_min), port_max=int(port_max))
                     ]
                     _ok(f"Discovery: {ip}:{port_min}-{port_max}")
                     break
@@ -453,12 +379,11 @@ class EvaluationCLI:
             )
             print(_wrap(
                 f"Please start Toolomics on the configured port range ({addr_str}).",
-                width=70, indent=2,
             ))
-            print(f"\n  {BOLD}Options:{RESET}")
-            print(f"    {CYAN}Enter{RESET}   – retry scan")
-            print(f"    {CYAN}skip{RESET}    – queue this run anyway "
-                  "(will fail at launch)")
+            print(f"\n  {WHITE}Options:{RESET}")
+            print(f"    {AMBER}Enter{RESET}   {GREY}– retry scan{RESET}")
+            print(f"    {AMBER}skip{RESET}    {GREY}– queue this run anyway "
+                  f"(will fail at launch){RESET}")
             choice = _ask("Retry or skip?").strip().lower()
             if choice == "skip":
                 _warn(
@@ -466,54 +391,6 @@ class EvaluationCLI:
                     "Evaluation may fail at runtime."
                 )
                 break
-
-        # ---- Workspace -------------------------------------------------
-        suggested_ws = self._suggest_workspace(run_config, run_id)
-        ws_is_new_suggestion = (os.path.realpath(run_config.workspace_dir) != suggested_ws)
-
-        print(_wrap(
-            "Workspace directory — the Toolomics folder where Mimosa reads "
-            "and writes task artifacts. Each queued run must use a unique workspace.",
-            width=70, indent=2,
-        ))
-
-        if ws_is_new_suggestion:
-            _info(f"Suggested workspace (avoids conflict): {suggested_ws}")
-
-        while True:
-            new_ws = _ask("Workspace directory path", default=suggested_ws)
-            new_ws = os.path.expanduser(new_ws.strip()) if new_ws.strip() else suggested_ws
-            resolved = os.path.realpath(new_ws)
-
-            # Check uniqueness against queue
-            conflict = False
-            for rid, qws in self._queued_workspaces():
-                if resolved == qws:
-                    _err(f"Workspace already used by Run #{rid}: {qws}")
-                    conflict = True
-                    break
-            if conflict:
-                _warn("Please choose a different workspace directory.")
-                continue
-
-            if os.path.isdir(new_ws):
-                run_config.workspace_dir = new_ws
-                _ok(f"Workspace: {new_ws}")
-                break
-
-            # Directory doesn't exist — offer to create it
-            _warn(f"Directory does not exist: {new_ws}")
-            create = _ask_yn("Create it now?", default=True)
-            if create:
-                try:
-                    os.makedirs(new_ws, exist_ok=True)
-                    run_config.workspace_dir = new_ws
-                    _ok(f"Created & set workspace: {new_ws}")
-                    break
-                except OSError as exc:
-                    _err(f"Could not create directory: {exc}")
-            else:
-                _info("Please enter a different path.")
 
         return mcp_list
 
@@ -524,12 +401,14 @@ class EvaluationCLI:
     def _choose_eval_mode(self) -> str:
         print(_wrap(
             "Choose how Mimosa should run each benchmark task:",
-            width=70, indent=2,
         ))
         print()
-        print(f"  {CYAN}[1]{RESET}  Single-agent       – one agent per task (baseline comparison)")
-        print(f"  {CYAN}[2]{RESET}  One-shot            – multi-agent workflow, no learning")
-        print(f"  {CYAN}[3]{RESET}  Iterative learning  – multi-agent with evolution loop")
+        print(f"  {AMBER}[1]{RESET}  {WHITE}Single-agent{RESET}        "
+              f"{GREY}– one agent per task (baseline comparison){RESET}")
+        print(f"  {AMBER}[2]{RESET}  {WHITE}One-shot{RESET}            "
+              f"{GREY}– multi-agent workflow, no learning{RESET}")
+        print(f"  {AMBER}[3]{RESET}  {WHITE}Iterative learning{RESET}  "
+              f"{GREY}– multi-agent with evolution loop{RESET}")
         print()
 
         while True:
@@ -558,7 +437,6 @@ class EvaluationCLI:
             "How many benchmark tasks should this run evaluate? "
             "This is equivalent to --csv_runs_limit. "
             "Enter a number (default: 200 = all tasks).",
-            width=70, indent=2,
         ))
         while True:
             raw = _ask("Number of tasks", default="200")
@@ -572,65 +450,245 @@ class EvaluationCLI:
             except ValueError:
                 _warn(f"Invalid number '{raw}'. Please enter a whole number.")
 
-    # ------------------------------------------------------------------
-    # Queue validation
-    # ------------------------------------------------------------------
+    def _ask_recovery_options(self) -> tuple[int, bool]:
+        """Resolve start-row and cache-restore decisions at configuration time.
 
-    def _validate_queue(self) -> bool:
+        csv_mode used to prompt for these when each queued run *started*;
+        resolving them here keeps the queue fully unattended after launch.
         """
-        Validate the full queue:
-        - No overlapping port ranges between any two runs
-        - All workspace paths are unique (resolved)
+        print(_wrap(
+            "Recovery options: resume from a given CSV row and/or restore "
+            "statistics from a previous run's notes (same model)."
+        ))
+        while True:
+            raw = _ask("Starting row (1 = first task)", default="1")
+            try:
+                start_row = max(0, int(raw.strip()) - 1)
+                break
+            except ValueError:
+                _warn(f"Invalid value '{raw}'. Please enter a whole number.")
+        restore_cache = _ask_yn(
+            "Restore previous run statistics from cache if found?", default=True,
+        )
+        _ok(f"Start row: {start_row + 1}, restore cache: {'yes' if restore_cache else 'no'}")
+        return start_row, restore_cache
 
-        Returns True if valid, False otherwise.
+    # ------------------------------------------------------------------
+    # Step 6 – Advanced / ablation options (optional)
+    # ------------------------------------------------------------------
+
+    # Selection strategies supported by sources/core/selection.py
+    _SELECTION_STRATEGIES = ("qd", "tournament", "greedy", "novelty")
+
+    def _configure_advanced_options(self, run_config: Config, eval_mode: str) -> dict:
+        """Optionally tweak ablation-level config knobs for this run.
+
+        Returns a dict of ``{field_name: new_value}`` for every field the
+        user changed (used for the queue summary and run notes).
         """
-        ok = True
+        print(_wrap(
+            "Optional: override evolution / orchestration knobs for ablation "
+            "runs (selection strategy, novelty weight, grounding, iteration "
+            "budget, …). Press Enter to keep the defaults from your config.",
+        ))
+        customise = _ask_yn("Customise advanced / ablation options?", default=False)
+        if not customise:
+            _info("Keeping default advanced options.")
+            return {}
 
-        # Collect port ranges and workspaces
-        port_ranges: list[tuple[int, set[int]]] = []  # (run_id, set_of_ports)
-        workspaces: list[tuple[int, str]] = []  # (run_id, resolved_path)
+        learning_only = eval_mode != "iterative"
+        overrides: dict = {}
 
-        for spec in self._queue:
-            # Build set of all ports for this run
-            ports: set[int] = set()
-            for addr in spec.config.discovery_addresses:
-                ports.update(range(addr.port_min, addr.port_max + 1))
-            port_ranges.append((spec.run_id, ports))
+        # (key, label, current-value getter, editor, learning_only)
+        options = [
+            (
+                "workflow_llm_model",
+                "Orchestrator backbone (workflow_llm_model)",
+                lambda: run_config.workflow_llm_model,
+                lambda: self._edit_text(
+                    "Orchestrator backbone model ID",
+                    run_config.workflow_llm_model,
+                ),
+                False,
+            ),
+            (
+                "orchestrator_choose_model",
+                "Per-agent model assignment (orchestrator_choose_model)",
+                lambda: run_config.orchestrator_choose_model,
+                lambda: _ask_yn(
+                    "Let the orchestrator assign models per agent?",
+                    default=bool(run_config.orchestrator_choose_model),
+                ),
+                False,
+            ),
+            (
+                "literrature_grounding",
+                "Literature grounding (literrature_grounding)",
+                lambda: run_config.literrature_grounding,
+                lambda: _ask_yn(
+                    "Enable literature grounding (Perspicacité)?",
+                    default=bool(run_config.literrature_grounding),
+                ),
+                False,
+            ),
+            (
+                "selection_strategy",
+                "Selection strategy",
+                lambda: run_config.selection_strategy,
+                lambda: self._edit_selection_strategy(run_config.selection_strategy),
+                True,
+            ),
+            (
+                "novelty_weight",
+                "Novelty weight (QD quality/novelty mix)",
+                lambda: run_config.novelty_weight,
+                lambda: self._edit_float(
+                    "Novelty weight (0.0 = quality-only, 1.0 = novelty-only)",
+                    run_config.novelty_weight, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "max_learning_evolve_iterations",
+                "Max evolve iterations",
+                lambda: run_config.max_learning_evolve_iterations,
+                lambda: self._edit_int(
+                    "Max evolve iterations (1 = evolution off / best-of-N)",
+                    run_config.max_learning_evolve_iterations, lo=1,
+                ),
+                True,
+            ),
+            (
+                "learned_score_threshold",
+                "Early-stop score threshold",
+                lambda: run_config.learned_score_threshold,
+                lambda: self._edit_float(
+                    "Early-stop score threshold",
+                    run_config.learned_score_threshold, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "crossover_rate",
+                "Crossover rate",
+                lambda: run_config.crossover_rate,
+                lambda: self._edit_float(
+                    "Crossover rate (0.0 = off)",
+                    run_config.crossover_rate, lo=0.0, hi=1.0,
+                ),
+                True,
+            ),
+            (
+                "population_size",
+                "Population / archive size",
+                lambda: run_config.population_size,
+                lambda: self._edit_int(
+                    "Population / archive size",
+                    run_config.population_size, lo=1,
+                ),
+                True,
+            ),
+        ]
 
-            # Resolved workspace path
-            ws = os.path.realpath(spec.config.workspace_dir)
-            workspaces.append((spec.run_id, ws))
+        while True:
+            print()
+            for idx, (_, label, getter, _, learn_only) in enumerate(options, start=1):
+                tag = f"  {GREY}(learning only){RESET}" if learn_only else ""
+                print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{label}{RESET}{tag}")
+                print(f"         {GREY}= {getter()}{RESET}")
+            print()
 
-        # Check port overlaps (pairwise)
-        for i in range(len(port_ranges)):
-            for j in range(i + 1, len(port_ranges)):
-                rid_a, ports_a = port_ranges[i]
-                rid_b, ports_b = port_ranges[j]
-                overlap = ports_a & ports_b
-                if overlap:
-                    sample = sorted(overlap)[:5]
-                    _err(
-                        f"Port conflict between Run #{rid_a} and Run #{rid_b}: "
-                        f"{len(overlap)} overlapping port(s) (e.g. {sample})"
-                    )
-                    ok = False
+            choice = _ask("Edit option number, or Enter to finish", default="").strip()
+            if not choice:
+                break
+            try:
+                idx = int(choice) - 1
+                if not (0 <= idx < len(options)):
+                    raise ValueError
+            except ValueError:
+                _warn(f"Unrecognised input '{choice}'. Pick 1-{len(options)} or Enter.")
+                continue
 
-        # Check workspace uniqueness
-        for i in range(len(workspaces)):
-            for j in range(i + 1, len(workspaces)):
-                rid_a, ws_a = workspaces[i]
-                rid_b, ws_b = workspaces[j]
-                if ws_a == ws_b:
-                    _err(
-                        f"Workspace conflict: Run #{rid_a} and Run #{rid_b} "
-                        f"share the same workspace: {ws_a}"
-                    )
-                    ok = False
+            key, _, getter, editor, learn_only = options[idx]
+            if learn_only and learning_only:
+                _warn(
+                    f"'{key}' only takes effect in iterative learning mode — "
+                    f"this run is '{eval_mode}'. It will be recorded but ignored."
+                )
+            new_value = editor()
+            if new_value is None:
+                continue  # user kept the current value
+            if new_value != getter():
+                setattr(run_config, key, new_value)
+                overrides[key] = new_value
+                _ok(f"{key} = {new_value}")
+            else:
+                _info(f"{key} unchanged.")
 
-        if ok and len(self._queue) > 1:
-            _ok(f"Queue validated: {len(self._queue)} runs, no port/workspace conflicts.")
+        if overrides:
+            _ok(f"Advanced overrides recorded: {len(overrides)}")
+        else:
+            _info("No advanced overrides — defaults kept.")
+        return overrides
 
-        return ok
+    # ------------------------------------------------------------------
+    # Small editors for the advanced menu
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _edit_text(prompt: str, current: str):
+        """Free-text editor; empty input keeps the current value (None)."""
+        raw = _ask(f"{prompt} (Enter to keep '{current}')", default="").strip()
+        return raw or None
+
+    def _edit_selection_strategy(self, current: str):
+        print(f"\n  {WHITE}Selection strategies:{RESET}")
+        for idx, s in enumerate(self._SELECTION_STRATEGIES, start=1):
+            tag = f"  {LOCKED}" if s == current else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{s}{RESET}{tag}")
+        while True:
+            raw = _ask(
+                f"Select 1-{len(self._SELECTION_STRATEGIES)} or Enter to keep '{current}'",
+                default="",
+            ).strip().lower()
+            if not raw:
+                return None
+            if raw in self._SELECTION_STRATEGIES:
+                return raw
+            try:
+                idx = int(raw) - 1
+                if 0 <= idx < len(self._SELECTION_STRATEGIES):
+                    return self._SELECTION_STRATEGIES[idx]
+            except ValueError:
+                pass
+            _warn(f"Invalid choice '{raw}'.")
+
+    @staticmethod
+    def _edit_float(prompt: str, current: float, lo: float, hi: float):
+        while True:
+            raw = _ask(f"{prompt} [{current}]", default=str(current)).strip()
+            try:
+                val = float(raw)
+                if not (lo <= val <= hi):
+                    _warn(f"Must be between {lo} and {hi}.")
+                    continue
+                return val
+            except ValueError:
+                _warn(f"Invalid number '{raw}'.")
+
+    @staticmethod
+    def _edit_int(prompt: str, current: int, lo: int = 1):
+        while True:
+            raw = _ask(f"{prompt} [{current}]", default=str(current)).strip()
+            try:
+                val = int(raw)
+                if val < lo:
+                    _warn(f"Must be at least {lo}.")
+                    continue
+                return val
+            except ValueError:
+                _warn(f"Invalid number '{raw}'.")
+
 
     # ------------------------------------------------------------------
     # Queue summary
@@ -639,23 +697,24 @@ class EvaluationCLI:
     def _print_queue_summary(self) -> None:
         """Print a summary table of all queued runs."""
         print()
-        print(f"  {BOLD}{'═' * 70}{RESET}")
-        print(f"  {BOLD}EVALUATION QUEUE — {len(self._queue)} run(s){RESET}")
-        print(f"  {'═' * 70}")
+        frame_top(f"EVALUATION QUEUE · {len(self._queue)} RUN(S)")
         for spec in self._queue:
             addrs = spec.config.discovery_addresses
             port_str = ", ".join(f"{a.ip}:{a.port_min}-{a.port_max}" for a in addrs)
-            print(f"  {CYAN}Run #{spec.run_id}{RESET}")
-            print(f"    Model:      {spec.config.smolagent_model_id}")
-            print(f"    Mode:       {spec.eval_mode}")
-            print(f"    Tasks:      {spec.csv_runs_limit}")
-            print(f"    Ports:      {port_str}")
-            print(f"    Workspace:  {spec.config.workspace_dir}")
-            print(f"    MCPs:       {len(spec.mcp_list)}")
-            print(f"  {'─' * 70}")
+            print(f"\n    {AMBER}RUN #{spec.run_id}{RESET}")
+            kv("model", spec.config.smolagent_model_id)
+            kv("mode", spec.eval_mode)
+            kv("tasks", str(spec.csv_runs_limit))
+            kv("ports", port_str)
+            kv("workspace", spec.config.workspace_dir)
+            kv("mcps", str(len(spec.mcp_list)))
+            if spec.overrides:
+                over_str = ", ".join(f"{k}={v}" for k, v in spec.overrides.items())
+                kv("overrides", over_str)
+        print()
+        frame_bottom()
         if len(self._queue) > 1:
-            print(f"  {BOLD}Execution: adaptive parallelism (starting with "
-                  f"{min(_INITIAL_CONCURRENCY, len(self._queue))} concurrent){RESET}")
+            _info("Execution: sequential — runs launch one at a time in queue order.")
         print()
 
     # ------------------------------------------------------------------
@@ -672,7 +731,10 @@ class EvaluationCLI:
         """
         eval_dir = Path("run_notes") / "evaluations"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_tag = spec.config.smolagent_model_id.replace("/", "_")
+        model_id = spec.config.smolagent_model_id
+        if isinstance(model_id, list):
+            model_id = model_id[0] if model_id else ""
+        model_tag = model_id.replace("/", "_")
         filename = f"{ts}_run{spec.run_id}_{model_tag}_{spec.eval_mode}.json"
         notes_path = eval_dir / filename
 
@@ -691,6 +753,17 @@ class EvaluationCLI:
             "workspace_dir": spec.config.workspace_dir,
             "detected_mcps": spec.mcp_list,
             "dataset": "datasets/ScienceAgentBench.csv",
+            "advanced_overrides": spec.overrides,
+            "evolution_config": {
+                "orchestrator_choose_model": spec.config.orchestrator_choose_model,
+                "literrature_grounding": spec.config.literrature_grounding,
+                "selection_strategy": spec.config.selection_strategy,
+                "novelty_weight": spec.config.novelty_weight,
+                "max_learning_evolve_iterations": spec.config.max_learning_evolve_iterations,
+                "learned_score_threshold": spec.config.learned_score_threshold,
+                "crossover_rate": spec.config.crossover_rate,
+                "population_size": spec.config.population_size,
+            },
             "status": "running",
             "queue_size": len(self._queue),
         }
@@ -727,121 +800,55 @@ class EvaluationCLI:
             pass  # best-effort
 
     # ------------------------------------------------------------------
-    # Adaptive parallel launch
+    # Sequential launch
     # ------------------------------------------------------------------
 
     async def _launch_queue(self) -> None:
         """
-        Execute all queued runs with adaptive parallelism.
+        Execute all queued runs sequentially, in queue order.
 
-        Strategy:
-        - Start with min(INITIAL_CONCURRENCY, queue_length) concurrent runs
-        - After each batch completes, measure peak RAM usage
-        - Double concurrency for the next batch if:
-            peak_ram_last_batch * 2 < available_ram
-        - Otherwise keep the same concurrency level
+        Each run finishes before the next one starts.  A failing run is
+        recorded (status + run notes) and does not stop the rest of the
+        queue.
         """
-        try:
-            import psutil
-        except ImportError:
-            _warn("psutil not installed — running all evaluations sequentially.")
-            _info("Install psutil for adaptive parallel execution: pip install psutil")
-            for spec in self._queue:
+        total = len(self._queue)
+        section(f"IGNITION · {total} EVALUATION(S)")
+        print()
+
+        for position, spec in enumerate(self._queue, start=1):
+            _info(f"Run #{spec.run_id} ({position}/{total}) launching…")
+            try:
                 await self._run_single_eval(spec)
-            return
-
-        remaining = list(self._queue)
-        concurrency = min(_INITIAL_CONCURRENCY, len(remaining))
-        batch_num = 0
-
-        print()
-        print(f"  {MAGENTA}{BOLD}{'═' * 60}{RESET}")
-        print(f"  {MAGENTA}{BOLD}  LAUNCHING {len(remaining)} EVALUATION(S){RESET}")
-        print(f"  {MAGENTA}{BOLD}  Initial concurrency: {concurrency}{RESET}")
-        print(f"  {MAGENTA}{BOLD}{'═' * 60}{RESET}")
-        print()
-
-        while remaining:
-            batch_num += 1
-            batch = remaining[:concurrency]
-            remaining = remaining[concurrency:]
-
-            _info(f"Batch #{batch_num}: launching {len(batch)} run(s) "
-                  f"(concurrency={concurrency}, {len(remaining)} remaining)")
-
-            # Snapshot RAM before batch
-            mem_before = psutil.virtual_memory()
-            ram_available_before = mem_before.available / (1024 * 1024)  # MB
-
-            # Launch batch concurrently
-            tasks = [
-                asyncio.create_task(
-                    self._run_single_eval(spec),
-                    name=f"eval_run_{spec.run_id}",
-                )
-                for spec in batch
-            ]
-
-            # Wait for all tasks in this batch, capturing exceptions
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Log results
-            peak_ram_batch = 0.0
-            for spec, result in zip(batch, results):
-                if isinstance(result, Exception):
-                    _err(f"Run #{spec.run_id} failed: {result}")
+            except Exception as exc:
+                _err(f"Run #{spec.run_id} failed: {exc}")
+                if spec.status == "pending":  # failed before the run recorded anything
                     spec.status = "error"
                     self._update_notes(spec.notes_path, {
                         "status": "error",
-                        "error": str(result),
+                        "error": str(exc),
                         "finished_at": datetime.now().isoformat(),
                     })
-                else:
-                    _ok(f"Run #{spec.run_id} completed.")
-                peak_ram_batch = max(peak_ram_batch, spec.peak_ram_mb)
-
-            # Adaptive scaling: decide concurrency for next batch
-            if remaining:
-                mem_after = psutil.virtual_memory()
-                ram_available_now = mem_after.available / (1024 * 1024)  # MB
-                ram_used_by_batch = max(0, ram_available_before - ram_available_now)
-
-                # Use the larger of measured usage or peak_ram from specs
-                ram_estimate = max(ram_used_by_batch, peak_ram_batch)
-
-                _info(f"Batch #{batch_num} RAM estimate: {ram_estimate:.0f} MB "
-                      f"(available: {ram_available_now:.0f} MB)")
-
-                if ram_estimate > 0 and (ram_estimate * _RAM_SAFETY_FACTOR) < ram_available_now:
-                    new_concurrency = concurrency * 2
-                    _ok(f"RAM headroom OK — scaling concurrency: {concurrency} → {new_concurrency}")
-                    concurrency = new_concurrency
-                else:
-                    _info(f"RAM headroom insufficient — keeping concurrency at {concurrency}")
-
-                # Never exceed remaining count
-                concurrency = min(concurrency, len(remaining))
+                continue
+            if spec.status == "completed":
+                _ok(f"Run #{spec.run_id} completed.")
+            else:
+                _warn(f"Run #{spec.run_id} finished with status: {spec.status}")
 
         print()
-        _ok(f"All {len(self._queue)} evaluation(s) finished.")
+        _ok(f"All {total} evaluation(s) finished.")
         self._print_final_queue_report()
 
     async def _run_single_eval(self, spec: EvalRunSpec) -> None:
         """Execute a single evaluation run from its spec."""
         from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
 
-        try:
-            import psutil
-            process = psutil.Process()
-        except ImportError:
-            process = None
-
         run_config = spec.config
 
-        # Isolate mutable directories per run to prevent race conditions
+        # Isolate mutable directories per run so runs cannot contaminate each other
         run_config.workflow_dir = f"sources/workflows/run_{spec.run_id}"
         run_config.memory_dir = f"sources/memory/run_{spec.run_id}"
         run_config.runner_temp_dir = f"./tmp/run_{spec.run_id}"
+        run_config.runs_capsule_dir = f"runs_capsule/run_{spec.run_id}"
 
         run_config.create_paths()
         try:
@@ -865,6 +872,7 @@ class EvaluationCLI:
             csv_runs_limit=spec.csv_runs_limit,
             max_concurrent_tasks=max_concurrent,
             task_start_delay=task_start_delay,
+            run_notes_dir=Path("run_notes") / f"run_{spec.run_id}",
         )
         # Attach the run notes path so csv_mode can write final results there
         evaluator._evaluation_cli_notes_path = spec.notes_path
@@ -880,6 +888,8 @@ class EvaluationCLI:
                 learning=learning,
                 single_agent_mode=single_agent,
                 concurrent=max_concurrent > 1,
+                start_row=spec.start_row,
+                restore_cache=spec.restore_cache,
             )
             spec.status = "completed"
             self._update_notes(spec.notes_path, {
@@ -901,14 +911,6 @@ class EvaluationCLI:
                 "finished_at": datetime.now().isoformat(),
             })
             raise
-        finally:
-            # Record peak RAM for adaptive scaling
-            if process is not None:
-                try:
-                    mem_info = process.memory_info()
-                    spec.peak_ram_mb = mem_info.rss / (1024 * 1024)
-                except Exception:
-                    pass
 
     # ------------------------------------------------------------------
     # Final report
@@ -917,30 +919,31 @@ class EvaluationCLI:
     def _print_final_queue_report(self) -> None:
         """Print a summary of all queue execution results."""
         print()
-        print(f"  {BOLD}{'═' * 60}{RESET}")
-        print(f"  {BOLD}QUEUE EXECUTION REPORT{RESET}")
-        print(f"  {'═' * 60}")
+        frame_top("QUEUE EXECUTION REPORT")
+        print()
 
         completed = sum(1 for s in self._queue if s.status == "completed")
         errors = sum(1 for s in self._queue if s.status == "error")
         other = len(self._queue) - completed - errors
 
         for spec in self._queue:
+            line = (f"{WHITE}Run #{spec.run_id}{RESET}  "
+                    f"{GREY}{spec.config.smolagent_model_id}  "
+                    f"({spec.eval_mode}, {spec.csv_runs_limit} tasks){RESET} "
+                    f"{EMBER}·{RESET} {spec.status}")
             if spec.status == "completed":
-                icon = f"{GREEN}✓{RESET}"
+                _ok(line)
             elif spec.status == "error":
-                icon = f"{RED}✗{RESET}"
+                _err(line)
             else:
-                icon = f"{YELLOW}?{RESET}"
-
-            print(f"  {icon}  Run #{spec.run_id}  "
-                  f"{spec.config.smolagent_model_id}  "
-                  f"({spec.eval_mode}, {spec.csv_runs_limit} tasks)  "
-                  f"→ {spec.status}")
+                _warn(line)
             if spec.notes_path:
-                print(f"      {DIM}Notes: {spec.notes_path}{RESET}")
+                print(f"          {GREY}Notes: {spec.notes_path}{RESET}")
 
-        print(f"  {'─' * 60}")
-        print(f"  Completed: {completed}  |  Errors: {errors}  |  Other: {other}")
-        print(f"  {'═' * 60}")
+        print()
+        kv("completed", str(completed), accent=True)
+        kv("errors", str(errors), accent=errors > 0)
+        kv("other", str(other))
+        print()
+        frame_bottom()
         print()

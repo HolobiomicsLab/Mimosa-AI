@@ -41,7 +41,7 @@
 
 ## TL;DR
 
-Mimosa-AI 是一个**面向自主科学研究的开源 Python 框架**:它为**每个任务编写定制的多智能体工作流**,在沙箱中运行它,并对照六个独立视角(文献、你的目标、智能体叙述、数学不变量、计算可复现性、统计指纹)核查智能体的实际行为;并且当你要求它学习时,它会以**质量-多样性 (Quality-Diversity)** 搜索(MAP-Elites 谱系)跨代进化工作流,同时保持性能与结构多样性。
+Mimosa-AI 是一个**面向自主科学研究的开源 Python 框架**:它为**每个任务编写定制的多智能体工作流**,在沙箱中运行它,并对照六个独立视角(文献、你的目标、智能体叙述、数学不变量、计算可复现性、统计指纹)核查智能体的实际行为;并且当你要求它学习时,它会以**质量-多样性 (Quality-Diversity)** 搜索跨代进化工作流,同时保持性能与结构多样性。
 
 工作流以纯 Python 形式输出 —— 无 DSL、无 YAML —— 因此任何一代都可以被检视、对比或独立重新执行。验证器运行确定性 Python 检查,重新计算智能体所声称的内容。每一代都连同其谱系和生成它的精确 LLM 提示一并落盘。
 
@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 工作流是**完整的 Python 程序**,作为源代码被变异。**代码即基因型 (code-as-genotype)** 是工作流文件;表现型是它在工作空间中产生的任何东西。
 
-- **选择:质量-多样性归档**(**MAP-Elites** 风格) —— 种群规模为 50,`qd_score = (1−w)·quality + w·novelty`(`w=0.25`)。**新颖性搜索 (novelty search)** 使用**基因型嵌入 (genotype embedding)** 行为描述符——对工作流生成源代码做 L2 归一化的嵌入(默认使用本地 `all-MiniLM-L6-v2`,可选 OpenAI `text-embedding-3-small`)——上的余弦距离 k-NN(`k=15`)。父代通过子代数量倒数轮盘抽取,使归档分布开来(`MAX_CHILDREN_PER_PARENT = 2`)。
+- **选择:质量-多样性归档** —— **非结构化归档**(单一名单,而非离散网格),种群规模上限 20,以单一标量化目标 `qd_score = (1−w)·quality + w·novelty`(`w=0.25`)评分;满员时淘汰 `qd_score` 最低的成员。**新颖性搜索 (novelty search)** 使用**基因型嵌入 (genotype embedding)** 行为描述符——对工作流生成源代码做 L2 归一化的嵌入(默认使用本地 `all-MiniLM-L6-v2`,可选 OpenAI `text-embedding-3-small`)——上的余弦距离 k-NN(`k=15`)。父代通过子代数量倒数轮盘抽取,使归档分布开来(`MAX_CHILDREN_PER_PARENT = 8`)。
 - **变异:由停滞驱动的尺度** —— 变异的大胆程度是过去 4 个提示梯度自身重复程度的连续函数。接近优胜者的个体会被保护。变异尺度的范围从"仅提示微调"一直到"完整拓扑重思"。
 - **交叉** —— 约 30% 的代次会以强者优先的方式组合两个父代。
 - **冷启动** —— 当归档为空时,会基于相似度过滤,从磁盘上过往运行进行扫描(MiniLM 余弦相似度 ≥ 0.5)以种子化搜索。有用的工作流可在任务之间迁移。
@@ -198,6 +198,18 @@ uv sync && uv run web_app_full.py
 
 ---
 
+## Web 界面(Observatory)
+
+Mimosa 本身仅提供 CLI;**Observatory** 是一个可选的本地 Web 界面(FastAPI + React),用于呈现一次运行产生的内容——演化谱系树、回放、工作区,以及一个配置/启动流程——让你可以直观查看和检视演化过程,而不必翻阅日志。它是一个单人使用、仅限本地(localhost)的工具,不含身份验证;请勿将其暴露在共享或公共网络上。
+
+```bash
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+```
+
+详细说明、环境变量与完整 API 列表参见:[`webui/README.md`](./webui/README.md)。
+
+---
+
 ## 执行模式
 
 | 模式 | 适用场景 | 命令 |
@@ -245,8 +257,8 @@ Mimosa 为科学用途而构建 —— 所有决策事后均可检视。
 | `workflow_llm_model` | 合成多智能体工作流(例如 `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | 执行智能体所使用的模型 |
 | `judge_model` | 编写验证器程序并给出软性裁定的 LLM |
-| `learned_score_threshold` | `--learn` 模式下的早停阈值(默认 `0.9`) |
-| `max_learning_evolve_iterations` | 代数上限(默认 `20`) |
+| `learned_score_threshold` | `--learn` 模式下的早停阈值(默认 `0.92`) |
+| `max_learning_evolve_iterations` | 代数上限(默认 `25`) |
 
 完整参考:[`docs/reference/configuration.md`](./docs/reference/configuration.md)。
 

@@ -41,7 +41,7 @@
 
 ## TL;DR
 
-Mimosa-AI는 **자율 과학 연구를 위한 오픈소스 Python 프레임워크**입니다. **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 여섯 개의 독립적인 관점(문헌, 사용자의 목표, 에이전트 내레이션, 수학적 불변량, 계산 재현성, 통계적 핑거프린트)에 비추어 검증합니다. 그리고 학습을 요청하면 **Quality-Diversity** 탐색(MAP-Elites 계보)을 통해 성능과 구조적 다양성을 모두 보존하며 세대를 거쳐 워크플로우를 진화시킵니다.
+Mimosa-AI는 **자율 과학 연구를 위한 오픈소스 Python 프레임워크**입니다. **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 여섯 개의 독립적인 관점(문헌, 사용자의 목표, 에이전트 내레이션, 수학적 불변량, 계산 재현성, 통계적 핑거프린트)에 비추어 검증합니다. 그리고 학습을 요청하면 **Quality-Diversity** 탐색을 통해 성능과 구조적 다양성을 모두 보존하며 세대를 거쳐 워크플로우를 진화시킵니다.
 
 워크플로우는 순수 Python으로 출력됩니다 — DSL 없이, YAML 없이 — 그래서 어떤 세대든 검사하거나 비교하거나 단독으로 다시 실행할 수 있습니다. 검증기는 에이전트가 주장하는 내용을 재계산하는 결정론적 Python 검사를 실행합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
 
@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 워크플로우는 **완전한 Python 프로그램**이며, 소스 코드 수준에서 변이됩니다. **코드를 유전자형으로 다루는 방식 (code-as-genotype)** 으로, 유전자형(genotype)은 워크플로우 파일이고 표현형(phenotype)은 워크스페이스에서 그것이 산출하는 모든 것입니다.
 
-- **선택: Quality-Diversity 아카이브**(**MAP-Elites** 방식) — 인구 50, `qd_score = (1−w)·quality + w·novelty` (`w=0.25`). **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 2`).
+- **선택: Quality-Diversity 아카이브** — **비구조 아카이브**(이산 그리드가 아니라 단일 목록), 인구 상한 20, 단일 스칼라화 점수 `qd_score = (1−w)·quality + w·novelty` (`w=0.25`)로 평가하며, 가득 차면 가장 낮은 `qd_score` 멤버를 퇴출합니다. **참신성 탐색 (novelty search)** 은 **유전자형 임베딩 (genotype embedding)** 행동 기술자 — 워크플로의 생성 소스 코드를 L2 정규화한 임베딩(기본값은 로컬 `all-MiniLM-L6-v2`, 선택적으로 OpenAI `text-embedding-3-small`) — 상의 코사인 거리 k-NN(`k=15`)을 사용합니다. 부모는 자식 수의 역수에 비례하는 룰렛으로 선택되어 아카이브가 고르게 퍼지도록 합니다 (`MAX_CHILDREN_PER_PARENT = 8`).
 - **변이: 정체 기반 범위 조절** — 변이의 대담함은 마지막 4개의 프롬프트 그래디언트가 얼마나 반복되는지에 대한 연속 함수입니다. 거의 승리한 개체는 보호됩니다. 범위 대역은 "프롬프트만 미세 조정"부터 "완전한 토폴로지 재고"까지 이어집니다.
 - **교차** — 약 30%의 세대에서 두 부모를 결합하며, 강한 쪽이 먼저 적용됩니다.
 - **콜드 스타트** — 아카이브가 비어 있으면, 디스크의 과거 실행을 유사도 필터링(MiniLM 코사인 ≥ 0.5)으로 스캔하여 탐색을 시드합니다. 유용한 워크플로우는 태스크 간에 전이됩니다.
@@ -198,6 +198,18 @@ uv sync && uv run web_app_full.py
 
 ---
 
+## 웹 인터페이스(Observatory)
+
+Mimosa 자체는 CLI 전용이지만, **Observatory**는 선택적으로 사용할 수 있는 로컬 웹 UI(FastAPI + React)로, 실행 결과물——계보 트리, 리플레이, 워크스페이스, 설정/실행 흐름——을 시각화하여 로그를 일일이 읽는 대신 진화 과정을 직접 관찰하고 살펴볼 수 있게 해줍니다. 이는 단일 운영자용 로컬호스트 전용 도구이며 인증 기능이 없습니다. 공유 네트워크나 공개 네트워크에는 노출하지 마십시오.
+
+```bash
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+```
+
+자세한 내용, 환경 변수, 전체 API 목록은 다음을 참고하십시오: [`webui/README.md`](./webui/README.md).
+
+---
+
 ## 실행 모드
 
 | 모드 | 사용 시점 | 명령 |
@@ -245,8 +257,8 @@ Mimosa는 과학적 용도로 설계되었습니다 — 모든 결정은 사후�
 | `workflow_llm_model` | 멀티에이전트 워크플로우를 합성합니다 (예: `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | 실행 에이전트가 사용하는 모델 |
 | `judge_model` | 검증기 프로그램을 작성하고 소프트 판정을 내리는 LLM |
-| `learned_score_threshold` | `--learn` 모드에서의 조기 종료 임계값 (기본값 `0.9`) |
-| `max_learning_evolve_iterations` | 세대 수 상한 (기본값 `20`) |
+| `learned_score_threshold` | `--learn` 모드에서의 조기 종료 임계값 (기본값 `0.92`) |
+| `max_learning_evolve_iterations` | 세대 수 상한 (기본값 `25`) |
 
 전체 레퍼런스: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 

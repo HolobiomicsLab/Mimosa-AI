@@ -5,7 +5,6 @@ Provides methods for loading task data, getting dataset paths, and transferring 
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class ScienceAgentBenchLoader:
@@ -131,27 +130,29 @@ class ScienceAgentBenchLoader:
 
         return dataset_path
 
-    def get_eval_script_path(self, task_data: dict[str, str]) -> Path:
+    def get_eval_script_path(self, task_data: dict[str, str]) -> tuple[Path, Path | None]:
         """
-        Get the evaluation script path for a task and gpt4 visual judge
+        Get the evaluation script path and the (optional) gpt4 visual judge.
+
+        The judge is only needed by figure-judged tasks; run_eval_script enforces
+        its presence there. So a missing judge yields None rather than raising —
+        a non-figure task must not be excluded just because the judge is absent.
+
         Args:
             task_data: Task dictionary from CSV
         Returns:
-            Path to evaluation script
+            (eval script path, visual judge path or None)
         """
         eval_script_name = task_data.get('eval_script_name', '')
         if not eval_script_name:
             raise ValueError(f"No eval script name for task {task_data.get('instance_id')}")
 
         eval_path = self.eval_programs_path / eval_script_name
-        judge_path = self.eval_programs_path / "gpt4_visual_judge.py"
-
         if not eval_path.exists():
             raise FileNotFoundError(f"Evaluation script not found: {eval_path}")
-        if not judge_path.exists():
-            raise FileNotFoundError(f"Visual judge script not found: {judge_path}")
 
-        return eval_path, judge_path
+        judge_path = self.eval_programs_path / "gpt4_visual_judge.py"
+        return eval_path, (judge_path if judge_path.exists() else None)
 
     def get_gold_program_path(self, task_data: dict[str, str]) -> Path:
         """

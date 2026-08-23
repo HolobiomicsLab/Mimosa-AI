@@ -11,6 +11,8 @@ from pathlib import Path
 
 import requests
 
+from sources.utils import paths
+
 
 @dataclass
 class TokenUsage:
@@ -261,46 +263,36 @@ class PricingCalculator:
             print(f"❌ Workflow directory not found: {workflow_path}")
             return 0.0
 
-        model_id = None
+        model = "unknown"
         try:
-            with open(workflow_path / "state_result.json") as f:
-                state_results = json.load(f)
-                model_id = state_results.get("model_id", None)
-        except FileNotFoundError:
-            print(f"⚠️  State result file not found for UUID {uuid} - workflow may have failed during execution.")
-            print("📊 Will calculate costs for workflow generation and judge calls only.")
-
-        # Only process SmolAgent costs if workflow execution succeeded and we have model_id
-        if model_id:
-            try:
-                for file in os.listdir(memory_path):
-                    if (file.startswith("task_") or file.startswith("single_agent")) and file.endswith(".json"):
-                        with open(memory_path / file) as f:
-                            steps = json.load(f)
-                            token_usage = {
-                                "input_tokens": 0,
-                                "output_tokens": 0,
-                                "total_tokens": 0,
-                            }
-                            for step in steps:
-                                step_usage = step.get("token_usage", None)
-                                if token_usage:
-                                    token_usage = {
-                                        key: token_usage[key] + step_usage[key]
-                                        for key in step_usage
-                                    }
-                            llm_calls.append(
-                                TokenUsage(
-                                    file.replace("task_", "").replace(".json", ""),
-                                    model_id,
-                                    *token_usage.values(),
-                                )
+            for file in os.listdir(memory_path):
+                if file.startswith("task_") and file.endswith(".json"):
+                    with open(memory_path / file) as f:
+                        steps = json.load(f)
+                        token_usage = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                        }
+                        for step in steps:
+                            step_usage = step.get("token_usage", None)
+                            model = step.get("model", model) or model
+                            if token_usage:
+                                token_usage = {
+                                    key: token_usage[key] + step_usage[key]
+                                    for key in step_usage
+                                }
+                        llm_calls.append(
+                            TokenUsage(
+                                file.replace("task_", "").replace(".json", ""),
+                                model,
+                                *token_usage.values(),
                             )
-            except Exception as e:
-                print(f"❌ Error reading workflow steps: {str(e)}")
-                # Don't return 0.0 here - we can still calculate workflow generation costs
+                        )
+        except Exception as e:
+            print(f"❌ Error reading workflow steps: {str(e)}")
         else:
-            print("📊 Skipping SmolAgent cost calculation (workflow execution failed)")
+            print("📊 Skipping SmolAgent cost calculation")
 
         total_cost = 0.0
         total_input_tokens = 0
@@ -322,7 +314,13 @@ class PricingCalculator:
             total_all_tokens += call.total_tokens
 
         from sources.cli.pretty_print import (
-            BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW,
+            BOLD,
+            CYAN,
+            DIM,
+            GREEN,
+            MAGENTA,
+            RESET,
+            YELLOW,
         )
 
         W = 64
@@ -361,10 +359,10 @@ class PricingCalculator:
 class OpenRouterPricingClient:
     """Client for fetching real-time model pricing from OpenRouter API."""
 
-    def __init__(self, cache_duration_hours: int = 24):
+    def __init__(self, cache_duration_hours: int = 24, cache_file: str | None = None):
         self.base_url = "https://openrouter.ai/api/v1"
         self.cache_duration = timedelta(hours=cache_duration_hours)
-        self.cache_file = "sources/cache/openrouter_pricing.json"
+        self.cache_file = cache_file or paths.pricing_cache_file()
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self):

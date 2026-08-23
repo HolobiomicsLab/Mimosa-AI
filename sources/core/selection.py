@@ -21,7 +21,7 @@ from typing import Any
 
 from .code_features import genotype_embedding_descriptor
 
-MAX_CHILDREN_PER_PARENT = 2
+MAX_CHILDREN_PER_PARENT = 8
 
 # Comparison-set modes for novelty.
 NOVELTY_ARCHIVE_KNN = "archive_knn"
@@ -33,7 +33,7 @@ class SelectionStrategy(Enum):
     GREEDY = "greedy"             # Accept only if strictly better (current behaviour)
     TOURNAMENT = "tournament"     # Probabilistic tournament selection
     NOVELTY = "novelty"           # Novelty search: reward behavioural diversity
-    QUALITY_DIVERSITY = "qd"      # MAP-Elites style: novelty + quality combined
+    QUALITY_DIVERSITY = "qd"      # Unstructured archive scored by scalarised novelty + quality
 
 
 @dataclass
@@ -83,6 +83,7 @@ class SelectionPressure:
 
     def __init__(
         self,
+        config: dict[str, Any],
         min_improvement_threshold: float = 0.01,
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
@@ -116,6 +117,7 @@ class SelectionPressure:
                 subtracted from ``qd_score``. Kept conservative so it only
                 breaks near-ties.
         """
+        self.config = config
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
 
@@ -805,7 +807,7 @@ if __name__ == "__main__":
         )
 
     sp = SelectionPressure(
-        strategy="qd", population_size=50, novelty_k_neighbours=25,
+        config={}, strategy="qd", population_size=50, novelty_k_neighbours=25,
         novelty_weight=0.4, length_penalty_baseline_chars=5000,
         length_penalty_lambda=0.05,
     )
@@ -829,7 +831,7 @@ if __name__ == "__main__":
 
     # previous_n mode: cosine distance against the recent window.
     sp_pn = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         novelty_comparison="previous_n", previous_n=4,
     )
     sp_pn._validate_open_ended([seed], [seed], threshold=0.01)

@@ -46,12 +46,16 @@ class SingleAgentFactory(Factory):
         Raises:
             RuntimeError: If MCP tools or the system prompt cannot be loaded.
         """
+        INSTRUCTIONS = goal
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         short_uuid = str(uuid.uuid4())[:8]
         uuid_str = f"single_agent_{timestamp}_{short_uuid}"
-        model_id = self.config.smolagent_model_id
+        # `smolagent_model_id` may be a list of candidate models; a single agent
+        # runs one model, so resolve to the primary (first) for the engine,
+        # provider lookup and cost tracking below.
+        model_id = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
         max_tokens = getattr(self.config, 'max_tokens', 8192)
-        provider, _ = extract_model_pattern(self.config.smolagent_model_id)
+        provider, _ = extract_model_pattern(model_id)
         token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
 
         try:
@@ -68,19 +72,6 @@ class SingleAgentFactory(Factory):
         # Create folder structure for cost tracking (like multi-agent mode)
         workflow_path, memory_path = self.create_folder_structure(uuid_str)
 
-        INSTRUCTIONS = ". ".join([
-            "TASK:",
-            goal,
-            "",
-            "CONSTRAINTS:",
-            "- Never plot anything to the user. Plotting causes: 'terminating due to uncaught exception of type NSException'.",
-            "- Save outputs instead of plotting.",
-            "- Only use execute_command to install packages.",
-            "- Wrap any command that may take significant time (>5 minutes) in a timeout.",
-            "",
-            "INITIAL STEP:",
-            "- Assess the workspace by running: ls -la"
-        ])
         # Resolve absolute paths (like craft_workflow does)
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
@@ -91,6 +82,7 @@ class SingleAgentFactory(Factory):
             re.findall(r"\bMCP_\d+_TOOLS\b", tools_code)
         ))
         mcps_string = "MCPS = [\n" + ",\n".join(f"    {name}" for name in mcp_vars) + "\n]"
+        engine = "mlx" if "mlx-community/" in model_id else self.config.engine_name
 
         code = f"""
 import os
@@ -105,8 +97,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_ID = {self.config.smolagent_model_id!r}
-GOAL = {goal!r}
+MODEL_ID = {model_id!r}
 SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
 INSTRUCTIONS = {INSTRUCTIONS!r}
 MEMORY_PATH = {memory_path_abs!r}
@@ -116,8 +107,41 @@ model_id = {model_id!r}
 max_tokens = {max_tokens}
 provider = {provider!r}
 token = {token!r}
-engine_name = {self.config.engine_name!r}
-openrouter_provider = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+engine_name = {engine!r}
+openrouter_provider = {self.config.openrouter_provider_for(model_id)!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
+TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
+
+def logprobs_kwargs_for(model_id):
+    \"\"\"Return the logprobs request params the model's provider accepts.
+
+    Mirrors smolagent_factory.logprobs_kwargs_for: litellm raises
+    UnsupportedParamsError for request params a provider lacks (mistral and
+    anthropic take neither param, gemini takes logprobs but not
+    top_logprobs), so build the request from its param map instead of
+    crashing at call time. Providers litellm has no param map for keep the
+    full request.
+    \"\"\"
+    kwargs = {{"logprobs": True, "top_logprobs": TOP_LOGPROBS}}
+    try:
+        import litellm
+        supported = litellm.get_supported_openai_params(model=model_id)
+    except Exception:
+        return kwargs
+    if supported is None:
+        return kwargs
+    if "logprobs" not in supported:
+        print(f"WARNING: logprobs disabled for '{{model_id}}': provider does not support them.")
+        return {{}}
+    if "top_logprobs" not in supported:
+        del kwargs["top_logprobs"]
+    return kwargs
+
+# Only the litellm engine forwards the logprobs request, and only when the
+# provider accepts the params — gating both keeps the missing-logprobs
+# warning honest.
+logprobs_kwargs = logprobs_kwargs_for(model_id) if SAVE_LOGPROBS and engine_name == "litellm" else {{}}
+save_logprobs = bool(logprobs_kwargs)
 engine = None
 
 if engine_name == "mlx":
@@ -137,7 +161,7 @@ elif engine_name == "inference_client":
         max_tokens=max_tokens,
     )
 elif engine_name == "litellm":
-    _litellm_extra = {{}}
+    _litellm_extra = dict(logprobs_kwargs)
     if openrouter_provider and str(model_id).startswith("openrouter/"):
         _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
         _litellm_extra["extra_body"] = {{
@@ -201,6 +225,30 @@ agent = CodeAgent(
 
 agent.prompt_templates["system_prompt"] = SYSTEM_PROMPT
 
+def extract_logprobs(step):
+    \"\"\"Return token logprobs from a step's raw model response, or None.
+
+    Mirrors smolagent_factory.extract_logprobs: logprobs only exist on the
+    raw provider response kept in model_output_message.raw, which
+    save_agent_memories strips. Drops the per-token "bytes" arrays
+    (redundant with "token") to keep memory files small.
+    \"\"\"
+    raw = getattr(getattr(step, "model_output_message", None), "raw", None)
+    if raw is None:
+        return None
+    try:
+        logprobs = raw.choices[0].logprobs
+        if logprobs is None:
+            return None
+        dumped = logprobs.model_dump() if hasattr(logprobs, "model_dump") else dict(logprobs)
+        for token_entry in dumped.get("content") or []:
+            token_entry.pop("bytes", None)
+            for alternative in token_entry.get("top_logprobs") or []:
+                alternative.pop("bytes", None)
+        return dumped
+    except (AttributeError, IndexError, TypeError, KeyError):
+        return None
+
 def save_agent_memories(agent, memory_path: str, agent_name: str):
     print(f"Saving agent memory to: {{{{memory_path}}}}")
     try:
@@ -223,8 +271,12 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                     if step.model_output_message
                     else None
                 )
+                action_step["logprobs"] = extract_logprobs(step)
+                action_step["model"] = self.model_id
                 memories.append(action_step)
 
+        if save_logprobs and memories and all(m["logprobs"] is None for m in memories):
+            print(f"WARNING: logprobs requested but none returned for agent '{{agent_name}}'; check provider support.")
         os.makedirs(memory_path, exist_ok=True)
         agent_task_path = os.path.join(memory_path, f"task_{{agent_name}}.json")
         with open(agent_task_path, "w") as f:
@@ -242,7 +294,7 @@ save_agent_memories(agent, MEMORY_PATH, "single_agent")
 # Save state_result.json for cost tracking and evaluation
 state_result = {{
     "model_id": MODEL_ID,
-    "goal": GOAL,
+    "goal": INSTRUCTIONS,
     "workflow_uuid": "{uuid_str}",
     "single_agent_mode": True,
     "step_name": ["single_agent"],

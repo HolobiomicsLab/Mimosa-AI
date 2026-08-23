@@ -45,9 +45,17 @@ Mimosa-AI is an **open-source Python framework for autonomous scientific researc
 
 The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier score workflows by running deterministic Python checks that verify litterature grounding, non-triviality, and quality metrics against artifacts that the agents produced. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
+**Complete Install:**
 ```bash
-uv sync && uv run main.py        # interactive onboarding
+uv tool install . && mimosa # Interactive onboarding
 ```
+
+**Run without system-wide install:**
+```bash
+uv sync && uv run main.py    # Interactive onboarding
+```
+
+**Note:** Mimosa needs Toolomics and Perspicacité-AI running in background.
 
 ---
 
@@ -105,9 +113,9 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 
 Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
 
-- **Selection: Quality-Diversity archive** (**MAP-Elites**-style) — max population of 50, `qd_score = (1−w)·quality + w·novelty` (`w = novelty_weight = 0.25`). **Novelty search** uses cosine-distance k-NN (`k = 15`) over the **genotype-embedding** behaviour descriptor — an L2-normalised embedding of the workflow's generated source code (local `all-MiniLM-L6-v2` by default; optional OpenAI `text-embedding-3-small`). Parents drawn by inverse-child-count roulette so the archive spreads (`MAX_CHILDREN_PER_PARENT = 2`).
+- **Selection: Quality-Diversity archive** — **unstructured** (a flat list, not a discretised grid), capped at 20 members, scored by a single scalarised objective `qd_score = (1−w)·quality + w·novelty` (`w = novelty_weight = 0.25`); the lowest-`qd_score` member is evicted when full. **Novelty search** uses cosine-distance k-NN (`k = 15`) over the **genotype-embedding** behaviour descriptor — an L2-normalised embedding of the workflow's generated source code (local `all-MiniLM-L6-v2` by default; optional OpenAI `text-embedding-3-small`). Parents drawn by inverse-child-count roulette so the archive spreads (`MAX_CHILDREN_PER_PARENT = 8`).
 - **Variation: Rechenberg-1/5 + plateau-driven scope** — mutation boldness blends the success rate of the last 5 scored offspring (Rechenberg 1/5 rule, threshold `0.20`) with an `iters_since_improvement` plateau counter (patience `6`). Near-winners (parent score > 0.95) get a damper. Scope bands run from `EXPLOITATION` (point mutation) to `RE-SPECIATION` (clean-slate redesign), gated by an effective-boldness threshold (`< 0.35 / 0.50 / 0.65 / 0.90 / 1.01`).
-- **Crossover** — by default ~10 % of generations combine two parents, strongest-first, with offspring hard-capped at the highest parent agent count.
+- **Crossover** — by default ~40 % of generations combine two parents, strongest-first, with offspring hard-capped at the highest parent agent count.
 - **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.8) seeds the search. Useful workflows transfer across tasks.
 
 Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md).
@@ -144,9 +152,18 @@ cd Mimosa-AI
 uv sync
 ```
 
+**Or install as a standalone `mimosa` command**, usable from any directory:
+
+```bash
+uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git   # or: uv tool install /path/to/Mimosa-AI
+mimosa --task "..."
+```
+
+When installed this way, settings persist to `~/.config/mimosa/config.json` (written by the onboarding wizard, loaded automatically on every run), API keys can live in `~/.config/mimosa/.env`, and runtime state (memory, workflows, run capsules) goes to `~/.local/share/mimosa/`. Repo checkouts keep the historical layout: `config_default.json` and state directories inside the checkout.
+
 ### 2. Add at least one LLM key
 
-Create `.env` at the project root. Only the providers you actually use are required.
+Create `.env` at the project root (or `~/.config/mimosa/.env` for the installed command). Only the providers you actually use are required.
 
 ```env
 ANTHROPIC_API_KEY=...       # Claude — recommended for workflow synthesis
@@ -200,6 +217,23 @@ uv sync && uv run web_app_full.py
 
 ---
 
+## Web interface (Observatory)
+
+Mimosa is otherwise CLI-only; **Observatory** is an optional local web UI
+(FastAPI + React) that renders what a run produces — lineage tree, replay,
+workspace, and a setup/launch flow — so you can watch and inspect evolution
+instead of reading logs. It's a single-operator, localhost tool with no
+authentication; don't expose it on a shared or public network.
+
+```bash
+cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+```
+
+Details, environment variables, and the full API surface:
+[`webui/README.md`](./webui/README.md).
+
+---
+
 ## Execution modes
 
 | Mode | Use when | Command |
@@ -247,8 +281,8 @@ Copy `config_default.json` to `my_config.json` and edit. The fields you'll touch
 | `workflow_llm_model` | Synthesizes the multi-agent workflow (e.g. `anthropic/claude-opus-4-5`) |
 | `smolagent_model_id` | Model used by execution agents |
 | `judge_model` | LLM that writes verifier programs and renders soft verdicts |
-| `learned_score_threshold` | Early-stop threshold in `--learn` mode (default `0.9`) |
-| `max_learning_evolve_iterations` | Cap on generations (default `20`) |
+| `learned_score_threshold` | Early-stop threshold in `--learn` mode (default `0.92`) |
+| `max_learning_evolve_iterations` | Cap on generations (default `25`) |
 
 Full reference: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
 

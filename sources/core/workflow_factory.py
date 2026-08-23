@@ -127,7 +127,6 @@ class WorkflowFactory(Factory):
             The raw LLM completion (typically containing one or more
             ```` ```python ``` ```` blocks).
         """
-
         prompt = f"""
 # INSTRUCTIONS:
 
@@ -320,11 +319,15 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path = str((script_dir / memory_path).resolve())
         workflow_path = str((script_dir / workflow_path).resolve())
+        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        # `WorkflowState.model_id` is a single string and is persisted to
+        # `state_result.json`, where cost accounting reads it back; store the
+        # resolved default rather than the raw (possibly list) config value.
         initial_state = {
             key: (
                 uuid_str
                 if key == "workflow_uuid"
-                else self.config.smolagent_model_id
+                else default_model
                 if key == "model_id"
                 else goal
                 if key == "goal"
@@ -332,6 +335,8 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             )
             for key in state_schema.WorkflowState.__annotations__
         }
+        providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
+        engine = "mlx" if "mlx-community/" in default_model else self.config.engine_name
         return f"""
 import os
 import sys
@@ -348,12 +353,13 @@ from typing import Annotated
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
-MODEL_ID = {self.config.smolagent_model_id!r}
-ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+MODEL_ID = {default_model!r}
+ENGINE_NAME = {engine!r}
+OPENROUTER_PROVIDER = {providers!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
 MAX_CONTEXT_TOKENS = {self.config.max_context_tokens!r}
 WORKSPACE_DIR = {self.config.workspace_dir!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 

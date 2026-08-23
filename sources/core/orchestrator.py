@@ -44,6 +44,7 @@ class WorkflowOrchestrator:
             python_version=self.config.runner_default_python_version,
             timeout=self.config.runner_default_timeout,
             max_memory_mb=self.config.runner_default_max_memory_mb,
+            temp_dir=self.config.runner_temp_dir,
         )
         self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 
@@ -273,6 +274,32 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             title=f"Workflow {uuid} execution failed",
             priority=1,
         )
+    
+    def _prompt_agents_model_list(self, craft_instructions: str) -> str:
+        """Prompt the orchestrator the list of allowed models choice.
+
+        Args:
+            craft_instructions: Original craft instructions to be enriched.
+
+        Returns:
+            The craft instructions, optionally prepended with model selection
+            instructions.
+        """
+        if not self.config.orchestrator_choose_model:
+            unallowed_banner = """
+\nYou are not allowed to choose per agent model. The workflow will use the default model(s) specified in the configuration.\n
+"""
+            return craft_instructions + unallowed_banner
+
+        model_list = self.config.smolagent_model_id if isinstance(self.config.smolagent_model_id, list) else [self.config.smolagent_model_id]
+        model_list_str = '\n - '.join(model_list)
+        model_list_prompt = (
+            "You can choose per agent model for this workflow from the following list:\n"
+            f"{model_list_str}\n"
+            "Do not choose a model that is not in the list. If you do not want to choose a model, you can leave it empty and the default model will be used.\n"
+            "Specify the model parameter for each agent with the value of your choice."
+        )
+        return model_list_prompt + '\n' + craft_instructions
 
     async def orchestrate_workflow(
         self,
@@ -302,7 +329,10 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         workflow_start = time.time()
         science_task = original_task or goal
 
-        craft_instructions = self._ground_with_perspicacite(science_task, craft_instructions)
+        craft_instructions = self._prompt_agents_model_list(craft_instructions)
+
+        if self.config.literrature_grounding == True:
+            craft_instructions = self._ground_with_perspicacite(science_task, craft_instructions)
 
         logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
         print_phase("WORKFLOW GENERATION PHASE")
