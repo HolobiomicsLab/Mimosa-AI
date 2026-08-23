@@ -176,3 +176,44 @@ def test_the_issue_196_scenario_end_to_end(tmp_path: Path):
     mentions = [c for c in out if "iimn_reproduction_plan" in json.dumps(c)]
     assert mentions, "the declared output must now be checkable"
     assert mentions[0]["importance"] == 10
+
+
+# ---- a declared directory is not a declared file --------------------------
+
+
+def test_a_directory_output_asks_for_a_directory_not_a_file():
+    """Observed live: a plan declared `workspace/p_iimn_task_001/data/`.
+
+    The claim said "A file exists at that path" — which no correct run can
+    satisfy for a directory, so a maximum-importance claim would have failed a
+    step that did exactly what the plan asked. ``_verify_expected_outputs``
+    already distinguishes the two; the claim has to as well.
+    """
+    claim = declared_outputs.as_claims(["workspace/p_iimn_task_001/data/"])[0]
+    assert "A directory exists at that path" in claim["description"]
+    assert "A file exists at that path" not in claim["description"]
+
+
+def test_a_file_output_still_asks_for_a_file():
+    claim = declared_outputs.as_claims(
+        ["workspace/p_iimn_task_001/data/dataset_inventory.csv"])[0]
+    assert "A file exists at that path" in claim["description"]
+    assert "A directory exists" not in claim["description"]
+
+
+def test_a_backslash_directory_is_recognised_too():
+    claim = declared_outputs.as_claims(["workspace\\analysis\\"])[0]
+    assert "A directory exists at that path" in claim["description"]
+
+
+def test_the_live_step_2_declaration_yields_one_of_each():
+    """The exact pair run 6 recorded for step `data_acquisition`."""
+    claims = declared_outputs.as_claims([
+        "workspace/p_iimn_task_001/data/",
+        "workspace/p_iimn_task_001/data/dataset_inventory.csv",
+    ])
+    assert [c["id"] for c in claims] == [
+        "declared_output_data", "declared_output_dataset_inventory_csv"]
+    kinds = ["directory" if "A directory exists" in c["description"] else "file"
+             for c in claims]
+    assert kinds == ["directory", "file"]
