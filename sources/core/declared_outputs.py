@@ -34,6 +34,10 @@ _logger = logging.getLogger(__name__)
 
 FILENAME_FMT = "declared_outputs_{task_key}.json"
 
+#: Suffixes whose content should be records rather than prose. A stub
+#: here is disqualifying; a report describing stubs is not.
+_DATA_SUFFIXES = {".csv", ".tsv", ".mgf", ".json", ".parquet", ".mzml", ".mztab"}
+
 
 def task_key(task_text: str) -> str:
     """Stable 16-hex-char key derived from a step's task text.
@@ -111,11 +115,23 @@ def as_claims(outputs: list[str]) -> list[dict]:
         # importance 10 on "File exists and is non-empty (1462 bytes)". A claim
         # that a placeholder satisfies applies pressure to create the file
         # without applying any to fill it, so it must ask for content.
+        #
+        # But the disqualifier has to distinguish a file that *is* a placeholder
+        # from a file that *reports on* one. A first version said "a file whose
+        # body announces missing or unavailable data does not satisfy this
+        # claim", and it failed a 292-line processing log — the most substantive
+        # artefact in the workspace — because the log honestly recorded that its
+        # sibling outputs were placeholders. Penalising that is exactly backwards.
+        is_data = Path(raw.rstrip("/\\")).suffix.lower() in _DATA_SUFFIXES
         substance = (
-            "It contains real content produced by this step — not a placeholder, "
-            "stub, template, or a note recording that the data could not be "
-            "obtained. A file whose body announces missing or unavailable data "
-            "does not satisfy this claim."
+            "It holds actual records — data rows, spectra, or entries — and not "
+            "merely comments, headers, or placeholder text standing in for data "
+            "that could not be obtained."
+            if is_data else
+            "It is substantive content produced by this step, not an empty stub "
+            "or an unfilled template. A report that documents what was attempted "
+            "and honestly records missing inputs or limitations does satisfy "
+            "this claim; a file with no content of its own does not."
         )
         expectation = (
             f"A directory exists at that path in the workspace and holds at "

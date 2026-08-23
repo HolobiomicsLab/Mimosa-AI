@@ -236,14 +236,57 @@ def test_the_claim_asks_for_content_not_merely_bytes():
     """
     for output in ("results/table.csv", "results/dir/"):
         desc = declared_outputs.as_claims([output])[0]["description"]
-        assert "placeholder" in desc.lower()
-        assert "is non-empty" not in desc, (
-            "byte count is not evidence of content")
+        assert "is non-empty" not in desc, "byte count is not evidence of content"
+    # The data-file wording names the failure mode outright; the report wording
+    # asks for substance instead, because a report may legitimately be *about*
+    # missing data (see test_a_report_that_records_missing_inputs...).
+    assert "placeholder text standing in for data" in \
+        declared_outputs.as_claims(["results/table.csv"])[0]["description"]
+    assert "not an empty stub" in \
+        declared_outputs.as_claims(["results/dir/"])[0]["description"]
 
 
 def test_both_kinds_carry_the_substance_requirement():
     claims = declared_outputs.as_claims(["a/table.csv", "a/dir/"])
-    for c in claims:
-        assert "real content produced by this step" in c["description"]
+    assert "holds actual records" in claims[0]["description"]
+    assert "substantive content produced by this step" in claims[1]["description"]
     assert "A directory exists" in claims[1]["description"]
     assert "A file exists" in claims[0]["description"]
+
+
+# ---- a file that IS a stub vs a file that REPORTS on one ------------------
+
+
+def test_a_report_that_records_missing_inputs_still_satisfies_its_claim():
+    """The first wording failed the best artefact in the workspace.
+
+    `processing_log.md` — 292 lines, batch parameters, a recovery path — was
+    failed by an A/B probe because it honestly recorded that its *sibling*
+    outputs were placeholders. The disqualifier caught a file reporting on
+    stubs rather than a file that is one, which penalises exactly the honesty
+    the claim is meant to protect.
+    """
+    desc = declared_outputs.as_claims(["a/processing_log.md"])[0]["description"]
+    assert "documents what was attempted" in desc
+    assert "honestly records missing inputs" in desc
+    assert "holds actual records" not in desc
+
+
+def test_a_data_file_must_hold_records():
+    for output in ("a/feature_table.csv", "a/spectra.mgf", "a/x.tsv", "a/y.json"):
+        desc = declared_outputs.as_claims([output])[0]["description"]
+        assert "holds actual records" in desc, output
+        assert "placeholder text standing in for data" in desc, output
+
+
+def test_the_two_wordings_are_mutually_exclusive():
+    data = declared_outputs.as_claims(["a/t.csv"])[0]["description"]
+    prose = declared_outputs.as_claims(["a/t.md"])[0]["description"]
+    assert data != prose
+    assert "substantive content" in prose and "substantive content" not in data
+
+
+def test_an_unknown_suffix_is_treated_as_a_report():
+    """Only the listed data suffixes get the record requirement."""
+    desc = declared_outputs.as_claims(["a/notes.rst"])[0]["description"]
+    assert "substantive content" in desc
