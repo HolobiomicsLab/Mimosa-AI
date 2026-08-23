@@ -96,13 +96,25 @@ def as_claims(outputs: list[str]) -> list[dict]:
     """
     claims = []
     for output in outputs:
-        stem = Path(str(output).rstrip("/\\")).name or str(output)
+        raw = str(output)
+        # A plan may declare a directory ("…/data/") as an output. Asserting a
+        # file exists at that path would fail a maximum-importance claim on a
+        # step that did exactly what was asked. Planner._verify_expected_outputs
+        # already makes this distinction; the claim must make it too.
+        is_directory = raw.rstrip().endswith(("/", "\\"))
+        stem = Path(raw.rstrip("/\\")).name or raw
         slug = "".join(c if c.isalnum() else "_" for c in stem.lower()).strip("_")
+        expectation = (
+            "A directory exists at that path in the workspace and holds at "
+            "least one non-empty file."
+            if is_directory else
+            "A file exists at that path, in the workspace, and is non-empty."
+        )
         claims.append({
             "id": f"declared_output_{slug}",
             "description": (
                 f"The plan declared `{output}` as an output of this step. "
-                f"A file exists at that path, in the workspace, and is non-empty."
+                f"{expectation}"
             ),
             "importance": 10,
             "importance_rationale": "declared by the plan before the step ran",
