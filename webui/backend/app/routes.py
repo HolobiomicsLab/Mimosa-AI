@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from . import bridge, config_store, lineage, memory, store, workspace
+from . import bridge, config_store, lineage, memory, provenance, store, workspace
 from .launcher import launcher
 from .live import hub
 
@@ -76,6 +76,16 @@ def get_tree(run_id: str) -> dict[str, Any]:
     if result is None:
         raise HTTPException(status_code=404, detail="no lineage for run")
     return result
+
+
+@router.get("/runs/{run_id}/provenance")
+def get_provenance(run_id: str) -> dict[str, Any]:
+    """The run's ASTRA capsule (decisions + universes) and every independent
+    asb_eval evaluation capsule that names it. Empty sections are normal —
+    only a family's best run has a capsule, and evaluations exist only after
+    ``asb_eval`` has been run against the workspace."""
+    _require_run(run_id)
+    return provenance.provenance(run_id)
 
 
 @router.get("/runs/{run_id}/series")

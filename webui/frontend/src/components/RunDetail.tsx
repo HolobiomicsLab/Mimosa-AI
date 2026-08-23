@@ -10,10 +10,11 @@ import LineageTree from './LineageTree'
 import RewardChart from './RewardChart'
 import MemoryReplay from './MemoryReplay'
 import WorkspacePanel from './WorkspacePanel'
+import ProvenancePanel from './ProvenancePanel'
 
 // Scientist-first ordering: outputs → what the agents did → the workflow. The
 // neuroevolution machinery lives under "Evolution", shown only for learning runs.
-type Tab = 'results' | 'verification' | 'replay' | 'workflow' | 'evolution' | 'artifacts'
+type Tab = 'results' | 'verification' | 'provenance' | 'replay' | 'workflow' | 'evolution' | 'artifacts'
 
 /** Objective shown truncated (first 512 chars) with a toggle to expand/collapse. */
 const OBJECTIVE_LIMIT = 512
@@ -46,6 +47,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const tabs: [Tab, string, number?][] = [
     ['results', 'Results'],
     ...(run.evaluation_scores ? [['verification', 'Verification'] as [Tab, string]] : []),
+    ['provenance', 'Provenance'],
     ['replay', 'Replay'],
     ['workflow', 'Workflow'],
     ...(run.learning_mode ? [['evolution', 'Evolution'] as [Tab, string]] : []),
@@ -78,6 +80,7 @@ export default function RunDetail({ runId }: { runId: string }) {
       <div className="tab-body">
         {tab === 'results' && <Results run={run} />}
         {tab === 'verification' && <Verification run={run} />}
+        {tab === 'provenance' && <ProvenancePanel runId={runId} />}
         {tab === 'replay' && <MemoryReplay runId={runId} />}
         {tab === 'workflow' && <Workflow run={run} />}
         {tab === 'evolution' && <Evolution run={run} />}

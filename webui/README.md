@@ -37,6 +37,16 @@ For every evolution run under `sources/workflows/<uuid>/`:
   call (prompt, response, cost, tokens).
 - **Workspace** — the toolomics workspace and per-run `/tmp` snapshots, files
   ranked by a relevance heuristic (figures first, then fresh/large data).
+- **Provenance** — the run rendered FROM its structured record rather than
+  from its own reporting: the transparency exporter's ASTRA capsule
+  (`runs_capsule/<uuid>/astra.yaml` — decisions with alternatives, rationale,
+  and universes; a run without its own capsule links to the family members
+  that have one) beside every independent `asb_eval` evaluation capsule
+  (`eval_astra.yaml`) that names the run — executor verdicts over the ASB
+  card's own criteria, workspace provenance flags, and the pinned-instrument
+  judge layer, which is never merged into the executor score. Directories are
+  overridable via `MIMOSA_CAPSULE_DIR` / `MIMOSA_EVAL_DIR` (defaults:
+  `runs_capsule/`, `evaluations/`).
 - **Artifacts** — a raw browser over every file in the run dir.
 
 Plus two pages that replace the CLI onboarding:

@@ -269,3 +269,90 @@ export interface LaunchInfo {
   log: string
   log_tail?: string
 }
+
+// ── Provenance: the run's ASTRA capsule + independent evaluations ──
+
+export interface AstraDecisionOption {
+  label?: string
+  description?: string
+  excluded_reason?: string
+}
+
+export interface AstraDecision {
+  label?: string
+  rationale?: string
+  default?: string | number | null
+  options?: Record<string, AstraDecisionOption>
+  /** The model that made this decision, when the exporter recorded it. */
+  model?: string
+}
+
+export interface AstraUniverse {
+  id?: string
+  description?: string
+  decisions?: Record<string, unknown>
+}
+
+export interface AstraCapsule {
+  name: string | null
+  description: string | null
+  version: string | null
+  decisions: Record<string, AstraDecision>
+  outputs: unknown[]
+  universes: AstraUniverse[]
+}
+
+export interface ProvenanceFlag {
+  kind?: string
+  artefact?: string
+  detail?: string
+}
+
+export interface EvalVerdict {
+  check_id?: string
+  status?: string
+  method?: string
+  criterion?: string
+  failure_kind?: string | null
+  observed?: unknown
+  expected?: unknown
+  note?: string
+  evidence?: string[]
+  provenance_flags?: ProvenanceFlag[]
+}
+
+export interface JudgeVerdict {
+  item_id?: string
+  layer?: string
+  verdict?: string
+  rationale?: string
+  confidence?: number | null
+  evidence_cited?: string[]
+}
+
+export interface JudgeLayer {
+  instrument?: Record<string, unknown>
+  summary?: Record<string, unknown>
+  refused?: { item_id?: string; reason?: string }[]
+  verdicts?: JudgeVerdict[]
+}
+
+export interface RunEvaluation {
+  source: string
+  name: string | null
+  criteria_source: string | null
+  independent_of_subject: boolean | null
+  summary: Record<string, unknown>
+  verdicts: EvalVerdict[]
+  workspace_flags: ProvenanceFlag[]
+  target_conflicts: unknown[]
+  judge: JudgeLayer | null
+}
+
+export interface Provenance {
+  run_id: string
+  astra: AstraCapsule | null
+  /** Family members holding the capsule, when this run has none of its own. */
+  family_capsules: string[]
+  evaluations: RunEvaluation[]
+}
