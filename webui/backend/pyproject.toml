@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "python-multipart>=0.0.12",
+    "pyyaml>=6.0",
     "uvicorn[standard]>=0.32",
     "watchfiles>=0.24",
 ]
