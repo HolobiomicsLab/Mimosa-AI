@@ -166,6 +166,8 @@ export interface UploadResult { saved: UploadedFile[] }
 export interface LiveEvent {
   type: 'iteration_complete' | 'execution_complete' | 'tree_updated'
     | 'run_finished' | 'archive_appended' | 'workflow_crafted'
+    | 'step_appended' | 'llm_call_logged' | 'gradient_updated'
+    | 'evaluation_updated' | 'astra_updated' | 'evaluation_capsule_updated'
   run_id: string | null
   filename: string
 }
@@ -355,4 +357,61 @@ export interface Provenance {
   /** Family members holding the capsule, when this run has none of its own. */
   family_capsules: string[]
   evaluations: RunEvaluation[]
+}
+
+// ── evolution replay + QD atlas ─────────────────────────────────────────────
+
+/** One family member, annotated with everything the replay narrates. */
+export interface EvolutionNode {
+  id: string
+  iteration: number | null
+  evolution_kind: EvolutionKind
+  created_at: string | null
+  score: number | null
+  status: RunStatus
+  is_focus: boolean
+  parents: string[]
+  score_uncapped: number | null
+  qd_score: number | null
+  novelty_score: number | null
+  iteration_cost_usd: number | null
+  cumulative_cost_usd: number | null
+  wall_time_s: number | null
+  on_error: boolean | null
+  claims: { passed: number; failed: number; error: number; unsure: number } | null
+  gradient_snippet: string | null
+  selection: {
+    improvement_type?: string | null
+    delta_reward?: number | null
+    is_validated?: boolean | null
+    confidence?: number | null
+    admit_rejected?: boolean | null
+  } | null
+}
+
+export interface FamilyEvolution {
+  focus: string
+  nodes: EvolutionNode[]
+  edges: { source: string; target: string; kind: EvolutionKind }[]
+}
+
+/** One run projected onto the 2-D PCA of Mimosa's own QD behaviour space. */
+export interface AtlasPoint {
+  id: string
+  x: number
+  y: number
+  score: number | null
+  iteration: number | null
+  evolution_kind: EvolutionKind | null
+  family: number | null
+  started_at: string | null
+  cost: number | null
+}
+
+export interface AtlasData {
+  points: AtlasPoint[]
+  edges: { source: string; target: string }[]
+  skipped: { id: string; reason: string }[]
+  variance_explained: number[]
+  n_dimensions: number
 }

@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { api, artifactUrl } from '../api'
-import { useAsync } from '../hooks'
-import type { Artifact, ClaimStatus, EvaluationClaim, RunDetail as RunDetailT } from '../types'
+import { useAsync, useLive } from '../hooks'
+import type { Artifact, ClaimStatus, EvaluationClaim, LiveEvent, RunDetail as RunDetailT } from '../types'
 import {
   KindTag, ScoreChip, Spinner, StatusBadge, fmtCost, fmtDuration,
 } from '../ui'
-import LineageTree from './LineageTree'
-import RewardChart from './RewardChart'
+import EvolutionReplay from './EvolutionReplay'
 import MemoryReplay from './MemoryReplay'
 import WorkspacePanel from './WorkspacePanel'
 import ProvenancePanel from './ProvenancePanel'
+import LiveFeed from './LiveFeed'
+import { SmartText } from '../render'
 
 // Scientist-first ordering: outputs → what the agents did → the workflow. The
 // neuroevolution machinery lives under "Evolution", shown only for learning runs.
@@ -36,13 +36,34 @@ function ObjectiveText({ text }: { text: string }) {
 }
 
 export default function RunDetail({ runId }: { runId: string }) {
-  const { data: run, loading, error } = useAsync<RunDetailT>(() => api.run(runId), [runId])
+  const { data: run, loading, error, refetch } = useAsync<RunDetailT>(() => api.run(runId), [runId])
   const [tab, setTab] = useState<Tab>('results')
+  // Live remount keys: bumping one refetches that panel from disk.
+  const [wsVersion, setWsVersion] = useState(0)
+  const [provVersion, setProvVersion] = useState(0)
+  const [sawActivity, setSawActivity] = useState(false)
 
-  useEffect(() => setTab('results'), [runId])
+  useEffect(() => { setTab('results'); setSawActivity(false) }, [runId])
+
+  /** This run's filesystem events, subscribed here (not in LiveFeed) so a
+   * completed run still surfaces the feed the moment new activity arrives. */
+  const onLive = (e: LiveEvent) => {
+    if (e.run_id && e.run_id !== runId) return
+    setSawActivity(true)
+    if (['iteration_complete', 'execution_complete', 'run_finished', 'evaluation_updated'].includes(e.type)) {
+      refetch()
+      setWsVersion((v) => v + 1)
+    }
+    if (e.type === 'astra_updated' || e.type === 'evaluation_capsule_updated') {
+      setProvVersion((v) => v + 1)
+    }
+  }
+  useLive(onLive)
 
   if (loading) return <Spinner label="Loading run…" />
   if (error || !run) return <div className="empty"><div className="hint">Run not found.</div></div>
+
+  const live = run.status === 'running' || sawActivity
 
   const tabs: [Tab, string, number?][] = [
     ['results', 'Results'],
@@ -78,26 +99,23 @@ export default function RunDetail({ runId }: { runId: string }) {
       </div>
 
       <div className="tab-body">
-        {tab === 'results' && <Results run={run} />}
+        {tab === 'results' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {live && <LiveFeed runId={runId} />}
+            <WorkspacePanel key={wsVersion} runId={run.id} />
+          </div>
+        )}
         {tab === 'verification' && <Verification run={run} />}
-        {tab === 'provenance' && <ProvenancePanel runId={runId} />}
+        {tab === 'provenance' && <ProvenancePanel key={provVersion} runId={runId} />}
         {tab === 'replay' && <MemoryReplay runId={runId} />}
         {tab === 'workflow' && <Workflow run={run} />}
-        {tab === 'evolution' && <Evolution run={run} />}
+        {tab === 'evolution' && <EvolutionReplay runId={runId} />}
         {tab === 'artifacts' && <Artifacts run={run} />}
       </div>
     </>
   )
 }
 
-/** Landing view: what it produced first (the files a scientist wants), then the score. */
-function Results({ run }: { run: RunDetailT }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <WorkspacePanel runId={run.id} />
-    </div>
-  )
-}
 
 /** Verification view: the verifier's score breakdown and per-claim results. */
 function Verification({ run }: { run: RunDetailT }) {
@@ -200,32 +218,6 @@ function Workflow({ run }: { run: RunDetailT }) {
   )
 }
 
-/** Expert view: the evolutionary search that produced this workflow. */
-function Evolution({ run }: { run: RunDetailT }) {
-  const runId = run.id
-  const tree = useAsync(() => api.tree(runId), [runId])
-  const series = useAsync(() => api.series(runId), [runId])
-  const navigate = useNavigate()
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div className="card">
-        <div className="card-head">evolution lineage · click a node to open it</div>
-        {tree.loading
-          ? <Spinner />
-          : tree.data
-            ? <LineageTree tree={tree.data} onSelect={(id) => navigate(`/runs/${id}`)} />
-            : <div className="hint">No lineage.</div>}
-      </div>
-      <div className="card">
-        <div className="card-head">reward &amp; cost across iterations</div>
-        <div className="card-body">
-          {series.loading ? <Spinner /> : series.data ? <RewardChart series={series.data} /> : null}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function Artifacts({ run }: { run: RunDetailT }) {
   const [sel, setSel] = useState<Artifact | null>(
     run.artifacts.find((a) => a.name === 'workflow_graph') || run.artifacts[0] || null,
@@ -279,7 +271,11 @@ function ArtifactView({ run, artifact }: { run: RunDetailT; artifact: Artifact }
       <div className="card-body">
         {artifact.empty && <div className="hint">Empty file (run incomplete).</div>}
         {!artifact.empty && artifact.kind === 'image' && <img className="artifact-img" src={url} alt={artifact.name} />}
-        {!artifact.empty && artifact.kind !== 'image' && (loading ? <Spinner /> : <pre className="code">{text}</pre>)}
+        {!artifact.empty && artifact.kind !== 'image' && (
+          loading
+            ? <Spinner />
+            : <SmartText text={text ?? ''} filename={artifact.filename} kind={artifact.kind} />
+        )}
       </div>
     </div>
   )
