@@ -285,9 +285,29 @@ export interface AstraDecision {
   rationale?: string
   default?: string | number | null
   options?: Record<string, AstraDecisionOption>
-  /** The model that made this decision, when the exporter recorded it. */
-  model?: string
+  /** The model that made this decision (``model:<id>`` tag or the legacy key). */
+  model?: string | null
+  /** Memory-trace steps this decision was extracted from (``trace_step:<N>`` tags). */
+  source_steps?: number[]
+  /** Backend-authored reason when ``source_steps`` is empty — rendered verbatim. */
+  source_steps_absent_reason?: string
+  /** How many ``trace_step:`` tags failed to parse (degraded evidence join). */
+  unparsed_trace_tags?: number
+  /** Raw decision tags, passed through untouched. */
+  tags?: string[]
 }
+
+/** The exporter's extraction-health block (absent on pre-extractor capsules). */
+export interface AstraExtraction {
+  steps_considered?: number
+  decisions_recorded?: number
+  llm_call_failures?: number
+  malformed_responses?: number
+}
+
+/** Why the decision layer is empty: written before the extractor existed, or
+ * the extractor ran and recorded nothing. null when decisions exist. */
+export type DecisionsEra = 'predates_extractor' | 'extracted_none'
 
 export interface AstraUniverse {
   id?: string
@@ -299,8 +319,13 @@ export interface AstraCapsule {
   name: string | null
   description: string | null
   version: string | null
+  /** Analysis-level tags, honest-empty markers (``mimosa:*``) included. */
+  tags: string[]
+  inputs: unknown[]
   decisions: Record<string, AstraDecision>
+  decisions_era: DecisionsEra | null
   outputs: unknown[]
+  extraction: AstraExtraction | null
   universes: AstraUniverse[]
 }
 

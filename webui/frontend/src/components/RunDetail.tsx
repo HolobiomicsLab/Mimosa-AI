@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, artifactUrl } from '../api'
 import { useAsync, useLive } from '../hooks'
 import type { Artifact, ClaimStatus, EvaluationClaim, LiveEvent, RunDetail as RunDetailT } from '../types'
@@ -14,7 +15,11 @@ import { SmartText } from '../render'
 
 // Scientist-first ordering: outputs → what the agents did → the workflow. The
 // neuroevolution machinery lives under "Evolution", shown only for learning runs.
-type Tab = 'results' | 'verification' | 'provenance' | 'replay' | 'workflow' | 'evolution' | 'artifacts'
+const TAB_IDS = ['results', 'verification', 'provenance', 'replay', 'workflow', 'evolution', 'artifacts'] as const
+type Tab = (typeof TAB_IDS)[number]
+
+/** Per-view query params that only make sense inside the tab that set them. */
+const TAB_SCOPED_PARAMS = ['call', 'from', 'file']
 
 /** Objective shown truncated (first 512 chars) with a toggle to expand/collapse. */
 const OBJECTIVE_LIMIT = 512
@@ -37,13 +42,26 @@ function ObjectiveText({ text }: { text: string }) {
 
 export default function RunDetail({ runId }: { runId: string }) {
   const { data: run, loading, error, refetch } = useAsync<RunDetailT>(() => api.run(runId), [runId])
-  const [tab, setTab] = useState<Tab>('results')
+  // The active tab lives in the URL (?tab=…) so run views are deep-linkable;
+  // an absent or unknown value falls back to the default tab.
+  const [params, setParams] = useSearchParams()
+  const rawTab = params.get('tab')
+  const urlTab: Tab = (TAB_IDS as readonly string[]).includes(rawTab ?? '') ? (rawTab as Tab) : 'results'
+  const setTab = (t: Tab) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (t === 'results') next.delete('tab')
+      else next.set('tab', t)
+      TAB_SCOPED_PARAMS.forEach((p) => next.delete(p))
+      return next
+    })
+  }
   // Live remount keys: bumping one refetches that panel from disk.
   const [wsVersion, setWsVersion] = useState(0)
   const [provVersion, setProvVersion] = useState(0)
   const [sawActivity, setSawActivity] = useState(false)
 
-  useEffect(() => { setTab('results'); setSawActivity(false) }, [runId])
+  useEffect(() => { setSawActivity(false) }, [runId])
 
   /** This run's filesystem events, subscribed here (not in LiveFeed) so a
    * completed run still surfaces the feed the moment new activity arrives. */
@@ -74,6 +92,9 @@ export default function RunDetail({ runId }: { runId: string }) {
     ...(run.learning_mode ? [['evolution', 'Evolution'] as [Tab, string]] : []),
     ['artifacts', 'Evolution Artifact (Expert)', run.artifacts.length],
   ]
+  // A deep link may name a tab this run does not show (e.g. ?tab=evolution on
+  // a plain task run); fall back to the default rather than a blank body.
+  const tab: Tab = tabs.some(([id]) => id === urlTab) ? urlTab : 'results'
 
   return (
     <>

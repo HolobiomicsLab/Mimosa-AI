@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type { CallDetail, StepDetail } from '../types'
@@ -20,8 +21,18 @@ type Sel =
 export default function MemoryReplay({ runId }: { runId: string }) {
   const timeline = useAsync(() => api.timeline(runId), [runId])
   const mem = useAsync(() => api.memory(runId), [runId])
-  const [tab, setTab] = useState<'steps' | 'calls'>('steps')
-  const [sel, setSel] = useState<Sel>(null)
+  // ?call=<name> deep-links straight to one LLM call (e.g. the extraction
+  // evidence behind a provenance decision); ?from=<decision-slug> keeps the
+  // way back to that decision as a breadcrumb.
+  const [params] = useSearchParams()
+  const urlCall = params.get('call')
+  const fromDecision = params.get('from')
+  const [tab, setTab] = useState<'steps' | 'calls'>(urlCall ? 'calls' : 'steps')
+  const [sel, setSel] = useState<Sel>(urlCall ? { kind: 'call', name: urlCall } : null)
+
+  useEffect(() => {
+    if (urlCall) { setTab('calls'); setSel({ kind: 'call', name: urlCall }) }
+  }, [urlCall])
 
   if (timeline.loading || mem.loading) return <Spinner />
   if (timeline.error) return <div className="hint">No agent memory for this run.</div>
@@ -89,6 +100,14 @@ export default function MemoryReplay({ runId }: { runId: string }) {
       </div>
 
       <div>
+        {fromDecision && (
+          <div style={{ marginBottom: 12 }}>
+            <Link className="mono" style={{ fontSize: 12 }}
+              to={`?tab=provenance#decision-${encodeURIComponent(fromDecision)}`}>
+              ← back to decision {fromDecision}
+            </Link>
+          </div>
+        )}
         {!sel && <div className="hint" style={{ padding: 20 }}>Select a step or LLM call to inspect its inputs, code and outputs.</div>}
         {sel?.kind === 'step' && <StepView runId={runId} agent={sel.agent} index={sel.index} />}
         {sel?.kind === 'call' && <CallView runId={runId} name={sel.name} />}
@@ -143,8 +162,16 @@ function StepView({ runId, agent, index }: { runId: string; agent: string; index
 }
 
 function CallView({ runId, name }: { runId: string; name: string }) {
-  const { data, loading } = useAsync<CallDetail>(() => api.call(runId, name), [runId, name])
-  if (loading || !data) return <Spinner />
+  const { data, loading, error } = useAsync<CallDetail>(() => api.call(runId, name), [runId, name])
+  if (loading) return <Spinner />
+  if (error || !data) {
+    return (
+      <div className="hint" style={{ padding: 20 }}>
+        LLM call <span className="mono">{name}</span> not found — the memory
+        trace does not carry this file (evicted or never recorded).
+      </div>
+    )
+  }
   return (
     <div>
       <div className="stats" style={{ display: 'flex', gap: 18, marginBottom: 14, flexWrap: 'wrap' }}>

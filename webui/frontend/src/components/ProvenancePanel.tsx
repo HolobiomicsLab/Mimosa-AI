@@ -1,8 +1,8 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type {
-  AstraDecision, EvalVerdict, JudgeLayer, Provenance, RunEvaluation,
+  AstraDecision, DecisionsEra, EvalVerdict, JudgeLayer, Provenance, RunEvaluation,
 } from '../types'
 import { Spinner, shortId } from '../ui'
 
@@ -70,7 +70,9 @@ function AstraCard({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
       <div className="card-body">
         {capsule.description && <div className="hint" style={{ marginBottom: 10 }}>{capsule.description}</div>}
         {decisions.length === 0 && <div className="hint">The capsule records no decisions.</div>}
-        {decisions.map(([slug, d]) => <DecisionRow key={slug} slug={slug} d={d} />)}
+        {decisions.map(([slug, d]) => (
+          <DecisionRow key={slug} slug={slug} d={d} era={capsule.decisions_era} />
+        ))}
         {capsule.universes.length > 0 && (
           <div style={{ marginTop: 12 }}>
             {capsule.universes.map((u) => (
@@ -87,17 +89,19 @@ function AstraCard({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
   )
 }
 
-/** One decision: the chosen option first and green, alternatives dim below. */
-function DecisionRow({ slug, d }: { slug: string; d: AstraDecision }) {
+/** One decision: the chosen option first and green, alternatives dim below,
+ * plus deep links into the memory-trace evidence it was extracted from. */
+function DecisionRow({ slug, d, era }: { slug: string; d: AstraDecision; era: DecisionsEra | null }) {
   const options = Object.entries(d.options ?? {})
   const chosen = d.default != null ? String(d.default) : null
   return (
-    <div style={{ padding: '10px 0', borderTop: '1px solid #ffffff14' }}>
+    <div id={`decision-${slug}`} style={{ padding: '10px 0', borderTop: '1px solid #ffffff14' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <b>{d.label ?? slug}</b>
         {d.model && <span className="mono" style={{ color: 'var(--text-dim)', fontSize: 11 }}>{d.model}</span>}
       </div>
       {d.rationale && <div className="hint" style={{ margin: '4px 0 6px' }}>{d.rationale}</div>}
+      <EvidenceLinks slug={slug} d={d} era={era} />
       {options.map(([oid, o]) => {
         const isChosen = oid === chosen
         return (
@@ -114,6 +118,45 @@ function DecisionRow({ slug, d }: { slug: string; d: AstraDecision }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** Deep links from a decision to the memory calls it was extracted from.
+ *
+ * A decision without `source_steps` renders an explicit muted marker with the
+ * BACKEND's reason verbatim (never a synthesized one); only when that
+ * per-decision reason is absent does the capsule-level `decisions_era` marker
+ * stand in. Partially-parsed tags surface the `unparsed_trace_tags` count so
+ * a degraded join is never mistaken for a complete one.
+ */
+function EvidenceLinks({ slug, d, era }: { slug: string; d: AstraDecision; era: DecisionsEra | null }) {
+  const steps = d.source_steps ?? []
+  const unparsed = d.unparsed_trace_tags ?? 0
+  const absentReason = d.source_steps_absent_reason ?? era ?? 'no evidence link recorded'
+  return (
+    <div style={{ margin: '2px 0 6px', fontSize: 12 }}>
+      {steps.length > 0 ? (
+        <span>
+          <span className="muted">evidence: </span>
+          {steps.map((n) => (
+            <Link
+              key={n}
+              className="mono"
+              style={{ marginRight: 8 }}
+              title={`open memory call astra_decision_step_${n}`}
+              to={`?tab=replay&call=astra_decision_step_${n}&from=${encodeURIComponent(slug)}`}
+            >
+              step {n} ↗
+            </Link>
+          ))}
+        </span>
+      ) : (
+        <span className="muted" style={{ fontStyle: 'italic' }}>no evidence link — {absentReason}</span>
+      )}
+      {unparsed > 0 && (
+        <span className="muted"> · {unparsed} trace tag{unparsed === 1 ? '' : 's'} unparseable</span>
+      )}
     </div>
   )
 }
