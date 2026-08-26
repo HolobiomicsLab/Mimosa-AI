@@ -38,13 +38,16 @@ const NO_ENV_BLOCK = 'no environment block; capsule predates environment capture
 
 /** env_capture encodes absence as "absent (<reason>)" and partial capture as
  * "partial (<scope>)" strings — decode them into the closed vocabulary,
- * keeping the reason text verbatim. */
+ * keeping the reason text verbatim. An unrecognized encoding grades
+ * ``partial`` with the raw string quoted: "recorded" (the ledger's only
+ * full-strength grade) is reserved for values the decoder positively
+ * understands, so a drifted producer can only understate, never inflate. */
 function fromEnvString(v: string): Cell {
   const absent = v.match(/^absent \((.+)\)$/)
   if (absent) return { grade: 'absent', detail: absent[1] }
   const partial = v.match(/^partial \((.+)\)$/)
   if (partial) return { grade: 'partial', detail: partial[1] }
-  return { grade: 'recorded', detail: v }
+  return { grade: 'partial', detail: `unrecognized encoding: "${v}"` }
 }
 
 function gitFacet(env: AstraEnvironment | null): Cell {
@@ -97,11 +100,11 @@ function configDigestFacet(env: AstraEnvironment | null): Cell {
   if (!env) return { grade: 'absent', detail: NO_ENV_BLOCK }
   const digest = env.config_digest
   if (digest == null) return { grade: 'absent', detail: 'no config digest in the environment block' }
-  const cell = fromEnvString(digest)
-  if (cell.grade === 'recorded') {
+  // Positive recognition of env_capture's digest shape gates "recorded".
+  if (/^sha256:[0-9a-f]{64}$/.test(digest)) {
     return { grade: 'recorded', detail: `secret-scrubbed ${digest.slice(0, 23)}…` }
   }
-  return cell
+  return fromEnvString(digest)
 }
 
 function groundingFacet(env: AstraEnvironment | null): Cell {
