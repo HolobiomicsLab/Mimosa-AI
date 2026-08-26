@@ -46,7 +46,6 @@ if __name__ == "__main__":
 
 from sources.transparency.decision_extractor import Decision, ExtractionResult, Option
 
-
 _ASTRA_VERSION = "0.0.12"
 _DEFAULT_UNIVERSE_ID = "best"
 
@@ -64,6 +63,7 @@ def build_analysis(
     decisions: list[Decision],
     recipe_command: str = _RECIPE_FALLBACK_COMMAND,
     extraction: ExtractionResult | None = None,
+    environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the dict that will be dumped to ``astra.yaml``.
 
@@ -72,6 +72,8 @@ def build_analysis(
     default is a pointer used only when no executable code was recovered.
     ``extraction`` adds the extraction-health block (see module docstring);
     the exporter always passes it, ``None`` merely keeps old callers working.
+    ``environment`` adds the orchestrator-environment block assembled by
+    :mod:`sources.transparency.env_capture` (same regime as ``extraction``).
     """
     analysis = {
         "version": _ASTRA_VERSION,
@@ -92,6 +94,8 @@ def build_analysis(
             "llm_call_failures": extraction.crashed,
             "malformed_responses": extraction.malformed,
         }
+    if environment is not None:
+        analysis["environment"] = environment
     return analysis
 
 

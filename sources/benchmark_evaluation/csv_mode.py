@@ -9,7 +9,6 @@ import json
 import logging
 import logging.handlers
 import shutil
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -17,16 +16,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
+from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.cli.pretty_print import (
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_summary,
+    print_warn,
+)
 from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
-from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
-from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
-from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.email_reporter import send_evaluation_report
-from sources.cli.pretty_print import (
-    print_ok, print_warn, print_err, print_info,
-    print_phase, print_summary,
-)
+from sources.utils.git_info import get_git_info
+from sources.utils.transfer_toolomics import LocalTransfer
 
 EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
 EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
@@ -159,7 +163,7 @@ class CsvEvaluationMode:
 
         for notes_file in self.run_notes_dir.glob("*.json"):
             try:
-                with open(notes_file, 'r', encoding='utf-8') as f:
+                with open(notes_file, encoding='utf-8') as f:
                     notes = json.load(f)
                     model = notes.get('model', '')
                     if not model or not self.config.smolagent_model_id:
@@ -171,7 +175,7 @@ class CsvEvaluationMode:
                     if total_eval > max_total_eval:
                         max_total_eval = total_eval
                         best_notes = notes
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 self.logger.warning(f"[CACHE RECOVERY] Could not load {notes_file}: {e}")
                 continue
 
@@ -306,28 +310,10 @@ class CsvEvaluationMode:
 
         Recorded in run notes so each run can be tied back to the exact code that
         produced it. Returns None values when git metadata is unavailable.
+        Delegates to the shared :func:`sources.utils.git_info.get_git_info`
+        (the ASTRA environment capture records the same facts the same way).
         """
-        repo_dir = Path(__file__).resolve().parent
-
-        def _git(*args: str) -> str | None:
-            try:
-                return subprocess.run(
-                    ["git", *args],
-                    cwd=repo_dir,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    timeout=5,
-                ).stdout.strip()
-            except (subprocess.SubprocessError, OSError):
-                return None
-
-        status = _git("status", "--porcelain")
-        return {
-            "commit": _git("rev-parse", "HEAD"),
-            "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
-            "dirty": bool(status) if status is not None else None,
-        }
+        return get_git_info(Path(__file__).resolve().parent)
 
     @staticmethod
     def _compute_per_iteration_costs(runs_data: list) -> list[float]:
@@ -1345,7 +1331,7 @@ EXPECTED OUTPUT:
         notes_path = getattr(self, "_evaluation_cli_notes_path", None)
         if notes_path and Path(notes_path).exists():
             try:
-                with open(notes_path, "r", encoding="utf-8") as fh:
+                with open(notes_path, encoding="utf-8") as fh:
                     notes_data = json.load(fh)
                 final = {
                     "steps_evaluated": len(current_runs),

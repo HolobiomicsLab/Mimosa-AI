@@ -21,10 +21,10 @@ import yaml
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sources.transparency.decision_extractor import (
+    _MALFORMED,
     Decision,
     ExtractionResult,
     Option,
-    _MALFORMED,
     _parse_response,
     extract_decisions,
 )
@@ -37,7 +37,6 @@ from sources.transparency.trace_compaction import (
     _MECHANICAL_CODE_PATTERNS,
     compact_step,
     compact_trace,
-    is_methodological_candidate,
     load_trace,
 )
 from sources.transparency.yaml_writer import (
@@ -45,7 +44,6 @@ from sources.transparency.yaml_writer import (
     build_universe,
     write_export,
 )
-
 
 _METHODOLOGICAL_STEP = {
     "step_number": 1,
@@ -713,6 +711,115 @@ def test_export_writes_extraction_health_block_and_warns(
     }
     assert loaded["decisions"]["fit_method"]["default"] == "ols"
     assert "Extraction degraded" in capsys.readouterr().out
+
+
+def test_write_outputs_manifest_digests_every_output(tmp_path: Path) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    artefacts = tmp_path / "artefacts"
+    artefacts.mkdir()
+    (artefacts / "report.md").write_bytes(b"hello")
+    capsule = tmp_path / "capsule"
+    capsule.mkdir()
+    exporter = AstraExporter(SimpleNamespace())
+    path = exporter._write_outputs_manifest(capsule, artefacts, ["report.md"])
+    manifest = json.loads(path.read_text())
+    assert path.name == "outputs_manifest.json" and path.parent == capsule
+    entry = manifest["report_md"]  # keyed by the SAME slug astra.yaml uses
+    assert entry["path"] == "report.md"
+    assert entry["bytes"] == 5
+    import hashlib
+    assert entry["sha256"] == hashlib.sha256(b"hello").hexdigest()
+
+
+def test_outputs_manifest_is_fail_soft_per_file(tmp_path: Path) -> None:
+    # One unreadable artefact yields an error entry (no absolute path in it);
+    # the readable one is still digested — never a crash, never silence.
+    from sources.transparency.astra_exporter import AstraExporter
+
+    artefacts = tmp_path / "artefacts"
+    artefacts.mkdir()
+    (artefacts / "good.csv").write_bytes(b"a,b\n")
+    capsule = tmp_path / "capsule"
+    capsule.mkdir()
+    exporter = AstraExporter(SimpleNamespace())
+    path = exporter._write_outputs_manifest(
+        capsule, artefacts, ["good.csv", "vanished.pkl"]
+    )
+    manifest = json.loads(path.read_text())
+    assert manifest["good_csv"]["bytes"] == 4
+    bad = manifest["vanished_pkl"]
+    assert bad["path"] == "vanished.pkl"
+    assert bad["error"].startswith("unreadable (")
+    assert "sha256" not in bad
+    assert str(tmp_path) not in json.dumps(manifest)
+
+
+def test_outputs_manifest_empty_snapshot_writes_empty_object(tmp_path: Path) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    exporter = AstraExporter(SimpleNamespace())
+    path = exporter._write_outputs_manifest(tmp_path, tmp_path, [])
+    assert json.loads(path.read_text()) == {}
+
+
+def test_export_writes_manifest_and_environment_blocks(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # End-to-end through export(): the capsule gains outputs_manifest.json and
+    # astra.yaml gains the environment block (with the run's grounding stats
+    # joined from run_metrics.json and labelled self-declared).
+    pytest.importorskip("litellm")
+    from sources.transparency import astra_exporter as exporter_mod
+
+    memory = tmp_path / "memory" / "run-x"
+    memory.mkdir(parents=True)
+    (memory / "task_single_agent.json").write_text(json.dumps([
+        {"step_number": 1, "code_action": "result = stats.ttest_ind(a, b)"},
+    ]))
+    (memory / "verifier_call.json").write_text(json.dumps({"temperature": 0.2}))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "report.md").write_bytes(b"content")
+    workflows = tmp_path / "workflows" / "run-x"
+    workflows.mkdir(parents=True)
+    (workflows / "run_metrics.json").write_text(json.dumps(
+        {"grounding": {"attempts": 2, "hit_rate": 0.5}}
+    ))
+
+    extraction = ExtractionResult(
+        decisions=(_decision("fit_method", "ols"),), steps_total=1,
+        crashed=0, malformed=0,
+    )
+    monkeypatch.setattr(exporter_mod, "extract_decisions", lambda *a, **k: extraction)
+    monkeypatch.setattr(
+        exporter_mod.AstraExporter, "_build_llm_config", lambda self: None
+    )
+    config = SimpleNamespace(
+        memory_dir=str(tmp_path / "memory"),
+        workspace_dir=str(workspace),
+        runs_capsule_dir=str(tmp_path / "capsule"),
+        workflow_dir=str(tmp_path / "workflows"),
+        smolagent_model_id="openrouter/deepseek/deepseek-v4-flash",
+    )
+    exporter = exporter_mod.AstraExporter(config)
+    exporter._SNAPSHOT_ROOT = tmp_path  # no snapshots here → workspace fallback
+
+    path = exporter.export("run-x", "the goal")
+
+    manifest = json.loads((path.parent / "outputs_manifest.json").read_text())
+    assert manifest["report_md"]["bytes"] == 7
+    loaded = yaml.safe_load(path.read_text())
+    environment = loaded["environment"]
+    assert environment["runner_env"].startswith("partial")
+    assert environment["grounding"] == {
+        "attempts": 2, "hit_rate": 0.5, "declared_by": "subject",
+    }
+    assert environment["temperature"] == {"min": 0.2, "max": 0.2, "n_calls": 1}
+    assert environment["model_roles"]["smolagent_model_id"].endswith("v4-flash")
+    assert environment["config_digest"].startswith("sha256:")
+    # Public repo: the exported analysis must never carry local abs paths.
+    assert str(tmp_path) not in path.read_text()
 
 
 def test_exporter_skips_when_memory_dir_missing(tmp_path: Path) -> None:

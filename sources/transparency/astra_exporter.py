@@ -21,6 +21,7 @@ after ``workspace_mgr.restore_best`` and is gated on ``config.export_astra``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -33,13 +34,17 @@ if __name__ == "__main__":
     )
 
 from sources.transparency.decision_extractor import extract_decisions
+from sources.transparency.env_capture import capture_environment
 from sources.transparency.memory_trace import RECIPE_FILENAME, reconstruct_recipe
 from sources.transparency.trace_compaction import compact_trace, load_trace
 from sources.transparency.yaml_writer import (
     build_analysis,
     build_universe,
+    safe_output_id,
     write_export,
 )
+
+OUTPUTS_MANIFEST_FILENAME = "outputs_manifest.json"
 
 
 # Names never worth listing as scientific outputs.
@@ -67,7 +72,10 @@ class AstraExporter:
             goal: User-provided goal text — supplied to the LLM as context.
         """
         from sources.cli.pretty_print import (
-            print_info, print_ok, print_section, print_warn,
+            print_info,
+            print_ok,
+            print_section,
+            print_warn,
         )
         print_section("ASTRA EXPORT")
         memory_path = Path(self.config.memory_dir) / best_uuid
@@ -104,14 +112,53 @@ class AstraExporter:
         workspace_files = self._list_workspace_files(artefacts_dir)
 
         recipe_command = self._write_recipe(capsule_dir, memory_path)
+        environment = capture_environment(
+            self.config, memory_path, self._run_metrics_path(best_uuid)
+        )
         analysis = build_analysis(
             goal, best_uuid, workspace_files, decisions, recipe_command,
-            extraction=extraction,
+            extraction=extraction, environment=environment,
         )
         universe = build_universe(decisions, best_uuid)
         path = write_export(capsule_dir, analysis, universe)
+        self._write_outputs_manifest(capsule_dir, artefacts_dir, workspace_files)
         print_ok(f"ASTRA analysis written to {path}")
         return path
+
+    def _write_outputs_manifest(
+        self, capsule_dir: Path, artefacts_dir: Path, workspace_files: list[str]
+    ) -> Path:
+        """Write ``outputs_manifest.json`` beside ``astra.yaml``.
+
+        Pure projection of the artefact snapshot: one entry per exported
+        output, keyed by the same slug the analysis uses as output id, with
+        the file's relative name, byte size and sha256 content digest.
+        Fail-soft per file — an unreadable artefact becomes an entry with an
+        ``error`` reason (no absolute paths in it), never a crash. An empty
+        snapshot writes ``{}``, which is itself the honest record.
+        """
+        manifest: dict[str, dict] = {}
+        for index, name in enumerate(workspace_files):
+            manifest[safe_output_id(name, index)] = self._manifest_entry(
+                artefacts_dir / name, name
+            )
+        manifest_path = capsule_dir / OUTPUTS_MANIFEST_FILENAME
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+        return manifest_path
+
+    @staticmethod
+    def _manifest_entry(path: Path, relative_name: str) -> dict:
+        """One manifest entry; ``error`` instead of digest when unreadable."""
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            reason = exc.strerror or type(exc).__name__
+            return {"path": relative_name, "error": f"unreadable ({reason})"}
+        return {
+            "path": relative_name,
+            "bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
 
     def _write_recipe(self, capsule_dir: Path, memory_path: Path) -> str:
         """Reconstruct the run's code into ``recipe.py`` and return its command.
@@ -152,6 +199,13 @@ class AstraExporter:
             openrouter_provider=self.config.openrouter_provider_for(judge),
             openrouter_quantizations=self.config.openrouter_quantizations_for(judge),
         )
+
+    def _run_metrics_path(self, best_uuid: str) -> Path | None:
+        """``sources/workflows/<uuid>/run_metrics.json``; None when unconfigured."""
+        workflow_dir = getattr(self.config, "workflow_dir", None)
+        if not workflow_dir:
+            return None
+        return Path(workflow_dir) / best_uuid / "run_metrics.json"
 
     def _resolve_artefacts_dir(self, best_uuid: str, workspace_dir: Path) -> Path:
         """Prefer the run's saved /tmp snapshot, fall back to the live workspace.
@@ -247,6 +301,15 @@ def _run_smoke_check() -> None:
         universe = build_universe([], run_uuid)
         out = write_export(capsule_dir / run_uuid, analysis, universe)
         assert out.exists() and out.parent == capsule_dir / run_uuid, out
+        manifest_path = exporter._write_outputs_manifest(
+            capsule_dir / run_uuid, workspace_dir, files
+        )
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["model_pkl"]["bytes"] == len("fake"), manifest
+        assert len(manifest["model_pkl"]["sha256"]) == 64, manifest
+        environment = capture_environment(config, memory_dir / run_uuid, None)
+        assert environment["runner_env"].startswith("partial"), environment
+        assert environment["model_roles"]["judge_model"], environment
         print(f"[OK] astra_exporter smoke check passed (wrote {out})")
 
 
