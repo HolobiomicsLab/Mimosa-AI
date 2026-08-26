@@ -33,6 +33,7 @@ export default function ProvenancePanel({ runId }: { runId: string }) {
   const empty = !data.astra && data.family_capsules.length === 0 && data.evaluations.length === 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {data.astra && <ExtractionStrip capsule={data.astra} />}
       {data.astra ? <AstraCard capsule={data.astra} /> : <NoCapsule family={data.family_capsules} />}
       {data.astra && <OutputsCard capsule={data.astra} />}
       {data.evaluations.map((ev) => <EvaluationCard key={ev.source} ev={ev} />)}
@@ -143,6 +144,60 @@ function DecisionRow({ slug, d, era }: { slug: string; d: AstraDecision; era: De
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** What the decisions-era enum means, spelled out for the reader (the enum
+ * itself stays visible — the explanation never replaces it). */
+const ERA_EXPLANATION: Record<DecisionsEra, string> = {
+  predates_extractor:
+    'the capsule was written before the decision extractor existed',
+  extracted_none:
+    'the extractor ran and recorded no decisions',
+}
+
+/** Compact extraction-health strip: how the decision layer was produced, why
+ * it is empty when it is, and the capsule's honest-empty ``mimosa:*`` tags —
+ * every tag rendered verbatim, never summarised away. */
+function ExtractionStrip({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
+  const ex = capsule.extraction
+  const era = capsule.decisions_era
+  const noDecisions = Object.keys(capsule.decisions).length === 0
+  const strip: React.CSSProperties = {
+    display: 'flex', flexWrap: 'wrap', gap: '6px 18px', alignItems: 'baseline',
+    padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8,
+    background: 'var(--panel)', fontSize: 12,
+  }
+  return (
+    <div style={strip}>
+      <span className="muted" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        extraction health
+      </span>
+      {ex ? (
+        <span className="mono" style={{ fontSize: 11.5 }}>
+          {ex.steps_considered ?? '—'} steps considered
+          {' · '}{ex.decisions_recorded ?? '—'} decisions recorded
+          {' · '}{ex.llm_call_failures ?? '—'} LLM-call failures
+          {' · '}{ex.malformed_responses ?? '—'} malformed responses
+        </span>
+      ) : (
+        <span className="muted" style={{ fontStyle: 'italic' }}>
+          no extraction block — capsule predates the decision extractor
+        </span>
+      )}
+      {noDecisions && era && (
+        <span>
+          <span className="mono" style={{ color: 'var(--warn)' }}>decisions_era={era}</span>
+          <span className="muted"> — {ERA_EXPLANATION[era]}</span>
+        </span>
+      )}
+      {capsule.tags.map((t) => (
+        <span key={t} className="mono" title="analysis-level tag, verbatim"
+          style={{ fontSize: 11, color: 'var(--text-dim)', border: '1px solid var(--border-strong)', borderRadius: 5, padding: '1px 6px' }}>
+          {t}
+        </span>
+      ))}
     </div>
   )
 }
