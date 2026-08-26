@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Component, useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from './api'
 import { useAsync, useLive } from './hooks'
 import type { LaunchInfo, LiveEvent, RunSummary } from './types'
@@ -135,6 +136,29 @@ function Sidebar({ runs, connected, launches, onStop }: {
   )
 }
 
+/** Last-resort boundary: a crashing view renders its error with a reason
+ * instead of React unmounting the whole app to a blank page. Remounted per
+ * route (keyed on pathname) so navigating away clears the error. */
+class ViewErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="empty">
+          <div className="hint">
+            This view crashed — {String(this.state.error.message || this.state.error)}.
+            Pick another run or edit the URL; the rest of the app is unaffected.
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   const { data: runs, refetch } = useAsync(() => api.runs(), [])
   const { launches, stop } = useLaunchWatcher()
@@ -147,19 +171,22 @@ export default function App() {
   }, [refetch])
 
   const { connected } = useLive(onEvent)
+  const { pathname } = useLocation()
 
   return (
     <div className="app">
       <ToastHost />
       <Sidebar runs={runs || []} connected={connected} launches={launches} onStop={stop} />
       <main className="main">
-        <Routes>
-          <Route index element={<Welcome count={runs?.length ?? 0} />} />
-          <Route path="/runs/:id" element={<RunRoute />} />
-          <Route path="/atlas" element={<AtlasView />} />
-          <Route path="/launch" element={<LaunchPage />} />
-          <Route path="/setup" element={<SetupPage />} />
-        </Routes>
+        <ViewErrorBoundary key={pathname}>
+          <Routes>
+            <Route index element={<Welcome count={runs?.length ?? 0} />} />
+            <Route path="/runs/:id" element={<RunRoute />} />
+            <Route path="/atlas" element={<AtlasView />} />
+            <Route path="/launch" element={<LaunchPage />} />
+            <Route path="/setup" element={<SetupPage />} />
+          </Routes>
+        </ViewErrorBoundary>
       </main>
     </div>
   )

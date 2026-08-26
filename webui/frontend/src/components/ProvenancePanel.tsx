@@ -9,6 +9,16 @@ import type {
 import { CopyLink, Spinner, fmtBytes, shortId } from '../ui'
 import ReproducibilityCard from './ReproducibilityCard'
 
+/** decodeURIComponent that returns its input untouched on a malformed
+ * escape — a truncated pasted link degrades to no-scroll, never a crash. */
+function safeDecode(raw: string): string {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * Provenance tab — the run rendered FROM its structured record (the MySTRA
  * principle): the ASTRA capsule's decisions with their alternatives, and the
@@ -24,7 +34,7 @@ export default function ProvenancePanel({ runId }: { runId: string }) {
   // SPA navigation never triggers the browser's native fragment scroll.
   useEffect(() => {
     if (!data || !hash.startsWith('#')) return
-    document.getElementById(decodeURIComponent(hash.slice(1)))
+    document.getElementById(safeDecode(hash.slice(1)))
       ?.scrollIntoView({ block: 'start' })
   }, [data, hash])
 
