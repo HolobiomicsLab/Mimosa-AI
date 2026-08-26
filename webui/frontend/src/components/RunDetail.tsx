@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, artifactUrl, workspaceFileUrl } from '../api'
+import { api, artifactUrl } from '../api'
 import { useAsync, useLive } from '../hooks'
 import type { Artifact, ClaimStatus, EvaluationClaim, LiveEvent, RunDetail as RunDetailT } from '../types'
 import {
@@ -192,57 +192,69 @@ const CLAIM_CLASS: Record<ClaimStatus, string> = {
   pass: 'ok', fail: 'bad', error: 'warn', unsure: 'dim',
 }
 
-/** How many distinct relevant files we probe per claim list (HEAD requests
- * against the existing workspace-file endpoint — no new API). */
-const MAX_FILE_PROBES = 64
+/** The backend's ranked-listing cap (workspace._walk max_files); a listing of
+ * exactly this size may be truncated, so an unmatched file is then "not
+ * probed" rather than declared dead. */
+const LISTING_CAP = 500
 
-/** Probe which of a run's claim-relevant files are still retrievable from its
- * workspace snapshot. Three-state per file: true (link works), false (dead),
- * or absent from the map (not probed — beyond the cap). `scopeExists` is null
- * while probing, false when the /tmp snapshot has been evicted.
- */
-function useSnapshotFileProbe(runId: string, files: string[]) {
-  const [scopeExists, setScopeExists] = useState<boolean | null>(null)
-  const [present, setPresent] = useState<Record<string, boolean> | null>(null)
-  const fileKey = files.join('\n')
+interface SnapshotProbe {
+  scopeExists: boolean
+  /** Snapshot-root-relative paths from the existing workspace listing API. */
+  paths: string[]
+  /** False when the listing may be truncated (or failed) — absence of a match
+   * is then inconclusive, never reported as a dead file. */
+  complete: boolean
+}
+
+/** Probe a run's workspace snapshot through the EXISTING workspace APIs (the
+ * per-run scope + its file listing — no new endpoint). null while probing. */
+function useSnapshotProbe(runId: string): SnapshotProbe | null {
+  const [state, setState] = useState<SnapshotProbe | null>(null)
 
   useEffect(() => {
     let alive = true
+    setState(null)
     api.workspaceScopes()
       .then(async (scopes) => {
-        const has = scopes.snapshots.includes(runId)
-        if (!alive) return
-        setScopeExists(has)
-        if (!has) { setPresent({}); return }
-        const unique = [...new Set(fileKey ? fileKey.split('\n') : [])].slice(0, MAX_FILE_PROBES)
-        const results = await Promise.all(unique.map(async (f) => {
-          try {
-            const res = await fetch(workspaceFileUrl(runId, f), { method: 'HEAD' })
-            return [f, res.ok] as const
-          } catch {
-            return [f, false] as const
+        if (!scopes.snapshots.includes(runId)) {
+          if (alive) setState({ scopeExists: false, paths: [], complete: true })
+          return
+        }
+        try {
+          const listing = await api.workspaceFiles(runId)
+          if (alive) {
+            setState({
+              scopeExists: true,
+              paths: listing.files.map((f) => f.path),
+              complete: listing.files.length < LISTING_CAP,
+            })
           }
-        }))
-        if (alive) setPresent(Object.fromEntries(results))
+        } catch {
+          // Scope exists but the listing failed — inconclusive, not "dead".
+          if (alive) setState({ scopeExists: true, paths: [], complete: false })
+        }
       })
-      .catch(() => { if (alive) { setScopeExists(false); setPresent({}) } })
+      .catch(() => { if (alive) setState({ scopeExists: false, paths: [], complete: true }) })
     return () => { alive = false }
-  }, [runId, fileKey])
+  }, [runId])
 
-  return { scopeExists, present }
+  return state
+}
+
+/** A claim's file is named relative to the run's task workspace, while the
+ * snapshot nests it (e.g. ``workspace/<task_slug>/README.md``) — match on
+ * exact path or a path-suffix, returning the full listing path to link to. */
+function resolveClaimFile(file: string, paths: string[]): string | undefined {
+  return paths.find((p) => p === file || p.endsWith(`/${file}`))
 }
 
 /** One claim-relevant file: a link into the run's workspace view when the
  * snapshot still holds it, an explicit dead-link state when it does not. */
-function ClaimFile({ file, scopeExists, present }: {
-  file: string
-  scopeExists: boolean | null
-  present: Record<string, boolean> | null
-}) {
-  if (scopeExists === null || present === null) {
+function ClaimFile({ file, probe }: { file: string; probe: SnapshotProbe | null }) {
+  if (probe === null) {
     return <span className="claim-file" title="probing the workspace snapshot…">{file}</span>
   }
-  if (scopeExists === false) {
+  if (!probe.scopeExists) {
     return (
       <span className="claim-file" title="snapshot evicted — file not retrievable"
         style={{ textDecoration: 'line-through', opacity: 0.6 }}>
@@ -250,17 +262,17 @@ function ClaimFile({ file, scopeExists, present }: {
       </span>
     )
   }
-  const state = present[file]
-  if (state === true) {
+  const resolved = resolveClaimFile(file, probe.paths)
+  if (resolved != null) {
     return (
       <Link className="claim-file" style={{ color: 'var(--accent)' }}
-        title="open in the run's workspace snapshot"
-        to={`?tab=results&file=${encodeURIComponent(file)}`}>
+        title={`open ${resolved} in the run's workspace snapshot`}
+        to={`?tab=results&file=${encodeURIComponent(resolved)}`}>
         {file} ↗
       </Link>
     )
   }
-  if (state === false) {
+  if (probe.complete) {
     return (
       <span className="claim-file" title="not found in the run's workspace snapshot"
         style={{ textDecoration: 'line-through', opacity: 0.6 }}>
@@ -268,7 +280,12 @@ function ClaimFile({ file, scopeExists, present }: {
       </span>
     )
   }
-  return <span className="claim-file" title={`not probed (only the first ${MAX_FILE_PROBES} distinct files are checked)`}>{file}</span>
+  return (
+    <span className="claim-file"
+      title={`not probed — the snapshot listing is capped at ${LISTING_CAP} files`}>
+      {file}
+    </span>
+  )
 }
 
 /** Per-claim pass/fail breakdown, failures first so they're immediately visible. */
@@ -281,11 +298,11 @@ function ClaimList({ runId, claims }: { runId: string; claims: EvaluationClaim[]
   )
   const passCount = claims.filter((c) => c.status === 'pass').length
   const shown = showPass ? sorted : sorted.filter((c) => c.status !== 'pass')
-  const probe = useSnapshotFileProbe(runId, claims.flatMap((c) => c.relevant_files))
+  const probe = useSnapshotProbe(runId)
 
   return (
     <div className="claim-list">
-      {probe.scopeExists === false && (
+      {probe?.scopeExists === false && (
         <div className="hint" style={{ padding: '6px 0', fontStyle: 'italic' }}>
           snapshot evicted — files referenced by the claims are not retrievable
         </div>
@@ -301,7 +318,7 @@ function ClaimList({ runId, claims }: { runId: string; claims: EvaluationClaim[]
             <div className="claim-tags">
               <span className="muted">importance {c.importance}</span>
               {c.relevant_files.map((f) => (
-                <ClaimFile key={f} file={f} scopeExists={probe.scopeExists} present={probe.present} />
+                <ClaimFile key={f} file={f} probe={probe} />
               ))}
             </div>
           </div>
