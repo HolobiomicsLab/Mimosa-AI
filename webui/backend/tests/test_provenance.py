@@ -63,6 +63,8 @@ EVAL_DOC = {
             "refused": [],
             "verdicts": [],
         },
+        "asb_workflow_rubrics": {"overall_score": 0.4, "openness": "closed"},
+        "result_evaluations": {"claims_total": 3, "claims_supported": 1},
     },
 }
 
@@ -196,6 +198,44 @@ def test_evaluations_match_on_the_run_id_stamped_in_the_document(data_roots):
     assert ev["judge"]["instrument"]["passes"] == 3
     # a different run finds nothing — no cross-run bleed
     assert provenance.find_evaluations(SIBLING) == []
+
+
+def test_eval_summary_passes_rubrics_and_result_evaluations_through(data_roots):
+    ev = provenance.find_evaluations(RUN)[0]
+    assert ev["asb_workflow_rubrics"]["overall_score"] == 0.4
+    assert ev["result_evaluations"]["claims_total"] == 3
+    assert ev["matched_by"] == "substring"  # legacy doc: no subject block
+
+
+def _write_eval(data_roots, rel_dir, doc):
+    out = get_settings().eval_dir / rel_dir
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "eval_astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+
+
+def test_subject_run_id_matches_structurally_before_any_substring(data_roots):
+    doc = {
+        "version": "0.0.12",
+        "name": "ASB criteria evaluation (subject-stamped, no id in text)",
+        "evaluation": {**EVAL_DOC["evaluation"],
+                       "subject": {"run_id": RUN, "task_id": "task_001"}},
+    }
+    _write_eval(data_roots, "p_iimn/task_002", doc)
+    by = {e["matched_by"] for e in provenance.find_evaluations(RUN)}
+    assert by == {"subject", "substring"}  # new doc + the legacy fixture
+
+
+def test_a_subject_id_naming_another_run_never_falls_back_to_substring(data_roots):
+    doc = {
+        "version": "0.0.12",
+        "name": f"evaluation mentioning {RUN} in prose",  # substring bait
+        "evaluation": {**EVAL_DOC["evaluation"],
+                       "subject": {"run_id": SIBLING}},
+    }
+    _write_eval(data_roots, "p_iimn/task_003", doc)
+    sources = [e["source"] for e in provenance.find_evaluations(RUN)]
+    assert not any("task_003" in s for s in sources)
+    assert [e["matched_by"] for e in provenance.find_evaluations(SIBLING)] == ["subject"]
 
 
 def test_everything_is_defensive_on_missing_or_junk_files(data_roots):

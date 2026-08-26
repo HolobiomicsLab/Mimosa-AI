@@ -221,17 +221,43 @@ def _summarise_eval(doc: dict[str, Any], source: Path) -> dict[str, Any] | None:
                             if isinstance(ev.get("workspace_flags"), list) else []),
         "target_conflicts": (ev.get("target_conflicts")
                              if isinstance(ev.get("target_conflicts"), list) else []),
+        "asb_workflow_rubrics": (ev.get("asb_workflow_rubrics")
+                                 if isinstance(ev.get("asb_workflow_rubrics"), dict)
+                                 else None),
+        "result_evaluations": (ev.get("result_evaluations")
+                               if isinstance(ev.get("result_evaluations"), dict)
+                               else None),
         "judge": judge,
     }
+
+
+def _eval_match(doc: dict[str, Any], run_id: str) -> str | None:
+    """How this eval document names *run_id*: "subject", "substring", or None.
+
+    Structured-first: a document carrying ``evaluation.subject.run_id`` is
+    matched on equality alone — a structured id naming a DIFFERENT run never
+    falls back to text matching. Legacy documents (no subject id) match on
+    the run id appearing in the name or an input's description/source, since
+    the eval output tree's layout (<capsule>/<task>/) carries no run id of
+    its own.
+    """
+    subject_id = _dict(_dict(doc.get("evaluation")).get("subject")).get("run_id")
+    if isinstance(subject_id, str) and subject_id:
+        return "subject" if subject_id == run_id else None
+    name = str(doc.get("name") or "")
+    inputs_text = " ".join(
+        str(i.get("description") or "") + str(i.get("source") or "")
+        for i in (doc.get("inputs") or []) if isinstance(i, dict)
+    )
+    return "substring" if run_id in name + inputs_text else None
 
 
 def find_evaluations(run_id: str) -> list[dict[str, Any]]:
     """Every asb_eval capsule under ``eval_dir`` that names *run_id*.
 
-    The evaluator stamps the run id into the capsule's ``name`` ("ASB criteria
-    evaluation of Mimosa run <id> on <task>") and into the workspace input's
-    description; matching on the document text is deliberate — the eval output
-    tree's layout (<capsule>/<task>/) carries no run id of its own.
+    Each summary records which path matched under ``matched_by``
+    ("subject" = structured ``evaluation.subject.run_id`` equality,
+    "substring" = legacy document-text fallback).
     """
     eval_dir = get_settings().eval_dir
     if not eval_dir.is_dir():
@@ -241,15 +267,12 @@ def find_evaluations(run_id: str) -> list[dict[str, Any]]:
         doc = _read_yaml(path)
         if not isinstance(doc, dict):
             continue
-        name = str(doc.get("name") or "")
-        inputs_text = " ".join(
-            str(i.get("description") or "") + str(i.get("source") or "")
-            for i in (doc.get("inputs") or []) if isinstance(i, dict)
-        )
-        if run_id not in name + inputs_text:
+        matched_by = _eval_match(doc, run_id)
+        if matched_by is None:
             continue
         summary = _summarise_eval(doc, path.relative_to(eval_dir))
         if summary is not None:
+            summary["matched_by"] = matched_by
             found.append(summary)
     return found
 
