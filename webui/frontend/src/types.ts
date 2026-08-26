@@ -332,6 +332,22 @@ export interface OutputsManifestEntry {
   sha256?: string
 }
 
+/** The orchestrator-environment block env_capture writes into astra.yaml.
+ * Fields degrade to an honest "absent (<reason>)" STRING instead of
+ * vanishing, so most unions here are `shape | string`. */
+export interface AstraEnvironment {
+  git?: { commit?: string | null; branch?: string | null; dirty?: boolean | null }
+  python_version?: string
+  platform?: string
+  model_roles?: Record<string, string> | string
+  temperature?: { min?: number; max?: number; n_calls?: number } | string
+  config_digest?: string
+  grounding?: Record<string, unknown> | string
+  runner_env?: string
+  /** Pin of the actual re-run unit, when a future exporter records one. */
+  workflow_genotype?: { path?: string; sha256?: string } | string
+}
+
 export interface AstraCapsule {
   name: string | null
   description: string | null
@@ -346,6 +362,11 @@ export interface AstraCapsule {
   /** Why the manifest is absent (legacy capsules predate it) — verbatim. */
   outputs_manifest_absent_reason: string | null
   extraction: AstraExtraction | null
+  /** env_capture's block, verbatim; null on capsules that predate it. */
+  environment: AstraEnvironment | null
+  /** First line of the capsule's recipe.py — the file's own self-description. */
+  recipe_header: string | null
+  recipe_header_absent_reason: string | null
   universes: AstraUniverse[]
 }
 

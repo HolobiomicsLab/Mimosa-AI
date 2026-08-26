@@ -7,6 +7,7 @@ import type {
   OutputsManifestEntry, Provenance, RunEvaluation,
 } from '../types'
 import { CopyLink, Spinner, fmtBytes, shortId } from '../ui'
+import ReproducibilityCard from './ReproducibilityCard'
 
 /**
  * Provenance tab — the run rendered FROM its structured record (the MySTRA
@@ -36,6 +37,7 @@ export default function ProvenancePanel({ runId }: { runId: string }) {
       {data.astra && <ExtractionStrip capsule={data.astra} />}
       {data.astra ? <AstraCard capsule={data.astra} /> : <NoCapsule family={data.family_capsules} />}
       {data.astra && <OutputsCard capsule={data.astra} />}
+      {data.astra && <ReproducibilityCard capsule={data.astra} />}
       {data.evaluations.map((ev) => <EvaluationCard key={ev.source} ev={ev} />)}
       {empty && (
         <div className="empty">

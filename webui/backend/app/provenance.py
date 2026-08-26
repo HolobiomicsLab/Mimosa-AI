@@ -170,6 +170,26 @@ def _decisions_era(decisions: dict[str, Any], extraction: Any) -> str | None:
     return "extracted_none" if isinstance(extraction, dict) else "predates_extractor"
 
 
+def _recipe_header(run_id: str) -> tuple[str | None, str | None]:
+    """(first line of the capsule's ``recipe.py``, absent-reason).
+
+    The reproducibility ledger quotes the recipe's own header line — the file
+    declares itself a transcript, not a standalone script — so the claim is
+    the artifact's, never the UI's.
+    """
+    path = capsule_path(run_id) / "recipe.py"
+    if not path.is_file():
+        return None, "no recipe.py in the capsule"
+    try:
+        with path.open(encoding="utf-8") as fh:
+            first = fh.readline().strip()
+    except (OSError, UnicodeDecodeError):
+        return None, "recipe.py unreadable"
+    if not first:
+        return None, "recipe.py starts with an empty line"
+    return first, None
+
+
 def _outputs_manifest(run_id: str) -> tuple[dict[str, Any] | None, str | None]:
     """(``outputs_manifest.json`` verbatim, absent-reason).
 
@@ -218,6 +238,8 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
     decisions = _merged_decisions(bodies)
     extraction = doc.get("extraction")
     manifest, manifest_reason = _outputs_manifest(run_id)
+    recipe_header, recipe_reason = _recipe_header(run_id)
+    environment = doc.get("environment")
     return {
         "name": doc.get("name"),
         "description": doc.get("description"),
@@ -232,6 +254,11 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
         "outputs_manifest": manifest,
         "outputs_manifest_absent_reason": manifest_reason,
         "extraction": extraction if isinstance(extraction, dict) else None,
+        # The orchestrator-environment block (registered extension written by
+        # env_capture) verbatim; None on capsules that predate it.
+        "environment": environment if isinstance(environment, dict) else None,
+        "recipe_header": recipe_header,
+        "recipe_header_absent_reason": recipe_reason,
         "universes": universes,
     }
 

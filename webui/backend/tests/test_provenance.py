@@ -220,6 +220,44 @@ def test_unreadable_outputs_manifest_says_so_instead_of_vanishing(data_roots):
         "outputs_manifest.json is not a JSON object")
 
 
+def test_environment_block_passes_through_verbatim(data_roots):
+    env = {
+        "git": {"commit": "abc123", "branch": "mimosa_v2_lfx", "dirty": False},
+        "python_version": "3.11.9",
+        "platform": "macOS-15.5-arm64",
+        "model_roles": {"judge_model": "openrouter/x:free"},
+        "temperature": {"min": 0.0, "max": 1.0, "n_calls": 12},
+        "config_digest": "sha256:" + "0" * 64,
+        "grounding": {"hit_rate": 0.5, "declared_by": "subject"},
+        "runner_env": "partial (orchestrator only; sandbox runner venv uncaptured)",
+    }
+    doc = {**ASTRA_DOC, "environment": env}
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    cap = provenance.read_astra_capsule(SIBLING)
+    assert cap["environment"] == env
+    # the legacy fixture has no environment block — honest None, never a KeyError
+    assert provenance.read_astra_capsule(RUN)["environment"] is None
+
+
+def test_recipe_header_quotes_the_files_own_first_line(data_roots):
+    cap_dir = get_settings().capsule_dir / RUN
+    (cap_dir / "recipe.py").write_text(
+        "# ASTRA recipe — reconstructed from the best run's agent trace.\n"
+        "print('step 1')\n", encoding="utf-8")
+    cap = provenance.read_astra_capsule(RUN)
+    assert cap["recipe_header"] == (
+        "# ASTRA recipe — reconstructed from the best run's agent trace.")
+    assert cap["recipe_header_absent_reason"] is None
+
+
+def test_missing_recipe_carries_a_reason(data_roots):
+    cap = provenance.read_astra_capsule(RUN)  # fixture writes no recipe.py
+    assert cap["recipe_header"] is None
+    assert cap["recipe_header_absent_reason"] == "no recipe.py in the capsule"
+
+
 def test_nested_analyses_documents_no_longer_render_zero_decisions(data_roots):
     nested = {
         "version": "0.0.10",
