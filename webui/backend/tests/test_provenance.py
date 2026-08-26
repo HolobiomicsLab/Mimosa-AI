@@ -258,6 +258,36 @@ def test_missing_recipe_carries_a_reason(data_roots):
     assert cap["recipe_header_absent_reason"] == "no recipe.py in the capsule"
 
 
+def test_non_dict_decisions_are_sanitised_into_explicit_malformed_markers(data_roots):
+    """A hand-edited or foreign capsule's null decision must reach the UI as a
+    renderable mapping (types.ts AstraDecision), never crash it as null."""
+    doc = {**ASTRA_DOC,
+           "decisions": {**ASTRA_DOC["decisions"], "null_decision": None}}
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    cap = provenance.read_astra_capsule(SIBLING)
+    bad = cap["decisions"]["null_decision"]
+    assert isinstance(bad, dict)
+    assert bad["options"] == {}
+    assert "not a mapping" in bad["rationale"]
+    assert bad["source_steps_absent_reason"] == "decision entry is not a mapping"
+    # the well-formed sibling decision is untouched
+    assert cap["decisions"]["param_sourcing"]["default"] == "published"
+
+
+def test_non_string_tags_are_marked_not_dropped_and_never_non_string(data_roots):
+    doc = {**ASTRA_DOC, "tags": ["ok_tag", 42, {"weird": "mapping"}]}
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    tags = provenance.read_astra_capsule(SIBLING)["tags"]
+    assert tags[0] == "ok_tag"
+    assert len(tags) == 3  # nothing dropped
+    assert all(isinstance(t, str) for t in tags)  # matches tags: string[]
+    assert "(non-string tag: 42)" in tags
+
+
 def test_nested_analyses_documents_no_longer_render_zero_decisions(data_roots):
     nested = {
         "version": "0.0.10",

@@ -131,14 +131,45 @@ def _with_parsed_tags(decision: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _clip(text: str, limit: int = 200) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _sanitised_decision(did: str, dec: Any) -> dict[str, Any]:
+    """A renderable mapping for ANY decision value.
+
+    A non-mapping entry (hand-edited or foreign capsule) becomes an explicit
+    malformed marker instead of crossing the wire shaped unlike the frontend
+    contract (types.ts ``AstraDecision``) — honest-empty, never a client crash.
+    """
+    if isinstance(dec, dict):
+        return _with_parsed_tags(dec)
+    return {
+        "label": did,
+        "rationale": f"malformed decision entry — not a mapping: {_clip(repr(dec))}",
+        "options": {},
+        "source_steps": [],
+        "source_steps_absent_reason": "decision entry is not a mapping",
+        "model": None,
+    }
+
+
 def _merged_decisions(bodies: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
     """Decisions across every analysis body, ids kept, collisions slug-prefixed."""
     merged: dict[str, Any] = {}
     for slug, body in bodies:
         for did, dec in _dict(body.get("decisions")).items():
             key = did if did not in merged else f"{slug}/{did}"
-            merged[key] = _with_parsed_tags(dec) if isinstance(dec, dict) else dec
+            merged[key] = _sanitised_decision(did, dec)
     return merged
+
+
+def _string_tags(raw: Any) -> list[str]:
+    """Analysis-level tags as strings; a non-string item is marked, not dropped."""
+    if not isinstance(raw, list):
+        return []
+    return [t if isinstance(t, str) else f"(non-string tag: {_clip(repr(t))})"
+            for t in raw]
 
 
 def _collected_ports(doc: dict[str, Any], key: str) -> list[Any]:
@@ -245,8 +276,9 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
         "description": doc.get("description"),
         "version": doc.get("version"),
         # Analysis-level honest-empty tags (e.g. ``mimosa:outputs=none (no
-        # artefacts captured)``) must reach the UI or the reason is lost.
-        "tags": doc.get("tags") if isinstance(doc.get("tags"), list) else [],
+        # artefacts captured)``) must reach the UI or the reason is lost;
+        # non-string items are stringified with a marker, never dropped.
+        "tags": _string_tags(doc.get("tags")),
         "inputs": _collected_ports(doc, "inputs"),
         "decisions": decisions,
         "decisions_era": _decisions_era(decisions, extraction),
