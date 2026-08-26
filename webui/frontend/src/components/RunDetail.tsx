@@ -4,7 +4,7 @@ import { api, artifactUrl } from '../api'
 import { useAsync, useLive } from '../hooks'
 import type { Artifact, ClaimStatus, EvaluationClaim, LiveEvent, RunDetail as RunDetailT } from '../types'
 import {
-  KindTag, ScoreChip, Spinner, StatusBadge, fmtCost, fmtDuration,
+  CopyLink, KindTag, ScoreChip, Spinner, StatusBadge, fmtCost, fmtDuration,
 } from '../ui'
 import EvolutionReplay from './EvolutionReplay'
 import MemoryReplay from './MemoryReplay'
@@ -119,6 +119,9 @@ export default function RunDetail({ runId }: { runId: string }) {
             {label}{count != null && <span className="count">{count}</span>}
           </button>
         ))}
+        <span style={{ marginLeft: 'auto', alignSelf: 'center', paddingLeft: 8 }}>
+          <CopyLink url={`?tab=${tab}`} label={`link to the ${tab} tab`} />
+        </span>
       </div>
 
       <div className="tab-body">

@@ -1,10 +1,11 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type {
   AstraDecision, DecisionsEra, EvalVerdict, JudgeLayer, Provenance, RunEvaluation,
 } from '../types'
-import { Spinner, shortId } from '../ui'
+import { CopyLink, Spinner, shortId } from '../ui'
 
 /**
  * Provenance tab — the run rendered FROM its structured record (the MySTRA
@@ -14,6 +15,16 @@ import { Spinner, shortId } from '../ui'
  */
 export default function ProvenancePanel({ runId }: { runId: string }) {
   const { data, loading, error } = useAsync<Provenance>(() => api.provenance(runId), [runId])
+  const { hash } = useLocation()
+
+  // Deep-linked decision anchors (#decision-<slug>, D16: the slug is the
+  // capsule's export-time decision id) scroll into view once data is here —
+  // SPA navigation never triggers the browser's native fragment scroll.
+  useEffect(() => {
+    if (!data || !hash.startsWith('#')) return
+    document.getElementById(decodeURIComponent(hash.slice(1)))
+      ?.scrollIntoView({ block: 'start' })
+  }, [data, hash])
 
   if (loading) return <Spinner label="Loading provenance…" />
   if (error || !data) return <div className="empty"><div className="hint">No provenance data.</div></div>
@@ -94,11 +105,23 @@ function AstraCard({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
 function DecisionRow({ slug, d, era }: { slug: string; d: AstraDecision; era: DecisionsEra | null }) {
   const options = Object.entries(d.options ?? {})
   const chosen = d.default != null ? String(d.default) : null
+  const anchor = `decision-${slug}`
+  const { hash } = useLocation()
+  const targeted = hash === `#${encodeURIComponent(anchor)}` || hash === `#${anchor}`
   return (
-    <div id={`decision-${slug}`} style={{ padding: '10px 0', borderTop: '1px solid #ffffff14' }}>
+    <div
+      id={anchor}
+      style={{
+        padding: '10px 0', borderTop: '1px solid #ffffff14', scrollMarginTop: 12,
+        ...(targeted ? { background: '#f2c14e10', outline: '1px solid var(--gold-dim)', borderRadius: 6, padding: '10px 8px' } : {}),
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <b>{d.label ?? slug}</b>
-        {d.model && <span className="mono" style={{ color: 'var(--text-dim)', fontSize: 11 }}>{d.model}</span>}
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {d.model && <span className="mono" style={{ color: 'var(--text-dim)', fontSize: 11 }}>{d.model}</span>}
+          <CopyLink url={`?tab=provenance#${encodeURIComponent(anchor)}`} label={`link to decision ${slug}`} />
+        </span>
       </div>
       {d.rationale && <div className="hint" style={{ margin: '4px 0 6px' }}>{d.rationale}</div>}
       <EvidenceLinks slug={slug} d={d} era={era} />

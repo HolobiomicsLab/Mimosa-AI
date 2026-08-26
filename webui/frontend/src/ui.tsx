@@ -1,4 +1,5 @@
 import type { RunStatus, EvolutionKind } from './types'
+import { toast } from './components/Toasts'
 
 /** Red→amber→green, matching Mimosa's own evolution-tree colormap. */
 export function scoreColor(score: number | null | undefined): string {
@@ -58,4 +59,30 @@ export function KindTag({ kind }: { kind: EvolutionKind }) {
 
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return <div className="spinner">{label}</div>
+}
+
+/** Copy a stable deep link (resolved against the current page) to the
+ * clipboard. `url` may be relative ("?tab=provenance#decision-x"). */
+export function CopyLink({ url, label = 'link' }: { url: string; label?: string }) {
+  const copy = () => {
+    const absolute = new URL(url, window.location.href).toString()
+    navigator.clipboard.writeText(absolute).then(
+      () => toast({ kind: 'info', text: `Copied ${label}.` }),
+      () => toast({ kind: 'error', text: `Could not copy — ${absolute}` }),
+    )
+  }
+  return (
+    <button
+      onClick={copy}
+      title={`Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      style={{
+        padding: '1px 7px', fontSize: 11, lineHeight: '16px',
+        color: 'var(--text-dim)', background: 'transparent',
+        border: '1px solid var(--border-strong)', borderRadius: 5,
+      }}
+    >
+      ⧉
+    </button>
+  )
 }
