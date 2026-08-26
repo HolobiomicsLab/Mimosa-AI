@@ -55,6 +55,40 @@ def test_successful_retrieval_counts_as_grounded(monkeypatch):
     assert stats["by_outcome"] == {"ok": 1}
 
 
+def test_explicit_kb_argument_wins_over_the_configured_default(monkeypatch):
+    seen = {}
+
+    def _capture(science_query, mode, base_url, kb_name):
+        seen["kb_name"] = kb_name
+        return "context"
+
+    monkeypatch.setattr(pc, "_read_cache", lambda *a, **k: None)
+    monkeypatch.setattr(pc, "_write_cache", lambda *a, **k: None)
+    monkeypatch.setattr(pc, "_query_perspicacite_streaming", _capture)
+
+    pc._SETTINGS["kb_name"] = "configured-default-kb"
+    pc.query_perspicacite("some goal", kb_name="explicit-agent-kb")
+    assert seen["kb_name"] == "explicit-agent-kb"
+    # The stats block reports what the attempts actually queried.
+    assert pc.grounding_stats()["kb_name"] == "explicit-agent-kb"
+
+
+def test_kb_argument_falls_back_to_the_configured_default_when_absent(monkeypatch):
+    seen = {}
+
+    def _capture(science_query, mode, base_url, kb_name):
+        seen["kb_name"] = kb_name
+        return "context"
+
+    monkeypatch.setattr(pc, "_read_cache", lambda *a, **k: None)
+    monkeypatch.setattr(pc, "_write_cache", lambda *a, **k: None)
+    monkeypatch.setattr(pc, "_query_perspicacite_streaming", _capture)
+
+    pc._SETTINGS["kb_name"] = "configured-default-kb"
+    pc.query_perspicacite("some goal")
+    assert seen["kb_name"] == "configured-default-kb"
+
+
 def test_cache_hits_count_as_grounded(monkeypatch):
     monkeypatch.setattr(pc, "_read_cache", lambda *a, **k: "cached context")
 

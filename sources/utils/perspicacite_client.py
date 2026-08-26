@@ -17,16 +17,18 @@ import json
 import logging
 import os
 import pathlib
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Request cache
 # ---------------------------------------------------------------------------
-_CACHE_DIR = pathlib.Path(__file__).resolve().parent.parent / "memory" / "perspicacite_requests"
+_CACHE_DIR = (
+    pathlib.Path(__file__).resolve().parent.parent / "memory" / "perspicacite_requests"
+)
 
-def _cache_key(science_query: str, mode: str, kb_name: Optional[str] = None) -> str:
+
+def _cache_key(science_query: str, mode: str, kb_name: str | None = None) -> str:
     """Return a deterministic hex digest for a (query, mode, kb_name) tuple.
 
     ``kb_name`` is included in the key only when set, so per-KB grounding caches
@@ -40,7 +42,9 @@ def _cache_key(science_query: str, mode: str, kb_name: Optional[str] = None) -> 
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def _read_cache(science_query: str, mode: str, kb_name: Optional[str] = None) -> Optional[str]:
+def _read_cache(
+    science_query: str, mode: str, kb_name: str | None = None
+) -> str | None:
     """Return the cached answer for *science_query* + *mode* + *kb_name*, or ``None``."""
     key = _cache_key(science_query, mode, kb_name)
     cache_file = _CACHE_DIR / f"{key}.json"
@@ -50,7 +54,8 @@ def _read_cache(science_query: str, mode: str, kb_name: Optional[str] = None) ->
         data = json.loads(cache_file.read_text(encoding="utf-8"))
         logger.info(
             "[Perspicacite] Cache HIT for query (mode=%s): %s…",
-            mode, science_query[:80],
+            mode,
+            science_query[:80],
         )
         return data.get("answer")
     except Exception:
@@ -58,7 +63,9 @@ def _read_cache(science_query: str, mode: str, kb_name: Optional[str] = None) ->
         return None
 
 
-def _write_cache(science_query: str, mode: str, answer: str, kb_name: Optional[str] = None) -> None:
+def _write_cache(
+    science_query: str, mode: str, answer: str, kb_name: str | None = None
+) -> None:
     """Persist *answer* to disk so future identical requests are served from cache."""
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key = _cache_key(science_query, mode, kb_name)
@@ -78,10 +85,9 @@ def _write_cache(science_query: str, mode: str, answer: str, kb_name: Optional[s
     except Exception as exc:
         logger.debug("[Perspicacite] Failed to write cache file: %s", exc)
 
+
 # Default Perspicacite API base URL (can be overridden by env var)
-PERSPICACITE_BASE_URL = os.environ.get(
-    "PERSPICACITE_API_URL", "http://localhost:8000"
-)
+PERSPICACITE_BASE_URL = os.environ.get("PERSPICACITE_API_URL", "http://localhost:8000")
 
 # ---------------------------------------------------------------------------
 # Runtime settings + telemetry
@@ -140,13 +146,15 @@ def configure_from_config(config) -> None:
 
 def _record(outcome: str, seconds: float, chars: int, kb_name: str | None) -> None:
     """Append one grounding attempt to the in-process ledger."""
-    _GROUNDING_LEDGER.append({
-        "outcome": outcome,
-        "seconds": round(seconds, 3),
-        "answer_chars": chars,
-        "kb_name": kb_name,
-        "mode": _SETTINGS["mode"],
-    })
+    _GROUNDING_LEDGER.append(
+        {
+            "outcome": outcome,
+            "seconds": round(seconds, 3),
+            "answer_chars": chars,
+            "kb_name": kb_name,
+            "mode": _SETTINGS["mode"],
+        }
+    )
 
 
 def grounding_stats() -> dict:
@@ -174,14 +182,33 @@ def grounding_stats() -> dict:
         "by_outcome": by,
         "total_seconds": round(secs, 3),
         "mean_seconds": round(secs / total, 3) if total else None,
-        "kb_name": _SETTINGS["kb_name"],
+        # The KB(s) the recorded attempts actually queried — a per-call
+        # argument (e.g. the agent-grounding KB) may differ from the
+        # configured default, and the record must state what was used.
+        "kb_name": _ledger_kb_name(),
         "mode": _SETTINGS["mode"],
     }
+
+
+def _ledger_kb_name() -> str | list[str] | None:
+    """Return the KB name the ledger's attempts used.
+
+    A single distinct value is returned as-is; several distinct values are
+    returned as a sorted list (None rendered as ``"(web-search)"``); an empty
+    ledger falls back to the configured default.
+    """
+    if not _GROUNDING_LEDGER:
+        return _SETTINGS["kb_name"]
+    distinct = {e["kb_name"] for e in _GROUNDING_LEDGER}
+    if len(distinct) == 1:
+        return next(iter(distinct))
+    return sorted("(web-search)" if k is None else k for k in distinct)
 
 
 def reset_grounding_stats() -> None:
     """Clear the ledger (used between tasks in batch evaluation)."""
     _GROUNDING_LEDGER.clear()
+
 
 # Timeout configuration.
 # The agentic pipeline involves multiple LLM calls, literature searches, paper
@@ -191,8 +218,8 @@ def reset_grounding_stats() -> None:
 #                     this is the gap between SSE events; for non-streaming it
 #                     is the total wall-clock time until the full response body
 #                     arrives.
-_CONNECT_TIMEOUT = 30       # seconds – TCP connect
-_READ_TIMEOUT = 600         # seconds – between data chunks (10 min)
+_CONNECT_TIMEOUT = 30  # seconds – TCP connect
+_READ_TIMEOUT = 600  # seconds – between data chunks (10 min)
 # NOTE: httpx has no single "overall" cap; the read timeout above bounds the
 # gap between SSE events, which is the operative limit for the streaming path.
 
@@ -200,6 +227,7 @@ _READ_TIMEOUT = 600         # seconds – between data chunks (10 min)
 def _build_httpx_timeout():
     """Build an ``httpx.Timeout`` with separate connect / read / write caps."""
     import httpx
+
     return httpx.Timeout(
         connect=_CONNECT_TIMEOUT,
         read=_READ_TIMEOUT,
@@ -212,8 +240,8 @@ def query_perspicacite(
     science_query: str,
     mode: str = "agentic",
     base_url: str = PERSPICACITE_BASE_URL,
-    kb_name: Optional[str] = None,
-) -> Optional[str]:
+    kb_name: str | None = None,
+) -> str | None:
     """Query Perspicacite-AI for scientific knowledge relevant to a task.
 
     Uses the ``/api/chat`` endpoint in **streaming** mode (SSE) by default.
@@ -236,7 +264,10 @@ def query_perspicacite(
     """
     import time as _time
 
-    kb_name = _SETTINGS["kb_name"]
+    # An explicit caller argument (e.g. the agent-grounding KB) wins; the
+    # configured process-wide default applies only when none is passed.
+    if kb_name is None:
+        kb_name = _SETTINGS["kb_name"]
     started = _time.perf_counter()
 
     if not _SETTINGS["enabled"]:
@@ -272,8 +303,8 @@ def _query_perspicacite_streaming(
     science_query: str,
     mode: str,
     base_url: str,
-    kb_name: Optional[str] = None,
-) -> Optional[str]:
+    kb_name: str | None = None,
+) -> str | None:
     """Query Perspicacite using SSE streaming.
 
     Streaming is the preferred transport because:
@@ -297,11 +328,11 @@ def _query_perspicacite_streaming(
     payload = {
         "query": science_query,
         "mode": mode,
-        "stream": True,           # SSE streaming
+        "stream": True,  # SSE streaming
         # None → Perspicacite's web-search pipeline; a KB name scopes
         # retrieval to that local corpus instead (see configure()).
         "max_papers": _SETTINGS["max_papers"],
-        "kb_name": kb_name,       # None -> web-search; a name -> that KB bundle
+        "kb_name": kb_name,  # None -> web-search; a name -> that KB bundle
         "databases": ["semantic_scholar", "openalex", "pubmed"],
     }
 
@@ -313,52 +344,54 @@ def _query_perspicacite_streaming(
             f"[Perspicacite] Querying {url} (streaming, mode={mode}, "
             f"query={science_query[:80]}...)"
         )
-        with httpx.Client(timeout=timeout) as client:
-            with client.stream("POST", url, json=payload) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    line = line.strip()
-                    if not line.startswith("data:"):
-                        continue
-                    raw = line[5:].strip()
-                    try:
-                        event = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
+        with (
+            httpx.Client(timeout=timeout) as client,
+            client.stream("POST", url, json=payload) as response,
+        ):
+            response.raise_for_status()
+            for line in response.iter_lines():
+                line = line.strip()
+                if not line.startswith("data:"):
+                    continue
+                raw = line[5:].strip()
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
 
-                    event_type = event.get("type", "")
+                event_type = event.get("type", "")
 
-                    # Log intermediate progress so the caller can see activity
-                    if event_type in ("thinking", "status"):
-                        msg = event.get("message", "")
-                        logger.debug(f"[Perspicacite] {event_type}: {msg}")
+                # Log intermediate progress so the caller can see activity
+                if event_type in ("thinking", "status"):
+                    msg = event.get("message", "")
+                    logger.debug(f"[Perspicacite] {event_type}: {msg}")
 
-                    elif event_type == "answer":
-                        # Answer may be base64-encoded (to avoid mid-chunk
-                        # JSON breakage over chunked HTTP)
-                        content_b64 = event.get("content_b64")
-                        if content_b64:
-                            full_answer = base64.b64decode(content_b64).decode(
-                                "utf-8", errors="replace"
-                            )
-                        elif "content" in event:
-                            full_answer = str(event["content"])
+                elif event_type == "answer":
+                    # Answer may be base64-encoded (to avoid mid-chunk
+                    # JSON breakage over chunked HTTP)
+                    content_b64 = event.get("content_b64")
+                    if content_b64:
+                        full_answer = base64.b64decode(content_b64).decode(
+                            "utf-8", errors="replace"
+                        )
+                    elif "content" in event:
+                        full_answer = str(event["content"])
 
-                    elif event_type == "token":
-                        # Live token delta (base64-encoded) — accumulate
-                        delta_b64 = event.get("delta_b64")
-                        if delta_b64:
-                            full_answer += base64.b64decode(delta_b64).decode(
-                                "utf-8", errors="replace"
-                            )
+                elif event_type == "token":
+                    # Live token delta (base64-encoded) — accumulate
+                    delta_b64 = event.get("delta_b64")
+                    if delta_b64:
+                        full_answer += base64.b64decode(delta_b64).decode(
+                            "utf-8", errors="replace"
+                        )
 
-                    elif event_type == "done":
-                        break
+                elif event_type == "done":
+                    break
 
-                    elif event_type == "error":
-                        err_msg = event.get("message", "Unknown server error")
-                        logger.warning(f"⚠️ [Perspicacite] Server error: {err_msg}")
-                        return None
+                elif event_type == "error":
+                    err_msg = event.get("message", "Unknown server error")
+                    logger.warning(f"⚠️ [Perspicacite] Server error: {err_msg}")
+                    return None
 
     except Exception as exc:  # noqa: BLE001
         logger.warning(
@@ -374,9 +407,7 @@ def _query_perspicacite_streaming(
         )
         return None
 
-    logger.info(
-        "[Perspicacite] Successfully retrieved scientific context (streaming)."
-    )
+    logger.info("[Perspicacite] Successfully retrieved scientific context (streaming).")
     return full_answer
 
 
@@ -384,8 +415,8 @@ def _query_perspicacite_non_streaming(
     science_query: str,
     mode: str,
     base_url: str,
-    kb_name: Optional[str] = None,
-) -> Optional[str]:
+    kb_name: str | None = None,
+) -> str | None:
     """Query Perspicacite using a plain (non-streaming) JSON POST.
 
     **Warning**: The server must complete the *entire* RAG pipeline before it
@@ -456,9 +487,7 @@ def _query_perspicacite_non_streaming(
 
     # Server might signal that non-streaming is not supported
     if isinstance(data, dict) and "error" in data:
-        logger.warning(
-            f"⚠️ [Perspicacite] Server returned error: {data['error']}"
-        )
+        logger.warning(f"⚠️ [Perspicacite] Server returned error: {data['error']}")
         return None
 
     # Extract answer from non-streaming response
@@ -496,9 +525,11 @@ def format_scientific_context(
         f"{scientific_context.strip()}\n"
     )
 
+
 if __name__ == "__main__":
     """test Perspicacite server."""
     import time
+
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -511,9 +542,9 @@ if __name__ == "__main__":
     t0 = time.time()
     result = query_perspicacite(test_query, mode="agentic")
     elapsed = time.time() - t0
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  Elapsed: {elapsed:.1f}s")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     if result:
         print(f"\n🔍 Scientific knowledge retrieved ({len(result)} chars):\n")
         # Print first 1000 chars as preview
