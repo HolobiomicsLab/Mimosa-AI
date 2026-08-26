@@ -104,12 +104,23 @@ function ScopeView({ scope, initialFile }: { scope: string; initialFile?: string
 function FilePreview({ scope, file, kind }: { scope: string; file: string; kind: string }) {
   const url = workspaceFileUrl(scope, file)
   const [text, setText] = useState<string | null>(null)
+  // A failed or non-OK fetch is its own explicit state — a stale ?file= deep
+  // link must say "not retrievable", never render blank or show a 404 body.
+  const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (kind === 'image') return
     setLoading(true)
-    fetch(url).then((r) => r.text()).then(setText).catch(() => setText(null)).finally(() => setLoading(false))
+    setFailed(false)
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.text()
+      })
+      .then(setText)
+      .catch(() => { setText(null); setFailed(true) })
+      .finally(() => setLoading(false))
   }, [url, kind])
 
   return (
@@ -121,7 +132,13 @@ function FilePreview({ scope, file, kind }: { scope: string; file: string; kind:
       <div className="card-body">
         {kind === 'image' && <img className="artifact-img" src={url} alt={file} />}
         {kind !== 'image' && loading && <Spinner />}
-        {kind !== 'image' && !loading && (
+        {kind !== 'image' && !loading && failed && (
+          <div className="hint">
+            File not retrievable at this path in this scope — a stale deep link,
+            or the snapshot changed since the link was made.
+          </div>
+        )}
+        {kind !== 'image' && !loading && !failed && (
           TEXTY.has(kind)
             ? <SmartText text={text ?? ''} filename={file} kind={kind} />
             : <div className="hint">Binary file — <a href={url} target="_blank" rel="noreferrer">download</a>.</div>
