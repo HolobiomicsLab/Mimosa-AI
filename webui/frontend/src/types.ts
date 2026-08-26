@@ -384,6 +384,33 @@ export interface Provenance {
   evaluations: RunEvaluation[]
 }
 
+// ── task definition: what the run was asked to do ───────────────────────────
+
+/** Where the {challenge, task_id} join came from: stamped at task generation
+ * (`task_ref.json`) or parsed from the structured ASB tag in the prompt. */
+export interface TaskRef {
+  challenge: string | null
+  task_id: string | null
+  csv_row: number | null
+  source: 'task_ref.json' | 'prompt_tag'
+}
+
+/** GET /api/runs/{id}/task — every absent layer carries a reason, never a
+ * silent null (see webui/backend/app/taskdef.py). */
+export interface TaskView {
+  run_id: string
+  prompt: string | null
+  prompt_file: string | null
+  prompt_absent_reason: string | null
+  task_ref: TaskRef | null
+  task_ref_absent_reason: string | null
+  grounding: Record<string, unknown> | null
+  grounding_absent_reason: string | null
+  /** The ASB card, verbatim — schema-driven display is the frontend's job. */
+  card: unknown
+  card_absent_reason: string | null
+}
+
 // ── evolution replay + QD atlas ─────────────────────────────────────────────
 
 /** One family member, annotated with everything the replay narrates. */

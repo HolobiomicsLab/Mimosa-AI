@@ -10,12 +10,13 @@ import EvolutionReplay from './EvolutionReplay'
 import MemoryReplay from './MemoryReplay'
 import WorkspacePanel from './WorkspacePanel'
 import ProvenancePanel from './ProvenancePanel'
+import TaskPanel from './TaskPanel'
 import LiveFeed from './LiveFeed'
 import { SmartText } from '../render'
 
 // Scientist-first ordering: outputs → what the agents did → the workflow. The
 // neuroevolution machinery lives under "Evolution", shown only for learning runs.
-const TAB_IDS = ['results', 'verification', 'provenance', 'replay', 'workflow', 'evolution', 'artifacts'] as const
+const TAB_IDS = ['results', 'task', 'verification', 'provenance', 'replay', 'workflow', 'evolution', 'artifacts'] as const
 type Tab = (typeof TAB_IDS)[number]
 
 /** Per-view query params that only make sense inside the tab that set them. */
@@ -85,6 +86,7 @@ export default function RunDetail({ runId }: { runId: string }) {
 
   const tabs: [Tab, string, number?][] = [
     ['results', 'Results'],
+    ['task', 'Task'],
     ...(run.evaluation_scores ? [['verification', 'Verification'] as [Tab, string]] : []),
     ['provenance', 'Provenance'],
     ['replay', 'Replay'],
@@ -126,6 +128,7 @@ export default function RunDetail({ runId }: { runId: string }) {
             <WorkspacePanel key={wsVersion} runId={run.id} />
           </div>
         )}
+        {tab === 'task' && <TaskPanel runId={runId} />}
         {tab === 'verification' && <Verification run={run} />}
         {tab === 'provenance' && <ProvenancePanel key={provVersion} runId={runId} />}
         {tab === 'replay' && <MemoryReplay runId={runId} />}
