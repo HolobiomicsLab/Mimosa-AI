@@ -190,6 +190,36 @@ def test_analysis_level_tags_pass_through_to_the_view(data_roots):
     assert provenance.read_astra_capsule(RUN)["tags"] == []
 
 
+def test_outputs_manifest_sidecar_passes_through_verbatim(data_roots):
+    manifest = {"report_md": {"path": "README.md", "bytes": 1234,
+                              "sha256": "ab" * 32}}
+    (get_settings().capsule_dir / RUN / "outputs_manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8")
+    cap = provenance.read_astra_capsule(RUN)
+    assert cap["outputs_manifest"] == manifest
+    assert cap["outputs_manifest_absent_reason"] is None
+
+
+def test_missing_outputs_manifest_carries_the_predates_reason(data_roots):
+    cap = provenance.read_astra_capsule(RUN)  # legacy fixture: no sidecar
+    assert cap["outputs_manifest"] is None
+    assert "predates the outputs manifest" in cap["outputs_manifest_absent_reason"]
+
+
+def test_unreadable_outputs_manifest_says_so_instead_of_vanishing(data_roots):
+    (get_settings().capsule_dir / RUN / "outputs_manifest.json").write_text(
+        "{not json", encoding="utf-8")
+    cap = provenance.read_astra_capsule(RUN)
+    assert cap["outputs_manifest"] is None
+    assert cap["outputs_manifest_absent_reason"] == "outputs_manifest.json unreadable"
+    (get_settings().capsule_dir / RUN / "outputs_manifest.json").write_text(
+        "[1, 2]", encoding="utf-8")  # valid JSON, wrong shape
+    cap = provenance.read_astra_capsule(RUN)
+    assert cap["outputs_manifest"] is None
+    assert cap["outputs_manifest_absent_reason"] == (
+        "outputs_manifest.json is not a JSON object")
+
+
 def test_nested_analyses_documents_no_longer_render_zero_decisions(data_roots):
     nested = {
         "version": "0.0.10",

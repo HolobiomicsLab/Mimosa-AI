@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAsync } from '../hooks'
 import type {
-  AstraDecision, DecisionsEra, EvalVerdict, JudgeLayer, Provenance, RunEvaluation,
+  AstraDecision, AstraOutput, DecisionsEra, EvalVerdict, JudgeLayer,
+  OutputsManifestEntry, Provenance, RunEvaluation,
 } from '../types'
-import { CopyLink, Spinner, shortId } from '../ui'
+import { CopyLink, Spinner, fmtBytes, shortId } from '../ui'
 
 /**
  * Provenance tab — the run rendered FROM its structured record (the MySTRA
@@ -33,6 +34,7 @@ export default function ProvenancePanel({ runId }: { runId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {data.astra ? <AstraCard capsule={data.astra} /> : <NoCapsule family={data.family_capsules} />}
+      {data.astra && <OutputsCard capsule={data.astra} />}
       {data.evaluations.map((ev) => <EvaluationCard key={ev.source} ev={ev} />)}
       {empty && (
         <div className="empty">
@@ -142,6 +144,104 @@ function DecisionRow({ slug, d, era }: { slug: string; d: AstraDecision; era: De
         )
       })}
     </div>
+  )
+}
+
+/** The capsule's output ports joined with the export-time content digests.
+ *
+ * The sha256 column is the CONTENT digest from ``outputs_manifest.json``
+ * (written beside new capsules at export time) — not asb_eval's name+size
+ * set-digest, which is a different instrument. Legacy capsules have no
+ * manifest; that absence renders with the backend's reason, per row.
+ */
+function OutputsCard({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
+  const outputs = capsule.outputs.filter((o): o is AstraOutput => typeof o === 'object' && o !== null)
+  const manifest = capsule.outputs_manifest
+  if (outputs.length === 0 && !manifest) {
+    return (
+      <div className="card">
+        <div className="card-head"><span>outputs</span></div>
+        <div className="card-body">
+          <div className="hint">The capsule declares no outputs
+            {capsule.outputs_manifest_absent_reason ? ` — ${capsule.outputs_manifest_absent_reason}` : ''}.
+          </div>
+        </div>
+      </div>
+    )
+  }
+  // Manifest-only ids (outputs the sidecar pinned that the YAML does not
+  // declare) still render — never dropped rows.
+  const declared = new Set(outputs.map((o) => o.id))
+  const extraIds = Object.keys(manifest ?? {}).filter((id) => !declared.has(id))
+  const th: React.CSSProperties = {
+    textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5,
+    color: 'var(--text-dim)', padding: '4px 10px 4px 0', borderBottom: '1px solid var(--border)',
+  }
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span>outputs · declared ports + export-time content digests</span>
+        <span className="mono">{manifest ? 'outputs_manifest.json' : 'no manifest'}</span>
+      </div>
+      <div className="card-body" style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={th}>id</th>
+              <th style={th}>description</th>
+              <th style={th}>path</th>
+              <th style={th}>bytes</th>
+              <th style={th} title="Content sha256 computed by the exporter and stored in outputs_manifest.json — NOT asb_eval's name+size set-digest.">
+                sha256 (content digest, from outputs manifest)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {outputs.map((o, i) => (
+              <OutputRow key={o.id ?? i} id={o.id ?? `(unnamed #${i})`}
+                description={o.description}
+                entry={o.id != null ? manifest?.[o.id] : undefined}
+                manifestReason={capsule.outputs_manifest_absent_reason} />
+            ))}
+            {extraIds.map((id) => (
+              <OutputRow key={`m:${id}`} id={id}
+                description="(pinned in the manifest; not declared in astra.yaml outputs)"
+                entry={manifest?.[id]} manifestReason={null} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function OutputRow({ id, description, entry, manifestReason }: {
+  id: string
+  description?: string
+  entry: OutputsManifestEntry | undefined
+  manifestReason: string | null
+}) {
+  const td: React.CSSProperties = { padding: '5px 10px 5px 0', verticalAlign: 'top', fontSize: 12 }
+  const noEntryText = manifestReason != null
+    ? 'no manifest (capsule predates outputs manifest)'
+    : 'not in the outputs manifest'
+  return (
+    <tr style={{ borderBottom: '1px solid #ffffff0a' }}>
+      <td style={td} className="mono">{id}</td>
+      <td style={{ ...td, color: 'var(--text-dim)' }}>{description ?? '—'}</td>
+      <td style={td} className="mono">{entry?.path ?? '—'}</td>
+      <td style={td}>{entry?.bytes != null ? fmtBytes(entry.bytes) : '—'}</td>
+      <td style={td}>
+        {entry?.sha256
+          ? <span className="mono" title={entry.sha256}>{entry.sha256.slice(0, 16)}…</span>
+          : (
+            <span className="muted" style={{ fontStyle: 'italic' }}
+              title={manifestReason ?? undefined}>
+              {noEntryText}
+            </span>
+          )}
+      </td>
+    </tr>
   )
 }
 

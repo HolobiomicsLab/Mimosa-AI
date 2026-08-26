@@ -21,6 +21,7 @@ artifacts yield ``None``/empty, never an exception.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +170,27 @@ def _decisions_era(decisions: dict[str, Any], extraction: Any) -> str | None:
     return "extracted_none" if isinstance(extraction, dict) else "predates_extractor"
 
 
+def _outputs_manifest(run_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    """(``outputs_manifest.json`` verbatim, absent-reason).
+
+    The exporter writes the sidecar ``{output_id: {path, bytes, sha256}}``
+    beside new capsules — CONTENT digests, a different instrument from
+    asb_eval's name+size set-digest. The 35 legacy capsules have none, and
+    that absence must reach the UI with its reason, never as a bare null.
+    """
+    path = capsule_path(run_id) / "outputs_manifest.json"
+    if not path.is_file():
+        return None, ("no outputs_manifest.json beside astra.yaml "
+                      "(capsule predates the outputs manifest)")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return None, "outputs_manifest.json unreadable"
+    if not isinstance(data, dict):
+        return None, "outputs_manifest.json is not a JSON object"
+    return data, None
+
+
 def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
     """The transparency exporter's capsule for *run_id*, or None.
 
@@ -178,7 +200,8 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
     (analysis-level, honest-empty markers included), ``inputs``,
     ``extraction``, ``decisions_era``, per-decision ``source_steps``/``model``
     (with ``source_steps_absent_reason``/``unparsed_trace_tags`` when the
-    evidence join is absent or degraded) and per-universe merged selections
+    evidence join is absent or degraded), the ``outputs_manifest.json``
+    sidecar (with a reason when absent) and per-universe merged selections
     are additive.
     """
     doc = _read_yaml(capsule_path(run_id) / "astra.yaml")
@@ -194,6 +217,7 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
     bodies = analysis_bodies(doc)
     decisions = _merged_decisions(bodies)
     extraction = doc.get("extraction")
+    manifest, manifest_reason = _outputs_manifest(run_id)
     return {
         "name": doc.get("name"),
         "description": doc.get("description"),
@@ -205,6 +229,8 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
         "decisions": decisions,
         "decisions_era": _decisions_era(decisions, extraction),
         "outputs": _collected_ports(doc, "outputs"),
+        "outputs_manifest": manifest,
+        "outputs_manifest_absent_reason": manifest_reason,
         "extraction": extraction if isinstance(extraction, dict) else None,
         "universes": universes,
     }

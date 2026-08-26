@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { api, artifactUrl } from '../api'
+import { Link, useSearchParams } from 'react-router-dom'
+import { api, artifactUrl, workspaceFileUrl } from '../api'
 import { useAsync, useLive } from '../hooks'
 import type { Artifact, ClaimStatus, EvaluationClaim, LiveEvent, RunDetail as RunDetailT } from '../types'
 import {
@@ -128,7 +128,7 @@ export default function RunDetail({ runId }: { runId: string }) {
         {tab === 'results' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {live && <LiveFeed runId={runId} />}
-            <WorkspacePanel key={wsVersion} runId={run.id} />
+            <WorkspacePanel key={wsVersion} runId={run.id} initialFile={params.get('file')} />
           </div>
         )}
         {tab === 'task' && <TaskPanel runId={runId} />}
@@ -148,10 +148,10 @@ export default function RunDetail({ runId }: { runId: string }) {
 function Verification({ run }: { run: RunDetailT }) {
   const ev = run.evaluation_scores
   if (!ev) return <div className="empty"><div className="hint">No verification data for this run.</div></div>
-  return <EvalCard ev={ev} claims={run.evaluation_claims} />
+  return <EvalCard runId={run.id} ev={ev} claims={run.evaluation_claims} />
 }
 
-function EvalCard({ ev, claims }: { ev: Record<string, unknown>; claims: EvaluationClaim[] | null }) {
+function EvalCard({ runId, ev, claims }: { runId: string; ev: Record<string, unknown>; claims: EvaluationClaim[] | null }) {
   const num = (k: string) => (typeof ev[k] === 'number' ? (ev[k] as number) : undefined)
   const chips: [string, unknown, string][] = [
     ['claims', ev.n_claims, 'var(--text)'],
@@ -181,7 +181,7 @@ function EvalCard({ ev, claims }: { ev: Record<string, unknown>; claims: Evaluat
             <div style={{ width: `${(pass / nClaims) * 100}%`, background: 'var(--ok)' }} />
           </div>
         )}
-        {claims && claims.length > 0 && <ClaimList claims={claims} />}
+        {claims && claims.length > 0 && <ClaimList runId={runId} claims={claims} />}
       </div>
     </div>
   )
@@ -192,8 +192,87 @@ const CLAIM_CLASS: Record<ClaimStatus, string> = {
   pass: 'ok', fail: 'bad', error: 'warn', unsure: 'dim',
 }
 
+/** How many distinct relevant files we probe per claim list (HEAD requests
+ * against the existing workspace-file endpoint — no new API). */
+const MAX_FILE_PROBES = 64
+
+/** Probe which of a run's claim-relevant files are still retrievable from its
+ * workspace snapshot. Three-state per file: true (link works), false (dead),
+ * or absent from the map (not probed — beyond the cap). `scopeExists` is null
+ * while probing, false when the /tmp snapshot has been evicted.
+ */
+function useSnapshotFileProbe(runId: string, files: string[]) {
+  const [scopeExists, setScopeExists] = useState<boolean | null>(null)
+  const [present, setPresent] = useState<Record<string, boolean> | null>(null)
+  const fileKey = files.join('\n')
+
+  useEffect(() => {
+    let alive = true
+    api.workspaceScopes()
+      .then(async (scopes) => {
+        const has = scopes.snapshots.includes(runId)
+        if (!alive) return
+        setScopeExists(has)
+        if (!has) { setPresent({}); return }
+        const unique = [...new Set(fileKey ? fileKey.split('\n') : [])].slice(0, MAX_FILE_PROBES)
+        const results = await Promise.all(unique.map(async (f) => {
+          try {
+            const res = await fetch(workspaceFileUrl(runId, f), { method: 'HEAD' })
+            return [f, res.ok] as const
+          } catch {
+            return [f, false] as const
+          }
+        }))
+        if (alive) setPresent(Object.fromEntries(results))
+      })
+      .catch(() => { if (alive) { setScopeExists(false); setPresent({}) } })
+    return () => { alive = false }
+  }, [runId, fileKey])
+
+  return { scopeExists, present }
+}
+
+/** One claim-relevant file: a link into the run's workspace view when the
+ * snapshot still holds it, an explicit dead-link state when it does not. */
+function ClaimFile({ file, scopeExists, present }: {
+  file: string
+  scopeExists: boolean | null
+  present: Record<string, boolean> | null
+}) {
+  if (scopeExists === null || present === null) {
+    return <span className="claim-file" title="probing the workspace snapshot…">{file}</span>
+  }
+  if (scopeExists === false) {
+    return (
+      <span className="claim-file" title="snapshot evicted — file not retrievable"
+        style={{ textDecoration: 'line-through', opacity: 0.6 }}>
+        {file} ⊘
+      </span>
+    )
+  }
+  const state = present[file]
+  if (state === true) {
+    return (
+      <Link className="claim-file" style={{ color: 'var(--accent)' }}
+        title="open in the run's workspace snapshot"
+        to={`?tab=results&file=${encodeURIComponent(file)}`}>
+        {file} ↗
+      </Link>
+    )
+  }
+  if (state === false) {
+    return (
+      <span className="claim-file" title="not found in the run's workspace snapshot"
+        style={{ textDecoration: 'line-through', opacity: 0.6 }}>
+        {file} ⊘
+      </span>
+    )
+  }
+  return <span className="claim-file" title={`not probed (only the first ${MAX_FILE_PROBES} distinct files are checked)`}>{file}</span>
+}
+
 /** Per-claim pass/fail breakdown, failures first so they're immediately visible. */
-function ClaimList({ claims }: { claims: EvaluationClaim[] }) {
+function ClaimList({ runId, claims }: { runId: string; claims: EvaluationClaim[] }) {
   const [showPass, setShowPass] = useState(false)
   const sorted = [...claims].sort(
     (a, b) =>
@@ -202,9 +281,15 @@ function ClaimList({ claims }: { claims: EvaluationClaim[] }) {
   )
   const passCount = claims.filter((c) => c.status === 'pass').length
   const shown = showPass ? sorted : sorted.filter((c) => c.status !== 'pass')
+  const probe = useSnapshotFileProbe(runId, claims.flatMap((c) => c.relevant_files))
 
   return (
     <div className="claim-list">
+      {probe.scopeExists === false && (
+        <div className="hint" style={{ padding: '6px 0', fontStyle: 'italic' }}>
+          snapshot evicted — files referenced by the claims are not retrievable
+        </div>
+      )}
       {shown.map((c) => (
         <div key={c.id} className="claim-row">
           <span className={`claim-status ${CLAIM_CLASS[c.status ?? 'unsure'] ?? 'dim'}`}>
@@ -215,7 +300,9 @@ function ClaimList({ claims }: { claims: EvaluationClaim[] }) {
             {c.details && <div className="claim-details">{c.details}</div>}
             <div className="claim-tags">
               <span className="muted">importance {c.importance}</span>
-              {c.relevant_files.map((f) => <span key={f} className="claim-file">{f}</span>)}
+              {c.relevant_files.map((f) => (
+                <ClaimFile key={f} file={f} scopeExists={probe.scopeExists} present={probe.present} />
+              ))}
             </div>
           </div>
         </div>

@@ -315,6 +315,23 @@ export interface AstraUniverse {
   decisions?: Record<string, unknown>
 }
 
+/** One capsule output port (astra.yaml ``outputs:`` entry). */
+export interface AstraOutput {
+  id?: string
+  type?: string
+  description?: string
+  inputs?: string[]
+  recipe?: { command?: string }
+}
+
+/** One ``outputs_manifest.json`` entry — a CONTENT sha256 taken at export
+ * time (a different instrument from asb_eval's name+size set-digest). */
+export interface OutputsManifestEntry {
+  path?: string
+  bytes?: number
+  sha256?: string
+}
+
 export interface AstraCapsule {
   name: string | null
   description: string | null
@@ -324,7 +341,10 @@ export interface AstraCapsule {
   inputs: unknown[]
   decisions: Record<string, AstraDecision>
   decisions_era: DecisionsEra | null
-  outputs: unknown[]
+  outputs: AstraOutput[]
+  outputs_manifest: Record<string, OutputsManifestEntry> | null
+  /** Why the manifest is absent (legacy capsules predate it) — verbatim. */
+  outputs_manifest_absent_reason: string | null
   extraction: AstraExtraction | null
   universes: AstraUniverse[]
 }

@@ -7,7 +7,19 @@ import { SmartText } from '../render'
 
 const TEXTY = new Set(['report', 'code', 'json', 'data'])
 
-export default function WorkspacePanel({ runId }: { runId: string }) {
+/** Client-side mirror of the backend's extension→kind map, for previewing a
+ * deep-linked file that exists on disk but fell outside the ranked listing. */
+const EXT_KIND: Record<string, string> = {
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image', webp: 'image',
+  csv: 'data', tsv: 'data', parquet: 'data',
+  md: 'report', txt: 'report', rst: 'report',
+  py: 'code', sh: 'code', r: 'code', ipynb: 'code',
+  json: 'json', yaml: 'json', yml: 'json',
+}
+const guessKind = (path: string) =>
+  EXT_KIND[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'other'
+
+export default function WorkspacePanel({ runId, initialFile }: { runId: string; initialFile?: string | null }) {
   const scopes = useAsync(() => api.workspaceScopes(), [])
   const [scope, setScope] = useState<string>('live')
 
@@ -36,16 +48,17 @@ export default function WorkspacePanel({ runId }: { runId: string }) {
           )}
         </div>
       </div>
-      <ScopeView scope={scope} />
+      <ScopeView scope={scope} initialFile={initialFile} />
     </div>
   )
 }
 
-function ScopeView({ scope }: { scope: string }) {
+function ScopeView({ scope, initialFile }: { scope: string; initialFile?: string | null }) {
   const { data, loading, error } = useAsync<WorkspaceListing>(() => api.workspaceFiles(scope), [scope])
   const [selected, setSelected] = useState<string | null>(null)
 
-  useEffect(() => { setSelected(data?.auto_preview ?? null) }, [data])
+  // A ?file= deep link wins over the ranked auto-preview.
+  useEffect(() => { setSelected(initialFile || (data?.auto_preview ?? null)) }, [data, initialFile])
 
   if (loading) return <Spinner />
   if (error || !data) return <div className="hint">Scope not available.</div>
@@ -59,7 +72,10 @@ function ScopeView({ scope }: { scope: string }) {
     )
   }
 
+  // A deep-linked file can exist on disk yet fall outside the capped ranked
+  // listing; preview it anyway with a kind guessed from its extension.
   const cur = data.files.find((f) => f.path === selected)
+    ?? (selected ? { path: selected, kind: guessKind(selected) } : undefined)
   return (
     <div className="split" style={{ ['--split-list' as string]: '300px' }}>
       <div className="card">
