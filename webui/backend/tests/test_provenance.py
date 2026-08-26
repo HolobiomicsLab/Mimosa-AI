@@ -120,6 +120,7 @@ def test_old_generation_capsule_payload_is_preserved_plus_additive_fields(data_r
     assert dec["default"] == "published"
     assert dec["model"] == "anthropic/claude-haiku-4-5"  # legacy key accepted
     assert dec["source_steps"] == []  # no tags on old capsules — honest empty
+    assert dec["source_steps_absent_reason"] == "capsule predates trace_step tags"
     assert cap["version"] == "0.1"
     assert cap["outputs"] == [{"id": "report_md", "type": "file"}]
     # previously-dropped fields now pass through
@@ -144,7 +145,49 @@ def test_decision_tags_yield_source_steps_and_model(data_roots):
     (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
     dec = provenance.read_astra_capsule(SIBLING)["decisions"]["normalisation"]
     assert dec["source_steps"] == [3, 17]
+    assert "source_steps_absent_reason" not in dec  # steps exist — no marker
     assert dec["model"] == "openrouter/some:free"  # value keeps its own colon
+
+
+def _write_capsule_with_decision(tags):
+    doc = dict(ASTRA_DOC)
+    doc["decisions"] = {
+        "normalisation": {"label": "N", "default": "tic",
+                          "options": {"tic": {"label": "TIC"}}, "tags": tags}
+    }
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True, exist_ok=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    return provenance.read_astra_capsule(SIBLING)["decisions"]["normalisation"]
+
+
+def test_unparseable_trace_tags_are_counted_never_silently_dropped(data_roots):
+    dec = _write_capsule_with_decision(["trace_step:x7", "trace_step:-1"])
+    assert dec["source_steps"] == []
+    assert dec["unparsed_trace_tags"] == 2
+    assert dec["source_steps_absent_reason"] == (
+        "trace_step tags present but unparseable")
+
+
+def test_partially_parsed_trace_tags_keep_steps_and_record_the_drop(data_roots):
+    dec = _write_capsule_with_decision(["trace_step:3", "trace_step:x7"])
+    assert dec["source_steps"] == [3]
+    assert dec["unparsed_trace_tags"] == 1
+    assert "source_steps_absent_reason" not in dec  # steps exist
+
+
+def test_analysis_level_tags_pass_through_to_the_view(data_roots):
+    doc = {**ASTRA_DOC,
+           "tags": ["mimosa:outputs=none (no artefacts captured)"],
+           "outputs": []}
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    cap = provenance.read_astra_capsule(SIBLING)
+    assert cap["tags"] == ["mimosa:outputs=none (no artefacts captured)"]
+    assert cap["outputs"] == []
+    # legacy capsules without a tags key yield [] — additive, never a KeyError
+    assert provenance.read_astra_capsule(RUN)["tags"] == []
 
 
 def test_nested_analyses_documents_no_longer_render_zero_decisions(data_roots):

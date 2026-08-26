@@ -94,21 +94,38 @@ def _with_parsed_tags(decision: dict[str, Any]) -> dict[str, Any]:
 
     New-generation capsules carry ``trace_step:<N>`` and ``model:<id>`` tags;
     old capsules carry a plain ``model`` key and no tags — both are accepted,
-    and the original keys are passed through untouched.
+    and the original keys are passed through untouched. Absence carries a
+    reason, never a bare empty list: an empty ``source_steps`` comes with
+    ``source_steps_absent_reason`` (capsule predates the tags, or every tag
+    was unparseable), and a ``trace_step:`` tag whose value fails to parse is
+    counted in ``unparsed_trace_tags`` instead of vanishing.
     """
     out = dict(decision)
     steps: list[int] = []
+    unparsed = 0
+    saw_trace_tag = False
     model = decision.get("model")
     tags = decision.get("tags")
     for tag in tags if isinstance(tags, list) else []:
         if not isinstance(tag, str):
             continue
         prefix, _, value = tag.partition(":")
-        if prefix == "trace_step" and value.isdigit():
-            steps.append(int(value))
+        if prefix == "trace_step":
+            saw_trace_tag = True
+            if value.isdigit():
+                steps.append(int(value))
+            else:
+                unparsed += 1
         elif prefix == "model" and value:
             model = value
     out["source_steps"] = steps
+    if unparsed:
+        out["unparsed_trace_tags"] = unparsed
+    if not steps:
+        out["source_steps_absent_reason"] = (
+            "trace_step tags present but unparseable" if saw_trace_tag
+            else "capsule predates trace_step tags"
+        )
     out["model"] = model
     return out
 
@@ -157,9 +174,12 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
 
     Reads both capsule generations (flat 0.1 with a per-decision ``model``
     key, and 0.0.12 with tags) and both document shapes (flat, nested
-    ``analyses:``). Every field of the old payload is preserved; ``inputs``,
+    ``analyses:``). Every field of the old payload is preserved; ``tags``
+    (analysis-level, honest-empty markers included), ``inputs``,
     ``extraction``, ``decisions_era``, per-decision ``source_steps``/``model``
-    and per-universe merged selections are additive.
+    (with ``source_steps_absent_reason``/``unparsed_trace_tags`` when the
+    evidence join is absent or degraded) and per-universe merged selections
+    are additive.
     """
     doc = _read_yaml(capsule_path(run_id) / "astra.yaml")
     if not isinstance(doc, dict):
@@ -178,6 +198,9 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
         "name": doc.get("name"),
         "description": doc.get("description"),
         "version": doc.get("version"),
+        # Analysis-level honest-empty tags (e.g. ``mimosa:outputs=none (no
+        # artefacts captured)``) must reach the UI or the reason is lost.
+        "tags": doc.get("tags") if isinstance(doc.get("tags"), list) else [],
         "inputs": _collected_ports(doc, "inputs"),
         "decisions": decisions,
         "decisions_era": _decisions_era(decisions, extraction),

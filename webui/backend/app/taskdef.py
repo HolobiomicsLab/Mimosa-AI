@@ -35,9 +35,14 @@ from .store import run_path
 # Structural, not vocabulary-bound: a bracketed/parenthesised span opening
 # with "ASB", an optional descriptor, an optional "challenge" keyword, the
 # challenge token, an optional "task" keyword, and a task_<id> token.
+# Case-insensitive on the keywords ("ASB"/"challenge"/"task" re-cased to
+# match e.g. the CSV's own "Challenge"/"TaskID" column casing must not
+# surface a false "no structured ASB tag" reason); the captured challenge
+# and task_id values are kept verbatim — never re-cased, never guessed.
 _TASK_TAG = re.compile(
     r"[\[(]ASB[\w ]*?[,\s—–-]+(?:challenge[:\s]+)?([A-Za-z0-9_-]+)"
-    r"[,\s]+(?:task[:\s]+)?(task_[A-Za-z0-9_-]+)[\])]"
+    r"[,\s]+(?:task[:\s]+)?(task_[A-Za-z0-9_-]+)[\])]",
+    re.IGNORECASE,
 )
 
 # Challenge/task-id values are used as path components under the corpus root;

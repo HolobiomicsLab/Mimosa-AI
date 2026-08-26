@@ -67,10 +67,19 @@ def task_roots(tmp_path, monkeypatch):
     "prose before (ASB Metabolomics challenge p_iimn, task_001) prose after",
     "(ASB Metabolomics challenge: p_iimn, task: task_001)",
     "[ASB Metabolomics — challenge: p_iimn, task: task_001]",
+    # Re-cased keywords (e.g. matching the CSV's own "Challenge" column
+    # casing) must parse too, or the honest-empty reason would be false.
+    "[ASB benchmark, Challenge p_iimn, task_001]",
+    "[asb benchmark, challenge p_iimn, task_001]",
 ])
 def test_every_on_disk_tag_spelling_parses(text):
     assert taskdef.parse_task_tag(text) == {"challenge": "p_iimn",
                                             "task_id": "task_001"}
+
+
+def test_recased_keywords_parse_but_captured_values_stay_verbatim():
+    parsed = taskdef.parse_task_tag("[ASB benchmark, challenge P_IIMN, Task_001]")
+    assert parsed == {"challenge": "P_IIMN", "task_id": "Task_001"}  # never re-cased
 
 
 @pytest.mark.parametrize("text", [
