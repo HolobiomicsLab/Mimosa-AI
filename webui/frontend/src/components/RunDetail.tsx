@@ -198,7 +198,9 @@ const CLAIM_CLASS: Record<ClaimStatus, string> = {
 const LISTING_CAP = 500
 
 interface SnapshotProbe {
-  scopeExists: boolean
+  /** null when the scopes fetch ITSELF failed — eviction is then unknown,
+   * never asserted (a backend hiccup must not render a dead-link verdict). */
+  scopeExists: boolean | null
   /** Snapshot-root-relative paths from the existing workspace listing API. */
   paths: string[]
   /** False when the listing may be truncated (or failed) — absence of a match
@@ -234,7 +236,9 @@ function useSnapshotProbe(runId: string): SnapshotProbe | null {
           if (alive) setState({ scopeExists: true, paths: [], complete: false })
         }
       })
-      .catch(() => { if (alive) setState({ scopeExists: false, paths: [], complete: true }) })
+      // The scopes fetch itself failed — everything is inconclusive, so no
+      // state below may claim eviction or a complete listing.
+      .catch(() => { if (alive) setState({ scopeExists: null, paths: [], complete: false }) })
     return () => { alive = false }
   }, [runId])
 
@@ -243,9 +247,24 @@ function useSnapshotProbe(runId: string): SnapshotProbe | null {
 
 /** A claim's file is named relative to the run's task workspace, while the
  * snapshot nests it (e.g. ``workspace/<task_slug>/README.md``) — match on
- * exact path or a path-suffix, returning the full listing path to link to. */
-function resolveClaimFile(file: string, paths: string[]): string | undefined {
-  return paths.find((p) => p === file || p.endsWith(`/${file}`))
+ * exact path, else path-suffix. A bare basename can suffix-match several
+ * files; the shallowest is linked and the count is surfaced, so a heuristic
+ * join is never presented as exact. */
+function resolveClaimFile(file: string, paths: string[]): { path: string; matches: number } | null {
+  const exact = paths.find((p) => p === file)
+  if (exact != null) return { path: exact, matches: 1 }
+  const depth = (p: string) => p.split('/').length
+  const suffix = paths
+    .filter((p) => p.endsWith(`/${file}`))
+    .sort((a, b) => depth(a) - depth(b) || a.localeCompare(b))
+  return suffix.length > 0 ? { path: suffix[0], matches: suffix.length } : null
+}
+
+/** Lock-step with workspace._walk's skip rule: dotfiles and these names are
+ * never listed even when present on disk, so their absence is inconclusive. */
+function isListingExcluded(file: string): boolean {
+  const base = file.split('/').pop() ?? file
+  return base.startsWith('.') || base === 'Thumbs.db'
 }
 
 /** One claim-relevant file: a link into the run's workspace view when the
@@ -253,6 +272,14 @@ function resolveClaimFile(file: string, paths: string[]): string | undefined {
 function ClaimFile({ file, probe }: { file: string; probe: SnapshotProbe | null }) {
   if (probe === null) {
     return <span className="claim-file" title="probing the workspace snapshot…">{file}</span>
+  }
+  if (probe.scopeExists == null) {
+    return (
+      <span className="claim-file"
+        title="not probed — workspace scopes unavailable (the probe failed, not the file)">
+        {file}
+      </span>
+    )
   }
   if (!probe.scopeExists) {
     return (
@@ -264,17 +291,28 @@ function ClaimFile({ file, probe }: { file: string; probe: SnapshotProbe | null 
   }
   const resolved = resolveClaimFile(file, probe.paths)
   if (resolved != null) {
+    const ambiguous = resolved.matches > 1
     return (
       <Link className="claim-file" style={{ color: 'var(--accent)' }}
-        title={`open ${resolved} in the run's workspace snapshot`}
-        to={`?tab=results&file=${encodeURIComponent(resolved)}`}>
-        {file} ↗
+        title={ambiguous
+          ? `${resolved.matches} snapshot files end with /${file} — linking the shallowest, ${resolved.path}`
+          : `open ${resolved.path} in the run's workspace snapshot`}
+        to={`?tab=results&file=${encodeURIComponent(resolved.path)}`}>
+        {file}{ambiguous ? ` (${resolved.matches} matches)` : ''} ↗
       </Link>
+    )
+  }
+  if (isListingExcluded(file)) {
+    return (
+      <span className="claim-file"
+        title="not probed — the snapshot listing excludes dotfiles, so absence here is inconclusive">
+        {file}
+      </span>
     )
   }
   if (probe.complete) {
     return (
-      <span className="claim-file" title="not found in the run's workspace snapshot"
+      <span className="claim-file" title="not found in the run's workspace snapshot listing"
         style={{ textDecoration: 'line-through', opacity: 0.6 }}>
         {file} ⊘
       </span>
