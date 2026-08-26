@@ -153,6 +153,10 @@ export interface WorkspaceListing {
   scope: string
   root: string
   files: WorkspaceFile[]
+  /** Producer-stated: true when the walk stopped at the backend's file cap,
+   * i.e. completeness is unknown (conservative — exactly-at-cap also reads
+   * true). Consumers must not infer this by mirroring the cap value. */
+  truncated: boolean
   auto_preview: string | null
 }
 export interface WorkspaceScopes {

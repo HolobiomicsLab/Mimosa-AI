@@ -7,8 +7,9 @@ import { SmartText } from '../render'
 
 const TEXTY = new Set(['report', 'code', 'json', 'data'])
 
-/** Client-side mirror of the backend's extension→kind map, for previewing a
- * deep-linked file that exists on disk but fell outside the ranked listing. */
+/** Client-side mirror of the backend's extension→kind map (workspace.py
+ * _EXT_KIND — keep in lock-step, a reciprocal note sits there), for previewing
+ * a deep-linked file that exists on disk but fell outside the ranked listing. */
 const EXT_KIND: Record<string, string> = {
   png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image', webp: 'image',
   csv: 'data', tsv: 'data', parquet: 'data',

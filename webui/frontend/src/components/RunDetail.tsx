@@ -192,11 +192,6 @@ const CLAIM_CLASS: Record<ClaimStatus, string> = {
   pass: 'ok', fail: 'bad', error: 'warn', unsure: 'dim',
 }
 
-/** The backend's ranked-listing cap (workspace._walk max_files); a listing of
- * exactly this size may be truncated, so an unmatched file is then "not
- * probed" rather than declared dead. */
-const LISTING_CAP = 500
-
 interface SnapshotProbe {
   /** null when the scopes fetch ITSELF failed — eviction is then unknown,
    * never asserted (a backend hiccup must not render a dead-link verdict). */
@@ -228,7 +223,9 @@ function useSnapshotProbe(runId: string): SnapshotProbe | null {
             setState({
               scopeExists: true,
               paths: listing.files.map((f) => f.path),
-              complete: listing.files.length < LISTING_CAP,
+              // Completeness is the PRODUCER's statement (an absent flag on an
+              // older backend reads as unknown, i.e. not complete).
+              complete: listing.truncated === false,
             })
           }
         } catch {
@@ -320,7 +317,7 @@ function ClaimFile({ file, probe }: { file: string; probe: SnapshotProbe | null 
   }
   return (
     <span className="claim-file"
-      title={`not probed — the snapshot listing is capped at ${LISTING_CAP} files`}>
+      title="not probed — the snapshot listing is truncated at the backend's file cap">
       {file}
     </span>
   )

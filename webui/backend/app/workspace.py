@@ -18,6 +18,9 @@ from typing import Any, BinaryIO
 
 from .settings import get_settings
 
+# Keep in lock-step with the client-side mirror in
+# webui/frontend/src/components/WorkspacePanel.tsx (EXT_KIND), used to guess a
+# kind for deep-linked files that fall outside the ranked listing.
 _EXT_KIND = {
     ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image",
     ".svg": "image", ".webp": "image",
@@ -45,10 +48,21 @@ def _priority(kind: str, size: int, mtime: float, newest: float) -> float:
     return round(score, 2)
 
 
-def _walk(root: Path, max_files: int = 500) -> list[dict[str, Any]]:
+def _walk(root: Path, max_files: int = 500) -> tuple[list[dict[str, Any]], bool]:
+    """(ranked files under *root*, truncated flag).
+
+    ``truncated`` is the PRODUCER's completeness statement, conservative by
+    design: True whenever the walk stopped at ``max_files`` (so exactly-at-cap
+    also reads truncated — completeness is then unknown). Consumers must treat
+    an unmatched file in a truncated listing as "not probed", never as absent;
+    the frontend's snapshot probe (RunDetail.tsx) consumes this flag instead
+    of mirroring the cap. The dotfile/_SKIP skip rule is mirrored by
+    RunDetail's ``isListingExcluded`` — keep the two in lock-step.
+    """
     if not root.is_dir():
-        return []
+        return [], False
     files: list[dict[str, Any]] = []
+    truncated = False
     newest = 0.0
     for path in root.rglob("*"):
         if not path.is_file() or path.name in _SKIP or path.name.startswith("."):
@@ -67,11 +81,12 @@ def _walk(root: Path, max_files: int = 500) -> list[dict[str, Any]]:
             }
         )
         if len(files) >= max_files:
+            truncated = True
             break
     for f in files:
         f["priority"] = _priority(f["kind"], f["size"], f["mtime"], newest)
     files.sort(key=lambda f: f["priority"], reverse=True)
-    return files
+    return files, truncated
 
 
 def _snapshot_dirs() -> dict[str, Path]:
@@ -111,11 +126,14 @@ def list_files(scope: str) -> dict[str, Any] | None:
     root = resolve_root(scope)
     if root is None:
         return None
-    files = _walk(root)
+    files, truncated = _walk(root)
     return {
         "scope": scope,
         "root": str(root),
         "files": files,
+        # Producer-stated completeness (see _walk) — the client must never
+        # infer it by mirroring the cap value.
+        "truncated": truncated,
         "auto_preview": files[0]["path"] if files else None,
     }
 
