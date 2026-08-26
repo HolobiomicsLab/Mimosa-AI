@@ -40,7 +40,7 @@ from sources.transparency.trace_compaction import compact_trace, load_trace
 from sources.transparency.yaml_writer import (
     build_analysis,
     build_universe,
-    safe_output_id,
+    unique_output_ids,
     write_export,
 )
 
@@ -131,17 +131,18 @@ class AstraExporter:
         """Write ``outputs_manifest.json`` beside ``astra.yaml``.
 
         Pure projection of the artefact snapshot: one entry per exported
-        output, keyed by the same slug the analysis uses as output id, with
-        the file's relative name, byte size and sha256 content digest.
-        Fail-soft per file — an unreadable artefact becomes an entry with an
-        ``error`` reason (no absolute paths in it), never a crash. An empty
-        snapshot writes ``{}``, which is itself the honest record.
+        output, keyed by the same collision-free id the analysis uses
+        (``unique_output_ids`` is the single id source for both surfaces, so
+        manifest keys always equal astra.yaml output ids), with the file's
+        relative name, byte size and sha256 content digest. Fail-soft per
+        file — an unreadable artefact becomes an entry with an ``error``
+        reason (no absolute paths in it), never a crash. An empty snapshot
+        writes ``{}``, matching the analysis's empty outputs list (the
+        ``mimosa:outputs=none`` tag carries the reason).
         """
         manifest: dict[str, dict] = {}
-        for index, name in enumerate(workspace_files):
-            manifest[safe_output_id(name, index)] = self._manifest_entry(
-                artefacts_dir / name, name
-            )
+        for output_id, name in zip(unique_output_ids(workspace_files), workspace_files):
+            manifest[output_id] = self._manifest_entry(artefacts_dir / name, name)
         manifest_path = capsule_dir / OUTPUTS_MANIFEST_FILENAME
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
         return manifest_path

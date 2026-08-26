@@ -763,6 +763,67 @@ def test_outputs_manifest_empty_snapshot_writes_empty_object(tmp_path: Path) -> 
     assert json.loads(path.read_text()) == {}
 
 
+def test_colliding_filenames_get_distinct_manifest_entries_with_correct_digests(
+    tmp_path: Path,
+) -> None:
+    # "a-b.csv" and "a b.csv" slugify identically; a shared key would silently
+    # attribute one file's digest to the other. Both surfaces (astra.yaml
+    # output ids, manifest keys) must de-collide the same way.
+    import hashlib
+    from sources.transparency.astra_exporter import AstraExporter
+
+    artefacts = tmp_path / "artefacts"
+    artefacts.mkdir()
+    (artefacts / "a-b.csv").write_bytes(b"dash")
+    (artefacts / "a b.csv").write_bytes(b"space")
+    capsule = tmp_path / "capsule"
+    capsule.mkdir()
+    files = ["a b.csv", "a-b.csv"]  # exporter order (sorted): space < dash
+    exporter = AstraExporter(SimpleNamespace())
+    manifest = json.loads(
+        exporter._write_outputs_manifest(capsule, artefacts, files).read_text()
+    )
+    assert len(manifest) == 2
+    assert manifest["a_b_csv"]["path"] == "a b.csv"
+    assert manifest["a_b_csv"]["sha256"] == hashlib.sha256(b"space").hexdigest()
+    assert manifest["a_b_csv_1"]["path"] == "a-b.csv"
+    assert manifest["a_b_csv_1"]["sha256"] == hashlib.sha256(b"dash").hexdigest()
+
+
+def test_manifest_keys_equal_astra_output_ids_even_on_collisions(
+    tmp_path: Path,
+) -> None:
+    from sources.transparency.astra_exporter import AstraExporter
+
+    artefacts = tmp_path / "artefacts"
+    artefacts.mkdir()
+    files = ["a b.csv", "a-b.csv", "report.md"]
+    for name in files:
+        (artefacts / name).write_bytes(b"x")
+    capsule = tmp_path / "capsule"
+    capsule.mkdir()
+    manifest = json.loads(
+        AstraExporter(SimpleNamespace())
+        ._write_outputs_manifest(capsule, artefacts, files)
+        .read_text()
+    )
+    analysis = build_analysis("goal", "uuid-1", files, [])
+    assert [o["id"] for o in analysis["outputs"]] == list(manifest.keys())
+
+
+def test_empty_snapshot_keeps_outputs_and_manifest_in_lockstep() -> None:
+    # No synthetic "(none captured)" output: the analysis carries an empty
+    # outputs list plus an honest-empty tag, matching the manifest's {}.
+    analysis = build_analysis("goal", "uuid-1", [], [])
+    assert analysis["outputs"] == []
+    assert "mimosa:outputs=none (no artefacts captured)" in analysis["tags"]
+
+
+def test_nonempty_snapshot_carries_no_outputs_none_tag() -> None:
+    analysis = build_analysis("goal", "uuid-1", ["report.md"], [])
+    assert not any(t.startswith("mimosa:outputs=none") for t in analysis["tags"])
+
+
 def test_export_writes_manifest_and_environment_blocks(
     monkeypatch, tmp_path: Path
 ) -> None:

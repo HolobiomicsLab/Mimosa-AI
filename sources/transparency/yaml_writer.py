@@ -20,10 +20,13 @@ Provenance extensions beyond the spec:
 - analysis-level ``tags`` state what is NOT tracked instead of implying it
   is: ``mimosa:output_attribution=untracked`` (per-output decision lists are
   honest-empty ``[]`` — the old writer stamped every decision id on every
-  output, which was attribution-shaped noise), and
+  output, which was attribution-shaped noise),
   ``mimosa:decisions=none (extractor produced no decisions)`` when the
   extractor ran and yielded nothing, so future empty capsules are
-  distinguishable from pre-extractor ones.
+  distinguishable from pre-extractor ones, and
+  ``mimosa:outputs=none (no artefacts captured)`` when the snapshot held no
+  files — the outputs list stays honestly empty (pre-0.0.12 capsules carried
+  a synthetic ``(none captured)`` output instead; readers accept both).
 
 The recipe field is left intentionally minimal: Mimosa runs Python inside
 smolagents rather than a single shell command, so we point reviewers at the
@@ -51,6 +54,7 @@ _DEFAULT_UNIVERSE_ID = "best"
 
 _OUTPUT_ATTRIBUTION_TAG = "mimosa:output_attribution=untracked"
 _NO_DECISIONS_TAG = "mimosa:decisions=none (extractor produced no decisions)"
+_NO_OUTPUTS_TAG = "mimosa:outputs=none (no artefacts captured)"
 
 
 _RECIPE_FALLBACK_COMMAND = "see agent trace in sources/memory/<run_uuid>/task_*.json"
@@ -82,7 +86,7 @@ def build_analysis(
             "ASTRA export of the best-performing evolved workflow. "
             "Decisions reconstructed post-run from the agent memory trace."
         ),
-        "tags": _build_analysis_tags(decisions),
+        "tags": _build_analysis_tags(decisions, workspace_files),
         "inputs": _build_inputs(goal),
         "outputs": _build_outputs(workspace_files, recipe_command),
         "decisions": _build_decisions(decisions),
@@ -124,11 +128,15 @@ def write_export(
     return analysis_path
 
 
-def _build_analysis_tags(decisions: list[Decision]) -> list[str]:
+def _build_analysis_tags(
+    decisions: list[Decision], workspace_files: list[str]
+) -> list[str]:
     """Analysis-level honest-empty tags (see module docstring)."""
     tags = [_OUTPUT_ATTRIBUTION_TAG]
     if not decisions:
         tags.append(_NO_DECISIONS_TAG)
+    if not workspace_files:
+        tags.append(_NO_OUTPUTS_TAG)
     return tags
 
 
@@ -147,11 +155,13 @@ def _build_outputs(
     workspace_files: list[str],
     recipe_command: str,
 ) -> list[dict[str, Any]]:
-    if not workspace_files:
-        workspace_files = ["(none captured)"]
+    # An empty snapshot yields an empty outputs list — the analysis-level
+    # ``mimosa:outputs=none`` tag carries the reason. The pre-0.0.12 writer
+    # synthesized a "(none captured)" output here, which dangled: the manifest
+    # never carried a matching entry. Readers still accept those capsules.
     return [
         {
-            "id": safe_output_id(f, i),
+            "id": output_id,
             "type": "data",
             "description": f"Artefact produced by the best run: {f}",
             "inputs": ["task_description"],
@@ -161,7 +171,7 @@ def _build_outputs(
             "decisions": [],
             "recipe": {"command": recipe_command},
         }
-        for i, f in enumerate(workspace_files)
+        for output_id, f in zip(unique_output_ids(workspace_files), workspace_files)
     ]
 
 
@@ -191,6 +201,32 @@ def safe_output_id(filename: str, index: int) -> str:
     if not stem or not stem[0].isalpha():
         stem = f"output_{index}"
     return stem[:48]
+
+
+def unique_output_ids(filenames: list[str]) -> list[str]:
+    """One collision-free output id per filename, in order.
+
+    ``safe_output_id`` can collapse distinct filenames onto one slug
+    (punctuation squashing, 48-char truncation). A colliding slug would make
+    one output id silently carry another file's digest in the manifest — the
+    exact misattribution a content-attestation artefact exists to prevent —
+    so collisions get a ``_<n>`` suffix (trimmed to stay within 48 chars).
+    This is THE shared id source: ``_build_outputs`` and the exporter's
+    ``outputs_manifest.json`` both call it, keeping astra.yaml output ids and
+    manifest keys unique and in lock-step.
+    """
+    ids: list[str] = []
+    taken: set[str] = set()
+    for index, name in enumerate(filenames):
+        slug = safe_output_id(name, index)
+        candidate, n = slug, index
+        while candidate in taken:
+            tail = f"_{n}"
+            candidate = slug[: 48 - len(tail)] + tail
+            n += 1
+        taken.add(candidate)
+        ids.append(candidate)
+    return ids
 
 
 def _dump(path: Path, data: dict[str, Any]) -> None:
@@ -247,4 +283,10 @@ if __name__ == "__main__":
 
     empty = build_analysis("goal", "abc-123", [], [])
     assert _NO_DECISIONS_TAG in empty["tags"], empty["tags"]
+    assert _NO_OUTPUTS_TAG in empty["tags"], empty["tags"]
+    assert empty["outputs"] == [], empty["outputs"]
+
+    colliding = unique_output_ids(["a-b.csv", "a b.csv"])
+    assert colliding == ["a_b_csv", "a_b_csv_1"], colliding
+    assert len(set(unique_output_ids(["a_b_csv_1", "a-b.csv", "a b.csv"]))) == 3
     print("[OK] yaml_writer smoke check passed")
