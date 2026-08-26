@@ -770,6 +770,7 @@ def test_colliding_filenames_get_distinct_manifest_entries_with_correct_digests(
     # attribute one file's digest to the other. Both surfaces (astra.yaml
     # output ids, manifest keys) must de-collide the same way.
     import hashlib
+
     from sources.transparency.astra_exporter import AstraExporter
 
     artefacts = tmp_path / "artefacts"

@@ -141,7 +141,9 @@ class AstraExporter:
         ``mimosa:outputs=none`` tag carries the reason).
         """
         manifest: dict[str, dict] = {}
-        for output_id, name in zip(unique_output_ids(workspace_files), workspace_files):
+        for output_id, name in zip(
+            unique_output_ids(workspace_files), workspace_files, strict=True
+        ):
             manifest[output_id] = self._manifest_entry(artefacts_dir / name, name)
         manifest_path = capsule_dir / OUTPUTS_MANIFEST_FILENAME
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))

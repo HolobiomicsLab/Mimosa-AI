@@ -171,7 +171,9 @@ def _build_outputs(
             "decisions": [],
             "recipe": {"command": recipe_command},
         }
-        for output_id, f in zip(unique_output_ids(workspace_files), workspace_files)
+        for output_id, f in zip(
+            unique_output_ids(workspace_files), workspace_files, strict=True
+        )
     ]
 
 
