@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from app import taskdef
 from app.settings import get_settings
 
@@ -158,9 +157,8 @@ def test_newest_prompt_file_wins(task_roots):
 
 
 def test_route_serves_the_view_behind_the_run_id_guard(task_roots):
-    from fastapi.testclient import TestClient
-
     from app.main import app
+    from fastapi.testclient import TestClient
 
     with TestClient(app) as client:
         res = client.get(f"/api/runs/{RUN}/task")

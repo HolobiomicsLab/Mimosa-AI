@@ -9,15 +9,33 @@ from __future__ import annotations
 
 import mimetypes
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import (
-    APIRouter, Body, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect,
+    APIRouter,
+    Body,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
 )
 from fastapi.responses import FileResponse
 
-from . import atlas, bridge, config_store, evolution, lineage, memory, provenance, store, taskdef, workspace
+from . import (
+    atlas,
+    bridge,
+    config_store,
+    evolution,
+    lineage,
+    memory,
+    provenance,
+    store,
+    taskdef,
+    workspace,
+)
 from .launcher import launcher
 from .live import hub
 from .settings import get_settings
@@ -318,7 +336,7 @@ def post_launch(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         mode=mode,
         learn=bool(payload.get("learn", False)),
         judge=bool(payload.get("judge", True)),
-        started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        started_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
     if not result.get("ok"):
         raise HTTPException(status_code=503, detail=result.get("error"))

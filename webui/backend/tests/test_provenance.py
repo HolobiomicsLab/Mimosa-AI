@@ -12,7 +12,6 @@ import json
 
 import pytest
 import yaml
-
 from app import provenance
 from app.settings import get_settings
 
@@ -266,9 +265,8 @@ def test_settings_defaults_derive_from_the_repo_not_a_developer_machine(monkeypa
 
 
 def test_health_reports_every_data_root_with_an_exists_flag(data_roots, monkeypatch):
-    from fastapi.testclient import TestClient
-
     from app.main import app
+    from fastapi.testclient import TestClient
 
     monkeypatch.setenv("MIMOSA_CORPUS_DIR", str(data_roots / "corpus"))
     get_settings.cache_clear()
@@ -283,9 +281,8 @@ def test_health_reports_every_data_root_with_an_exists_flag(data_roots, monkeypa
 
 
 def test_route_serves_the_view(data_roots):
-    from fastapi.testclient import TestClient
-
     from app.main import app
+    from fastapi.testclient import TestClient
 
     with TestClient(app) as client:
         res = client.get(f"/api/runs/{RUN}/provenance")
