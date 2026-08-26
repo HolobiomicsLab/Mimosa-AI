@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from . import atlas, bridge, config_store, evolution, lineage, memory, provenance, store, workspace
+from . import atlas, bridge, config_store, evolution, lineage, memory, provenance, store, taskdef, workspace
 from .launcher import launcher
 from .live import hub
 from .settings import get_settings
@@ -94,6 +94,15 @@ def get_provenance(run_id: str) -> dict[str, Any]:
     ``asb_eval`` has been run against the workspace."""
     _require_run(run_id)
     return provenance.provenance(run_id)
+
+
+@router.get("/runs/{run_id}/task")
+def get_task(run_id: str) -> dict[str, Any]:
+    """The task the run was asked to do: verbatim prompt, parsed task ref,
+    grounding statistics, and the ASB card (verbatim) when a benchmark corpus
+    is configured. Absent layers carry a reason, never a silent null."""
+    _require_run(run_id)
+    return taskdef.task_view(run_id)
 
 
 @router.get("/runs/{run_id}/evolution")
