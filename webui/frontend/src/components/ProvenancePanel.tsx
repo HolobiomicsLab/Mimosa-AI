@@ -223,8 +223,13 @@ function ExtractionStrip({ capsule }: { capsule: NonNullable<Provenance['astra']
  */
 function OutputsCard({ capsule }: { capsule: NonNullable<Provenance['astra']> }) {
   const outputs = capsule.outputs.filter((o): o is AstraOutput => typeof o === 'object' && o !== null)
+  // Non-object port entries (foreign or hand-edited capsules) get their own
+  // rows — never silently dropped, and never counted as "declares no outputs".
+  const malformed = capsule.outputs
+    .map((o, i) => [o, i] as const)
+    .filter(([o]) => typeof o !== 'object' || o === null)
   const manifest = capsule.outputs_manifest
-  if (outputs.length === 0 && !manifest) {
+  if (capsule.outputs.length === 0 && !manifest) {
     return (
       <div className="card">
         <div className="card-head"><span>outputs</span></div>
@@ -270,6 +275,11 @@ function OutputsCard({ capsule }: { capsule: NonNullable<Provenance['astra']> })
                 entry={o.id != null ? manifest?.[o.id] : undefined}
                 manifestReason={capsule.outputs_manifest_absent_reason} />
             ))}
+            {malformed.map(([o, i]) => (
+              <OutputRow key={`x:${i}`} id={`(malformed entry #${i})`}
+                description={String(o)} entry={undefined}
+                manifestReason="not joinable — the declared entry is not an object" />
+            ))}
             {extraIds.map((id) => (
               <OutputRow key={`m:${id}`} id={id}
                 description="(pinned in the manifest; not declared in astra.yaml outputs)"
@@ -289,9 +299,10 @@ function OutputRow({ id, description, entry, manifestReason }: {
   manifestReason: string | null
 }) {
   const td: React.CSSProperties = { padding: '5px 10px 5px 0', verticalAlign: 'top', fontSize: 12 }
-  const noEntryText = manifestReason != null
-    ? 'no manifest (capsule predates outputs manifest)'
-    : 'not in the outputs manifest'
+  // The backend's absence reason renders VERBATIM as the visible cell text —
+  // it distinguishes "predates the manifest" from "manifest unreadable" and a
+  // paraphrase would assert the wrong cause for the latter.
+  const noEntryText = manifestReason ?? 'not in the outputs manifest'
   return (
     <tr style={{ borderBottom: '1px solid #ffffff0a' }}>
       <td style={td} className="mono">{id}</td>
@@ -301,12 +312,7 @@ function OutputRow({ id, description, entry, manifestReason }: {
       <td style={td}>
         {entry?.sha256
           ? <span className="mono" title={entry.sha256}>{entry.sha256.slice(0, 16)}…</span>
-          : (
-            <span className="muted" style={{ fontStyle: 'italic' }}
-              title={manifestReason ?? undefined}>
-              {noEntryText}
-            </span>
-          )}
+          : <span className="muted" style={{ fontStyle: 'italic' }}>{noEntryText}</span>}
       </td>
     </tr>
   )

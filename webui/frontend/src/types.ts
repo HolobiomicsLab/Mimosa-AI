@@ -357,7 +357,10 @@ export interface AstraCapsule {
   inputs: unknown[]
   decisions: Record<string, AstraDecision>
   decisions_era: DecisionsEra | null
-  outputs: AstraOutput[]
+  /** Declared output ports, verbatim from the wire — a foreign or hand-edited
+   * capsule can carry non-object entries, which the UI renders as malformed
+   * rows rather than dropping (see OutputsCard). */
+  outputs: unknown[]
   outputs_manifest: Record<string, OutputsManifestEntry> | null
   /** Why the manifest is absent (legacy capsules predate it) — verbatim. */
   outputs_manifest_absent_reason: string | null
