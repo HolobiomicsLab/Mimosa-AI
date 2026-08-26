@@ -38,14 +38,129 @@ def _read_yaml(path: Path) -> Any | None:
         return None
 
 
+# ── dual-shape ASTRA reading ─────────────────────────────────────────────────
+# SOURCE OF TRUTH: AgenticScienceBuilder,
+# src/agentic_science_builder/astra_render/render.py (``analysis_bodies`` and
+# ``_universe_selection``; ``analysis_body`` is not needed here). Vendored so
+# nested ``analyses:``-shaped documents (ASB ground truth, astra_export
+# output) resolve without importing the ASB package — shape convergence
+# happens at readers, never writers. Keep in lock-step with the renderer.
+
+
+def _dict(value: Any) -> dict[str, Any]:
+    """The value as a mapping, or empty — never an AttributeError downstream."""
+    return value if isinstance(value, dict) else {}
+
+
+def analysis_bodies(doc: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Every analysis in the document, root first.
+
+    A nested document holds the run as the ROOT analysis plus one inline
+    sub-analysis per capsule — dropping the root or the later siblings would
+    silently hide most of the record. A flat legacy document (no ``analyses``
+    container) is just its own single body.
+    """
+    doc = _dict(doc)
+    analyses = _dict(doc.get("analyses"))
+    if not analyses:
+        return [(doc.get("id", ""), doc)]
+    bodies: list[tuple[str, dict[str, Any]]] = []
+    root = {k: v for k, v in doc.items() if k != "analyses"}
+    if any(_dict(root.get(k)) for k in ("decisions", "findings", "evaluation")):
+        bodies.append(("(root)", root))
+    bodies += [(slug, _dict(body)) for slug, body in analyses.items()]
+    return bodies
+
+
+def _universe_selection(universe: dict[str, Any]) -> dict[str, Any]:
+    """Option selection of a universe in either shape (nested merged, or flat)."""
+    analyses = _dict(universe.get("analyses"))
+    if not analyses:
+        return _dict(universe.get("decisions"))
+    merged: dict[str, Any] = {}
+    for body in analyses.values():
+        merged.update(_dict(_dict(body).get("decisions")))
+    return merged
+
+
 # ── the run's own ASTRA capsule ──────────────────────────────────────────────
 
 def capsule_path(run_id: str) -> Path:
     return get_settings().capsule_dir / run_id
 
 
+def _with_parsed_tags(decision: dict[str, Any]) -> dict[str, Any]:
+    """The decision plus derived ``source_steps`` and ``model``.
+
+    New-generation capsules carry ``trace_step:<N>`` and ``model:<id>`` tags;
+    old capsules carry a plain ``model`` key and no tags — both are accepted,
+    and the original keys are passed through untouched.
+    """
+    out = dict(decision)
+    steps: list[int] = []
+    model = decision.get("model")
+    tags = decision.get("tags")
+    for tag in tags if isinstance(tags, list) else []:
+        if not isinstance(tag, str):
+            continue
+        prefix, _, value = tag.partition(":")
+        if prefix == "trace_step" and value.isdigit():
+            steps.append(int(value))
+        elif prefix == "model" and value:
+            model = value
+    out["source_steps"] = steps
+    out["model"] = model
+    return out
+
+
+def _merged_decisions(bodies: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
+    """Decisions across every analysis body, ids kept, collisions slug-prefixed."""
+    merged: dict[str, Any] = {}
+    for slug, body in bodies:
+        for did, dec in _dict(body.get("decisions")).items():
+            key = did if did not in merged else f"{slug}/{did}"
+            merged[key] = _with_parsed_tags(dec) if isinstance(dec, dict) else dec
+    return merged
+
+
+def _collected_ports(doc: dict[str, Any], key: str) -> list[Any]:
+    """The union of ``inputs``/``outputs`` across the document, root first.
+
+    Unlike ``analysis_bodies``'s root gate (which keys on decision-ish
+    content), the root ALWAYS counts here: a nested export declares the run's
+    ports on the root analysis even when the root carries no decisions.
+    """
+    analyses = _dict(doc.get("analyses"))
+    bodies: list[dict[str, Any]] = [doc] + [_dict(b) for b in analyses.values()]
+    out: list[Any] = []
+    for body in bodies:
+        value = body.get(key)
+        if isinstance(value, list):
+            out.extend(value)
+    return out
+
+
+def _decisions_era(decisions: dict[str, Any], extraction: Any) -> str | None:
+    """Why the decision layer is empty, when it is.
+
+    ``predates_extractor`` — the capsule was written before the decision
+    extractor existed (no ``extraction`` block either); ``extracted_none`` —
+    the extractor ran and recorded nothing. None when decisions exist.
+    """
+    if decisions:
+        return None
+    return "extracted_none" if isinstance(extraction, dict) else "predates_extractor"
+
+
 def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
-    """The transparency exporter's capsule for *run_id*, or None."""
+    """The transparency exporter's capsule for *run_id*, or None.
+
+    Reads both capsule generations (flat 0.1 with a per-decision ``model``
+    key, and 0.0.12 with tags) and both document shapes (flat, nested
+    ``analyses:``). Every field of the old payload is preserved; ``inputs``,
+    ``extraction``, ``decisions_era``, per-decision ``source_steps``/``model``
+    and per-universe merged selections are additive.
+    """
     doc = _read_yaml(capsule_path(run_id) / "astra.yaml")
     if not isinstance(doc, dict):
         return None
@@ -55,14 +170,19 @@ def read_astra_capsule(run_id: str) -> dict[str, Any] | None:
         for upath in sorted(udir.glob("*.yaml")):
             u = _read_yaml(upath)
             if isinstance(u, dict):
-                universes.append(u)
-    decisions = doc.get("decisions")
+                universes.append({**u, "decisions": _universe_selection(u)})
+    bodies = analysis_bodies(doc)
+    decisions = _merged_decisions(bodies)
+    extraction = doc.get("extraction")
     return {
         "name": doc.get("name"),
         "description": doc.get("description"),
         "version": doc.get("version"),
-        "decisions": decisions if isinstance(decisions, dict) else {},
-        "outputs": doc.get("outputs") if isinstance(doc.get("outputs"), list) else [],
+        "inputs": _collected_ports(doc, "inputs"),
+        "decisions": decisions,
+        "decisions_era": _decisions_era(decisions, extraction),
+        "outputs": _collected_ports(doc, "outputs"),
+        "extraction": extraction if isinstance(extraction, dict) else None,
         "universes": universes,
     }
 

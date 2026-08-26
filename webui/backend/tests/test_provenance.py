@@ -35,7 +35,11 @@ ASTRA_DOC = {
             "model": "anthropic/claude-haiku-4-5",
         }
     },
+    "inputs": [{"id": "task_description", "type": "text", "source": "user_goal",
+                "description": "Reproduce the study."}],
     "outputs": [{"id": "report_md", "type": "file"}],
+    "extraction": {"steps_considered": 12, "decisions_recorded": 1,
+                   "llm_call_failures": 0, "malformed_responses": 0},
 }
 
 EVAL_DOC = {
@@ -104,6 +108,76 @@ def test_capsule_is_read_with_universes(data_roots):
     assert cap is not None
     assert "param_sourcing" in cap["decisions"]
     assert cap["universes"][0]["decisions"] == {"param_sourcing": "published"}
+
+
+def test_old_generation_capsule_payload_is_preserved_plus_additive_fields(data_roots):
+    """A version 0.1 capsule with legacy keys yields the same payload as
+    before, plus inputs/extraction/era/source_steps where derivable."""
+    cap = provenance.read_astra_capsule(RUN)
+    dec = cap["decisions"]["param_sourcing"]
+    assert dec["label"] == "Parameter specification source"
+    assert dec["default"] == "published"
+    assert dec["model"] == "anthropic/claude-haiku-4-5"  # legacy key accepted
+    assert dec["source_steps"] == []  # no tags on old capsules — honest empty
+    assert cap["version"] == "0.1"
+    assert cap["outputs"] == [{"id": "report_md", "type": "file"}]
+    # previously-dropped fields now pass through
+    assert cap["inputs"][0]["id"] == "task_description"
+    assert cap["extraction"]["steps_considered"] == 12
+    assert cap["decisions_era"] is None  # decisions exist — no era marker
+
+
+def test_decision_tags_yield_source_steps_and_model(data_roots):
+    doc = dict(ASTRA_DOC)
+    doc["decisions"] = {
+        "normalisation": {
+            "label": "Normalisation strategy",
+            "default": "tic",
+            "options": {"tic": {"label": "TIC"}},
+            "tags": ["trace_step:3", "trace_step:17", "model:openrouter/some:free",
+                     "mimosa:other=x"],
+        }
+    }
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+    dec = provenance.read_astra_capsule(SIBLING)["decisions"]["normalisation"]
+    assert dec["source_steps"] == [3, 17]
+    assert dec["model"] == "openrouter/some:free"  # value keeps its own colon
+
+
+def test_nested_analyses_documents_no_longer_render_zero_decisions(data_roots):
+    nested = {
+        "version": "0.0.10",
+        "name": "ASB ground truth",
+        "inputs": [{"id": "article", "type": "data"}],
+        "analyses": {
+            "task_001": {"decisions": {"filtering": {"label": "F", "default": "a",
+                                                     "options": {"a": {}}}},
+                         "outputs": [{"id": "table"}]},
+            "task_002": {"decisions": {"filtering": {"label": "F2", "default": "b",
+                                                     "options": {"b": {}}}}},
+        },
+    }
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(nested), encoding="utf-8")
+    cap = provenance.read_astra_capsule(SIBLING)
+    assert cap["decisions"]["filtering"]["label"] == "F"
+    assert cap["decisions"]["task_002/filtering"]["label"] == "F2"  # collision kept
+    assert cap["inputs"] == [{"id": "article", "type": "data"}]  # root-level input
+    assert cap["outputs"] == [{"id": "table"}]  # sub-analysis output collected
+
+
+def test_decisions_era_distinguishes_predates_extractor_from_extracted_none(data_roots):
+    cap_dir = get_settings().capsule_dir / SIBLING
+    cap_dir.mkdir(parents=True)
+    pre = {"version": "0.1", "name": "old", "decisions": {}}
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(pre), encoding="utf-8")
+    assert provenance.read_astra_capsule(SIBLING)["decisions_era"] == "predates_extractor"
+    none = {**pre, "extraction": {"steps_considered": 9, "decisions_recorded": 0}}
+    (cap_dir / "astra.yaml").write_text(yaml.safe_dump(none), encoding="utf-8")
+    assert provenance.read_astra_capsule(SIBLING)["decisions_era"] == "extracted_none"
 
 
 def test_run_without_capsule_points_at_the_family_best(data_roots):
