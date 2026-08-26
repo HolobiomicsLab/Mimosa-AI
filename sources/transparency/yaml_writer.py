@@ -6,14 +6,24 @@ ASTRA fields used (see https://astra-spec.org/latest/specification/#decisions):
 - ``inputs[*]``, ``outputs[*]``
 - universe file with ``id``, ``description``, ``decisions``
 
-Two provenance extensions beyond the spec:
-- each decision carries ``model`` — the model id that produced the source
-  trace step — when the saved memory recorded it (older traces predate the
-  field and simply omit it);
+Provenance extensions beyond the spec:
+- each decision carries ``tags``: one ``trace_step:<N>`` per contributing
+  trace step (the join key to ``sources/memory/<uuid>/astra_decision_step_N``
+  evidence) plus ``model:<id>`` — the model that produced the source trace
+  step — when the saved memory recorded it. Capsules written before version
+  0.0.12 carried the model as a per-decision ``model`` key instead; readers
+  accept both generations.
 - the analysis carries an ``extraction`` block with the decision-extraction
   health counters, so a capsule produced from a degraded extraction (crashed
   LLM calls, malformed responses) is self-describing rather than silently
   thin.
+- analysis-level ``tags`` state what is NOT tracked instead of implying it
+  is: ``mimosa:output_attribution=untracked`` (per-output decision lists are
+  honest-empty ``[]`` — the old writer stamped every decision id on every
+  output, which was attribution-shaped noise), and
+  ``mimosa:decisions=none (extractor produced no decisions)`` when the
+  extractor ran and yielded nothing, so future empty capsules are
+  distinguishable from pre-extractor ones.
 
 The recipe field is left intentionally minimal: Mimosa runs Python inside
 smolagents rather than a single shell command, so we point reviewers at the
@@ -37,8 +47,11 @@ if __name__ == "__main__":
 from sources.transparency.decision_extractor import Decision, ExtractionResult, Option
 
 
-_ASTRA_VERSION = "0.1"
+_ASTRA_VERSION = "0.0.12"
 _DEFAULT_UNIVERSE_ID = "best"
+
+_OUTPUT_ATTRIBUTION_TAG = "mimosa:output_attribution=untracked"
+_NO_DECISIONS_TAG = "mimosa:decisions=none (extractor produced no decisions)"
 
 
 _RECIPE_FALLBACK_COMMAND = "see agent trace in sources/memory/<run_uuid>/task_*.json"
@@ -67,8 +80,9 @@ def build_analysis(
             "ASTRA export of the best-performing evolved workflow. "
             "Decisions reconstructed post-run from the agent memory trace."
         ),
+        "tags": _build_analysis_tags(decisions),
         "inputs": _build_inputs(goal),
-        "outputs": _build_outputs(workspace_files, decisions, recipe_command),
+        "outputs": _build_outputs(workspace_files, recipe_command),
         "decisions": _build_decisions(decisions),
     }
     if extraction is not None:
@@ -106,11 +120,19 @@ def write_export(
     return analysis_path
 
 
+def _build_analysis_tags(decisions: list[Decision]) -> list[str]:
+    """Analysis-level honest-empty tags (see module docstring)."""
+    tags = [_OUTPUT_ATTRIBUTION_TAG]
+    if not decisions:
+        tags.append(_NO_DECISIONS_TAG)
+    return tags
+
+
 def _build_inputs(goal: str) -> list[dict[str, Any]]:
     return [
         {
             "id": "task_description",
-            "type": "text",
+            "type": "data",
             "source": "user_goal",
             "description": goal.strip()[:500] or "(empty goal)",
         }
@@ -119,19 +141,20 @@ def _build_inputs(goal: str) -> list[dict[str, Any]]:
 
 def _build_outputs(
     workspace_files: list[str],
-    decisions: list[Decision],
     recipe_command: str,
 ) -> list[dict[str, Any]]:
-    decision_ids = [d.id for d in decisions]
     if not workspace_files:
         workspace_files = ["(none captured)"]
     return [
         {
-            "id": _safe_output_id(f, i),
-            "type": "file",
+            "id": safe_output_id(f, i),
+            "type": "data",
             "description": f"Artefact produced by the best run: {f}",
             "inputs": ["task_description"],
-            "decisions": decision_ids,
+            # Per-output decision attribution is not tracked; an honest empty
+            # list (plus the analysis-level tag) beats stamping every decision
+            # id on every output as the pre-0.0.12 writer did.
+            "decisions": [],
             "recipe": {"command": recipe_command},
         }
         for i, f in enumerate(workspace_files)
@@ -141,7 +164,10 @@ def _build_outputs(
 def _build_decisions(decisions: list[Decision]) -> dict[str, Any]:
     entries: dict[str, Any] = {}
     for d in decisions:
-        entry: dict[str, Any] = {
+        tags = [f"trace_step:{n}" for n in d.source_steps]
+        if d.model:
+            tags.append(f"model:{d.model}")
+        entries[d.id] = {
             "label": d.label,
             "rationale": d.rationale,
             "default": d.chosen_option_id,
@@ -149,14 +175,13 @@ def _build_decisions(decisions: list[Decision]) -> dict[str, Any]:
                 o.id: {"label": o.label, "description": o.description}
                 for o in d.options
             },
+            "tags": tags,
         }
-        if d.model:
-            entry["model"] = d.model
-        entries[d.id] = entry
     return entries
 
 
-def _safe_output_id(filename: str, index: int) -> str:
+def safe_output_id(filename: str, index: int) -> str:
+    """Slugify ``filename`` into a stable ASTRA output id (also the manifest key)."""
     import re
     stem = re.sub(r"[^a-z0-9_]+", "_", filename.lower()).strip("_")
     if not stem or not stem[0].isalpha():
@@ -195,9 +220,18 @@ if __name__ == "__main__":
         out = write_export(Path(tmp), analysis, universe)
         assert out.exists() and out.name == "astra.yaml"
         loaded = yaml.safe_load(out.read_text())
-        assert loaded["decisions"]["fit_method"]["default"] == "ols"
-        assert set(loaded["decisions"]["fit_method"]["options"]) == {"ols", "robust"}
-        assert loaded["decisions"]["fit_method"]["model"] == "openrouter/qwen/qwen3.7-plus"
+        assert loaded["version"] == "0.0.12", loaded["version"]
+        entry = loaded["decisions"]["fit_method"]
+        assert entry["default"] == "ols"
+        assert set(entry["options"]) == {"ols", "robust"}
+        # Provenance now travels as tags; the legacy per-decision "model" key
+        # is no longer written (readers still accept it on old capsules).
+        assert entry["tags"] == ["trace_step:2", "model:openrouter/qwen/qwen3.7-plus"]
+        assert "model" not in entry
+        assert loaded["inputs"][0]["type"] == "data"
+        for output in loaded["outputs"]:
+            assert output["type"] == "data" and output["decisions"] == []
+        assert loaded["tags"] == ["mimosa:output_attribution=untracked"]
         assert loaded["extraction"] == {
             "steps_considered": 5,
             "decisions_recorded": 1,
@@ -206,4 +240,7 @@ if __name__ == "__main__":
         }, loaded["extraction"]
         uni = yaml.safe_load((Path(tmp) / "universes" / "best.yaml").read_text())
         assert uni["decisions"]["fit_method"] == "ols"
+
+    empty = build_analysis("goal", "abc-123", [], [])
+    assert _NO_DECISIONS_TAG in empty["tags"], empty["tags"]
     print("[OK] yaml_writer smoke check passed")

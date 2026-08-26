@@ -67,10 +67,14 @@ class Option:
 
 @dataclass(frozen=True)
 class Decision:
-    """One ASTRA decision surfaced from a single trace step.
+    """One ASTRA decision surfaced from one or more trace steps.
 
     ``model`` is the model id that produced the source step (trace
     provenance, not LLM output); "" when the trace predates the field.
+    ``source_step`` is the first contributing step (kept as the scalar
+    accessor for existing readers); ``source_steps`` lists EVERY
+    contributing step in trace order, deduped — the merge path appends the
+    steps of later re-justifications of the same decision id.
     """
 
     id: str
@@ -80,6 +84,12 @@ class Decision:
     options: tuple[Option, ...]
     source_step: int
     model: str = ""
+    source_steps: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Default ``source_steps`` to the scalar so both stay consistent."""
+        if not self.source_steps:
+            object.__setattr__(self, "source_steps", (self.source_step,))
 
 
 @dataclass(frozen=True)
@@ -140,7 +150,7 @@ def extract_decisions(
         if not isinstance(result, Decision):
             continue
         existing = merged.get(result.id)
-        merged[result.id] = _merge_options(existing, result) if existing else result
+        merged[result.id] = _merge_decisions(existing, result) if existing else result
     return ExtractionResult(
         decisions=tuple(merged.values()),
         steps_total=len(steps),
@@ -172,18 +182,26 @@ def _warn_on_failures(crashed: int, malformed: int, total: int) -> None:
     )
 
 
-def _merge_options(existing: Decision, later: Decision) -> Decision:
-    """Fold a later step's alternative options into the first occurrence.
+def _merge_decisions(existing: Decision, later: Decision) -> Decision:
+    """Fold a later step's options AND provenance into the first occurrence.
 
-    First-occurrence-wins for the core fields (label, rationale, chosen option,
-    provenance); options are unioned by id so alternatives raised when the same
-    choice is re-justified later aren't lost.
+    First-occurrence-wins for the core fields (label, rationale, chosen
+    option, scalar ``source_step``); options are unioned by id so
+    alternatives raised when the same choice is re-justified later aren't
+    lost, and ``source_steps`` collects every contributing step (trace
+    order, deduped) so no re-justifying step is dropped from provenance.
     """
-    known = {o.id for o in existing.options}
-    extra = tuple(o for o in later.options if o.id not in known)
-    if not extra:
+    known_options = {o.id for o in existing.options}
+    extra_options = tuple(o for o in later.options if o.id not in known_options)
+    known_steps = set(existing.source_steps)
+    extra_steps = tuple(s for s in later.source_steps if s not in known_steps)
+    if not extra_options and not extra_steps:
         return existing
-    return replace(existing, options=existing.options + extra)
+    return replace(
+        existing,
+        options=existing.options + extra_options,
+        source_steps=existing.source_steps + extra_steps,
+    )
 
 
 def _extract_one(
@@ -406,15 +424,19 @@ if __name__ == "__main__":
     fenced = "```json\n" + good + "\n```"
     assert _parse_response(fenced, 1).chosen_option_id == "robust"
 
-    # Option merge keeps first-occurrence core fields, unions alternatives.
+    # Decision merge keeps first-occurrence core fields, unions alternatives,
+    # and collects every contributing step in source_steps.
     first = _parse_response(good, 3)
+    assert first.source_steps == (3,), first
     later = Decision(
         id="fit_method", label="ignored", rationale="ignored",
         chosen_option_id="ols",
         options=(Option(id="theil_sen", label="Theil-Sen", description="Median slope."),),
         source_step=9,
     )
-    merged = _merge_options(first, later)
+    merged = _merge_decisions(first, later)
     assert merged.label == "Fitting method", merged
     assert {o.id for o in merged.options} == {"robust", "ols", "theil_sen"}, merged
+    assert merged.source_step == 3, merged
+    assert merged.source_steps == (3, 9), merged
     print("[OK] decision_extractor smoke check passed")

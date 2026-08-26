@@ -289,7 +289,43 @@ def test_extract_decisions_dedupes_by_id(monkeypatch, tmp_path: Path) -> None:
     assert len(result.decisions) == 1
     assert result.decisions[0].id == "fit_method"
     assert result.decisions[0].source_step == 0
+    # Dedup must not drop provenance: BOTH contributing steps are kept.
+    assert result.decisions[0].source_steps == (0, 1)
     assert (result.steps_total, result.crashed, result.malformed) == (2, 0, 0)
+
+
+def test_decision_source_steps_defaults_to_the_scalar_step() -> None:
+    # Existing constructors pass only source_step; source_steps must always
+    # be populated so no reader has to special-case single-step decisions.
+    decision = _decision("fit_method", "ols")
+    assert decision.source_steps == (decision.source_step,)
+
+
+def test_merge_decisions_collects_steps_ordered_and_deduped() -> None:
+    from dataclasses import replace
+
+    from sources.transparency.decision_extractor import _merge_decisions
+
+    first = _decision("fit_method", "ols")            # source_step 0
+    later = replace(_decision("fit_method", "ols"),
+                    source_step=7, source_steps=(7,))
+    merged = _merge_decisions(first, later)
+    assert merged.source_step == 0          # scalar accessor: first occurrence
+    assert merged.source_steps == (0, 7)
+    remerged = _merge_decisions(merged, later)  # same step again: no dup
+    assert remerged.source_steps == (0, 7)
+
+
+def test_merge_decisions_keeps_steps_even_when_options_add_nothing() -> None:
+    # The old early return ("no new options -> keep existing") silently
+    # dropped the later step from provenance; that is the severed join.
+    from dataclasses import replace
+
+    from sources.transparency.decision_extractor import _merge_decisions
+
+    first = _decision("fit_method", "ols")
+    later = replace(first, source_step=4, source_steps=(4,))
+    assert _merge_decisions(first, later).source_steps == (0, 4)
 
 
 def test_extract_decisions_attaches_step_model(monkeypatch, tmp_path: Path) -> None:
@@ -409,18 +445,69 @@ def test_analysis_records_rejected_alternatives_beside_the_chosen_option() -> No
     assert entry["default"] == "ols"
 
 
-def test_analysis_records_decision_model_when_available() -> None:
+def test_analysis_records_decision_model_as_tag() -> None:
+    # Since 0.0.12 the step's model travels as a "model:<id>" tag; the legacy
+    # per-decision "model" key is never written on new capsules (readers keep
+    # accepting it on the 35 pre-0.0.12 capsules on disk).
     from dataclasses import replace
 
     decision = replace(_decision("fit_method", "ols"),
                        model="openrouter/qwen/qwen3.7-plus")
-    analysis = build_analysis("g", "abc", ["r.md"], [decision])
-    assert analysis["decisions"]["fit_method"]["model"] == "openrouter/qwen/qwen3.7-plus"
+    entry = build_analysis("g", "abc", ["r.md"], [decision])["decisions"]["fit_method"]
+    assert "model:openrouter/qwen/qwen3.7-plus" in entry["tags"]
+    assert "model" not in entry
 
 
-def test_analysis_omits_model_for_legacy_traces() -> None:
+def test_analysis_omits_model_tag_for_legacy_traces() -> None:
+    entry = build_analysis(
+        "g", "abc", ["r.md"], [_decision("fit_method", "ols")]
+    )["decisions"]["fit_method"]
+    assert "model" not in entry
+    assert not [t for t in entry["tags"] if t.startswith("model:")]
+
+
+def test_analysis_tags_every_contributing_trace_step() -> None:
+    # The decision -> trace-step join: one "trace_step:<N>" tag per
+    # contributing step, in trace order (evidence files are
+    # sources/memory/<uuid>/astra_decision_step_<N>.json).
+    from dataclasses import replace
+
+    decision = replace(_decision("fit_method", "ols"), source_steps=(3, 9, 17))
+    entry = build_analysis("g", "abc", ["r.md"], [decision])["decisions"]["fit_method"]
+    assert [t for t in entry["tags"] if t.startswith("trace_step:")] == [
+        "trace_step:3", "trace_step:9", "trace_step:17",
+    ]
+
+
+def test_analysis_version_marks_the_new_writer_generation() -> None:
     analysis = build_analysis("g", "abc", ["r.md"], [_decision("fit_method", "ols")])
-    assert "model" not in analysis["decisions"]["fit_method"]
+    assert analysis["version"] == "0.0.12"
+
+
+def test_analysis_ports_use_data_type() -> None:
+    # ASTRA port type is "data" — the old writer's "text"/"file" were
+    # writer-local vocabulary.
+    analysis = build_analysis("g", "abc", ["r.md"], [_decision("fit_method", "ols")])
+    assert analysis["inputs"][0]["type"] == "data"
+    assert all(o["type"] == "data" for o in analysis["outputs"])
+
+
+def test_outputs_carry_honest_empty_attribution() -> None:
+    # The pre-0.0.12 writer stamped EVERY decision id on EVERY output —
+    # attribution-shaped noise. New capsules say "untracked" instead.
+    decisions = [_decision("fit_method", "ols"), _decision("metric", "r2")]
+    analysis = build_analysis("g", "abc", ["a.csv", "b.csv"], decisions)
+    assert all(o["decisions"] == [] for o in analysis["outputs"])
+    assert "mimosa:output_attribution=untracked" in analysis["tags"]
+
+
+def test_analysis_tags_distinguish_extractor_empty_from_pre_extractor() -> None:
+    # decisions:{} used to be indistinguishable from a capsule written before
+    # the extractor existed; the honest-empty tag closes that gap.
+    empty = build_analysis("g", "abc", ["r.md"], [])
+    assert "mimosa:decisions=none (extractor produced no decisions)" in empty["tags"]
+    populated = build_analysis("g", "abc", ["r.md"], [_decision("fit_method", "ols")])
+    assert not [t for t in populated["tags"] if t.startswith("mimosa:decisions=none")]
 
 
 def test_analysis_records_extraction_health_block() -> None:
