@@ -16,6 +16,7 @@ cookies.json
 CLAUDE.md
 workflows/*
 runs_capsule/*
+evaluations/
 runs_notes/*
 config_*.json
 parallel_testing_results/
