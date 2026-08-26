@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse
 from . import atlas, bridge, config_store, evolution, lineage, memory, provenance, store, workspace
 from .launcher import launcher
 from .live import hub
+from .settings import get_settings
 
 router = APIRouter(prefix="/api")
 
@@ -41,12 +42,19 @@ def _require_run(run_id: str) -> None:
 
 @router.get("/health")
 def health() -> dict[str, Any]:
-    s = store.workflow_dir()
+    wf = store.workflow_dir()
+    s = get_settings()
     return {
         "ok": True,
-        "workflow_dir": str(s),
-        "workflow_dir_exists": s.is_dir(),
+        "workflow_dir": str(wf),
+        "workflow_dir_exists": wf.is_dir(),
         "run_count": len(store.list_run_ids()),
+        "capsule_dir": str(s.capsule_dir),
+        "capsule_dir_exists": s.capsule_dir.is_dir(),
+        "eval_dir": str(s.eval_dir),
+        "eval_dir_exists": s.eval_dir.is_dir(),
+        "corpus_dir": str(s.corpus_dir) if s.corpus_dir else None,
+        "corpus_dir_exists": s.corpus_dir.is_dir() if s.corpus_dir else False,
     }
 
 

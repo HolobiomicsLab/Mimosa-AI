@@ -3,8 +3,10 @@
 The Observatory never runs Mimosa; it reads the directories Mimosa writes:
 ``<root>/sources/workflows`` (per-run evolution artifacts) and
 ``<root>/sources/memory`` (per-agent traces), plus the shared toolomics
-workspace. All four are env-overridable so the API can point at any checkout,
-install, or a copied dataset without code changes.
+workspace and, optionally, an ASB benchmark corpus (``MIMOSA_CORPUS_DIR``).
+Everything is env-overridable so the API can point at any checkout, install,
+or a copied dataset without code changes; the defaults derive from this
+file's location in the repo, never from a developer machine's paths.
 """
 
 from __future__ import annotations
@@ -13,15 +15,16 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+# webui/backend/app/settings.py → three parents up is the repo checkout root.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 class Settings:
     """Filesystem locations the API reads from. Env vars override every field."""
 
     def __init__(self) -> None:
         # Root of a Mimosa checkout/install whose runtime data we observe.
-        root = Path(
-            os.environ.get("MIMOSA_ROOT", "/Users/mlg/Documents/CNRS/Mimosa-AI")
-        ).expanduser()
+        root = Path(os.environ.get("MIMOSA_ROOT", _REPO_ROOT)).expanduser()
         self.root = root
         self.workflow_dir = Path(
             os.environ.get("MIMOSA_WORKFLOW_DIR", root / "sources" / "workflows")
@@ -30,9 +33,7 @@ class Settings:
             os.environ.get("MIMOSA_MEMORY_DIR", root / "sources" / "memory")
         ).expanduser()
         self.workspace_dir = Path(
-            os.environ.get(
-                "MIMOSA_WORKSPACE_DIR", "/Users/mlg/Documents/CNRS/toolomics/workspace"
-            )
+            os.environ.get("MIMOSA_WORKSPACE_DIR", root / "workspace")
         ).expanduser()
         # Per-run workspace snapshots survive the live-workspace churn.
         self.snapshot_glob = os.environ.get("MIMOSA_SNAPSHOT_GLOB", "/tmp/mimosa_run_*")
@@ -45,6 +46,11 @@ class Settings:
         self.eval_dir = Path(
             os.environ.get("MIMOSA_EVAL_DIR", root / "evaluations")
         ).expanduser()
+        # Root of an ASB benchmark corpus (<corpus>/<challenge>/cards/…) for
+        # the task-definition join. Unset by default — the corpus is a
+        # separate checkout, so there is no honest in-repo default.
+        corpus = os.environ.get("MIMOSA_CORPUS_DIR", "")
+        self.corpus_dir: Path | None = Path(corpus).expanduser() if corpus else None
         # CORS origins for the dev frontend.
         self.cors_origins = os.environ.get(
             "MIMOSA_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"

@@ -134,6 +134,40 @@ def test_everything_is_defensive_on_missing_or_junk_files(data_roots):
     assert provenance.find_evaluations(RUN) == []
 
 
+def test_settings_defaults_derive_from_the_repo_not_a_developer_machine(monkeypatch):
+    for var in ("MIMOSA_ROOT", "MIMOSA_WORKFLOW_DIR", "MIMOSA_WORKSPACE_DIR",
+                "MIMOSA_CORPUS_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    get_settings.cache_clear()
+    try:
+        s = get_settings()
+        import app.settings as settings_mod
+        repo_root = __import__("pathlib").Path(settings_mod.__file__).resolve().parents[3]
+        assert s.root == repo_root
+        assert s.workspace_dir == repo_root / "workspace"
+        assert "/Users/mlg" not in str(vars(s))
+        assert s.corpus_dir is None  # unset by default — no honest in-repo default
+    finally:
+        get_settings.cache_clear()
+
+
+def test_health_reports_every_data_root_with_an_exists_flag(data_roots, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    monkeypatch.setenv("MIMOSA_CORPUS_DIR", str(data_roots / "corpus"))
+    get_settings.cache_clear()
+    with TestClient(app) as client:
+        body = client.get("/api/health").json()
+    assert body["capsule_dir_exists"] is True
+    assert body["eval_dir_exists"] is True
+    assert body["corpus_dir"].endswith("corpus")
+    assert body["corpus_dir_exists"] is False  # named but not created
+    # the pre-existing keys survive unchanged
+    assert body["ok"] is True and "workflow_dir" in body and "run_count" in body
+
+
 def test_route_serves_the_view(data_roots):
     from fastapi.testclient import TestClient
 
