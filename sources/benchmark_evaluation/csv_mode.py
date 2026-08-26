@@ -303,6 +303,50 @@ class CsvEvaluationMode:
             json.dump(notes, f, indent=2, ensure_ascii=False)
         self.logger.info(f"[PAPERS DATASET MODE] Run notes saved to {notes_file}")
 
+    def _stamp_task_ref(self, row: dict, csv_row: int, run_uuids: list[str]) -> None:
+        """Stamp ``task_ref.json`` {challenge, task_id, csv_row} into each run dir.
+
+        Restores the run -> task-definition join for benchmark rows carrying
+        the ASB ``Challenge``/``TaskID`` columns (rows without them are
+        skipped — they are not joinable to a task definition). ``csv_row`` is
+        the 0-based data-row index (header excluded). The ``URLS`` column is
+        NEVER copied: it carries absolute local paths. Best-effort and
+        fail-soft: a missing run dir or a write error is logged, never fatal.
+        """
+        challenge = (row.get('Challenge') or '').strip()
+        task_id = (row.get('TaskID') or '').strip()
+        if not challenge and not task_id:
+            return
+        workflow_dir = getattr(self.config, 'workflow_dir', None)
+        if not workflow_dir:
+            return
+        payload = {"challenge": challenge, "task_id": task_id, "csv_row": csv_row}
+        for run_uuid in dict.fromkeys(run_uuids):
+            run_dir = Path(workflow_dir) / run_uuid
+            if not run_dir.is_dir():
+                self.logger.warning(
+                    f"[TASK REF] Run dir missing, task_ref.json not stamped: {run_uuid}"
+                )
+                continue
+            try:
+                (run_dir / "task_ref.json").write_text(
+                    json.dumps(payload, indent=2), encoding='utf-8'
+                )
+            except OSError as e:
+                self.logger.warning(f"[TASK REF] Could not stamp {run_uuid}: {e}")
+
+    @staticmethod
+    def _run_uuids_from(runs: list | None = None, tasks: list | None = None) -> list[str]:
+        """Collect run uuids from evolution runs and/or planner tasks, in order."""
+        uuids = [getattr(run, 'current_uuid', None) for run in runs or []]
+        for task in tasks or []:
+            uuids.extend(
+                getattr(run, 'current_uuid', None)
+                for run in getattr(task, 'evolve_runs', None) or []
+            )
+            uuids.append(getattr(task, 'final_uuid', None))
+        return [u for u in uuids if u]
+
     @staticmethod
     def _get_git_info() -> dict:
         """
@@ -868,7 +912,7 @@ EXPECTED OUTPUT:
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
-                runs = None
+                runs, planned_tasks = None, None
                 if dataset_type == "science_agent_bench" and sab_loader:
                     # Transfer files to isolated workspace
                     await self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
@@ -881,7 +925,7 @@ EXPECTED OUTPUT:
                         single_agent_mode=single_agent_mode
                     )
                 else:
-                    _ = await isolated_planner.start_planner(
+                    planned_tasks = await isolated_planner.start_planner(
                         goal=goal,
                         judge=True,
                         max_task_retry=3
@@ -936,6 +980,11 @@ EXPECTED OUTPUT:
                         )
 
                 print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
+
+                # Join each run dir back to its benchmark task definition.
+                self._stamp_task_ref(
+                    row, i, self._run_uuids_from(runs=runs, tasks=planned_tasks)
+                )
 
                 # Save run notes (thread-safe via file system)
                 # Pass current execution_data for concurrent mode since execution_history isn't updated yet
@@ -1180,6 +1229,7 @@ EXPECTED OUTPUT:
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
+                    runs, planned_tasks = None, None
                     if dataset_type == "science_agent_bench" and sab_loader:
                         await self.sab_files_transfer(sab_loader, file_transfer, row)
                         runs = await self.evolve.start_workflow_evolution(goal=goal,
@@ -1189,7 +1239,7 @@ EXPECTED OUTPUT:
                                                         single_agent_mode=single_agent_mode
                                                        )
                     else:
-                        _ = await self.planner.start_planner(goal=goal,
+                        planned_tasks = await self.planner.start_planner(goal=goal,
                                     judge=True,
                                     max_task_retry=3
                                    )
@@ -1232,6 +1282,11 @@ EXPECTED OUTPUT:
                                 sab_loader=sab_loader,
                                 execution_data=execution_data
                             )
+
+                    # Join each run dir back to its benchmark task definition.
+                    self._stamp_task_ref(
+                        row, i, self._run_uuids_from(runs=runs, tasks=planned_tasks)
+                    )
 
                     self.execution_history.append(execution_data)
                     self._print_final_summary()
