@@ -75,8 +75,56 @@ def test_missing_run_dir_is_logged_never_fatal(tmp_path: Path, caplog) -> None:
     assert (tmp_path / "run-a" / "task_ref.json").exists()
 
 
-def test_no_workflow_dir_configured_is_a_silent_no_op(tmp_path: Path) -> None:
-    _mode(None)._stamp_task_ref(_ROW, 0, ["run-a"])  # must not raise
+def test_no_workflow_dir_configured_warns_and_skips(caplog) -> None:
+    # Never fatal, but never silent either: a guard whose silence would read
+    # as "stamped fine" must say why it did nothing.
+    with caplog.at_level(logging.WARNING, logger="task_ref_test"):
+        _mode(None)._stamp_task_ref(_ROW, 0, ["run-a"])  # must not raise
+    assert "workflow_dir unset" in caplog.text
+
+
+def test_sequential_rows_sharing_one_planner_history_keep_their_own_identity(
+    tmp_path: Path,
+) -> None:
+    # Regression: Planner.start_planner returns self.task_history, an
+    # instance-lifetime accumulator, and sequential mode reuses one planner
+    # for every CSV row. Stamping the whole list made row N rewrite rows
+    # 1..N-1's task_ref.json with row N's identity.
+    (tmp_path / "run-row1").mkdir()
+    (tmp_path / "run-row2").mkdir()
+    mode = _mode(tmp_path)
+    shared_history: list = []  # the planner's task_history, shared across rows
+
+    row1 = {**_ROW, "Challenge": "challenge_01", "TaskID": "task_001"}
+    before = len(shared_history)
+    shared_history.append(SimpleNamespace(evolve_runs=None, final_uuid="run-row1"))
+    mode._stamp_task_ref_for_row(row1, 0, None, shared_history, before)
+
+    row2 = {**_ROW, "Challenge": "challenge_02", "TaskID": "task_002"}
+    before = len(shared_history)
+    shared_history.append(SimpleNamespace(evolve_runs=None, final_uuid="run-row2"))
+    mode._stamp_task_ref_for_row(row2, 1, None, shared_history, before)
+
+    stamped1 = json.loads((tmp_path / "run-row1" / "task_ref.json").read_text())
+    assert stamped1 == {"challenge": "challenge_01", "task_id": "task_001",
+                        "csv_row": 0}  # row 2 never touched row 1's run dir
+    stamped2 = json.loads((tmp_path / "run-row2" / "task_ref.json").read_text())
+    assert stamped2 == {"challenge": "challenge_02", "task_id": "task_002",
+                        "csv_row": 1}
+
+
+def test_stamp_for_row_combines_evolution_runs_with_the_row_slice(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "run-evo").mkdir()
+    mode = _mode(tmp_path)
+    # SAB branch: runs from evolution, planner history untouched this row.
+    history = [SimpleNamespace(evolve_runs=None, final_uuid="run-earlier")]
+    mode._stamp_task_ref_for_row(
+        _ROW, 3, [SimpleNamespace(current_uuid="run-evo")], history, len(history)
+    )
+    assert (tmp_path / "run-evo" / "task_ref.json").exists()
+    assert not (tmp_path / "run-earlier").exists()  # never warmed into being
 
 
 def test_run_uuids_from_collects_evolution_runs_in_order() -> None:

@@ -311,7 +311,8 @@ class CsvEvaluationMode:
         skipped — they are not joinable to a task definition). ``csv_row`` is
         the 0-based data-row index (header excluded). The ``URLS`` column is
         NEVER copied: it carries absolute local paths. Best-effort and
-        fail-soft: a missing run dir or a write error is logged, never fatal.
+        fail-soft: a missing run dir, an unconfigured workflow dir or a write
+        error is logged, never fatal — but never silent either.
         """
         challenge = (row.get('Challenge') or '').strip()
         task_id = (row.get('TaskID') or '').strip()
@@ -319,6 +320,10 @@ class CsvEvaluationMode:
             return
         workflow_dir = getattr(self.config, 'workflow_dir', None)
         if not workflow_dir:
+            self.logger.warning(
+                "[TASK REF] config.workflow_dir unset; task_ref.json not stamped "
+                f"for csv row {csv_row}"
+            )
             return
         payload = {"challenge": challenge, "task_id": task_id, "csv_row": csv_row}
         for run_uuid in dict.fromkeys(run_uuids):
@@ -334,6 +339,34 @@ class CsvEvaluationMode:
                 )
             except OSError as e:
                 self.logger.warning(f"[TASK REF] Could not stamp {run_uuid}: {e}")
+
+    def _stamp_task_ref_for_row(
+        self,
+        row: dict,
+        csv_row: int,
+        runs: list | None,
+        planner_task_history: list,
+        tasks_before: int,
+    ) -> None:
+        """Stamp task_ref.json for THIS row's runs only (D11: at task generation).
+
+        ``Planner.start_planner`` returns ``self.task_history`` — an
+        instance-lifetime accumulator that is never cleared — and sequential
+        mode reuses one planner across every CSV row. Stamping the returned
+        list wholesale would make row N rewrite rows 1..N-1's task_ref.json
+        with row N's identity, silently corrupting the run -> task join this
+        stamp exists to restore. Slicing at ``tasks_before`` (the history
+        length captured immediately before this row's planner call) isolates
+        the row's own tasks; it also recovers partially-completed tasks when
+        the call raised, which is why call sites invoke this from a
+        ``finally`` (a crashed or interrupted row keeps its join instead of
+        falling back to the prompt tag and losing ``csv_row``).
+        """
+        self._stamp_task_ref(
+            row,
+            csv_row,
+            self._run_uuids_from(runs=runs, tasks=planner_task_history[tasks_before:]),
+        )
 
     @staticmethod
     def _run_uuids_from(runs: list | None = None, tasks: list | None = None) -> list[str]:
@@ -912,23 +945,33 @@ EXPECTED OUTPUT:
                     runs_capsule_dir=self.config.runs_capsule_dir
                 )
 
-                runs, planned_tasks = None, None
-                if dataset_type == "science_agent_bench" and sab_loader:
-                    # Transfer files to isolated workspace
-                    await self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
+                runs = None
+                try:
+                    if dataset_type == "science_agent_bench" and sab_loader:
+                        # Transfer files to isolated workspace
+                        await self._sab_files_transfer_isolated(sab_loader, file_transfer, row, task_id)
 
-                    runs = await isolated_dgm.start_workflow_evolution(
-                        goal=goal,
-                        judge=True,
-                        enable_evolution=learning,
-                        scenario_rubric=scenario_rubric_filename,
-                        single_agent_mode=single_agent_mode
-                    )
-                else:
-                    planned_tasks = await isolated_planner.start_planner(
-                        goal=goal,
-                        judge=True,
-                        max_task_retry=3
+                        runs = await isolated_dgm.start_workflow_evolution(
+                            goal=goal,
+                            judge=True,
+                            enable_evolution=learning,
+                            scenario_rubric=scenario_rubric_filename,
+                            single_agent_mode=single_agent_mode
+                        )
+                    else:
+                        await isolated_planner.start_planner(
+                            goal=goal,
+                            judge=True,
+                            max_task_retry=3
+                        )
+                finally:
+                    # Join each run dir back to its benchmark task definition
+                    # — stamped at task generation (D11), so a task that
+                    # crashes below keeps whatever join exists. The isolated
+                    # planner is fresh per task: its whole history is this
+                    # row's.
+                    self._stamp_task_ref_for_row(
+                        row, i, runs, isolated_planner.task_history, 0
                     )
                 # get session id for artefact in tmp for this run
                 # Kimi you will need to use this
@@ -980,11 +1023,6 @@ EXPECTED OUTPUT:
                         )
 
                 print(f"\033[96m[Worker {task_id}] ✅ Task {i + 1} completed in {execution_time:.2f}s\033[0m")
-
-                # Join each run dir back to its benchmark task definition.
-                self._stamp_task_ref(
-                    row, i, self._run_uuids_from(runs=runs, tasks=planned_tasks)
-                )
 
                 # Save run notes (thread-safe via file system)
                 # Pass current execution_data for concurrent mode since execution_history isn't updated yet
@@ -1229,20 +1267,32 @@ EXPECTED OUTPUT:
                     print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
                     print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
-                    runs, planned_tasks = None, None
-                    if dataset_type == "science_agent_bench" and sab_loader:
-                        await self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.evolve.start_workflow_evolution(goal=goal,
-                                                        judge=True,
-                                                        enable_evolution=learning,
-                                                        scenario_rubric=scenario_rubric_filename,
-                                                        single_agent_mode=single_agent_mode
-                                                       )
-                    else:
-                        planned_tasks = await self.planner.start_planner(goal=goal,
-                                    judge=True,
-                                    max_task_retry=3
-                                   )
+                    runs = None
+                    # The planner accumulates task_history across rows; the
+                    # pre-call length bounds THIS row's tasks for the stamp.
+                    planner_tasks_before = len(self.planner.task_history)
+                    try:
+                        if dataset_type == "science_agent_bench" and sab_loader:
+                            await self.sab_files_transfer(sab_loader, file_transfer, row)
+                            runs = await self.evolve.start_workflow_evolution(goal=goal,
+                                                            judge=True,
+                                                            enable_evolution=learning,
+                                                            scenario_rubric=scenario_rubric_filename,
+                                                            single_agent_mode=single_agent_mode
+                                                           )
+                        else:
+                            await self.planner.start_planner(goal=goal,
+                                        judge=True,
+                                        max_task_retry=3
+                                       )
+                    finally:
+                        # Join each run dir back to its benchmark task
+                        # definition — stamped at task generation (D11), so a
+                        # row that crashes below keeps whatever join exists.
+                        self._stamp_task_ref_for_row(
+                            row, i, runs,
+                            self.planner.task_history, planner_tasks_before,
+                        )
                     # get session id for artefact in tmp for this run
                     # Kimi you will need to use this
                     session_id = self.evolve.get_workspace_manager_session_id()
@@ -1282,11 +1332,6 @@ EXPECTED OUTPUT:
                                 sab_loader=sab_loader,
                                 execution_data=execution_data
                             )
-
-                    # Join each run dir back to its benchmark task definition.
-                    self._stamp_task_ref(
-                        row, i, self._run_uuids_from(runs=runs, tasks=planned_tasks)
-                    )
 
                     self.execution_history.append(execution_data)
                     self._print_final_summary()
