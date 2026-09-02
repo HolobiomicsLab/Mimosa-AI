@@ -1,10 +1,11 @@
 import json
+import logging
 import os
 import re
 import sys
 import threading
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from sources.cli.pretty_print import (
@@ -32,6 +33,15 @@ from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
 from .workflow_selection import WorkflowSelector
+
+
+class UserInterventionRequired(Exception):
+    """A decision needs a human, and no human is reachable.
+
+    Raised instead of blocking on ``input()`` when stdin is not a TTY, so an
+    unattended run fails with the question it could not ask rather than with
+    ``EOF when reading a line``.
+    """
 
 
 class PlanValidationError(Exception):
@@ -66,6 +76,7 @@ class Planner:
             raise ValueError("❌ Planner: Configuration cannot be None")
 
         self.config = config
+        self.logger = logging.getLogger(__name__)
         self.workspace_path = config.workspace_dir
         self.evolve = EvolutionEngine(config)
         self.task_history: list[Task] = []
@@ -635,6 +646,17 @@ Original request:
         workspace_files = self._get_workspace_files()
 
         for expected_output in step.expected_outputs:
+            # A plan may declare a *directory* as an output ("/workspace/data/").
+            # The workspace scan yields files only, so such an output could never
+            # be matched and the step stayed permanently "missing outputs" —
+            # which then blocked every dependent step. Observed on p_iimn
+            # 2026-08-22: data_acquisition wrote nine files under data/ and was
+            # still reported as missing /workspace/data/.
+            if str(expected_output).rstrip().endswith(("/", "\\")):
+                if self._directory_output_satisfied(expected_output, workspace_files):
+                    continue
+                missing_outputs.append(expected_output)
+                continue
             # Normalise expected path to forward slashes for cross-platform comparison
             normalised_expected = Path(expected_output).as_posix()
             # Use Path.stem to strip the extension in a platform-agnostic way
@@ -649,6 +671,22 @@ Original request:
                 missing_outputs.append(expected_output)
 
         return len(missing_outputs) == 0, missing_outputs
+
+    @staticmethod
+    def _directory_output_satisfied(expected_output: str, workspace_files: list[str]) -> bool:
+        """True when any workspace file sits inside the declared directory.
+
+        Matches on the trailing directory name rather than the full path: plans
+        declare workspace-absolute paths ("/workspace/data/") while the scan
+        returns paths relative to the workspace root ("data/features.csv").
+        """
+        name = PurePosixPath(str(expected_output).replace("\\", "/").rstrip("/")).name.lower()
+        if not name:
+            return False
+        return any(
+            name in [part.lower() for part in PurePosixPath(actual).parent.parts]
+            for actual in workspace_files
+        )
 
     def _can_execute_step(self, step: PlanStep) -> tuple[bool, list[str]]:
         """
@@ -675,7 +713,19 @@ Original request:
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
-        """Send a notification and prompt the user to continue or exit.
+        """Ask whether to continue — but only when someone can answer.
+
+        On a non-TTY this raises :class:`UserInterventionRequired` instead of
+        reading stdin. The prompt was the last blocking ``input()`` on the
+        benchmark path: on the p_iimn run of 2026-08-22 the planner reached
+        step 4 of 6, asked "Continue ? (y/n)" into a redirected stdout, and
+        died with ``EOF when reading a line`` — a message that names neither
+        the question nor the step it was asked about.
+
+        Raising rather than ``exit(1)`` is deliberate: the CSV harness counts
+        the row as failed and still prints its summary, which a ``SystemExit``
+        from inside the planner would skip. The same rule is already applied in
+        ``pricing.py`` and ``csv_mode._prompt_with_default``.
 
         Args:
             msg: Message shown both in the Pushover notification body and
@@ -686,6 +736,13 @@ Original request:
             title="Mimosa exit request."
         )
         print(msg)
+
+        if not sys.stdin.isatty():
+            self.logger.error("Intervention needed but stdin is not a TTY: %s", msg)
+            raise UserInterventionRequired(
+                f"{msg}\n(stdin is not a TTY — cannot ask whether to continue)"
+            )
+
         choice = input("\nContinue ? (y(yes)/n(no))")
         if choice.lower() == "y" or choice.lower() == "yes":
             return
@@ -895,13 +952,51 @@ Original request:
 
         step.cost = attempt_cost
         step.score = attempt_score
-        if self.tts:
-            answer = '. '.join([x[:128] for x in final_answers if x]) if final_answers else "No answers produced."
+        self._narrate_step_completion(step_name, attempt_score, attempt_cost, final_answers)
+        return step
+
+    def _narrate_step_completion(
+        self,
+        step_name: str,
+        attempt_score: float,
+        attempt_cost: float,
+        final_answers: list[Any],
+    ) -> None:
+        """Speak a step's outcome, without ever being able to fail the step.
+
+        Two defects met here on a real run and cost it everything it had
+        produced.
+
+        ``final_answers`` is annotated ``list[str]`` but agents answer with a
+        structured object: every entry of that run's ``state_result.json`` is a
+        dict (``{"status": ..., "approach": ...}``). Slicing one raised
+        ``TypeError: unhashable type: 'slice'`` on Python 3.11 — and on 3.12+,
+        where slices became hashable, the same line degrades to a ``KeyError``
+        instead. Every other consumer already coerces first
+        (``planner.py`` line ~397, ``evolution_engine.py`` line ~245); this one
+        did not.
+
+        And the narration sat inside the step body, so a cosmetic summary
+        propagated out as "Critical error in step execution" — reported after
+        the step had already written its deliverable and its ASTRA capsule, and
+        turning a scored run into a 0% success rate and a non-zero exit. What
+        is spoken aloud must never decide whether the work counts.
+        """
+        if not self.tts:
+            return
+        try:
+            answer = (
+                '. '.join([str(x)[:128] for x in final_answers if x])
+                if final_answers else "No answers produced."
+            )
             tts_text = f"""
             Task completed. Score: {attempt_score}, Cost: {attempt_cost}. {answer}
             """
             self.tts.speak(tts_text, voice_index=0)
-        return step
+        except Exception:
+            # Loud, but not fatal: the operator still learns narration broke.
+            self.logger.exception("TTS narration failed for step '%s'", step_name)
+            print_warn(f"Could not narrate completion of step '{step_name}'")
 
     async def start_planner(
         self,
@@ -976,7 +1071,19 @@ Original request:
                 except Exception as e:
                     step.status = TaskStatus.FAILED
                     self._update_visualization(total_cost)  # Update to show failed status
-                    raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
+                    # Log the traceback before re-raising. `from e` preserves the
+                    # chain for a Python caller, but the operator only ever sees
+                    # the formatted message — so a bare TypeError like
+                    # "unhashable type: 'slice'" arrives with no file or line and
+                    # is effectively unattributable. Observed on a real run that
+                    # had already produced its deliverable.
+                    self.logger.exception(
+                        "Step '%s' (%d/%d) failed", step_name, step_idx + 1,
+                        len(self.current_plan.steps),
+                    )
+                    raise Exception(
+                        f"❌ Critical error in step execution: {type(e).__name__}: {e}"
+                    ) from e
                 lst_step = step
 
                 if step.status != TaskStatus.COMPLETED:
