@@ -16,7 +16,7 @@ cookies.json
 CLAUDE.md
 workflows/*
 runs_capsule/*
-runs_notes/*
+run_notes/*
 config_*.json
 parallel_testing_results/
 cached_server/cache/*
@@ -33,7 +33,6 @@ datasets/**/*.np
 datasets/**/*.mtx
 datasets/**/*.tif"
 datasets/ScienceAgentBench/datasets/
-runs_notes/*
 docs/*.tex
 docs/communication_strategy/*
 *.wav
