@@ -2,7 +2,8 @@ import type {
   RunSummary, RunDetail, Tree, Series, MemoryList, Timeline,
   StepDetail, CallDetail, WorkspaceScopes, WorkspaceListing,
   SetupInfo, SetupConfig, KeyStatus, McpHealth, RefineResult, ClassifyResult,
-  LaunchInfo, RunMode, ObjectiveHistoryResult, UploadResult,
+  LaunchInfo, RunMode, ObjectiveHistoryResult, UploadResult, Provenance,
+  FamilyEvolution, AtlasData,
 } from './types'
 
 async function parseResponse<T>(res: Response, path: string): Promise<T> {
@@ -40,6 +41,9 @@ export const api = {
   runs: () => get<RunSummary[]>('/runs'),
   run: (id: string) => get<RunDetail>(`/runs/${id}`),
   tree: (id: string) => get<Tree>(`/runs/${id}/tree`),
+  provenance: (id: string) => get<Provenance>(`/runs/${id}/provenance`),
+  evolution: (id: string) => get<FamilyEvolution>(`/runs/${id}/evolution`),
+  atlas: (space: 'qd' | 'genotype' = 'qd') => get<AtlasData>(`/atlas/${space}`),
   series: (id: string) => get<Series>(`/runs/${id}/series`),
   memory: (id: string) => get<MemoryList>(`/runs/${id}/memory`),
   timeline: (id: string) => get<Timeline>(`/runs/${id}/memory/timeline`),

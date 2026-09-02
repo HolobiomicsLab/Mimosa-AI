@@ -8,6 +8,7 @@ import { ToastHost, toast } from './components/Toasts'
 import RunDetail from './components/RunDetail'
 import SetupPage from './components/SetupPage'
 import LaunchPage from './components/LaunchPage'
+import AtlasView from './components/AtlasView'
 
 const navClass = ({ isActive }: { isActive: boolean }) => `side-link ${isActive ? 'active' : ''}`
 
@@ -88,6 +89,7 @@ function Sidebar({ runs, connected, launches, onStop }: {
       </div>
       <div className="side-nav">
         <NavLink to="/launch" className={navClass}>✦ New run</NavLink>
+        <NavLink to="/atlas" className={navClass}>QD Atlas</NavLink>
         <NavLink to="/setup" className={navClass}>Setup</NavLink>
       </div>
       {running.length > 0 && (
@@ -154,6 +156,7 @@ export default function App() {
         <Routes>
           <Route index element={<Welcome count={runs?.length ?? 0} />} />
           <Route path="/runs/:id" element={<RunRoute />} />
+          <Route path="/atlas" element={<AtlasView />} />
           <Route path="/launch" element={<LaunchPage />} />
           <Route path="/setup" element={<SetupPage />} />
         </Routes>

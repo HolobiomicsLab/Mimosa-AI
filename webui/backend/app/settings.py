@@ -36,6 +36,15 @@ class Settings:
         ).expanduser()
         # Per-run workspace snapshots survive the live-workspace churn.
         self.snapshot_glob = os.environ.get("MIMOSA_SNAPSHOT_GLOB", "/tmp/mimosa_run_*")
+        # ASTRA capsules the transparency exporter writes for a family's best
+        # run, and the root scanned for ASB-as-evaluator evaluation capsules
+        # (eval_astra.yaml) produced by asb_eval against this checkout's runs.
+        self.capsule_dir = Path(
+            os.environ.get("MIMOSA_CAPSULE_DIR", root / "runs_capsule")
+        ).expanduser()
+        self.eval_dir = Path(
+            os.environ.get("MIMOSA_EVAL_DIR", root / "evaluations")
+        ).expanduser()
         # CORS origins for the dev frontend.
         self.cors_origins = os.environ.get(
             "MIMOSA_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
