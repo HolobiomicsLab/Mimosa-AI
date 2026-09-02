@@ -34,7 +34,7 @@ from sources.utils.visualization import VisualizationUtils
 from sources.utils.workspace_management import WorkspaceManager
 
 from .lineage import record_lineage
-from .orchestrator import WorkflowOrchestrator
+from .orchestrator import DEPENDENCY_INSTALL_ERROR_PREFIX, WorkflowOrchestrator
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
 from .variation_engine import VariationEngine
@@ -445,6 +445,27 @@ class EvolutionEngine:
 
         return runs
 
+    @staticmethod
+    def _blocked_reason_from(run_stdout: str, executed: bool) -> str | None:
+        """Return the orchestrator's environment-failure report, if that is what ran.
+
+        Keys on the ``DEPENDENCY_INSTALL_ERROR_PREFIX`` constant the orchestrator
+        emits, not on the installer text after it.
+
+        Args:
+            run_stdout: Output returned by ``orchestrate_workflow``.
+            executed: The ``executed`` flag returned alongside it.
+
+        Returns:
+            The full report when the sandbox could not be provisioned, else
+            ``None``.
+        """
+        if executed or not isinstance(run_stdout, str):
+            return None
+        if run_stdout.startswith(DEPENDENCY_INSTALL_ERROR_PREFIX):
+            return run_stdout
+        return None
+
     async def evolve_generation(
         self,
         runs: list[IndividualRun],
@@ -508,6 +529,10 @@ class EvolutionEngine:
         on_error = not executed
         if on_error:
             print_err(f"Workflow failed:\n{run_stdout[:512]}")
+        # Recorded on the run so the planner can mark the task blocked rather
+        # than failed; evolution stops below, because mutating the workflow
+        # cannot repair its environment.
+        runs[-1].blocked_reason = self._blocked_reason_from(run_stdout, executed)
         # ── Snapshot workspace results produced by this run ───────────────────
         if workspace_mgr is not None and uuid:
             workspace_mgr.save_run_snapshot(uuid)
@@ -602,6 +627,13 @@ class EvolutionEngine:
             )
 
         # Check termination conditions
+        if runs[-1].blocked_reason:
+            print_err(
+                "Sandbox could not be provisioned; stopping evolution for this "
+                "task. Another iteration would regenerate the workflow and fail "
+                "the same install."
+            )
+            return runs
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs

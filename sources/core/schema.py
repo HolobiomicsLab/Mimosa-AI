@@ -13,6 +13,9 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    # The step cannot run as things stand and another attempt would not
+    # change that (its sandbox could not be provisioned). Needs an operator.
+    BLOCKED = "blocked"
 
 class TaskComplexity(Enum):
     """Enumeration for task complexity levels."""
@@ -70,6 +73,9 @@ class IndividualRun:
     # persisted via sources.core.lineage.record_lineage afterwards.
     parent_uuids: list[str] = field(default_factory=list)
     evolution_kind: str = "seed"  # "seed" | "mutation" | "crossover"
+    # Set when the workflow never ran because its environment could not be
+    # provisioned (dependency install failed); carries the installer output.
+    blocked_reason: str | None = None
 
     def __str__(self) -> str:
         """Return a verbose, debug-style summary of the run."""
@@ -161,3 +167,4 @@ class Task:
     expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     produced_outputs: list[str] = field(default_factory=list)  # Actual outputs produced
+    blocked_reason: str | None = None  # Why status is BLOCKED, from the failing stage

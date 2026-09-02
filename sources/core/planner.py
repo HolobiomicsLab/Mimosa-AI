@@ -774,6 +774,20 @@ Original request:
         except Exception as e:
             raise ValueError(f"❌ Planner: Evolution execution failed: {str(e)}") from e
 
+    def _blocked_reason_for(self, step_name: str) -> str:
+        """Most recent reason recorded for a blocked task with this name.
+
+        Args:
+            step_name: Name of the plan step.
+
+        Returns:
+            The recorded reason, or a placeholder when none was recorded.
+        """
+        for task in reversed(self.task_history):
+            if task.name == step_name and task.blocked_reason:
+                return task.blocked_reason
+        return "no reason recorded"
+
     def _get_evolve_success(self, run: IndividualRun) -> bool:
         """Return the final success flag recorded in ``run.state_result``.
 
@@ -857,6 +871,13 @@ Original request:
 
                 evolve_success = self._get_evolve_success(last_run)
                 attempt_score = last_run.reward
+                blocked_reason = getattr(last_run, "blocked_reason", None)
+                if blocked_reason:
+                    status = TaskStatus.BLOCKED
+                elif evolve_success:
+                    status = TaskStatus.COMPLETED
+                else:
+                    status = TaskStatus.FAILED
                 task = Task(
                     name=step_name,
                     description=step_task,
@@ -864,7 +885,8 @@ Original request:
                     final_answers=final_answers,
                     final_uuid=final_uuid,
                     workflow_uuid=workflow_uuid,
-                    status=TaskStatus.COMPLETED if evolve_success else TaskStatus.FAILED,
+                    status=status,
+                    blocked_reason=blocked_reason,
                     depends_on=getattr(step, 'depends_on', []) or [],
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
@@ -873,6 +895,13 @@ Original request:
                 )
 
                 self.task_history.append(task)
+
+                if blocked_reason:
+                    # Retries exist to improve the workflow; they cannot
+                    # provision its environment. Stop and say why.
+                    step.status = TaskStatus.BLOCKED
+                    print_err(f"Task '{step_name}' is blocked: {blocked_reason[:512]}")
+                    break
 
                 if evolve_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
@@ -978,6 +1007,19 @@ Original request:
                     self._update_visualization(total_cost)  # Update to show failed status
                     raise Exception(f"❌ Critical error in step execution: {str(e)}") from e
                 lst_step = step
+
+                if step.status == TaskStatus.BLOCKED:
+                    reason = self._blocked_reason_for(step_name)
+                    self.notifier.send_message(
+                        f"Task '{step_name}' is blocked: {reason[:256]}\n"
+                        f"Goal: {goal[:128]}...\n"
+                        f"Step: {step_idx + 1}/{len(self.current_plan.steps)}",
+                        title=f"Task '{step_name}' blocked",
+                        priority=1
+                    )
+                    raise Exception(
+                        f"❌ Task '{step_name}' is blocked and was not retried: {reason}"
+                    )
 
                 if step.status != TaskStatus.COMPLETED:
                     step.status = TaskStatus.FAILED

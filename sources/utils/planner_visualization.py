@@ -23,6 +23,7 @@ class PlannerVisualizer:
     COLOR_SUCCESS = (50, 205, 50)  # Green
     COLOR_FAILED = (220, 50, 50)   # Red
     COLOR_SKIPPED = (150, 150, 150)  # Grey
+    COLOR_BLOCKED = (170, 110, 220)  # Violet: waiting on an operator
 
     # Layout constants
     DOT_RADIUS = 12
@@ -99,6 +100,7 @@ class PlannerVisualizer:
             TaskStatus.COMPLETED: self.COLOR_SUCCESS,
             TaskStatus.FAILED: self.COLOR_FAILED,
             TaskStatus.SKIPPED: self.COLOR_SKIPPED,
+            TaskStatus.BLOCKED: self.COLOR_BLOCKED,
         }
         return color_map.get(status, self.COLOR_PENDING)
 

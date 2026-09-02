@@ -19,6 +19,20 @@ from .workflow_factory import WorkflowFactory
 from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
+# Prefix of the output ``orchestrate_workflow`` returns when the sandbox could
+# not be provisioned. Consumers key on this constant, never on the installer
+# text that follows it.
+DEPENDENCY_INSTALL_ERROR_PREFIX = "WORKFLOW_DEPENDENCY_ERROR"
+
+
+class DependencyInstallError(RuntimeError):
+    """The runner's declared dependencies could not be installed.
+
+    A ``RuntimeError`` subclass, so existing handlers keep working; the
+    distinct type lets the orchestrator report an environment failure apart
+    from a workflow failure.
+    """
+
 
 class WorkflowOrchestrator:
     """Main Meta-Agent workflow orchestration class.
@@ -52,14 +66,16 @@ class WorkflowOrchestrator:
         """Install the runner's declared dependencies into the sandbox.
 
         Raises:
-            RuntimeError: If the dependency installation does not complete
-                successfully.
+            DependencyInstallError: If the dependency installation does not
+                complete successfully.
         """
         deps = self.config.runner_requirements
         print_info(f"📦 Installing workflow dependencies: {deps}")
         dep_result = await self.workflow_runner.install_dependencies(deps)
         if dep_result.status != ExecutionStatus.COMPLETED:
-            raise RuntimeError(f"Dependency installation failed: {dep_result.stderr}")
+            raise DependencyInstallError(
+                f"Dependency installation failed: {dep_result.stderr}"
+            )
 
     async def workflow_sandbox_run(self, workflow_genotype_code: str) -> str:
         """Run the workflow code in a sandboxed environment.
@@ -356,6 +372,15 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             import traceback
             traceback.print_exc()
             self._notify_execution_failure(uuid, goal, workflow_time, e)
+            if isinstance(e, DependencyInstallError):
+                # The workflow never ran; tell the caller it is an
+                # environment problem so it is not retried as a code problem.
+                return (
+                    f"{DEPENDENCY_INSTALL_ERROR_PREFIX}: {e}",
+                    uuid,
+                    workflow_genotype_code,
+                    False,
+                )
             return str(e), uuid, workflow_genotype_code, False
         finally:
             print_info("Cleaning up sandbox…")
