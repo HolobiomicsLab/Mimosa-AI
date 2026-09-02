@@ -372,11 +372,27 @@ class PreCheck:
                     empty_required.append(model_id)
 
         if empty_required:
+            hint = (
+                "Either widen `openrouter_provider` in config, pick a "
+                "different model, or relax probe strictness."
+            )
+            if getattr(self.config, "save_logprobs", False):
+                # The probe sends logprobs alongside require_parameters=True,
+                # so an endpoint that simply does not advertise logprobs is
+                # rejected with a 404 that reads like a routing failure. That
+                # has nothing to do with the provider allowlist, so say so
+                # before the generic advice sends the operator down that path.
+                hint = (
+                    "`save_logprobs` is enabled, so the probe requires "
+                    "endpoints to support logprobs; models served without "
+                    "logprobs fail every probe with a routing-shaped 404. "
+                    "Set `save_logprobs: false` if this model does not need "
+                    "them. Otherwise: " + hint
+                )
             raise RuntimeError(
                 "No usable OpenRouter provider for required model(s): "
                 f"{empty_required}. Every probe failed (404, rate limit, or "
-                "invalid content). Either widen `openrouter_provider` in "
-                "config, pick a different model, or relax probe strictness."
+                f"invalid content). {hint}"
             )
 
     def run(self, check_provider=True) -> None:

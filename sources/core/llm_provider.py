@@ -9,6 +9,18 @@ import random
 
 import litellm
 
+# Highest temperature every supported backend accepts. Some serving stacks
+# refuse anything above this with an opaque 400 rather than a typed error, so
+# it doubles as the value the retry path falls back to.
+_SAFE_MAX_TEMPERATURE = 1.0
+
+# Output-budget escalation. A reasoning model spends its budget on reasoning
+# before emitting content, so a budget that fits the answer can still yield a
+# truncated one. Doubling twice covers that without unbounded spend.
+_MAX_TRUNCATION_RETRIES = 2
+_MAX_OUTPUT_TOKENS = 65536
+
+
 def extract_model_pattern(llm_model: str) -> tuple[str, str]:
     """Split a model identifier into provider and model components.
 
@@ -350,9 +362,42 @@ class LLMProvider:
         return True
 
     @staticmethod
-    def _is_temperature_error(error: Exception) -> bool:
-        """True when the API rejected ``temperature``, read from ``error.param``."""
-        return getattr(error, "param", None) == "temperature"
+    def _is_temperature_error(error: Exception, temperature: float | None = None) -> bool:
+        """True when the API rejected ``temperature``.
+
+        OpenAI-style backends name the offending field in ``error.param``, so
+        that is checked first. Many gateways do not: OpenRouter forwards an
+        upstream refusal as a bare 400 whose body carries no ``param`` and
+        whose ``metadata.raw`` is often just ``"ERROR"``. For those, the only
+        signal available is the pairing of a 400/bad-request with a request
+        that asked for a temperature above the widely-supported 1.0 ceiling —
+        so treat that combination as a temperature rejection and let the
+        caller retry at 1.0 rather than abort the run.
+        """
+        if getattr(error, "param", None) == "temperature":
+            return True
+        if temperature is None or temperature <= _SAFE_MAX_TEMPERATURE:
+            return False
+        status = getattr(error, "status_code", None)
+        error_str = str(error).lower()
+        looks_bad_request = status == 400 or "badrequest" in type(error).__name__.lower() or (
+            "400" in error_str and "error" in error_str
+        )
+        return bool(looks_bad_request)
+
+    @staticmethod
+    def _is_truncated(response: Any) -> bool:
+        """True when the provider stopped because the output budget ran out.
+
+        Providers spell it ``length`` (OpenAI-style) or ``max_tokens``
+        (Anthropic-style); litellm surfaces whichever the upstream sent.
+        """
+        try:
+            choice = response.choices[0]
+        except (AttributeError, IndexError, TypeError):
+            return False
+        reason = getattr(choice, "stop_reason", None) or getattr(choice, "finish_reason", None)
+        return reason in ("length", "max_tokens")
 
     @staticmethod
     def _is_quantization_routing_error(error: Exception) -> bool:
@@ -366,6 +411,24 @@ class LLMProvider:
         """
         error_str = str(error).lower()
         return "no endpoints found" in error_str and "quantization" in error_str
+
+    @staticmethod
+    def _is_upstream_provider_failure(error: Exception) -> bool:
+        """True for a gateway reporting that the *upstream* model failed.
+
+        OpenRouter surfaces an upstream fault as HTTP 400 with
+        ``message: "Provider returned error"`` and ``metadata.raw: "ERROR"``.
+        The 400 makes it look like a malformed request, but the request is
+        fine — the same payload succeeds on the next attempt. Measured against
+        stealth/ox-alpha: 6/6 identical calls succeeded in isolation while the
+        same prompt shape was failing intermittently under four concurrent
+        lanes. Semantically this is a 502, so it is retryable; a genuinely
+        malformed request keeps failing and still exhausts the retry ceiling.
+
+        Deliberately narrow: matches the gateway's own wording, not 400s in
+        general, so real client errors are not retried in a loop.
+        """
+        return "provider returned error" in str(error).lower()
 
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
@@ -397,6 +460,9 @@ class LLMProvider:
             "context",  # Context window errors
             "token limit",  # Token limit errors
         ]
+
+        if self._is_upstream_provider_failure(error):
+            return True
 
         return any(pattern in error_str for pattern in retryable_patterns)
 
@@ -452,6 +518,8 @@ class LLMProvider:
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
         effective_temperature = self.config.temperature
+        effective_max_tokens = self.config.max_tokens
+        truncation_retry_count = 0  # Track output-budget escalations
 
         while True:  # Infinite retry loop
             try:
@@ -459,7 +527,7 @@ class LLMProvider:
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": self._apply_cache_control(message),
                     "timeout": timeout,
-                    "max_tokens": self.config.max_tokens,
+                    "max_tokens": effective_max_tokens,
                     "drop_params": True,
                 }
                 # Anthropic models reject (Opus 4.x) or ignore an explicit
@@ -491,6 +559,26 @@ class LLMProvider:
 
                 response = litellm.completion(**completion_params)
 
+                # A response cut off at the budget is not a success: the
+                # caller gets a truncated document (JSON ending mid-string,
+                # code ending mid-function) and no exception. Reasoning models
+                # make this common, because the budget is spent on reasoning
+                # before any content is emitted. Escalate the budget and retry
+                # rather than hand back something unparsable.
+                if (
+                    self._is_truncated(response)
+                    and truncation_retry_count < _MAX_TRUNCATION_RETRIES
+                    and effective_max_tokens < _MAX_OUTPUT_TOKENS
+                ):
+                    truncation_retry_count += 1
+                    effective_max_tokens = min(effective_max_tokens * 2, _MAX_OUTPUT_TOKENS)
+                    self.logger.warning(
+                        f"⚠️  Response truncated at max_tokens; retrying with "
+                        f"max_tokens={effective_max_tokens} "
+                        f"(escalation {truncation_retry_count}/{_MAX_TRUNCATION_RETRIES})."
+                    )
+                    continue
+
                 # Success - break out of retry loop
                 break
 
@@ -508,12 +596,15 @@ class LLMProvider:
                 attempt += 1
 
             except Exception as e:
-                if self._is_temperature_error(e) and effective_temperature != 1.0:
+                if (
+                    self._is_temperature_error(e, effective_temperature)
+                    and effective_temperature != _SAFE_MAX_TEMPERATURE
+                ):
                     self.logger.warning(
                         f"Provider rejected temperature={effective_temperature:.2f}; "
-                        f"falling back to 1.0 and retrying."
+                        f"falling back to {_SAFE_MAX_TEMPERATURE} and retrying."
                     )
-                    effective_temperature = 1.0
+                    effective_temperature = _SAFE_MAX_TEMPERATURE
                     continue
 
                 # OpenRouter 404: the `quantizations` routing filter excluded
@@ -593,13 +684,13 @@ class LLMProvider:
                 f"Total: {total_tokens}{cache_suffix} (max_tokens: {self.config.max_tokens})"
             )
 
-        # Check for truncation due to max_tokens limit
-        stop_reason = getattr(response.choices[0], 'stop_reason', None) or \
-                      getattr(response.choices[0], 'finish_reason', None)
-        if stop_reason == 'max_tokens' or stop_reason == 'length':
+        # Still truncated after every escalation: the caller is about to
+        # receive an incomplete document, so say so loudly.
+        if self._is_truncated(response):
             self.logger.warning(
-                f"⚠️  LLM response was truncated due to max_tokens limit ({self.config.max_tokens}). "
-                f"Consider increasing max_tokens in config for longer outputs."
+                f"⚠️  LLM response still truncated at max_tokens={effective_max_tokens} "
+                f"after {truncation_retry_count} escalation(s). The caller is "
+                f"receiving an incomplete response; raise max_tokens in config."
             )
 
         json_res = {
@@ -607,7 +698,16 @@ class LLMProvider:
             "response": res,
             "message": message,
             "temperature": effective_temperature,
-            "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
+            # Record what was actually sent, not what was configured. The
+            # request only carries reasoning_effort when the model is one of
+            # the reasoning families; persisting the configured value for
+            # every other model puts a parameter in the run's provenance that
+            # the provider never saw.
+            "reasoning_effort": (
+                self.config.reasoning_effort
+                if self._supports_reasoning_tokens() and not self._is_claude_model()
+                else None
+            ),
             "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
         }
         if self.memory_path and self.agent_name:

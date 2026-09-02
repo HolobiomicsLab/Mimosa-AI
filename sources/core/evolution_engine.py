@@ -29,6 +29,7 @@ from sources.evaluators.evaluator import WorkflowEvaluator
 from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
+from sources.utils.perspicacite_client import grounding_stats
 from sources.utils.run_metrics import append_jsonl, write_run_metrics
 from sources.utils.visualization import VisualizationUtils
 from sources.utils.workspace_management import WorkspaceManager
@@ -1011,6 +1012,10 @@ class EvolutionEngine:
             "qd_score": _scalar(verdict.get("qd_score")),
             "novelty_score": _scalar(verdict.get("novelty_score")),
             "variation_state": dict(self.variation.last_variation_state),
+            # Grounding fails soft — every failure path substitutes a "no
+            # context" string, so without this the artifacts of an ungrounded
+            # run are identical to a grounded one.
+            "grounding": grounding_stats(),
             "finished_at": datetime.utcnow().isoformat(),
         }
 
