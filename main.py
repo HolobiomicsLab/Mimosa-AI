@@ -73,6 +73,12 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--runner_temp_dir", type=str, help="Override temp directory path for runners")
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
+    parser.add_argument(
+        "--planner_human_approve",
+        action="store_true",
+        default=False,
+        help="Show the generated plan and wait for approval before executing it (interactive --goal runs only)",
+    )
 
 def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     """Apply CLI argument overrides to config."""
@@ -98,6 +104,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
+    if getattr(args, "planner_human_approve", False):
+        config.planner_human_approve = True
     if args.max_evolve_iterations:
         config.max_learning_evolve_iterations = args.max_evolve_iterations
 
@@ -196,6 +204,7 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
+                                    human_approve=config.planner_human_approve,
                                    )
         trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)

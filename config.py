@@ -78,6 +78,15 @@ class Config:
         self.literrature_grounding = True
 
         ##############
+        # Human in the loop
+        ##############
+        # When True, the planner prints the generated plan and waits for the
+        # operator: Enter approves it, typed feedback regenerates it. Honoured
+        # by the interactive `--goal` path only; benchmark and web entry points
+        # never prompt. Refused, not silently skipped, when stdin is not a TTY.
+        self.planner_human_approve: bool = False
+
+        ##############
         # ScienceAgentBench Concurrency settings
         ##############
         self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
@@ -347,6 +356,7 @@ class Config:
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
             "export_astra": self.export_astra,
+            "planner_human_approve": self.planner_human_approve,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "agent_execution_timeout": self.agent_execution_timeout,
@@ -444,6 +454,9 @@ class Config:
         self.memory_dir = data.get("memory_dir", self.memory_dir)
         self.export_astra = bool(
             data.get("export_astra", self.export_astra)
+        )
+        self.planner_human_approve = bool(
+            data.get("planner_human_approve", self.planner_human_approve)
         )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version

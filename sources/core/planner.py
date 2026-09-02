@@ -34,6 +34,15 @@ from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
 from .workflow_selection import WorkflowSelector
 
 
+class UserInterventionRequired(Exception):
+    """A decision needs a human, and no human is reachable.
+
+    Raised instead of blocking on ``input()`` when stdin is not a TTY, so an
+    unattended run fails with the question it could not ask rather than with
+    ``EOF when reading a line``.
+    """
+
+
 class PlanValidationError(Exception):
     """Exception raised when plan validation fails."""
     pass
@@ -430,7 +439,17 @@ Original request:
             tuple[bool, str]: (is_approved, feedback)
                 - is_approved: True if human pressed Enter (approve), False otherwise.
                 - feedback: User's correction/feedback if plan not approved.
+
+        Raises:
+            UserInterventionRequired: If stdin is not a TTY, so the prompt
+                could not be answered.
         """
+        if not sys.stdin.isatty():
+            raise UserInterventionRequired(
+                "Plan approval was requested but stdin is not a TTY, so nobody "
+                "can answer the prompt. Run interactively or unset "
+                "planner_human_approve."
+            )
         print_section("👤 HUMAN VALIDATION REQUIRED")
         print(f"  {DIM}Please review the plan above.{RESET}")
         print(f"  {DIM}Press [ENTER] to approve  ·  Type feedback and [ENTER] to regenerate{RESET}\n")
@@ -907,7 +926,8 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_task_retry: int = 5
+        max_task_retry: int = 5,
+        human_approve: bool = False,
     ) -> list[Task]:
         """
         Start the planner with a given goal with comprehensive error handling.
@@ -915,20 +935,35 @@ Original request:
             goal: The goal description for the planner
             judge: Whether to use a judge for evaluation
             max_task_retry: Maximum number of retries for each task
+            human_approve: When True, show the plan and wait for the operator
+                to approve it (Enter) or send it back with feedback before
+                any step runs. Interactive runs only.
         Returns:
             List[Task]: List of executed tasks
         Raises:
             ValueError: If goal is invalid or planning fails
+            UserInterventionRequired: If approval was requested but stdin is
+                not a TTY
         """
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
+
+        if human_approve and not sys.stdin.isatty():
+            # Refuse before the planning LLM call: otherwise the plan is
+            # generated, printed into a log, and the run dies on input().
+            raise UserInterventionRequired(
+                "planner_human_approve is set but stdin is not a TTY, so the "
+                "plan could not be approved. Run interactively or unset it."
+            )
 
         goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
         print_info(f"Starting planner with goal: {goal[:80]}…")
 
         try:
             # Generate plan with human validation loop
-            self.current_plan = self._generate_plan_with_human_validation(goal)
+            self.current_plan = self._generate_plan_with_human_validation(
+                goal, human_approve=human_approve
+            )
 
             if self.current_plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
