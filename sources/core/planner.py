@@ -28,6 +28,7 @@ from sources.utils.perspicacite_client import (
 )
 from sources.utils.planner_visualization import PlannerVisualizer
 
+from . import declared_outputs
 from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
@@ -692,6 +693,26 @@ Original request:
         print("\n---\nExited upon user request.\n---\n")
         exit(1)
 
+    def _record_declared_outputs(self, step: Any, step_task: str) -> None:
+        """Persist ``step.expected_outputs`` where the verifier can find them.
+
+        Best-effort: a failure here must never fail the step, it only means the
+        verifier scores as it did before this existed.
+        """
+        try:
+            outputs = list(getattr(step, "expected_outputs", None) or [])
+            if not outputs:
+                return
+            temp_root = (getattr(self.config, "temp_dir", None)
+                         or Path(getattr(self.config, "workflow_dir", ".")) / "_verifier_tmp")
+            if declared_outputs.record(temp_root, step_task, outputs):
+                self.logger.info(
+                    "Declared outputs recorded for step '%s': %s",
+                    getattr(step, "name", "unknown"), ", ".join(outputs)
+                )
+        except Exception:
+            self.logger.exception("Could not record declared outputs for the verifier")
+
     async def evolve_runs(
         self,
         task: str,
@@ -821,6 +842,11 @@ Original request:
         goal = getattr(step, 'goal_context', '')
         task = getattr(step, 'task', '')
         step_task = f"Broader context:{goal}\n---\nYour task:{task}"
+        # Carry the plan's declared outputs to the verifier, which is handed a
+        # uuid and would otherwise never see them (issue #196). Keyed on the
+        # same task text the verifier keys its rubric cache on, so no signature
+        # between here and there has to change.
+        self._record_declared_outputs(step, step_task)
         attempt = attempt_counts.get(step_name, 0)
         attempt_cost = 0
         attempt_score = 0.0
@@ -877,13 +903,34 @@ Original request:
                 if evolve_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
-                    step.status = TaskStatus.COMPLETED
                     if outputs_produced:
+                        step.status = TaskStatus.COMPLETED
                         print_ok(f"Task '{step_name}' completed successfully")
                         break
-                    else:
-                        print_warn(f"Task '{step_name}' completed but missing expected outputs: {missing_outputs}")
-                        break
+                    # The declared outputs are missing. Both branches used to mark
+                    # the step COMPLETED and break, differing only in the log line,
+                    # so a step that never produced its deliverable was recorded as
+                    # a success and the failure surfaced one layer later at the next
+                    # step's dependency gate (issue #196). Spend the remaining
+                    # attempts on producing it instead of banking the miss.
+                    step.missing_outputs = list(missing_outputs)
+                    if attempt < max_attempts:
+                        print_warn(
+                            f"Task '{step_name}' scored {attempt_score} but did not produce "
+                            f"its declared outputs: {missing_outputs} — retrying "
+                            f"({attempt}/{max_attempts})"
+                        )
+                        continue
+                    # Out of attempts. Keep COMPLETED so the dependency gate still
+                    # reports precisely which output is missing for which step,
+                    # rather than replacing that with a generic step failure.
+                    step.status = TaskStatus.COMPLETED
+                    print_err(
+                        f"Task '{step_name}' exhausted {max_attempts} attempts with its "
+                        f"declared outputs still missing: {missing_outputs}. Dependent "
+                        f"steps cannot run."
+                    )
+                    break
                 else:
                     print_err(f"Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}")
                     if self.tts:
