@@ -5,6 +5,7 @@ CsvEvaluationMode - Autonomous goal generation and execution system with concurr
 import asyncio
 import copy
 import csv
+import hashlib
 import json
 import logging
 import logging.handlers
@@ -357,23 +358,40 @@ class CsvEvaluationMode:
     @staticmethod
     def _extract_workspace_name_from_row(row: dict) -> str:
         """
-        Extract a clean workspace folder name from the gold_program_name field.
+        Extract a clean workspace folder name from a CSV row.
+
+        Falls back through the identifying columns a non-ScienceAgentBench CSV
+        can supply, then to a digest of the row itself. The previous last
+        resort, ``id(row)``, is the memory address of a throwaway dict, so any
+        CSV without ``gold_program_name`` or ``instance_id`` produced a
+        different name on every process — and reruns of the same task neither
+        collided with nor resumed from their predecessor's workspace and run
+        notes.
 
         Args:
-            row: CSV row data containing 'gold_program_name' field
+            row: CSV row data
 
         Returns:
             Cleaned folder name (e.g., 'clintox_nn' from 'clintox_nn.py')
         """
-        script_name = (row.get('gold_program_name') or '').strip()
-        # Remove .py extension if present
-        if script_name.endswith('.py'):
-            script_name = script_name[:-3]
-        # Fallback to instance_id if script_name is empty
-        if not script_name:
-            script_name = (row.get('instance_id') or f'task_{id(row)}').strip()
+        name = ''
+        for column in ('gold_program_name', 'instance_id', 'TaskID', 'Title'):
+            name = (row.get(column) or '').strip()
+            if name.endswith('.py'):
+                name = name[:-3]
+            if name:
+                break
+
+        if not name:
+            digest = hashlib.sha256(
+                repr(sorted(row.items())).encode('utf-8')
+            ).hexdigest()[:12]
+            name = f'task_{digest}'
+
         # Sanitize: replace any non-alphanumeric characters with underscore
-        return ''.join(c if c.isalnum() or c == '_' else '_' for c in script_name)
+        sanitized = ''.join(c if c.isalnum() or c == '_' else '_' for c in name)
+        # A Title-derived name can be arbitrarily long; keep it path-friendly.
+        return sanitized[:80]
 
     def _generate_task_default(self, row, workspace_subfolder: str | None = None):
         paper_title = (row.get('Title') or '').strip()
