@@ -4,7 +4,7 @@
 #
 # Brings up everything Mimosa needs and then opens the Observatory web UI:
 #
-#   1. Preflight   — git / uv / Node 20+ / Docker present, Docker daemon running
+#   1. Preflight   — git / uv / Python 3.12 / Node 20+ / Docker present, Docker daemon running
 #   2. API key     — make sure at least one LLM provider key is available
 #   3. Toolomics   — clone + ./start.sh (MCP tools, ports 5000-5200, via Docker)
 #   4. Perspicacité— clone + uv run perspicacite serve (literature grounding, :5468)
@@ -182,11 +182,40 @@ if ! have uv; then
 fi
 ok "uv    $(uv --version 2>/dev/null | awk '{print $2}')"
 
+# Python 3.12 — required by Mimosa; uv installs it on demand without root.
+if ! uv python find 3.12 >/dev/null 2>&1; then
+  info "Python 3.12 not found — installing via uv"
+  uv python install 3.12 || die "could not install Python 3.12 — install it manually (https://www.python.org or 'brew install python@3.12')."
+fi
+ok "python $(uv python find 3.12) ($(uv run --python 3.12 python -V 2>/dev/null || echo 3.12))"
+
 have npm || die "npm not found — install Node.js 20+ (https://nodejs.org or 'brew install node')."
 node_major="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
 [ -n "$node_major" ] && [ "$node_major" -ge 20 ] 2>/dev/null \
   || die "Node.js 20+ required (found $(node -v 2>/dev/null || echo none))."
 ok "node  $(node -v)"
+
+# Hugging Face reachability — mainland-China mirror fallback.
+# Mimosa downloads the all-MiniLM-L6-v2 sentence-transformer on first use;
+# huggingface.co is blocked in mainland China, where hf-mirror.com mirrors it.
+# When the hub is unreachable but the mirror answers, export HF_ENDPOINT so
+# every child process (including the web UI bridge via deploy.sh) downloads
+# through the mirror, and persist it to the project .env for later runs.
+if [ -n "${HF_ENDPOINT:-}" ]; then
+  ok "HF_ENDPOINT already set ($HF_ENDPOINT)"
+elif curl -m 5 -sfI https://huggingface.co >/dev/null 2>&1; then
+  ok "huggingface.co is reachable"
+elif curl -m 5 -sfI https://hf-mirror.com >/dev/null 2>&1; then
+  export HF_ENDPOINT="https://hf-mirror.com"
+  warn "huggingface.co unreachable — using mirror: HF_ENDPOINT=$HF_ENDPOINT"
+  if ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?HF_ENDPOINT=' "$PROJECT_ENV" 2>/dev/null; then
+    printf '\n# Hugging Face mirror (auto-detected: huggingface.co unreachable)\nHF_ENDPOINT=%s\n' "$HF_ENDPOINT" >> "$PROJECT_ENV"
+    chmod 600 "$PROJECT_ENV" 2>/dev/null || true
+    info "Persisted HF_ENDPOINT to $PROJECT_ENV"
+  fi
+else
+  warn "Neither huggingface.co nor hf-mirror.com is reachable — the embedding model cannot be downloaded (Mimosa will fall back to lexical similarity)."
+fi
 
 # --------------------------------------------------------------------------- #
 # 2. Docker
@@ -331,7 +360,7 @@ fi
 # --------------------------------------------------------------------------- #
 step "6/6  Mimosa core"
 info "Installing Mimosa deps (uv sync — creates .venv for the web UI bridge)"
-( cd "$MIMOSA_DIR" && uv sync )
+( cd "$MIMOSA_DIR" && uv sync --python 3.12 )
 ok "Mimosa environment ready"
 
 case "$INSTALL_CLI" in

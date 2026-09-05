@@ -178,6 +178,14 @@ code, .mono { font-family: var(--mono); }
 }
 .detail-head .rid { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
 .detail-head h2 { font-size: 17px; margin: 6px 0 10px; max-width: 900px; line-height: 1.4; }
+.detail-head h2.objective { font-size: 13px; font-weight: 500; line-height: 1.45; }
+.objective-toggle {
+  margin-left: 8px; padding: 1px 8px;
+  font-size: 10.5px; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 20px;
+  background: transparent; vertical-align: middle;
+}
+.objective-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .detail-head .stats { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
 .stat { display: flex; flex-direction: column; }
 .stat b { font-size: 15px; font-family: var(--mono); }
@@ -238,6 +246,13 @@ pre.code.tight { white-space: pre; word-break: normal; }
   cursor: pointer;
 }
 .pill.active { color: var(--gold); border-color: var(--gold-dim); background: #f2c14e14; }
+
+.file-chip { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.chip-x {
+  border: none; background: none; padding: 0 2px;
+  color: var(--text-faint); font-size: 13px; line-height: 1;
+}
+.chip-x:hover { color: var(--bad); background: none; }
 
 .muted { color: var(--text-faint); }
 .hint { color: var(--text-faint); font-size: 12px; }

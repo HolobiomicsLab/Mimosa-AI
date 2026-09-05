@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .bridge import BRIDGE_SCRIPT, bridge_available
+from .bridge import BRIDGE_SCRIPT, bridge_available, bridge_env
 from .settings import get_settings
 
 _LOG_DIR = Path(tempfile.gettempdir()) / "mimosa_observatory_launches"
@@ -129,6 +129,7 @@ class Launcher:
         proc = subprocess.Popen(
             [str(settings.mimosa_python), str(BRIDGE_SCRIPT), "run", json.dumps(params)],
             cwd=str(settings.root),
+            env=bridge_env(),
             stdout=log_fh,
             stderr=subprocess.STDOUT,
             start_new_session=True,

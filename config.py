@@ -65,6 +65,8 @@ class Config:
         self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
         self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        # Vision model for Source G (visual figure inspection).
+        self.vision_judge_model: str | None = "openrouter/moonshot/kimi-k3"
 
         #############
         # Orchestrator Workflow generation options
@@ -74,6 +76,15 @@ class Config:
         self.orchestrator_choose_model = False
         # Ground workflow generation with perspicacité
         self.literrature_grounding = True
+
+        ##############
+        # Human in the loop
+        ##############
+        # When True, the planner prints the generated plan and waits for the
+        # operator: Enter approves it, typed feedback regenerates it. Honoured
+        # by the interactive `--goal` path only; benchmark and web entry points
+        # never prompt. Refused, not silently skipped, when stdin is not a TTY.
+        self.planner_human_approve: bool = False
 
         ##############
         # ScienceAgentBench Concurrency settings
@@ -292,6 +303,7 @@ class Config:
         resource_fields = (
             "prompt_planner",
             "prompt_workflow_creator",
+            "prompt_smolagent",
             "schema_code_path",
             "smolagent_factory_code_path",
         )
@@ -308,17 +320,21 @@ class Config:
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
             "judge_model": self.judge_model,
+            "vision_judge_model": self.vision_judge_model,
             "capsule_namer_model": self.capsule_namer_model,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
+            "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
             "prompt_planner": portable_resources["prompt_planner"],
             "prompt_workflow_creator": portable_resources["prompt_workflow_creator"],
+            "prompt_smolagent": portable_resources["prompt_smolagent"],
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
             "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
+            "max_concurrent_eval_tasks": self.max_concurrent_eval_tasks,
             "evaluate_snapshot_ablations": self.evaluate_snapshot_ablations,
             "novelty_comparison": self.novelty_comparison,
             "novelty_previous_n": self.novelty_previous_n,
@@ -340,6 +356,7 @@ class Config:
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
             "export_astra": self.export_astra,
+            "planner_human_approve": self.planner_human_approve,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "agent_execution_timeout": self.agent_execution_timeout,
@@ -352,23 +369,34 @@ class Config:
     def from_json(self, data: dict[str, Any]) -> None:
         """Load configuration from a JSON-serializable dictionary."""
         self.workspace_dir = data.get("workspace_dir", self.workspace_dir)
-        self.discovery_addresses = [
-            AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
-            for addr in data.get("discovery_addresses", [])
-        ]
+        # Absent key keeps the default, like every other field below. Falling
+        # back to [] left MCP discovery with no address range to scan.
+        raw_addresses = data.get("discovery_addresses")
+        if raw_addresses is not None:
+            self.discovery_addresses = [
+                AddressMCP(addr["ip"], addr["port_min"], addr["port_max"])
+                for addr in raw_addresses
+            ]
         self.planner_llm_model = data.get("planner_llm_model", self.planner_llm_model)
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
         self.judge_model = data.get("judge_model", self.judge_model)
+        self.vision_judge_model = data.get(
+            "vision_judge_model", self.vision_judge_model
+        )
         self.capsule_namer_model = data.get(
             "capsule_namer_model", self.capsule_namer_model
         )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
+        self.default_openrouter_quantizations = data.get(
+            "default_openrouter_quantizations", self.default_openrouter_quantizations
+        )
         self.save_logprobs = data.get("save_logprobs", self.save_logprobs)
         self.prompt_planner = data.get("prompt_planner", self.prompt_planner)
+        self.prompt_smolagent = data.get("prompt_smolagent", self.prompt_smolagent)
         self.prompt_workflow_creator = data.get(
             "prompt_workflow_creator", self.prompt_workflow_creator
         )
@@ -378,6 +406,9 @@ class Config:
             "learned_score_threshold", self.learned_score_threshold
         )
         self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
+        self.max_concurrent_eval_tasks = data.get(
+            "max_concurrent_eval_tasks", self.max_concurrent_eval_tasks
+        )
         self.max_learning_evolve_iterations = data.get(
             "max_learning_evolve_iterations", self.max_learning_evolve_iterations
         )
@@ -424,6 +455,9 @@ class Config:
         self.export_astra = bool(
             data.get("export_astra", self.export_astra)
         )
+        self.planner_human_approve = bool(
+            data.get("planner_human_approve", self.planner_human_approve)
+        )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
@@ -456,6 +490,7 @@ class Config:
         resource_fields = (
             "prompt_planner",
             "prompt_workflow_creator",
+            "prompt_smolagent",
             "schema_code_path",
             "smolagent_factory_code_path",
         )

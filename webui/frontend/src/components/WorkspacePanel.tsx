@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, workspaceFileUrl } from '../api'
 import { useAsync } from '../hooks'
 import type { WorkspaceListing } from '../types'
-import { Spinner, fmtBytes, shortId } from '../ui'
+import { Spinner, fmtBytes } from '../ui'
 
 const TEXTY = new Set(['report', 'code', 'json', 'data'])
 
@@ -20,15 +20,20 @@ export default function WorkspacePanel({ runId }: { runId: string }) {
 
   return (
     <div>
-      <div className="pill-row" style={{ marginBottom: 14 }}>
-        <button className={`pill ${scope === 'live' ? 'active' : ''}`} onClick={() => setScope('live')}>
-          live workspace
-        </button>
-        {snaps.map((s) => (
-          <button key={s} className={`pill ${scope === s ? 'active' : ''}`} onClick={() => setScope(s)}>
-            snapshot {s === runId ? '(this run)' : shortId(s)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div className="card-head" style={{ padding: 0, border: 'none' }}>
+          output files
+        </div>
+        <div className="pill-row" style={{ marginBottom: 0 }}>
+          <button className={`pill ${scope === 'live' ? 'active' : ''}`} onClick={() => setScope('live')}>
+            live workspace
           </button>
-        ))}
+          {snaps.includes(runId) && (
+            <button className={`pill ${scope === runId ? 'active' : ''}`} onClick={() => setScope(runId)}>
+              snapshot (this run)
+            </button>
+          )}
+        </div>
       </div>
       <ScopeView scope={scope} />
     </div>
