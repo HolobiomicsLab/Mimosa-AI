@@ -891,9 +891,15 @@ class EvaluationCLI:
                 start_row=spec.start_row,
                 restore_cache=spec.restore_cache,
             )
-            spec.status = "completed"
+            # A run aborted by a persistent network outage is NOT a completed
+            # benchmark — most rows may never have been evaluated.
+            spec.status = (
+                "network_failure"
+                if getattr(evaluator, "_network_aborted", False)
+                else "completed"
+            )
             self._update_notes(spec.notes_path, {
-                "status": "completed",
+                "status": spec.status,
                 "finished_at": datetime.now().isoformat(),
             })
         except KeyboardInterrupt:

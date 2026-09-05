@@ -9,6 +9,7 @@ import json
 import logging
 import logging.handlers
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -17,16 +18,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
+from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.cli.pretty_print import (
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_summary,
+    print_warn,
+)
 from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
-from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
-from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
-from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.email_reporter import send_evaluation_report
-from sources.cli.pretty_print import (
-    print_ok, print_warn, print_err, print_info,
-    print_phase, print_summary,
-)
+from sources.utils.transfer_toolomics import LocalTransfer
 
 EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
 EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
@@ -88,6 +93,37 @@ def _is_excluded(run: dict) -> bool:
     return run.get("status") == "excluded" or run.get("success_level") == "Excluded"
 
 
+# --- Transient network failure handling --------------------------------------
+# A short DNS/connectivity outage (USB-Ethernet link flap, router DNS
+# forwarder hiccup, DHCP renewal — e.g. `OpenrouterException - [Errno 8]
+# nodename nor servname provided, or not known`) must not burn through dataset
+# rows nor be counted as agent failures. On such an error the eval loop waits
+# for connectivity to come back, retries the row, and if the outage persists,
+# excludes the row as an infra failure and aborts the run.
+NETWORK_ERROR_MARKERS = (
+    "nodename nor servname",                 # macOS getaddrinfo EAI_NONAME [Errno 8]
+    "Name or service not known",             # Linux getaddrinfo EAI_NONAME [Errno -2]
+    "Temporary failure in name resolution",  # Linux getaddrinfo EAI_AGAIN
+    "Network is unreachable",                # [Errno 51]
+    "No route to host",                      # [Errno 65]
+    "APIConnectionError",                    # litellm/openai transport-level failure
+)
+NETWORK_PROBE_HOST = "openrouter.ai"
+NETWORK_PROBE_INTERVAL_S = 15.0
+NETWORK_MAX_WAIT_S = 86400  # give up waiting after 1 day of outage
+NETWORK_ROW_MAX_RETRIES = 100  # retry the same row at most this many times
+
+
+class NetworkUnavailableError(RuntimeError):
+    """Raised when network connectivity does not recover within the wait budget."""
+
+
+def _is_transient_network_error(exc: BaseException | str) -> bool:
+    """True if the exception/message looks like a transient DNS/connectivity failure."""
+    message = str(exc)
+    return any(marker in message for marker in NETWORK_ERROR_MARKERS)
+
+
 @dataclass
 class TaskContext:
     """Context for a single concurrent task evaluation."""
@@ -142,6 +178,63 @@ class CsvEvaluationMode:
         self._single_agent_mode: bool = False
         self._concurrent: bool = False
         self._start_row: int = 0
+        # Set when the loop aborts because the network never came back.
+        self._network_aborted: bool = False
+
+    async def _wait_for_network_recovery(self) -> None:
+        """
+        Block until outbound DNS resolution works again.
+
+        A dropped link or a dead router DNS forwarder makes getaddrinfo fail
+        with EAI_NONAME ([Errno 8]); probing until it succeeds rides out
+        short outages instead of failing dataset rows.
+
+        Raises:
+            NetworkUnavailableError: connectivity not restored within
+                NETWORK_MAX_WAIT_S seconds.
+        """
+        waited = 0.0
+        while True:
+            try:
+                await asyncio.to_thread(
+                    socket.getaddrinfo, NETWORK_PROBE_HOST, 443,
+                    proto=socket.IPPROTO_TCP,
+                )
+                if waited:
+                    self.logger.info(f"[NETWORK] Connectivity restored after {waited:.0f}s")
+                    print_ok(f"🌐 Network connectivity restored after {waited:.0f}s")
+                return
+            except OSError:
+                if waited >= NETWORK_MAX_WAIT_S:
+                    raise NetworkUnavailableError(
+                        f"no network connectivity for {waited:.0f}s "
+                        f"(DNS probe to {NETWORK_PROBE_HOST} kept failing)"
+                    )
+                self.logger.warning(
+                    f"[NETWORK] No connectivity — DNS probe to {NETWORK_PROBE_HOST} failed; "
+                    f"retrying in {NETWORK_PROBE_INTERVAL_S:.0f}s (down for {waited:.0f}s)"
+                )
+                print_warn(
+                    f"🌐 Network down (DNS probe to {NETWORK_PROBE_HOST} failed) — "
+                    f"retrying in {NETWORK_PROBE_INTERVAL_S:.0f}s"
+                )
+                await asyncio.sleep(NETWORK_PROBE_INTERVAL_S)
+                waited += NETWORK_PROBE_INTERVAL_S
+
+    def _record_network_excluded_row(self, row_number: int, detail: str) -> None:
+        """Record a row lost to a network outage as an infra exclusion, not a failure."""
+        self.execution_history.append({
+            "iteration": row_number,
+            "goal": "Unknown",
+            "execution_time": 0,
+            "status": "excluded",
+            "success_level": "Excluded",
+            "infra_error": detail,
+            "VER": None,
+            "SR": None,
+            "CBS": None,
+            "key_insight": detail,
+        })
 
     def _load_previous_run_notes(self) -> dict | None:
         """
@@ -159,7 +252,7 @@ class CsvEvaluationMode:
 
         for notes_file in self.run_notes_dir.glob("*.json"):
             try:
-                with open(notes_file, 'r', encoding='utf-8') as f:
+                with open(notes_file, encoding='utf-8') as f:
                     notes = json.load(f)
                     model = notes.get('model', '')
                     if not model or not self.config.smolagent_model_id:
@@ -171,7 +264,7 @@ class CsvEvaluationMode:
                     if total_eval > max_total_eval:
                         max_total_eval = total_eval
                         best_notes = notes
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 self.logger.warning(f"[CACHE RECOVERY] Could not load {notes_file}: {e}")
                 continue
 
@@ -639,9 +732,11 @@ EXPECTED OUTPUT:
         best_uuid = getattr(best_run, 'current_uuid', None) if best_run else None
 
         # Order snapshots by evolution index; orphans (uuid not in runs) last,
-        # in mtime order.
+        # in mtime order. The uuid is recovered by stripping the known prefix
+        # (session_id is pure hex, so no rsplit('_') ambiguity even though
+        # run uuids themselves contain underscores: YYYYMMDD_HHMMSS_<8hex>).
         def _sort_key(path: Path) -> tuple[int, float]:
-            uuid = path.name.rsplit("_", 1)[-1]
+            uuid = path.name.removeprefix(f"mimosa_run_{session_id}_")
             idx = uuid_to_index.get(uuid)
             return (idx if idx is not None else len(runs), path.stat().st_mtime)
 
@@ -652,7 +747,7 @@ EXPECTED OUTPUT:
         next_orphan_index = len(runs)
 
         for snapshot in snapshots:
-            uuid = snapshot.name.rsplit("_", 1)[-1]
+            uuid = snapshot.name.removeprefix(f"mimosa_run_{session_id}_")
             idx = uuid_to_index.get(uuid)
             if idx is None:
                 idx = next_orphan_index
@@ -803,6 +898,85 @@ EXPECTED OUTPUT:
             return "Error generating task", None, None
 
     async def _process_single_task(
+        self,
+        task_context: TaskContext,
+        dataset_type: str,
+        learning: bool,
+        single_agent_mode: bool,
+        sab_loader: ScienceAgentBenchLoader | None,
+        launch_index: int = 0
+    ) -> dict[str, Any]:
+        """
+        Process one task, riding out transient network outages.
+
+        A DNS/connectivity failure (see NETWORK_ERROR_MARKERS) is an
+        infrastructure problem, not an agent failure: wait for connectivity
+        to come back, then retry the task. If the outage persists, the task
+        is excluded as an infra failure so it does not poison the benchmark
+        statistics.
+        """
+        row_number = task_context.row_index + 1
+        network_attempt = 0
+        while True:
+            result = await self._process_single_task_once(
+                task_context=task_context,
+                dataset_type=dataset_type,
+                learning=learning,
+                single_agent_mode=single_agent_mode,
+                sab_loader=sab_loader,
+                launch_index=launch_index,
+            )
+            error = result.get("error") or result.get("key_insight") or ""
+            if not (result.get("success_level") == "Error" and _is_transient_network_error(error)):
+                return result
+            network_attempt += 1
+            self.logger.error(
+                f"[CONCURRENT] Transient network error in task {row_number} "
+                f"(attempt {network_attempt}/{NETWORK_ROW_MAX_RETRIES}): {error}"
+            )
+            if network_attempt >= NETWORK_ROW_MAX_RETRIES:
+                detail = (f"Network failure (DNS/connectivity) still present "
+                          f"after {NETWORK_ROW_MAX_RETRIES} attempts: {error}")
+                self.logger.error(
+                    f"[CONCURRENT] EXCLUDING task {row_number} (infra): {detail}"
+                )
+                return {
+                    "iteration": row_number,
+                    "goal": result.get("goal", "Unknown"),
+                    "execution_time": result.get("execution_time", 0),
+                    "status": "excluded",
+                    "success_level": "Excluded",
+                    "infra_error": detail,
+                    "VER": None,
+                    "SR": None,
+                    "CBS": None,
+                    "key_insight": detail,
+                    "task_id": task_context.task_id,
+                }
+            try:
+                await self._wait_for_network_recovery()
+            except NetworkUnavailableError as net_err:
+                # Persistent outage: exclude this task; other in-flight tasks
+                # will hit the same wall and be excluded too.
+                self._network_aborted = True
+                self.logger.error(
+                    f"[CONCURRENT] EXCLUDING task {row_number} (infra): {net_err}"
+                )
+                return {
+                    "iteration": row_number,
+                    "goal": result.get("goal", "Unknown"),
+                    "execution_time": result.get("execution_time", 0),
+                    "status": "excluded",
+                    "success_level": "Excluded",
+                    "infra_error": str(net_err),
+                    "VER": None,
+                    "SR": None,
+                    "CBS": None,
+                    "key_insight": str(net_err),
+                    "task_id": task_context.task_id,
+                }
+
+    async def _process_single_task_once(
         self,
         task_context: TaskContext,
         dataset_type: str,
@@ -1112,7 +1286,9 @@ EXPECTED OUTPUT:
         self.execution_history.sort(key=lambda x: x.get("iteration", 0))
 
         self._print_final_summary()
-        self._send_email_report(status="completed")
+        self._send_email_report(
+            status="network_failure" if self._network_aborted else "completed"
+        )
 
     async def run_single_thread_eval_loop(self, dataset_type: str, dataset_path: str, learning: bool,
                                           single_agent_mode: bool = False,
@@ -1175,87 +1351,122 @@ EXPECTED OUTPUT:
                     continue
                 if i >= self.csv_runs_limit:
                     break
-                try:
-                    iteration_start_time = time.time()
-                    goal, scenario_id, scenario_rubric_filename = self._generate_next_task(row, dataset_type)
-                    print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
-                    print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
+                network_attempt = 0
+                while True:
+                    try:
+                        iteration_start_time = time.time()
+                        goal, scenario_id, scenario_rubric_filename = self._generate_next_task(row, dataset_type)
+                        print_info(f"📋 GOAL: {goal[:120]}…" if len(goal) > 120 else f"📋 GOAL: {goal}")
+                        print_info(f"📄 Scenario Rubric: {scenario_rubric_filename}")
 
-                    if dataset_type == "science_agent_bench" and sab_loader:
-                        await self.sab_files_transfer(sab_loader, file_transfer, row)
-                        runs = await self.evolve.start_workflow_evolution(goal=goal,
-                                                        judge=True,
-                                                        enable_evolution=learning,
-                                                        scenario_rubric=None,
-                                                        single_agent_mode=single_agent_mode
-                                                       )
-                    else:
-                        _ = await self.planner.start_planner(goal=goal,
-                                    judge=True,
-                                    max_task_retry=3
-                                   )
-                    # get session id for artefact in tmp for this run
-                    # Kimi you will need to use this
-                    session_id = self.evolve.get_workspace_manager_session_id()
-                    print_info("📦 Transferring results files…")
-                    # Offloaded: the capsule namer is a blocking sync LLM call.
-                    trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
-                    task_id = self._extract_workspace_name_from_row(row)
-                    capsule_name = await asyncio.to_thread(
-                        trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
-                    )
-
-                    execution_time = time.time() - iteration_start_time
-                    execution_data = {
-                        "iteration": i + 1,
-                        "goal": goal,
-                        "execution_time": execution_time,
-                        "task_id": task_id,
-                    }
-                    if dataset_type == "science_agent_bench" and sab_loader:
-                        # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
-                        execution_data = await asyncio.to_thread(
-                            self._evaluate_with_science_agent_bench,
-                            capsule_name=capsule_name,
-                            row=row,
-                            runs=runs,
-                            sab_loader=sab_loader,
-                            execution_data=execution_data
+                        if dataset_type == "science_agent_bench" and sab_loader:
+                            await self.sab_files_transfer(sab_loader, file_transfer, row)
+                            runs = await self.evolve.start_workflow_evolution(goal=goal,
+                                                            judge=True,
+                                                            enable_evolution=learning,
+                                                            scenario_rubric=None,
+                                                            single_agent_mode=single_agent_mode
+                                                           )
+                        else:
+                            _ = await self.planner.start_planner(goal=goal,
+                                        judge=True,
+                                        max_task_retry=3
+                                       )
+                        # get session id for artefact in tmp for this run
+                        # Kimi you will need to use this
+                        session_id = self.evolve.get_workspace_manager_session_id()
+                        print_info("📦 Transferring results files…")
+                        # Offloaded: the capsule namer is a blocking sync LLM call.
+                        trs = LocalTransfer(config=self.config, workspace_path=self.config.workspace_dir, runs_capsule_dir=self.config.runs_capsule_dir)
+                        task_id = self._extract_workspace_name_from_row(row)
+                        capsule_name = await asyncio.to_thread(
+                            trs.transfer_workspace_files_to_capsule, goal, task_token=task_id
                         )
-                        if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
-                            # Ablation: score every evolution snapshot in /tmp.
-                            # Offloaded: per-snapshot VER/SR subprocesses are blocking.
-                            execution_data["ablations"] = await asyncio.to_thread(
-                                self._evaluate_snapshot_ablations,
-                                session_id=session_id,
+
+                        execution_time = time.time() - iteration_start_time
+                        execution_data = {
+                            "iteration": i + 1,
+                            "goal": goal,
+                            "execution_time": execution_time,
+                            "task_id": task_id,
+                        }
+                        if dataset_type == "science_agent_bench" and sab_loader:
+                            # Offloaded: sandbox build, VER/SR subprocesses and CBS are blocking.
+                            execution_data = await asyncio.to_thread(
+                                self._evaluate_with_science_agent_bench,
+                                capsule_name=capsule_name,
                                 row=row,
                                 runs=runs,
                                 sab_loader=sab_loader,
                                 execution_data=execution_data
                             )
+                            if getattr(self.config, "evaluate_snapshot_ablations", False) and session_id:
+                                # Ablation: score every evolution snapshot in /tmp.
+                                # Offloaded: per-snapshot VER/SR subprocesses are blocking.
+                                execution_data["ablations"] = await asyncio.to_thread(
+                                    self._evaluate_snapshot_ablations,
+                                    session_id=session_id,
+                                    row=row,
+                                    runs=runs,
+                                    sab_loader=sab_loader,
+                                    execution_data=execution_data
+                                )
 
-                    self.execution_history.append(execution_data)
-                    self._print_final_summary()
-                    self._save_run_notes(
-                        capsule_name, goal, execution_time
+                        self.execution_history.append(execution_data)
+                        self._print_final_summary()
+                        self._save_run_notes(
+                            capsule_name, goal, execution_time
+                        )
+
+                        print_ok(f"Iteration {i + 1} completed")
+                        print_info(f"  Time: {execution_time:.2f}s")
+                        break
+                    except Exception as e:
+                        if _is_transient_network_error(e):
+                            network_attempt += 1
+                            self.logger.error(
+                                f"[DATASET EVALUATION] Transient network error in csv row {i + 1} "
+                                f"(attempt {network_attempt}/{NETWORK_ROW_MAX_RETRIES}): {e}"
+                            )
+                            if network_attempt >= NETWORK_ROW_MAX_RETRIES:
+                                detail = (f"Network failure (DNS/connectivity) still present "
+                                          f"after {NETWORK_ROW_MAX_RETRIES} attempts: {e}")
+                                self.logger.error(
+                                    f"[DATASET EVALUATION] EXCLUDING csv row {i + 1} (infra): {detail}"
+                                )
+                                self._record_network_excluded_row(i + 1, detail)
+                                break
+                            try:
+                                await self._wait_for_network_recovery()
+                            except NetworkUnavailableError as net_err:
+                                # Persistent outage: exclude this row and abort
+                                # the run instead of burning the remaining rows.
+                                self._record_network_excluded_row(i + 1, str(net_err))
+                                self._network_aborted = True
+                                break
+                            continue  # connectivity is back: retry the same row
+                        self.logger.error(f"[DATASET EVALUATION] Error in csv row {i + 1}: {str(e)}")
+                        print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
+                        self.execution_history.append({
+                            "iteration": i + 1,
+                            "goal": "Unknown",
+                            "execution_time": 0,
+                            "success_level": "Error",
+                            "key_insight": str(e),
+                        })
+                        break
+                if self._network_aborted:
+                    self.logger.error(
+                        "[DATASET EVALUATION] Aborting eval loop: network did not recover"
                     )
-
-                    print_ok(f"Iteration {i + 1} completed")
-                    print_info(f"  Time: {execution_time:.2f}s")
-                except Exception as e:
-                    self.logger.error(f"[DATASET EVALUATION] Error in csv row {i + 1}: {str(e)}")
-                    print(f"\033[91m❌ Error in csv row {i + 1}: {str(e)}\033[0m")
-                    self.execution_history.append({
-                        "iteration": i + 1,
-                        "goal": "Unknown",
-                        "execution_time": 0,
-                        "success_level": "Error",
-                        "key_insight": str(e),
-                    })
-                    continue
+                    print_err("🌐 Aborting evaluation: network did not recover — "
+                              "remaining rows were NOT evaluated")
+                    break
 
         self._print_final_summary()
-        self._send_email_report(status="completed")
+        self._send_email_report(
+            status="network_failure" if self._network_aborted else "completed"
+        )
 
     def _build_summary_rows(self) -> tuple[list[tuple[str, str]], list[dict], list[dict]]:
         """Build the rows used for both the printed summary and the email report."""
@@ -1320,13 +1531,15 @@ EXPECTED OUTPUT:
         notes_path = getattr(self, "_evaluation_cli_notes_path", None)
         if notes_path and Path(notes_path).exists():
             try:
-                with open(notes_path, "r", encoding="utf-8") as fh:
+                with open(notes_path, encoding="utf-8") as fh:
                     notes_data = json.load(fh)
                 final = {
                     "steps_evaluated": len(current_runs),
                     "successful_runs": len(successful_runs),
                     "success_rate": success_rate,
                 }
+                if self._network_aborted:
+                    final["network_aborted"] = True
                 if sab_runs:
                     final.update({
                         "ver_success": ver_success,
