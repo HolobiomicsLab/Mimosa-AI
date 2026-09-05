@@ -82,7 +82,7 @@ class Config:
         # Ablation: also benchmark-score every per-iteration /tmp snapshot
         # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
         # convergence across evolution. Multiplies per-task eval wall-clock.
-        self.evaluate_snapshot_ablations: bool = False
+        self.evaluate_snapshot_ablations: bool = True
 
         ##############
         # QD/Novelty / Learning parameters
