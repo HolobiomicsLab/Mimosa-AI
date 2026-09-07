@@ -368,6 +368,10 @@ class EvolutionEngine:
         """
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
+        enable_evolution = enable_evolution and not single_agent_mode
+        max_iteration = (
+            self.config.max_learning_evolve_iterations if enable_evolution else 1
+        )
 
         # Reset archive and variation history at session start so each task
         # starts with a clean slate (prevents boldness contamination across rows).
@@ -600,11 +604,11 @@ class EvolutionEngine:
                 runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
                 wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
             )
-
-        # Check termination conditions
+        
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
+        
         if wf_info and enable_evolution:
             if wf_info.overall_score >= self.config.learned_score_threshold:
                 print_ok("Evolution engine reached learning threshold.")
