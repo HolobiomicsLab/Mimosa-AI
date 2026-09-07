@@ -369,6 +369,7 @@ class EvolutionEngine:
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
         enable_evolution = enable_evolution and not single_agent_mode
+        judge = judge and not single_agent_mode
         max_iteration = (
             self.config.max_learning_evolve_iterations if enable_evolution else 1
         )
