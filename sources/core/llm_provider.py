@@ -569,6 +569,12 @@ class LLMProvider:
                     raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
+        if res is None:
+            self.logger.warning(
+                "LLM returned null content (finish_reason=%s); returning empty string.",
+                getattr(response.choices[0], "finish_reason", None),
+            )
+            res = "<LLM response error>"
 
         # Log token usage for debugging
         usage = getattr(response, 'usage', None)

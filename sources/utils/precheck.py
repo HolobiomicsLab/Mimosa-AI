@@ -17,7 +17,9 @@ Outcomes are classified, not pass/fail:
   - tier 2 (drift):  content-valid but drifts at temp=0  (accepted only if no
                      strict-pass providers exist for this model)
   - tier 0 (fail):   content-invalid, routing failure, or rate-limited
-Final ordering: tier asc, discovered-quantization rank desc, latency asc.
+Final ordering: tier asc, first-party priority (model creator, then other
+official slugs) before community, discovered-quantization rank desc,
+latency asc.
 """
 
 import ast
@@ -32,6 +34,7 @@ import litellm
 
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.utils.openrouter_endpoints import (
+    is_first_party,
     is_model_creator,
     providers_for_model,
     quant_rank,
@@ -86,6 +89,21 @@ def _normalize_provider_name(name: str) -> str:
     """`parasail/fp8` -> `parasail`. Discovery returns the bare provider
     name; the suffix in legacy configs is now redundant."""
     return name.split("/", 1)[0]
+
+
+def _provider_priority(provider: str, model_slug: str) -> int:
+    """0 = model creator, 1 = other first-party slug, 2 = community reseller.
+
+    First-party endpoints serve the reference weights at intended precision
+    even when they don't advertise a quantization tag (``unknown`` ranks -1),
+    so they always rank ahead of community resellers — quantization is only
+    compared *within* the same priority band.
+    """
+    if is_model_creator(provider, model_slug):
+        return 0
+    if is_first_party(provider):
+        return 1
+    return 2
 
 
 class PreCheck:
@@ -269,9 +287,10 @@ class PreCheck:
         # Bare model slug needed for model-creator checks below.
         _, model_slug = extract_model_pattern(model_id)
 
-        # Order candidates by discovered quant (best first) — affects probe
-        # order under thread pool but not final ranking (we sort results below).
-        candidates.sort(key=lambda x: -quant_rank(x[1]))
+        # Order candidates: first-party endpoints first, then discovered quant
+        # (best first) — affects probe order under thread pool but not final
+        # ranking (we sort results below).
+        candidates.sort(key=lambda x: (_provider_priority(x[0], model_slug), -quant_rank(x[1])))
 
         summary = ", ".join(f"{p}({q})" for p, q in candidates)
         print(
@@ -288,12 +307,13 @@ class PreCheck:
             results = [fut.result() for fut in concurrent.futures.as_completed(futures)]
 
         # Final sort: pass-strict first, then drift, then fail.
-        # Within each tier: the model's own creator before community
-        # resellers, then higher quant rank, then lower latency.
+        # Within each tier: first-party endpoints always before community
+        # resellers (model creator first), then higher quant rank, then
+        # lower latency.
         results.sort(
             key=lambda r: (
                 r["tier"] if r["tier"] != 0 else 99,
-                0 if is_model_creator(r["provider"], model_slug) else 1,
+                _provider_priority(r["provider"], model_slug),
                 -quant_rank(r["discovered_quant"]),
                 r["mean_latency"],
             )
@@ -342,7 +362,7 @@ class PreCheck:
                 (
                     r["provider"],
                     r["tier"],
-                    0 if is_model_creator(r["provider"], model_slug) else 1,
+                    _provider_priority(r["provider"], model_slug),
                     quant_rank(r["discovered_quant"]),
                     r["mean_latency"],
                     r["discovered_quant"],
@@ -350,8 +370,9 @@ class PreCheck:
                 for r in results
                 if r["tier"] != 0
             ]
-            # Stable sort: strict before drift; within each, the model's own
-            # creator before community, then higher precision, then faster.
+            # Stable sort: strict before drift; within each, first-party
+            # endpoints (model creator first) before community, then higher
+            # precision, then faster.
             kept.sort(key=lambda x: (x[1], x[2], -x[3], x[4]))
             new_list = [t[0] for t in kept]
             selected_quants = {t[5] for t in kept}

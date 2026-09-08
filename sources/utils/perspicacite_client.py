@@ -71,7 +71,7 @@ def _write_cache(science_query: str, mode: str, answer: str) -> None:
 
 # Default Perspicacite API base URL (can be overridden by env var)
 PERSPICACITE_BASE_URL = os.environ.get(
-    "PERSPICACITE_API_URL", "http://localhost:8000"
+    "PERSPICACITE_API_URL", "http://localhost:5468"
 )
 
 # Timeout configuration.

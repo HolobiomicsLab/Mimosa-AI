@@ -55,6 +55,11 @@ PINNED_CONSTRAINTS = [
     # out to (a no-op on py3.10 — v2 requires >=3.11 — but pins the era in case
     # the sandbox interpreter moves).
     "chemprop<2.0",
+    # opencv 4.11+ requires numpy>=2, conflicting with the numpy<2.0 pin;
+    # 4.10.0.84 is the last release built against numpy 1.x (cp37-abi3 wheels
+    # cover the py3.10 sandbox on macOS arm64 and Linux).
+    "opencv-python<=4.10.0.84",
+    "opencv-python-headless<=4.10.0.84",
 ]
 
 # pipreqs import name -> PyPI package name (authors' handcrafted remaps).
@@ -116,6 +121,19 @@ class ExecutionSandbox:
         "tf_keras<=2.17.0",
         "rdkit<=2023.09.5",
         "openai==1.54.4",
+        # openai 1.54.4 passes the `proxies` kwarg to httpx.Client, which
+        # httpx>=0.28 removed — leaving the default (transitive) httpx breaks
+        # the GPT-4 visual judge at `OpenAI()` construction. Cap httpx below
+        # 0.28 to keep the authors' exact openai pin while restoring the judge.
+        "httpx<0.28",
+        # pipreqs can NEVER provision cv2: it queries PyPI for a package named
+        # "cv2", finds none, and silently drops the import (observed 2026-08-05:
+        # BBBC002 task excluded — "No module named 'cv2'"). IMPORT_NAME_REMAP
+        # cannot fix this (the remap only sees pipreqs' output, and cv2 never
+        # reaches it). Install it in the base venv instead; headless because
+        # the sandbox has no display and benchmark code never calls imshow.
+        # The <=4.10.0.84 pin mirrors PINNED_CONSTRAINTS (numpy<2.0 compat).
+        "opencv-python-headless<=4.10.0.84",
         "pipreqs",
         "pip-tools",
     ]

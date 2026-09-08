@@ -196,7 +196,7 @@ agent = CodeAgent(
     tools=all_tools,
     model=engine,
     name="single_agent",
-    max_steps=256,
+    max_steps=64,
     additional_authorized_imports = [
         'requests', 'json', 'requests.exceptions',
         'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
