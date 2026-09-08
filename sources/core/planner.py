@@ -170,13 +170,16 @@ Important: Every task description should be very detailled and specific with the
 
         last_error = None
 
-        prompt = self.make_scientific_grounded_prompt(goal_prompt)
+        base_prompt = self.make_scientific_grounded_prompt(goal_prompt)
+        prompt = base_prompt
         for attempt in range(1, max_retries + 1):
             try:
                 print_info(f"Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = self.config.memory_dir
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
+                # Retries bypass the flat cache: with an unchanged prompt a
+                # cached unparseable response would be replayed verbatim.
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=(attempt == 1))
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -205,8 +208,9 @@ Important: Every task description should be very detailled and specific with the
                     print_info(f"Waiting {wait_time}s before retry…")
                     time.sleep(wait_time)
 
-                    if attempt > 1:
-                        goal_prompt = self._enhance_prompt_with_error(goal_prompt, error_msg)
+                    # Feed the error back into the retry prompt so the LLM can
+                    # correct its output format on the next attempt.
+                    prompt = self._enhance_prompt_with_error(base_prompt, error_msg)
                 else:
                     print_err(f"All {max_retries} attempts failed")
 
@@ -284,35 +288,58 @@ Important: Every task description should be very detailled and specific with the
 
     @staticmethod
     def _extract_json_from_code_block(text: str) -> dict[str, Any] | None:
-        """Extract JSON from markdown code blocks (```json ... ```).
+        """Extract a JSON object from an LLM response.
+
+        Tries, in order: each fenced code block (```` ```json ```` or plain
+        ```` ``` ````), the whole response when it starts with ``{``/``[``,
+        and decoding from each ``{`` (to tolerate surrounding prose and
+        earlier broken blocks). The first candidate that parses as a JSON
+        object is returned.
 
         Args:
-            text: Raw text potentially containing a fenced JSON code block.
+            text: Raw LLM response potentially containing a JSON plan.
 
         Returns:
-            The decoded JSON object, or ``None`` when no JSON code block is
-            found.
+            The decoded JSON object, or ``None`` when the text contains no
+            JSON-looking candidate at all.
 
         Raises:
-            json.JSONDecodeError: If the extracted block is not valid JSON.
+            json.JSONDecodeError: If JSON-looking candidates were found but
+                none of them parse (the last decode error is re-raised so
+                callers can detect e.g. truncation).
         """
-        code_blocks = []
-        in_code_block = False
+        candidates = []
+        for match in re.finditer(r"```[ \t]*(?:json)?[ \t]*\r?\n(.*?)```", text, re.DOTALL | re.IGNORECASE):
+            block = match.group(1).strip()
+            if block:
+                candidates.append(block)
 
-        for line in text.splitlines():
-            line_stripped = line.strip()
-            if line_stripped.startswith("```json") or line_stripped.startswith("```JSON"):
-                in_code_block = True
-                continue
-            if line_stripped.startswith("```") and in_code_block:
-                in_code_block = False
-                continue
-            if in_code_block:
-                code_blocks.append(line)
+        stripped = text.strip()
+        if stripped.startswith(("{", "[")):
+            candidates.append(stripped)
 
-        if code_blocks:
-            json_str = "\n".join(code_blocks)
-            return json.loads(json_str)
+        last_decode_error = None
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError as e:
+                last_decode_error = e
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", text):
+            try:
+                parsed, _ = decoder.raw_decode(text, match.start())
+            except json.JSONDecodeError as e:
+                last_decode_error = e
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        if last_decode_error is not None:
+            raise last_decode_error
         return None
 
     @staticmethod

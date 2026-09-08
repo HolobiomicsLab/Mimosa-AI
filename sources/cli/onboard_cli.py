@@ -39,6 +39,9 @@ from sources.cli.theme import (
     ask as _ask,
 )
 from sources.cli.theme import (
+    ask_multiline as _ask_multiline,
+)
+from sources.cli.theme import (
     ask_yn as _ask_yn,
 )
 from sources.cli.theme import (
@@ -1213,8 +1216,10 @@ class OnboardCLI:
     def _collect_objective(self) -> None:
         """Prompt the user for their initial research objective.
 
-        Shows a preview of the most recent objective (Enter reuses it) and
-        supports ``/history`` for interactive selection among past objectives.
+        Accepts multi-line input (submitted with an empty line) so long
+        text can be pasted in. Shows a preview of the most recent objective
+        (an immediate empty submission reuses it) and supports ``/history``
+        for interactive selection among past objectives.
         """
         print(_wrap(
             "Describe what you want Mimosa to do. This can be a high-level "
@@ -1234,7 +1239,7 @@ class OnboardCLI:
             print()
             _info("Press Enter to reuse it, or type /history to pick from past objectives.")
         while True:
-            objective = _ask("Your objective")
+            objective = _ask_multiline("Your objective")
             if not objective.strip() and history:
                 self._objective = history[0]["objective"]
                 _ok(f"Reusing last objective: {_truncate(self._objective, 80)}")
