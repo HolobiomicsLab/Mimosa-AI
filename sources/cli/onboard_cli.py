@@ -545,6 +545,11 @@ class OnboardCLI:
         _print_step(2, TOTAL_STEPS, "Configuration")
         self._load_config()
 
+        # Resolve the Toolomics workspace immediately after loading the
+        # config — an invalid or stale workspace_dir never gets past this
+        # step (auto-detect ../Toolomics/workspace, else prompt, else refuse).
+        self._verify_workspace_dir()
+
         # Step 3 – LLM model selection
         _print_step(3, TOTAL_STEPS, "LLM Model Selection")
         self._choose_models()
@@ -736,9 +741,6 @@ class OnboardCLI:
                     continue
                 else:
                     _ok("Shell tool (execute_command) is available.")
-
-                # ── Workspace directory check ──────────────────────────
-                self._verify_workspace_dir()
                 return   # ← success, exit loop
 
             # No MCPs found — ask the user what to do
@@ -754,9 +756,6 @@ class OnboardCLI:
             choice = _ask("Retry or skip?").lower()
             if choice == "skip":
                 _warn("Skipping Toolomics check. Execution may fail at runtime.")
-                # The workspace check is mandatory either way — it cannot be
-                # bypassed by skipping the MCP scan.
-                self._verify_workspace_dir()
                 return
             # Any other input (including blank/Enter) → retry
 
