@@ -117,6 +117,10 @@ class EvaluationCLI:
         _print_step(1, TOTAL_STEPS, "Configuration")
         self._load_config()
 
+        # Resolve the Toolomics workspace before anything is configured or
+        # launched — the CLI refuses to start without a valid one.
+        self._resolve_workspace()
+
         # Build queue: loop of configure-run → validate → "add another?"
         while True:
             run_spec = await self._configure_single_run()
@@ -160,6 +164,89 @@ class EvaluationCLI:
         else:
             _info("No config_default.json found – using built-in defaults.")
         self.config.create_paths()
+
+    # ------------------------------------------------------------------
+    # Toolomics workspace resolution
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_toolomics_workspace(path: str) -> bool:
+        """True if *path* is an existing directory with 'toolomics' in it (any case)."""
+        try:
+            resolved = os.path.realpath(os.path.expanduser(path))
+        except (OSError, ValueError):
+            return False
+        return os.path.isdir(resolved) and "toolomics" in resolved.lower()
+
+    def _resolve_workspace(self) -> None:
+        """Resolve the Toolomics workspace, refusing to start without one.
+
+        Resolution order:
+        1. The configured ``workspace_dir`` (config file / built-in default),
+           kept as-is when it already points at an existing 'toolomics' folder.
+        2. The sibling checkout ``<repo>/../Toolomics/workspace`` — the layout
+           ``auto-install.sh`` creates (Toolomics cloned next to Mimosa-AI),
+           checked from the repo location and from the current directory.
+        3. Interactive prompt. The user is re-prompted until the given path is
+           an existing directory containing 'toolomics' (case-insensitive);
+           empty, missing or non-matching answers are refused.
+
+        A detected or typed path is persisted to the config file so later
+        launches skip this step.
+        """
+        section("TOOLOMICS WORKSPACE")
+
+        current = self.config.workspace_dir
+        if self._is_toolomics_workspace(current):
+            _ok(f"Workspace: {os.path.realpath(current)}")
+            return
+
+        # Auto-detect the sibling Toolomics checkout (auto-install layout).
+        repo_root = Path(__file__).resolve().parents[2]
+        candidates = [
+            repo_root.parent / "Toolomics" / "workspace",
+            (Path.cwd() / ".." / "Toolomics" / "workspace").resolve(),
+        ]
+        for candidate in candidates:
+            if self._is_toolomics_workspace(str(candidate)):
+                self.config.workspace_dir = str(candidate)
+                _ok(f"Auto-detected workspace: {os.path.realpath(str(candidate))}")
+                self._persist_workspace_dir()
+                return
+
+        _warn(f"Configured workspace is not an existing 'toolomics' folder: {current}")
+        print(_wrap(
+            "Every artefact the agents produce is written to the Toolomics "
+            "shared workspace, so a valid folder is required before any "
+            "evaluation can run.",
+        ))
+
+        while True:
+            raw = _ask("Workspace directory path (e.g. ../Toolomics/workspace)")
+            if not raw or not raw.strip():
+                _warn("No path given — a 'toolomics' workspace is required to continue.")
+                continue
+            path = os.path.expanduser(raw.strip())
+            if self._is_toolomics_workspace(path):
+                self.config.workspace_dir = os.path.realpath(path)
+                _ok(f"Workspace: {self.config.workspace_dir}")
+                self._persist_workspace_dir()
+                return
+            if os.path.isdir(path):
+                _err(
+                    f"'{path}' exists but 'toolomics' is not in its path — "
+                    "refusing to use it as the workspace."
+                )
+            else:
+                _err(f"'{path}' is not an existing directory — try again.")
+
+    def _persist_workspace_dir(self) -> None:
+        """Write the current workspace_dir into the persisted config file."""
+        try:
+            self.config.dump(_CONFIG_DEFAULT_PATH)
+            _ok(f"Saved workspace_dir to {_CONFIG_DEFAULT_PATH}")
+        except Exception as exc:
+            _warn(f"Could not persist workspace path to {_CONFIG_DEFAULT_PATH}: {exc}")
 
     # ------------------------------------------------------------------
     # Configure a single run (Steps 2–5 for each queued run)
@@ -322,7 +409,11 @@ class EvaluationCLI:
     # ------------------------------------------------------------------
 
     async def _setup_connectivity(self, run_config: Config, run_id: int) -> list[str]:
-        """Configure port range, discover MCPs, set workspace. Returns MCP list."""
+        """Configure port range and discover MCPs. Returns MCP list.
+
+        The workspace itself is resolved once in ``run()`` before any run is
+        configured, so every queued run inherits the same validated path.
+        """
 
         # ---- Port range ------------------------------------------------
         if self._queue:

@@ -754,6 +754,9 @@ class OnboardCLI:
             choice = _ask("Retry or skip?").lower()
             if choice == "skip":
                 _warn("Skipping Toolomics check. Execution may fail at runtime.")
+                # The workspace check is mandatory either way — it cannot be
+                # bypassed by skipping the MCP scan.
+                self._verify_workspace_dir()
                 return
             # Any other input (including blank/Enter) → retry
 
@@ -767,50 +770,77 @@ class OnboardCLI:
 
     _CONFIG_DEFAULT_PATH = _persisted_config_path()
 
+    @staticmethod
+    def _is_toolomics_workspace(path: str) -> bool:
+        """True if *path* is an existing directory with 'toolomics' in it (any case)."""
+        try:
+            resolved = os.path.realpath(os.path.expanduser(path))
+        except (OSError, ValueError):
+            return False
+        return os.path.isdir(resolved) and "toolomics" in resolved.lower()
+
     def _verify_workspace_dir(self) -> None:
-        """Check that config.workspace_dir exists; prompt the user until it does.
+        """Resolve the Toolomics workspace, refusing to continue without one.
 
-        When the user supplies a valid path it is written back to
-        *config_default.json* so that subsequent runs don't ask again.
+        Resolution order:
+        1. The configured ``workspace_dir``, kept when it already points at an
+           existing 'toolomics' folder.
+        2. The sibling checkout ``<repo>/../Toolomics/workspace`` — the layout
+           ``auto-install.sh`` creates (Toolomics cloned next to Mimosa-AI) —
+           checked from the repo location and from the current directory.
+        3. Interactive prompt, repeated until the given path is an existing
+           directory containing 'toolomics' (case-insensitive). There is no
+           skip: onboarding does not continue without a valid workspace.
+
+        A detected or typed path is written back to the persisted config
+        file so that subsequent runs don't ask again.
         """
+        workspace = self.config.workspace_dir
+        if self._is_toolomics_workspace(workspace):
+            _ok(f"Workspace directory found: {os.path.realpath(workspace)}")
+            return
+
+        # Auto-detect the sibling Toolomics checkout (auto-install layout).
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[2]
+        candidates = [
+            repo_root.parent / "Toolomics" / "workspace",
+            (Path.cwd() / ".." / "Toolomics" / "workspace").resolve(),
+        ]
+        for candidate in candidates:
+            if self._is_toolomics_workspace(str(candidate)):
+                self.config.workspace_dir = str(candidate)
+                _ok(f"Auto-detected workspace: {os.path.realpath(str(candidate))}")
+                self._persist_workspace_dir(self.config.workspace_dir)
+                return
+
+        _err(f"Workspace directory not found or not a 'toolomics' folder: {workspace}")
+        print(_wrap(
+            "This path must point to the Toolomics workspace folder — the shared "
+            "directory where Mimosa reads and writes task artifacts. Enter the "
+            "correct absolute path (e.g. ../Toolomics/workspace); it must exist "
+            "and contain 'toolomics' in its path (any case).",
+        ))
+
         while True:
-            workspace = self.config.workspace_dir
-            if os.path.isdir(workspace):
-                _ok(f"Workspace directory found: {workspace}")
-                self._warn_if_workspace_not_in_toolomics(workspace)
-                return
-
-            _err(f"Workspace directory not found: {workspace}")
-            print(_wrap(
-                "This path must point to the Toolomics workspace folder — the shared "
-                "directory where Mimosa reads and writes task artifacts. "
-                "Please enter the correct absolute path, or press Enter to skip.",
-            ))
-            new_path = _ask("Workspace directory path (Enter to skip)")
-            if not new_path:
-                _warn(
-                    "Skipping workspace check. "
-                    "Execution will fail unless workspace_dir is set correctly."
-                )
-                return
+            new_path = _ask("Workspace directory path")
+            if not new_path or not new_path.strip():
+                _warn("No path given — a 'toolomics' workspace is required to continue.")
+                continue
             new_path = os.path.expanduser(new_path.strip())
-            if os.path.isdir(new_path):
-                self.config.workspace_dir = new_path
-                _ok(f"Workspace directory set to: {new_path}")
-                self._persist_workspace_dir(new_path)
-                self._warn_if_workspace_not_in_toolomics(new_path)
+            if self._is_toolomics_workspace(new_path):
+                self.config.workspace_dir = os.path.realpath(new_path)
+                _ok(f"Workspace directory set to: {self.config.workspace_dir}")
+                self._persist_workspace_dir(self.config.workspace_dir)
                 return
-            _err(f"Directory does not exist: {new_path}. Please try again.")
-
-    def _warn_if_workspace_not_in_toolomics(self, path: str) -> None:
-        """Warn when the workspace path is not inside a Toolomics directory."""
-        if "toolomics" not in os.path.abspath(path).lower():
-            _warn(
-                "The workspace path does not contain a 'toolomics' directory. "
-                "If you wish to use Toolomics, execution will fail; "
-                "otherwise, if you are bringing your own MCP, ensure they are "
-                "configured to the same path as the file mount."
-            )
+            if os.path.isdir(new_path):
+                _err(
+                    f"'{new_path}' exists but 'toolomics' is not in its path — "
+                    "refusing to use it as the workspace."
+                )
+            else:
+                _err(f"Directory does not exist: {new_path}. Please try again.")
 
     def _persist_workspace_dir(self, path: str) -> None:
         """Write *path* as workspace_dir into config_default.json.

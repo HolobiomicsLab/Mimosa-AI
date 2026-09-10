@@ -28,6 +28,7 @@ Controls
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import random
@@ -41,9 +42,149 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame
 from PIL import Image
 
-# Reuse the trace-parsing helpers from the existing timelapse tool.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from memory_timelapse import StepInfo, load_memory_files, parse_step  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Memory-trace parsing (formerly memory_timelapse.py)
+# ---------------------------------------------------------------------------
+@dataclass
+class StepInfo:
+    step: int
+    stage: str
+    agent: str
+    duration: float
+    start_time: float
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    tool_calls: list[str]
+    has_error: bool
+    action_status: str | None
+    thought_preview: str
+    code_preview: str
+    observation_preview: str
+
+
+def load_memory_files(memory_dir: Path) -> dict[str, list[dict]]:
+    """Load all memory JSON files organized by stage."""
+    stages = {}
+
+    # Load plan_creator
+    plan_file = memory_dir / "plan_creator.json"
+    if plan_file.exists():
+        with open(plan_file) as f:
+            data = json.load(f)
+            # plan_creator is a single response, not a list of steps
+            stages["plan_creator"] = [{
+                "step": 0,
+                "stage": "plan_creator",
+                "agent": "plan_creator",
+                "timing": {"duration": 0},
+                "token_usage": data.get("usage", {}),
+                "tool_calls": [],
+                "error": None,
+                "model_output": data.get("response", "")[:500],
+                "action_output": {"status": "SUCCESS", "message": "Plan created"},
+            }]
+
+    # Load stage files
+    for stage_dir in sorted(memory_dir.glob("stage*")):
+        stage_name = stage_dir.name
+        stages[stage_name] = []
+
+        for json_file in sorted(stage_dir.glob("*.json")):
+            agent_name = json_file.stem
+            with open(json_file) as f:
+                data = json.load(f)
+
+                if isinstance(data, list):
+                    # It's a trace of steps
+                    for step_data in data:
+                        step_data["stage"] = stage_name
+                        step_data["agent"] = agent_name
+                        stages[stage_name].append(step_data)
+                else:
+                    # Single response
+                    stages[stage_name].append({
+                        "step": 0,
+                        "stage": stage_name,
+                        "agent": agent_name,
+                        "timing": {"duration": 0},
+                        "token_usage": data.get("usage", {}),
+                        "tool_calls": [],
+                        "error": None,
+                        "model_output": data.get("response", "")[:500],
+                        "action_output": {"status": "SUCCESS", "message": "Task completed"},
+                    })
+
+    return stages
+
+
+def parse_step(step_data: dict) -> StepInfo:
+    """Parse step data into structured format."""
+    timing = step_data.get("timing", {})
+    token_usage = step_data.get("token_usage", {})
+
+    # Extract tool calls
+    tool_calls = step_data.get("tool_calls", [])
+    tool_names = []
+    for tc in tool_calls:
+        if isinstance(tc, dict):
+            func = tc.get("function", {})
+            if isinstance(func, dict):
+                tool_names.append(func.get("name", "unknown"))
+            else:
+                tool_names.append(str(tc.get("name", "unknown")))
+
+    # Get action status
+    action_output = step_data.get("action_output", {})
+    if isinstance(action_output, dict):
+        action_status = action_output.get("status")
+    else:
+        action_status = str(action_output) if action_output else None
+
+    # Extract thought/code/observation previews
+    model_output = step_data.get("model_output", "")
+    thought_preview = ""
+    code_preview = ""
+    observation_preview = ""
+
+    if model_output:
+        lines = model_output.split("\n")
+        for i, line in enumerate(lines):
+            if "Thought:" in line and i + 1 < len(lines):
+                thought_preview = lines[i + 1][:256]
+            if "```py" in line or "```python" in line:
+                # Find code block - extract up to 15 lines for better preview
+                code_lines = []
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip() == "```":
+                        break
+                    code_lines.append(lines[j][:110])
+                    if len(code_lines) >= 15:  # Get more lines for the preview
+                        break
+                code_preview = "\n".join(code_lines)
+
+    observations = step_data.get("observations", "")
+    if observations:
+        observation_preview = str(observations)[:100]
+
+    return StepInfo(
+        step=step_data.get("step", 0),
+        stage=step_data.get("stage", "unknown"),
+        agent=step_data.get("agent", "unknown"),
+        duration=timing.get("duration", 0) if isinstance(timing, dict) else 0,
+        start_time=timing.get("start_time", 0) if isinstance(timing, dict) else 0,
+        input_tokens=token_usage.get("input_tokens", 0) if isinstance(token_usage, dict) else 0,
+        output_tokens=token_usage.get("output_tokens", 0) if isinstance(token_usage, dict) else 0,
+        total_tokens=token_usage.get("total_tokens", 0) if isinstance(token_usage, dict) else 0,
+        tool_calls=tool_names,
+        has_error=step_data.get("error") is not None,
+        action_status=action_status,
+        thought_preview=thought_preview,
+        code_preview=code_preview,
+        observation_preview=observation_preview,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Visual constants — SF / Jarvis vibe: deep navy background, cyan/amber glow.
@@ -195,7 +336,7 @@ def _extract_previews(entry: dict) -> tuple[str, str, str]:
     """Pull thought / code / observation strings out of one raw step dict.
 
     Handles three formats seen in this repo:
-      * ``Thought:`` + ```` ```py ```` fences (memory_timelapse default)
+      * ``Thought:`` + ```` ```py ```` fences (the parse_step default)
       * ``<code>...</code>`` tagged blocks with prose-before as the thought
       * ``code_action`` field already containing the code
     """
@@ -266,7 +407,6 @@ def _load_memory_steps(mem_dir: Path) -> list[StepInfo]:
                 continue
             raw_pool.append((s, parse_step(s)))
 
-    import json
     for jf in sorted(mem_dir.glob("*.json")):
         agent = jf.stem
         if agent.startswith("verifier_"):
@@ -304,7 +444,6 @@ def _load_workflow(wf_dir: Path, memory_root: Path) -> Workflow | None:
     lineage = wf_dir / f"lineage_{uuid}.json"
     if not lineage.exists():
         return None
-    import json
     data = json.loads(lineage.read_text())
 
     steps = _load_memory_steps(memory_root / uuid)
