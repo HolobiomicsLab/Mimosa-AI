@@ -42,7 +42,8 @@ class PopulationMember:
 
     Attributes:
         iteration: Iteration index at which this member was produced.
-        reward: Capped reward used for greedy comparisons.
+        reward: Capped reward (``overall_score`` with the hard-fail cap
+            applied) used for greedy comparisons and QD quality.
         cost: Monetary or compute cost spent to produce this member.
         uuid: Workflow UUID; ``None`` for members without on-disk artifacts.
         behaviour_descriptor: Unit-norm genotype embedding used for the
@@ -52,7 +53,6 @@ class PopulationMember:
             used for the length-penalty term in ``qd_score``.
         novelty_score: Mean cosine distance to the current comparison set.
         qd_score: Combined quality-diversity score with length penalty.
-        reward_uncapped: Base reward with no hard-fail cap.
         created_at: Wall-clock timestamp of construction.
     """
     iteration: int
@@ -63,7 +63,6 @@ class PopulationMember:
     genotype_chars: int = 0
     novelty_score: float = 0.0
     qd_score: float = 0.0
-    reward_uncapped: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -387,9 +386,12 @@ class SelectionPressure:
     ) -> dict[str, Any]:
         """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
 
-        QD weighting uses ``reward_uncapped`` (uncapped base reward),
-        then subtracts a length-penalty term so runaway code growth costs
-        ranking points without overriding it on real improvements.
+        QD weighting uses ``reward`` (the capped ``overall_score``), so a
+        candidate that refuted a hard claim ranks at its capped score and
+        cannot top the archive on its other claims alone; ties at the cap
+        are broken by the novelty and length-penalty terms. The length
+        penalty discourages runaway code growth without overriding
+        ranking on real improvements.
 
         Args:
             baseline_list: Previous runs whose mean reward forms the bar.
@@ -406,18 +408,18 @@ class SelectionPressure:
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
         best_new = max(new_list, key=lambda r: _safe_attr(r, "reward", 0.0))
-        new_reward_uncapped = _safe_attr(best_new, "reward_uncapped", 0.0) or new_reward
+        new_reward = _safe_attr(best_new, "reward", 0.0) or new_reward
 
         descriptor = self._extract_behaviour_descriptor(best_new)
         genotype_chars = _genotype_chars(best_new)
         novelty = self._compute_novelty(descriptor)
 
         novelty_range = self._novelty_range()
-        quality_norm = min(max(new_reward_uncapped, 0.0), 1.0)
+        quality_norm = min(max(new_reward, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
         qd_score = self._compose_qd_score(
-            new_reward_uncapped, novelty, genotype_chars, novelty_range,
+            new_reward, novelty, genotype_chars, novelty_range,
         )
 
         absolute_improvement = new_reward - baseline_reward
@@ -433,7 +435,6 @@ class SelectionPressure:
             genotype_chars=genotype_chars,
             novelty_score=novelty,
             qd_score=qd_score,
-            reward_uncapped=new_reward_uncapped,
         )
         admit_rejected = not self._try_admit(member, is_valid)
         self._record_previous(descriptor)
@@ -564,7 +565,7 @@ class SelectionPressure:
         if not is_valid:
             self._n_admit_rejected += 1
             self.logger.info(
-                f"ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
+                f"ADMIT REJECTED (reward={member.reward:.3f}, "
                 f"qd={member.qd_score:.3f}, novelty={member.novelty_score:.3f}) — "
                 f"total rejected={self._n_admit_rejected}"
             )
@@ -603,7 +604,7 @@ class SelectionPressure:
         )
         for m in self._archive:
             m.qd_score = self._compose_qd_score(
-                m.reward_uncapped, m.novelty_score, m.genotype_chars, novelty_range,
+                m.reward, m.novelty_score, m.genotype_chars, novelty_range,
             )
 
     def _knn_novelty_against_peers(self, m: PopulationMember) -> float:
@@ -618,13 +619,13 @@ class SelectionPressure:
 
     def _compose_qd_score(
         self,
-        reward_uncapped: float,
+        reward: float,
         novelty: float,
         genotype_chars: int,
         novelty_range: float,
     ) -> float:
         """``(1-w)·quality + w·novelty − λ·length_penalty`` in one place."""
-        quality_norm = min(max(reward_uncapped, 0.0), 1.0)
+        quality_norm = min(max(reward, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
         return (
@@ -799,7 +800,7 @@ if __name__ == "__main__":
 
     def _run(reward: float, descriptor: list[float], uuid: str, *, code_len: int = 100) -> SimpleNamespace:
         return SimpleNamespace(
-            reward=reward, reward_uncapped=reward, current_uuid=uuid,
+            reward=reward, current_uuid=uuid,
             iteration_count=1, cost=0.0,
             code="x" * code_len,
             behaviour_descriptor=descriptor,
