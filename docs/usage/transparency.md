@@ -94,18 +94,6 @@ The screen is split into:
 
 The CLI is read-only — it does not modify any memory file.
 
-## `memory_timelapse.py` — memory growth visualisation
-
-For longer `--learn` runs, you may want a coarser view: how the agent's
-memory grew over iterations. Run:
-
-```bash
-uv run memory_timelapse.py <uuid>
-```
-
-It renders an animated frame-by-frame view of the memory state, useful for
-spotting where the agent's understanding shifted.
-
 ## Reading `state_result.json`
 
 The verifier writes summary scores plus the workflow's final state to
