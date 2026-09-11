@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1912,6 +1912,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#extraction-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extraction health
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#deduplication" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2030,12 +2041,12 @@ variables — and nothing else:</p>
 </tr>
 <tr>
 <td><code>reasoning</code></td>
-<td><code>step.model_output_message.content</code> (str or text chunks)</td>
+<td><code>memory_trace.extract_output_text</code> — <code>model_output_message.content</code>, else <code>model_output</code></td>
 <td>The agent's natural-language justification, where the decision is voiced</td>
 </tr>
 <tr>
 <td><code>code</code></td>
-<td><code>step.action_output</code> (fallback: code block in reasoning)</td>
+<td><code>memory_trace.extract_code</code> — <code>code_action</code>, else <code>tool_calls[*].function.arguments</code>, else a fenced block in the output</td>
 <td>The concrete chosen option as executed</td>
 </tr>
 <tr>
@@ -2045,11 +2056,23 @@ variables — and nothing else:</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Shared extraction.</strong> Code/reasoning extraction lives in
+<a href="../../sources/transparency/memory_trace.py"><code>sources/transparency/memory_trace.py</code></a>,
+reused by both the exporter and the interactive memory chat
+(<code>sources/cli/memory_chat_cli.py</code>) so the two never disagree on "the code
+the agent ran". Note <code>code</code> reads <code>code_action</code> — <strong>not</strong> <code>action_output</code>,
+which is the step's <em>result</em>, not its source.</p>
+</blockquote>
 <p>Variables that are deliberately <strong>not</strong> passed:</p>
 <ul>
 <li><code>model_input_messages</code> — re-serialises the entire prior conversation on
   every step. Stripped in <a href="../../sources/transparency/trace_compaction.py"><code>trace_compaction.compact_step</code></a>.
   This is the dominant token-cost saving, usually ≥80% of the raw file.</li>
+<li><code>model</code> — the per-step model id stamped by <code>save_memories</code>
+  (e.g. <code>openrouter/qwen/qwen3.7-plus</code>). It rides along on the compact step
+  as provenance for the YAML/recipe outputs but never enters the prompt, so
+  extraction cache keys are unaffected.</li>
 <li>Workspace file contents — the <em>names</em> of output files reach the YAML
   builder, but never the LLM. Decisions live in the reasoning, not the
   artefacts.</li>
@@ -2090,7 +2113,7 @@ analysis dict:</p>
 </tr>
 <tr>
 <td><code>outputs[i]</code></td>
-<td>Each top-level file in the artefacts directory — prefers <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code> (the canonical snapshot), falls back to <code>config.workspace_dir</code>. See <code>AstraExporter._resolve_artefacts_dir</code>.</td>
+<td>Each top-level file in the artefacts directory — prefers <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code> (the canonical snapshot), falls back to <code>config.workspace_dir</code>. See <code>AstraExporter._resolve_artefacts_dir</code>. OS junk (<code>.DS_Store</code>, <code>Thumbs.db</code>, <code>.gitkeep</code>), dotfiles, and our own <code>recipe.py</code> are dropped.</td>
 </tr>
 <tr>
 <td><code>outputs[i].decisions</code></td>
@@ -2098,7 +2121,7 @@ analysis dict:</p>
 </tr>
 <tr>
 <td><code>outputs[i].recipe.command</code></td>
-<td>Pointer to the memory trace (Mimosa does not run as a single CLI command)</td>
+<td><code>python recipe.py</code>. The run's executed code is reconstructed by <code>memory_trace.reconstruct_recipe</code> (ordered <code>code_action</code> of every step) and written to <code>runs_capsule/&lt;uuid&gt;/recipe.py</code>. ASTRA's <code>recipe.command</code> is a single shell command, so the multi-step transcript lives in the script and the command points at it. Falls back to a memory-trace pointer string when no code was recovered.</td>
 </tr>
 <tr>
 <td><code>decisions[d.id]</code></td>
@@ -2109,20 +2132,50 @@ analysis dict:</p>
 <td>LLM-extracted from the step's reasoning</td>
 </tr>
 <tr>
+<td><code>decisions[d.id].default</code></td>
+<td>The realised option (<code>Decision.chosen_option_id</code>)</td>
+</tr>
+<tr>
 <td><code>decisions[d.id].options</code></td>
-<td>Single-option map keyed by <code>d.option_id</code> (Mimosa picks one option, doesn't enumerate alternatives)</td>
+<td>Multi-option map: the chosen option plus any alternatives the agent explicitly weighed in the trace (never invented)</td>
+</tr>
+<tr>
+<td><code>decisions[d.id].model</code></td>
+<td>Per-step model id from the memory trace, when recorded — provenance extension beyond the spec; omitted for legacy traces</td>
+</tr>
+<tr>
+<td><code>extraction</code></td>
+<td>Extraction-health block (see below) — provenance extension beyond the spec</td>
 </tr>
 </tbody>
 </table>
 <p>The companion universe file
 (<code>universes/best.yaml</code>) is a flat <code>{decision_id: option_id}</code> map matching
 the realised configuration.</p>
+<h2 id="extraction-health">Extraction health<a class="headerlink" href="#extraction-health" title="Permanent link">&para;</a></h2>
+<p>The extractor refuses to guess. A response whose <code>chosen_option_id</code> is
+missing or unresolvable is <strong>dropped and counted as malformed</strong> unless the
+response listed exactly one cleanly-parsed option (then that option is the
+choice by construction; this also covers the legacy single-option shape).
+Prose, truncated JSON, empty/None content, and schema violations are all
+counted as <code>malformed</code>; LLM calls that raise are counted as <code>crashed</code>. Both
+counters are logged as warnings, echoed by the exporter CLI, and written
+into <code>astra.yaml</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">extraction</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">steps_considered</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;steps sent to the LLM&gt;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">decisions_recorded</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;deduped decisions kept&gt;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">llm_call_failures</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;crashed calls&gt;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">malformed_responses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;unusable responses&gt;</span>
+</span></code></pre></div>
+<p>A capsule produced from a degraded extraction is therefore self-describing:
+zero decisions with non-zero failure counters reads as "extraction broke",
+never as "the run made no decisions".</p>
 <h2 id="deduplication">Deduplication<a class="headerlink" href="#deduplication" title="Permanent link">&para;</a></h2>
 <p>Decisions are keyed by <code>Decision.id</code>. If two steps surface the same
 decision (e.g. the agent re-justifies a choice late in the trace), the
-first occurrence wins and <code>source_step</code> records which step it came from.
-This is a deliberate v1 simplification — multi-option enumeration is
-deferred until reviewers actually ask for it.</p>
+first occurrence wins for the core fields (label, rationale, chosen option,
+provenance) while options surfaced by later re-justifications are unioned
+in by <code>_merge_options</code>, so alternatives raised later aren't lost.</p>
 <h2 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h2>
 <p>Each per-step LLM call uses <code>LLMProvider</code> with <code>agent_name =
 f"astra_decision_step_{i}"</code> and <code>memory_path = sources/memory/&lt;best_uuid&gt;</code>.
@@ -2132,9 +2185,6 @@ export on the same best run incurs zero new LLM cost.</p>
 <ul>
 <li><strong>Cross-decision dependencies</strong> (<code>requires</code>, <code>incompatible_with</code>) —
   the trace doesn't encode them; would need a second LLM pass.</li>
-<li><strong>Alternatives considered</strong> (multi-option <code>options</code>) — the agent
-  usually picks one; back-filling alternatives is honest only if grounded
-  in the trace.</li>
 <li><strong><code>tags</code>, <code>when</code>, <code>from</code></strong> — ASTRA optional fields; not used in v1.</li>
 <li><strong><code>insights</code></strong> — ASTRA's prior-insight links; out of scope.</li>
 </ul>
@@ -2233,7 +2283,7 @@ export on the same best run incurs zero new LLM cost.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

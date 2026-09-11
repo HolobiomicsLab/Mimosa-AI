@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1370,6 +1370,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#infra-exclusion-vs-genuine-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infra exclusion vs. genuine failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sandbox-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sandbox environment
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1453,6 +1475,17 @@
     <span class="md-ellipsis">
       
         Reported Results Snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validating-the-eval-pipeline-against-the-gold-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating the eval pipeline against the gold solutions
       
     </span>
   </a>
@@ -2190,6 +2223,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#infra-exclusion-vs-genuine-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infra exclusion vs. genuine failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sandbox-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sandbox environment
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2273,6 +2328,17 @@
     <span class="md-ellipsis">
       
         Reported Results Snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validating-the-eval-pipeline-against-the-gold-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating the eval pipeline against the gold solutions
       
     </span>
   </a>
@@ -2476,35 +2542,73 @@ released by the ScienceAgentBench authors
   output meets the task's acceptance criterion.</li>
 </ul>
 <p>The Mimosa-side ScienceAgentBench code in
-<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/"><code>sources/evaluation/</code></a>
+<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/benchmark_evaluation/"><code>sources/benchmark_evaluation/</code></a>
 runs the candidate workflow, hands the produced file to the benchmark's
 own evaluation machinery, and aggregates the resulting metrics. It does
 not re-implement the benchmark; it bridges Mimosa to it.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
 <h3 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sources/evaluation/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── capsule_evaluator.py      # Main evaluation orchestrator
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── execution_sandbox.py       # Safe code execution utilities
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>└── codebert_scorer.py         # Code similarity scoring
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>sources/extensibility/
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└── papers_mode.py             # Integration with autonomous mode
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sources/benchmark_evaluation/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── csv_mode.py               # Drives evaluation over the task CSV, aggregates metrics
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── capsule_evaluator.py      # Per-task VER/SR/CBS orchestrator
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── execution_sandbox.py      # Sandboxed code execution + shared venv
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── codebert_scorer.py        # Code similarity scoring
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── science_agent_bench.py    # Dataset/eval-script/gold-program loader
 </span></code></pre></div>
 <h3 id="evaluation-flow">Evaluation Flow<a class="headerlink" href="#evaluation-flow" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>1. Task Execution (Mimosa-AI)
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>   ↓
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>2. File Transfer to Capsule
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>   ↓
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>3. CapsuleEvaluator Initialization
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>3. CapsuleEvaluator (sandbox built lazily; base venv reused across tasks)
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>   ↓
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>4. VER Evaluation (Code Execution)
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>4. VER Evaluation (execute generated code; SR is conditioned on VER)
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>   ↓
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>5. SR Evaluation (Task-Specific Metrics)
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>5. SR Evaluation (task-specific eval script)
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>   ↓
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>6. CBS Calculation (Code Similarity)
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>6. CBS Calculation (CBS=1.0 when SR passes)
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>   ↓
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>7. Results Aggregation &amp; Storage
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>7. Results Aggregation &amp; Storage (infra failures excluded, not counted)
 </span></code></pre></div>
+<h3 id="infra-exclusion-vs-genuine-failure">Infra exclusion vs. genuine failure<a class="headerlink" href="#infra-exclusion-vs-genuine-failure" title="Permanent link">&para;</a></h3>
+<p>A task is <strong>excluded</strong> from the metrics (VER/SR/CBS reported as <code>null</code>, shown
+as <code>—</code>, counted under <em>Excluded (infra)</em>) when the eval <strong>harness</strong> — not the
+agent's code — fails. This keeps setup problems from being mis-counted as
+agent failures. Excluded conditions:</p>
+<ul>
+<li>the sandbox/venv fails to build,</li>
+<li>the task's <code>gold_results</code> are missing,</li>
+<li>a <strong>figure-judged</strong> task has no <code>OPENAI_API_KEY</code> / <code>AZURE_OPENAI_KEY</code> set,</li>
+<li>the eval script itself is missing.</li>
+</ul>
+<p>Genuine agent failures still count: a generated program that crashes or does
+not save its output is <code>VER = False</code>; an eval script that returns <code>(0, …)</code> is
+<code>SR = False</code>.</p>
+<h3 id="sandbox-environment">Sandbox environment<a class="headerlink" href="#sandbox-environment" title="Permanent link">&para;</a></h3>
+<p>The sandbox mirrors the ScienceAgentBench authors' pinned eval environment
+(<code>config_conda_env.py</code>) so gold/agent programs reproduce instead of failing on
+version drift:</p>
+<ul>
+<li><strong>Python 3.10</strong> — a hard requirement (<code>SANDBOX_PYTHON_VERSION</code>); the sandbox
+  errors clearly if <code>python3.10</code> is absent. Old rdkit/deepchem-era wheels do not
+  exist for 3.12, so matching 3.10 is required to reproduce their results.</li>
+<li><strong>Pinned base stack:</strong> <code>numpy&lt;2.0</code>, <code>scipy&lt;1.14.0</code>, <code>pandas&lt;=1.5.3</code>,
+  <code>matplotlib&lt;3.8.0</code>, <code>scikit-learn</code>, <code>torch&lt;=2.3.0</code>, <code>tensorflow&lt;=2.17.0</code>,
+  <code>tf_keras&lt;=2.17.0</code>, <code>rdkit&lt;=2023.09.5</code>, <code>openai==1.54.4</code>.</li>
+<li><strong>Constraints file:</strong> those version caps are written once and passed as <code>-c</code>
+  to every install (base and per-task), so a program's <code>pipreqs</code>-discovered deps
+  cannot pull an incompatible numpy/rdkit.</li>
+<li><strong>Handcrafted rules</strong> (matching the authors): import-name remaps
+  (<code>scvi</code>→<code>scvi-tools</code>, <code>skimage</code>→<code>scikit-image</code>, <code>iris</code>→<code>scitools-iris</code>, drop
+  <code>benchmark</code>), extra deps (<code>biopsykit</code>→<code>mne</code>, <code>scanpy</code>→<code>scikit-misc</code>+<code>leidenalg</code>,
+  <code>oggm</code>→<code>salem</code>+<code>tables</code>+<code>geopandas</code>), and special-case installs
+  (<code>deepchem</code>→<code>dgl</code>, <code>DeepPurpose</code>→<code>descriptastorus</code>, <code>qsprpred</code>→
+  <code>papyrus-scaffold-visualizer</code>+<code>kaleido</code>).</li>
+</ul>
+<p>The venv is built <strong>once per process</strong> and reused across tasks (per-program deps
+installed on top), so the first task pays the heavy install and the rest reuse it.
+Without the rdkit/numpy pins, RDKit-based tasks (e.g. <code>deepchem</code>/clintox) crash
+with a numpy ragged-array error; with them, the gold reproduces (VER=SR=1).</p>
 <h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
 <h3 id="1-ver-valid-execution-rate">1. VER (Valid Execution Rate)<a class="headerlink" href="#1-ver-valid-execution-rate" title="Permanent link">&para;</a></h3>
 <p><strong>Type:</strong> Binary (True/False)</p>
@@ -2514,15 +2618,10 @@ not re-implement the benchmark; it bridges Mimosa to it.</p>
 - Executes with 5-minute timeout
 - Validates expected output file creation
 - Returns success status and error message</p>
-<p><strong>Implementation:</strong>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_exec_rate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="sd">    Checks:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="sd">    1. Python file exists</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="sd">    2. Executes without errors</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">    3. Expected output file created</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span></code></pre></div></p>
+<p>The sandbox pre-creates the <code>pred_results/</code> output directory, so a program that
+writes there without <code>mkdir</code> does not fail VER on its final line.</p>
+<p><strong>Implementation:</strong> <code>CapsuleEvaluator.evaluate_success_rate</code> runs the generated
+program (VER) and then the task-specific eval script (SR).</p>
 <h3 id="2-sr-success-rate">2. SR (Success Rate)<a class="headerlink" href="#2-sr-success-rate" title="Permanent link">&para;</a></h3>
 <p><strong>Type:</strong> Binary (True/False)</p>
 <p><strong>Definition:</strong> Evaluates if the output meets task-specific success criteria (e.g., accuracy thresholds, metric requirements).</p>
@@ -2531,15 +2630,15 @@ not re-implement the benchmark; it bridges Mimosa to it.</p>
 - Compares predictions with gold results
 - Returns success based on threshold criteria</p>
 <p><strong>Example Evaluation Script:</strong>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># From BBBC002_cell_count_eval.py</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">eval</span><span class="p">():</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">preds</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;pred_results/cell-count_pred.csv&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">labels</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;benchmark/eval_programs/gold_results/cell-count_gold.csv&#39;</span><span class="p">)[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">metric</span> <span class="o">=</span> <span class="n">mean_absolute_error</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">preds</span><span class="p">)</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">threshold</span> <span class="o">=</span> <span class="mf">30.0</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">metric</span> <span class="o">&lt;=</span> <span class="n">threshold</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;MAE: </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&quot;</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># From BBBC002_cell_count_eval.py</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">eval</span><span class="p">():</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">preds</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">'pred_results/cell-count_pred.csv'</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">labels</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">'benchmark/eval_programs/gold_results/cell-count_gold.csv'</span><span class="p">)[</span><span class="s1">'count'</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">metric</span> <span class="o">=</span> <span class="n">mean_absolute_error</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">preds</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">threshold</span> <span class="o">=</span> <span class="mf">30.0</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">metric</span> <span class="o">&lt;=</span> <span class="n">threshold</span><span class="p">),</span> <span class="sa">f</span><span class="s2">"MAE: </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">"</span>
 </span></code></pre></div></p>
 <h3 id="3-cbs-codebertscore">3. CBS (CodeBERTScore)<a class="headerlink" href="#3-cbs-codebertscore" title="Permanent link">&para;</a></h3>
 <p><strong>Type:</strong> Float (0.0-1.0)</p>
@@ -2550,7 +2649,10 @@ not re-implement the benchmark; it bridges Mimosa to it.</p>
 - Generate contextual embeddings
 - Compute cosine similarity matrix
 - Calculate F1 score using greedy matching</p>
-<p><strong>Fallback:</strong> If transformers library unavailable, uses token-based Jaccard similarity.</p>
+<p><strong>On failure:</strong> if CBS cannot be computed (e.g. <code>transformers</code>/<code>torch</code> missing,
+or the gold program is unavailable), the scorer raises; the evaluator records the
+reason in <code>CBS_error</code> and falls back to <code>0.0</code>. That fallback is logged distinctly
+so it is never mistaken for a genuine zero similarity.</p>
 <h3 id="4-api-cost">4. API Cost<a class="headerlink" href="#4-api-cost" title="Permanent link">&para;</a></h3>
 <p><strong>Type:</strong> Float (USD)</p>
 <p><strong>Definition:</strong> Tracks total API costs from LLM calls during task execution.</p>
@@ -2563,46 +2665,86 @@ not re-implement the benchmark; it bridges Mimosa to it.</p>
 <li>Iterative-learning: <code>SR 43.1%</code>, <code>CBS 0.921</code>, <code>$1.7/task</code></li>
 </ul>
 <p>These figures are manuscript results, not a guaranteed console output for every local run. Actual summary metrics will vary with the selected model, run subset, and configuration.</p>
-<p><strong>Evaluation on ScienceAgentBench limited to 102 tasks with learning limited to 10 iterations</strong></p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--science_agent_bench<span class="w"> </span>--csv_runs_limit<span class="w"> </span><span class="m">102</span>
+<p><strong>Run the full benchmark (all 102 tasks).</strong> Run from the repository root where
+the input datasets live under <code>datasets/ScienceAgentBench/datasets/</code> (these are
+untracked and are <strong>not</strong> present in a git worktree — use the main checkout):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># one-shot multi-agent over all 102 tasks</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--science_agent_bench<span class="w"> </span>--csv_runs_limit<span class="w"> </span><span class="m">102</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># iterative-learning mode (adds workflow evolution)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--science_agent_bench<span class="w"> </span>--csv_runs_limit<span class="w"> </span><span class="m">102</span><span class="w"> </span>--learn
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># single-agent mode</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--science_agent_bench<span class="w"> </span>--csv_runs_limit<span class="w"> </span><span class="m">102</span><span class="w"> </span>--single_agent
+</span></code></pre></div>
+<p>Set <code>OPENAI_API_KEY</code> (or <code>AZURE_OPENAI_KEY</code>) first, or figure-judged tasks are
+excluded rather than scored. Concurrency is controlled by <code>max_concurrent_eval_tasks</code>
+in the config.</p>
+<h3 id="validating-the-eval-pipeline-against-the-gold-solutions">Validating the eval pipeline against the gold solutions<a class="headerlink" href="#validating-the-eval-pipeline-against-the-gold-solutions" title="Permanent link">&para;</a></h3>
+<p><code>tests/brute_gold_eval.py</code> is a sanity check: it runs each task's <strong>gold</strong>
+program (VER) and feeds the result through the eval script (SR). A correct
+pipeline scores VER = SR = 100% on the gold. With no arguments it runs the
+<strong>full benchmark</strong> (all 102 tasks from the CSV) using the same base packages as
+Mimosa (<code>BASIC_PACKAGES</code>), so the first task pays a one-time heavy install into
+the shared venv. Run from the main checkout (the input datasets are not in a
+worktree):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># full benchmark — all 102 tasks</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python3.12<span class="w"> </span>tests/brute_gold_eval.py
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># list the tasks, run nothing</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>python3.12<span class="w"> </span>tests/brute_gold_eval.py<span class="w"> </span>--list
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># a fast subset with a lighter base env</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>python3.12<span class="w"> </span>tests/brute_gold_eval.py<span class="w"> </span>--light<span class="w"> </span>CogSci_pattern_high_sim_eval<span class="w"> </span>mountainLion3_eval
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># SR-only: feed the gold output through the eval, skip executing the gold</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>python3.12<span class="w"> </span>tests/brute_gold_eval.py<span class="w"> </span>--seed-only<span class="w"> </span>clintox_nn_eval
+</span></code></pre></div>
+<p>Set <code>OPENAI_API_KEY</code> (or <code>AZURE_OPENAI_KEY</code>) for figure tasks, or they are excluded.</p>
+<p>Unit tests for the error-handling behaviour:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/test_benchmark_eval_error_handling.py
 </span></code></pre></div>
 <h3 id="output-structure">Output Structure<a class="headerlink" href="#output-structure" title="Permanent link">&para;</a></h3>
 <h4 id="per-task-results">Per-Task Results<a class="headerlink" href="#per-task-results" title="Permanent link">&para;</a></h4>
 <p>Saved to <code>runs_capsule/&lt;capsule_name&gt;/evaluation_results.json</code>:</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;task_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">,</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-10-29T10:20:00&quot;</span><span class="p">,</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">&quot;VER&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">&quot;VER_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Execution successful, output file created&quot;</span><span class="p">,</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">&quot;SR&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">&quot;SR_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Test accuracy: 0.89&quot;</span><span class="p">,</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">&quot;CBS&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">&quot;cost_usd&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.023</span><span class="p">,</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Task 1 Evaluation Results:...&quot;</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"task_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1"</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-10-29T10:20:00"</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"evaluated"</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">"VER"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">"VER_message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Execution successful, output file created"</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">"SR"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="nt">"SR_message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Test accuracy: 0.89"</span><span class="p">,</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">"CBS"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nt">"cost_usd"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.023</span><span class="p">,</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Task 1 Evaluation Results:..."</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">}</span>
 </span></code></pre></div>
+<p><code>status</code> is <code>"evaluated"</code> or <code>"excluded"</code>. An excluded task has <code>VER</code>/<code>SR</code>/<code>CBS</code>
+= <code>null</code> and an <code>infra_error</code> field. A CBS that fell back to <code>0.0</code> carries a
+<code>CBS_error</code> field.</p>
 <h4 id="aggregate-summary">Aggregate Summary<a class="headerlink" href="#aggregate-summary" title="Permanent link">&para;</a></h4>
 <p>At completion, Mimosa prints an aggregate ScienceAgentBench summary for the selected run. The exact values depend on the evaluated subset, execution mode, and model configuration.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <h3 id="required-dependencies">Required Dependencies<a class="headerlink" href="#required-dependencies" title="Permanent link">&para;</a></h3>
 <p>Add to <code>requirements.txt</code>:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>transformers&gt;=4.30.0
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>torch&gt;=2.0.0
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>scikit-learn&gt;=1.0.0
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>pandas&gt;=1.5.0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>transformers&gt;=4.30.0
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>torch&gt;=2.0.0
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>scikit-learn&gt;=1.0.0
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>pandas&gt;=1.5.0
 </span></code></pre></div></p>
 <h3 id="environment-setup">Environment Setup<a class="headerlink" href="#environment-setup" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
 <p>Install dependencies:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 </span></code></pre></div></p>
 </li>
 <li>
 <p>Download CodeBERT model (automatic on first use):
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoTokenizer</span><span class="p">,</span> <span class="n">AutoModel</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;microsoft/codebert-base&quot;</span><span class="p">)</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">AutoModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;microsoft/codebert-base&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoTokenizer</span><span class="p">,</span> <span class="n">AutoModel</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"microsoft/codebert-base"</span><span class="p">)</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">AutoModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"microsoft/codebert-base"</span><span class="p">)</span>
 </span></code></pre></div></p>
 </li>
 </ol>
@@ -2772,7 +2914,7 @@ benchmark report.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

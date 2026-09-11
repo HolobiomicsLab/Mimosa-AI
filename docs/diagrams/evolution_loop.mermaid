@@ -81,7 +81,7 @@ flowchart TB
     subgraph QD["Quality-Diversity machinery"]
         BD["behaviour descriptor<br/>genotype_embedding(code) →<br/>L2-normalised code embedding<br/>(MiniLM all-MiniLM-L6-v2, default)"]
         Nov["k-NN novelty<br/>(cosine distance, k=15, against archive)"]
-        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.25)<br/>quality from reward_uncapped<br/>(additive: no quality leak into novelty)"]
+        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.25)<br/>quality from reward (capped overall_score)<br/>(additive: no quality leak into novelty)"]
     end
     State -. workflow genotype (code) .-> BD
     Archive -. distances .-> Nov

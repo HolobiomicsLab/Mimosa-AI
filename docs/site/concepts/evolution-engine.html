@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2282,9 +2282,9 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
 <li><strong>Reset</strong> the workspace to the initial state.</li>
 <li><strong>Orchestrate</strong> a workflow run (LLM writes Python → sandbox runs it).</li>
 <li><strong>Snapshot</strong> the workspace.</li>
-<li><strong>Evaluate</strong> — get <code>overall_score</code> and <code>reward_uncapped</code> (i.e.
-   <code>overall_score_uncapped</code> in the persisted JSON) plus an
-   <code>abstracted_prompt_gradient</code>.</li>
+<li><strong>Evaluate</strong> — get <code>overall_score</code> (which drives QD quality) plus an
+   <code>abstracted_prompt_gradient</code>; <code>overall_score_uncapped</code> is still
+   persisted for analysis.</li>
 <li><strong><code>validate_survivor()</code></strong> — admit to the archive when the candidate
    improves over baseline or clears <code>qd_score &gt; admit_threshold</code>;
    capacity is curated by lowest-<code>qd_score</code> eviction.</li>
@@ -2308,8 +2308,10 @@ implements four strategies — <code>greedy</code>, <code>tournament</code>, <co
   <code>w = novelty_weight = 0.25</code>. Quality and novelty are <strong>additive</strong> — never
   multiplied — so high quality cannot rescue a redundant profile and high
   novelty cannot drag a broken run above peers.</li>
-<li>Quality is sourced from <code>reward_uncapped</code> so the hard-fail cap doesn't
-  flatten rank ordering.</li>
+<li>Quality is sourced from <code>reward</code> (the capped <code>overall_score</code>), so a run
+  that refuted a hard claim ranks at its capped score and cannot top the
+  archive on its other claims alone; ties at the cap are broken by the
+  novelty and length-penalty terms.</li>
 <li>Novelty is cosine-distance k-NN (<code>k = 15</code>) in <strong>genotype-embedding</strong>
   space. The descriptor is the L2-normalised embedding of the workflow's
   generated source code (its <em>genotype</em>), produced by
@@ -2710,7 +2712,7 @@ but never aborts a run.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

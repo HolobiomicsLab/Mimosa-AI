@@ -12,7 +12,8 @@
 
 QD selection compares candidates with two scalars:
 
-- **quality** — `reward_uncapped`, i.e. how well the workflow scored.
+- **quality** — `reward`, the capped `overall_score`; runs that refuted a
+  hard claim rank at the cap, and ties there are broken by novelty.
 - **novelty** — k-NN distance in *behaviour-descriptor space* to the
   rest of the archive.
 

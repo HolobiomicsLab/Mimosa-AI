@@ -83,8 +83,9 @@ Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.me
 - Layer `3` executes those workflows in a sandboxed runner with
   SmolAgents.
 - Layer `4` runs the multi-source per-claim verifier and reports
-  `overall_score`, `reward_uncapped`, and `abstracted_prompt_gradient`
-  back into the loop.
+  `overall_score`, `overall_score_uncapped` (logged for analysis), and
+  `abstracted_prompt_gradient` back into the loop; QD selection ranks on
+  the capped `overall_score`.
 
 ---
 
@@ -250,9 +251,9 @@ Each recursive step:
 1. resets the workspace to the initial state,
 2. orchestrates a workflow run (LLM → sandbox),
 3. snapshots the workspace,
-4. evaluates → `overall_score` / `reward_uncapped`,
-5. calls `validate_survivor()` and admits to the archive if non-dominated
-   on `(reward_uncapped, novelty)`,
+4. evaluates → `overall_score` (surfaced as `reward` on the run),
+5. calls `validate_survivor()` and admits to the archive on improvement
+   or `qd_score > admit_threshold` (quality term from the capped `reward`),
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
@@ -266,9 +267,11 @@ Termination: `overall_score >= learned_score_threshold` (default 0.9) in
 Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
-(`w = novelty_weight = 0.25`). Quality is sourced from `reward_uncapped`
-so the hard-fail cap (`_HARD_FAIL_CAP`, currently `0.99`) doesn't
-flatten rank ordering. Admission is
+(`w = novelty_weight = 0.25`). Quality is sourced from `reward` (the
+capped `overall_score`), so a run that refuted a hard claim ranks at the
+cap (`_HARD_FAIL_CAP`, currently `0.7`) and cannot top the archive on its
+other claims alone; ties at the cap are broken by novelty and the length
+penalty. Admission is
 gated by the validity check (improvement over baseline or
 `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
@@ -506,7 +509,7 @@ For each generation:
    ```
    overall = clamp(base_mean, 0, 1)
    if any hard claim refuted:
-       overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
+       overall = min(overall, 0.7)         # _HARD_FAIL_CAP
    ```
    `base_mean` is the importance-weighted mean of per-claim scores.
 5. **Prompt gradient** — plain-language single-sentence diagnosis

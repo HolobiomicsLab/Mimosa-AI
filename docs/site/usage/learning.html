@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2153,7 +2153,7 @@ workflow space, archive what worked, and recombine.</p>
 </ul>
 <h2 id="how-to-enable-it">How to enable it<a class="headerlink" href="#how-to-enable-it" title="Permanent link">&para;</a></h2>
 <p>Add <code>--learn</code> to a task or goal mode invocation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">&quot;Train a multitask model on the Clintox dataset…&quot;</span><span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">"Train a multitask model on the Clintox dataset…"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">              </span>--learn<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">              </span>--config<span class="w"> </span>my_config.json
 </span></code></pre></div>
@@ -2168,8 +2168,8 @@ workflow space, archive what worked, and recombine.</p>
 <li><code>overall_score &gt;= learned_score_threshold</code> (config field, default <code>0.92</code>).</li>
 <li><code>iteration ≥ max_learning_evolve_iterations</code> (default <code>25</code>).</li>
 </ul>
-<p>The "best" workflow at termination — the one with the highest
-<code>reward_uncapped</code> in the archive — has its workspace snapshot restored as
+<p>The "best" workflow at termination — the one with the highest <code>reward</code>
+(the capped <code>overall_score</code>) — has its workspace snapshot restored as
 the run's final state.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tuning the threshold</p>
@@ -2381,7 +2381,7 @@ on disk under <code>sources/workflows/&lt;uuid&gt;/</code> and can be inspected.
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

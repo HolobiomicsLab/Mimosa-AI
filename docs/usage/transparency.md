@@ -102,8 +102,8 @@ The verifier writes summary scores plus the workflow's final state to
 
 | Field | What it tells you |
 | ----- | ----------------- |
-| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.99`) when a hard claim is refuted. |
-| `overall_score_uncapped` | Same score pre-cap — used as `reward_uncapped` for QD ranking. |
+| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.7`) when a hard claim is refuted. |
+| `overall_score_uncapped` | Same score pre-cap — recorded for analysis; QD ranking uses the capped `overall_score`. |
 | `base_mean` | Importance-weighted mean over non-error per-claim scores. |
 | `hard_fail_capped` | `true` when a hard claim was refuted (cap fired). |
 | `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |

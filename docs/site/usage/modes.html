@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2263,7 +2263,7 @@ checks, then either kicks off a task or saves a config file for later.</p>
 <p><strong>Recommended for first-time users</strong> — everything below assumes you've
 already configured Mimosa once.</p>
 <h2 id="task-mode">Task mode<a class="headerlink" href="#task-mode" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">&quot;Train a multitask model on the Clintox dataset…&quot;</span><span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">"Train a multitask model on the Clintox dataset…"</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">              </span>--config<span class="w"> </span>my_config.json
 </span></code></pre></div>
 <p>What happens:</p>
@@ -2292,7 +2292,7 @@ the planner to break it down.</p>
 the argument is a readable file, its contents are loaded as the goal.</p>
 </div>
 <h2 id="goal-mode">Goal mode<a class="headerlink" href="#goal-mode" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--goal<span class="w"> </span><span class="s2">&quot;Reproduce experiments from arXiv:2306.00306 and compare results.&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--goal<span class="w"> </span><span class="s2">"Reproduce experiments from arXiv:2306.00306 and compare results."</span>
 </span></code></pre></div>
 <p>Adds Layer 0 — the <strong>Planner</strong> (<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/planner.py"><code>sources/core/planner.py</code></a>)
 — before evolution:</p>
@@ -2340,7 +2340,7 @@ pages for each:</p>
 when you have a hard ground-truth assertion list and want pass/fail scoring
 instead of LLM-judged scoring.</p>
 <h2 id="single-agent-baseline">Single-agent baseline<a class="headerlink" href="#single-agent-baseline" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">&quot;…&quot;</span><span class="w"> </span>--single_agent
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>main.py<span class="w"> </span>--task<span class="w"> </span><span class="s2">"…"</span><span class="w"> </span>--single_agent
 </span></code></pre></div>
 <p>Replaces the multi-agent factory with <code>SingleAgentFactory</code>. Fast and cheap,
 but <strong>cannot improve through learning</strong> — included so benchmark comparisons
@@ -2490,7 +2490,7 @@ iterating on prompt templates.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

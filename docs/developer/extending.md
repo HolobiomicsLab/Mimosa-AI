@@ -39,9 +39,10 @@ To add a new scoring strategy:
 The returned `EvaluationResult` must include at minimum:
 
 - `overall_score: float ∈ [0, 1]`
-- `overall_score_uncapped: float ∈ [0, 1]` — surfaced as `reward_uncapped`
-  on the in-memory `WorkflowRun`/`ArchiveMember`; pass through unchanged
-  (or set equal to `overall_score`) for backends without a cap.
+- `overall_score_uncapped: float ∈ [0, 1]` — still surfaced as
+  `reward_uncapped` on the in-memory run; the pre-cap value is logged for
+  analysis, but QD ranking uses the capped `overall_score`. Pass through
+  unchanged (or set equal to `overall_score`) for backends without a cap.
 - `abstracted_prompt_gradient: str` — the **only** signal fed back to the
   mutator.
 
