@@ -141,6 +141,9 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         """
 
         provider, model = extract_model_pattern(self.config.workflow_llm_model)
+        api_base, api_key_env = self.config.completion_endpoint_for(
+            self.config.workflow_llm_model
+        )
         temperature = random.uniform(0.7, 1.3) # enhance workflow diversity and avoid error repetition.
         if provider == "anthropic" or "claude" in model.lower():
             temperature = min(temperature, 1.0)
@@ -152,6 +155,9 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             reasoning_effort=self.config.reasoning_effort,
             max_tokens=32000,
             openrouter_provider=None, # use default
+            api_base=api_base,
+            api_key_env=api_key_env,
+            harness_auth_mode=self.config.harness_auth_mode,
         )
         return LLMProvider("workflow_creator", path, system_prompt, llm_config)(prompt, use_cache=allow_cache)
 
@@ -356,6 +362,8 @@ WORKFLOW_PATH = {workflow_path!r}
 MODEL_ID = {default_model!r}
 ENGINE_NAME = {engine!r}
 OPENROUTER_PROVIDER = {providers!r}
+API_BASE = {getattr(self.config, 'api_base', None)!r}
+API_KEY_ENV = {getattr(self.config, 'api_key_env', None)!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
 MAX_CONTEXT_TOKENS = {self.config.max_context_tokens!r}
 WORKSPACE_DIR = {self.config.workspace_dir!r}
@@ -478,7 +486,7 @@ if WORKFLOW_PATH:
                 craft_instructions, existing_tool_prompt, memory_path, allow_cache
             ) # Generate workflow code - let Evolution handle retries
         except Exception as e:
-            raise e # raise error for evolve-level to handle
+            raise ValueError(f"UUID:{uuid_str}|{str(e)}") from e
         # Save workflow code immediately so learning layer can access it even if validation fails
         if save_workflow and isinstance(workflow_genotype_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_genotype_code, goal, original_task)

@@ -1,13 +1,22 @@
+import glob
 import json
 import logging
 import os
+import random
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
-import glob
-import random
+from urllib.parse import urlsplit
 
 import litellm
+
+from .completion_backends import (
+    CLI_BACKENDS,
+    CompletionBackendError,
+    call_completion_bridge,
+    is_cli_completion_provider,
+)
 
 # Highest temperature every supported backend accepts. Some serving stacks
 # refuse anything above this with an opaque 400 rather than a typed error, so
@@ -54,6 +63,9 @@ class LLMConfig:
     key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     reasoning_effort: str = "medium"
     max_tokens = 8192
+    api_base: str | None = None
+    api_key_env: str | None = None
+    harness_auth_mode: str = "subscription"
     openrouter_provider: list[str] | None = None
     # OpenRouter `quantizations` exclusion filter. `None` means omit the
     # filter (required when routing to untagged first-party endpoints like
@@ -62,7 +74,24 @@ class LLMConfig:
         default_factory=lambda: ["bf16", "fp16", "fp8"]
     )
 
-    def __init__(self, model: str = model, provider: str = provider, temperature: float = 1.0, key: str = "", reasoning_effort: str = "medium", max_tokens: int = 8192, openrouter_provider: list[str] | str | None = None, openrouter_quantizations: list[str] | tuple[str, ...] | None = ("bf16", "fp16", "fp8")) -> None:
+    def __init__(
+        self,
+        model: str = model,
+        provider: str = provider,
+        temperature: float = 1.0,
+        key: str = "",
+        reasoning_effort: str = "medium",
+        max_tokens: int = 8192,
+        openrouter_provider: list[str] | str | None = None,
+        openrouter_quantizations: list[str] | tuple[str, ...] | None = (
+            "bf16",
+            "fp16",
+            "fp8",
+        ),
+        api_base: str | None = None,
+        api_key_env: str | None = None,
+        harness_auth_mode: str = "subscription",
+    ) -> None:
         """Initialize an LLMConfig from explicit arguments.
 
         Args:
@@ -90,6 +119,9 @@ class LLMConfig:
         self.key = key
         self.reasoning_effort = reasoning_effort
         self.max_tokens = max_tokens
+        self.api_base = api_base
+        self.api_key_env = api_key_env
+        self.harness_auth_mode = harness_auth_mode
         if isinstance(openrouter_provider, str):
             openrouter_provider = [openrouter_provider]
         self.openrouter_provider = openrouter_provider
@@ -103,8 +135,39 @@ class LLMConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
+        is_cli = is_cli_completion_provider(self.provider)
+        if self.harness_auth_mode not in {"subscription", "api_key"}:
+            raise ValueError("harness_auth_mode must be 'subscription' or 'api_key'")
+        if self.provider == "codex-cli" and self.harness_auth_mode != "subscription":
+            raise ValueError("codex-cli supports subscription authentication only")
+        if self.api_base:
+            parsed_base = urlsplit(self.api_base)
+            if parsed_base.scheme != "https" or not parsed_base.netloc:
+                raise ValueError("api_base must be an absolute HTTPS URL")
+            if parsed_base.username is not None or parsed_base.password is not None:
+                raise ValueError("api_base must not contain user information")
+            if parsed_base.query or parsed_base.fragment:
+                raise ValueError("api_base must not contain a query or fragment")
+        if self.api_key_env and not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", self.api_key_env
+        ):
+            raise ValueError("api_key_env must be an environment variable name")
+        if self.api_base and not self.api_key_env and not self.key:
+            raise ValueError(
+                "api_base requires api_key_env or an explicitly supplied API key"
+            )
+        if self.api_key_env and (not is_cli or self.harness_auth_mode == "api_key"):
+            configured_key = os.getenv(self.api_key_env)
+            if not configured_key:
+                raise ValueError(
+                    "configured API key environment variable is not set: "
+                    f"{self.api_key_env}"
+                )
+            self.key = configured_key
         # Set appropriate API key based on provider
-        if self.provider == "anthropic" and not self.key:
+        if self.api_key_env or is_cli:
+            pass
+        elif self.provider == "anthropic" and not self.key:
             self.key = os.getenv("ANTHROPIC_API_KEY", "")
         elif self.provider == "openai" and not self.key:
             self.key = os.getenv("OPENAI_API_KEY", "")
@@ -127,7 +190,11 @@ class LLMConfig:
         self.temperature = float(self.temperature)  # Ensure numeric type
 
         # Validate reasoning effort
-        valid_efforts = {"minimal", "low", "medium", "high"}
+        valid_efforts = (
+            {"low", "medium", "high", "xhigh", "max"}
+            if is_cli
+            else {"minimal", "low", "medium", "high"}
+        )
         if self.reasoning_effort not in valid_efforts:
             raise ValueError(
                 f"reasoning_effort must be one of {valid_efforts}, got '{self.reasoning_effort}'"
@@ -158,6 +225,9 @@ class LLMConfig:
             reasoning_effort=config.get("reasoning_effort", "medium"),
             max_tokens=config.get("max_tokens", 8192),
             openrouter_provider=config.get("openrouter_provider"),
+            api_base=config.get("api_base"),
+            api_key_env=config.get("api_key_env"),
+            harness_auth_mode=config.get("harness_auth_mode", "subscription"),
         )
         # Only forward `openrouter_quantizations` if the caller set it;
         # otherwise inherit the constructor default.
@@ -207,6 +277,94 @@ class LLMProvider:
         self.use_flat_cache = use_flat_cache
         self.max_retries = 100
         self.logger = logging.getLogger(__name__)
+        self.last_completion_metadata: dict[str, Any] | None = None
+
+    def _call_cli_completion(self, prompt: str, timeout: int) -> str:
+        """Call one configured CLI backend without cache, retry, or API fallback."""
+        if not 1 <= timeout <= 300:
+            raise ValueError("CLI completion timeout must be between 1 and 300 seconds")
+        messages = []
+        if self.sys_msg is not None:
+            messages.append({"role": "system", "content": self.sys_msg})
+        messages.append({"role": "user", "content": prompt})
+        request = {
+            "protocol_version": 1,
+            "backend": CLI_BACKENDS[self.config.provider],
+            "model": self.config.model,
+            "messages": messages,
+            "response_format": "text",
+            "auth_mode": self.config.harness_auth_mode,
+            "effort": self.config.reasoning_effort,
+            "timeout_seconds": timeout,
+        }
+        if self.config.provider == "claude-cli" and self.config.harness_auth_mode == "api_key":
+            if self.config.api_base:
+                request["api_base"] = self.config.api_base
+            if self.config.api_key_env:
+                request["api_key_env"] = self.config.api_key_env
+        unsupported = {
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens,
+        }
+        self.logger.warning(
+            "CLI text completion does not support temperature or max_tokens; "
+            "both controls are omitted from the bridge request."
+        )
+        result = None
+        try:
+            result = call_completion_bridge(request)
+            if result["status"] != "completed":
+                detail = result.get("error") or "bridge did not complete the request"
+                raise CompletionBackendError(
+                    f"CLI completion {result['status']}: {detail}"
+                )
+            # Retain these checks at the dispatch seam for test doubles and
+            # future alternate clients that bypass call_completion_bridge.
+            route_fields = {
+                "backend": request["backend"],
+                "requested_model": request["model"],
+                "auth_mode": request["auth_mode"],
+            }
+            mismatches = {
+                field: (expected, result.get(field))
+                for field, expected in route_fields.items()
+                if result.get(field) != expected
+            }
+            if mismatches:
+                raise CompletionBackendError(
+                    "completion bridge returned mismatched route metadata: "
+                    f"{mismatches}"
+                )
+            if not isinstance(result.get("text"), str) or not result["text"].strip():
+                raise CompletionBackendError(
+                    "completed bridge result must contain non-empty text"
+                )
+        except Exception as exc:
+            result_metadata = (
+                result
+                if isinstance(result, dict) and result.get("status") != "completed"
+                else {}
+            )
+            self.last_completion_metadata = {
+                **result_metadata,
+                "status": result_metadata.get("status", "malformed"),
+                "backend": request["backend"],
+                "requested_model": self.config.model,
+                "unsupported_controls": unsupported,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            raise CompletionBackendError(str(exc)) from exc
+        self.last_completion_metadata = {**result, "unsupported_controls": unsupported}
+        if self.memory_path and self.agent_name:
+            self.save_call(
+                {
+                    "response": result["text"],
+                    "message": messages,
+                    "completion_metadata": self.last_completion_metadata,
+                    "cache_eligible": False,
+                }
+            )
+        return result["text"]
 
     def _supports_reasoning_tokens(self) -> bool:
         """Check if the current model supports reasoning tokens.
@@ -302,6 +460,12 @@ class LLMProvider:
                     with open(agent_file) as f:
                         cached_data = json.load(f)
 
+                    if cached_data.get("cache_eligible") is False:
+                        self.logger.info(
+                            "Skipping cache-ineligible record for agent '%s'",
+                            self.agent_name,
+                        )
+                        return None
                     cached_messages = cached_data.get('message', [])
                     if self._messages_match(expected_messages, cached_messages):
                         self.logger.info(f"Cache hit (flat) for agent '{self.agent_name}' with complete context match")
@@ -324,6 +488,8 @@ class LLMProvider:
                     with open(agent_file) as f:
                         cached_data = json.load(f)
 
+                    if cached_data.get("cache_eligible") is False:
+                        continue
                     cached_messages = cached_data.get('message', [])
                     if self._messages_match(expected_messages, cached_messages):
                         self.logger.info(f"Cache hit for agent '{self.agent_name}' with complete context match")
@@ -503,7 +669,13 @@ class LLMProvider:
             RuntimeError: When a non-retryable error is raised by the
                 underlying API call.
         """
-        cached_response = self._find_cache_match(prompt) if use_cache else None
+        if is_cli_completion_provider(self.config.provider):
+            return self._call_cli_completion(prompt, timeout)
+
+        cache_eligible = not (self.config.api_base or self.config.api_key_env)
+        cached_response = (
+            self._find_cache_match(prompt) if use_cache and cache_eligible else None
+        )
         if cached_response:
             self.logger.info(f"Returning cached response for agent '{self.agent_name}'")
             return cached_response
@@ -539,6 +711,8 @@ class LLMProvider:
                 if not self._is_claude_model():
                     completion_params["temperature"] = effective_temperature
                 completion_params["api_key"] = self.config.key
+                if self.config.api_base:
+                    completion_params["api_base"] = self.config.api_base
                 # Add reasoning effort if supported (not for Claude models)
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
                     completion_params["reasoning_effort"] = self.config.reasoning_effort
@@ -713,9 +887,18 @@ class LLMProvider:
                 else None
             ),
             "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
+            "cache_eligible": cache_eligible,
         }
         if self.memory_path and self.agent_name:
             self.save_call(json_res)
+
+        self.last_completion_metadata = {
+            "status": "completed",
+            "backend": "litellm",
+            "requested_model": f"{self.config.provider}/{self.config.model}",
+            "actual_model": getattr(response, "model", None),
+            "usage": response.json().get("usage"),
+        }
 
         return res
 

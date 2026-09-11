@@ -129,6 +129,10 @@ class SmolAgentFactory:
         self.tools = [_make_tool_json_aware(t) for t in tools]
         # variable defined by workflow factory
         self.model_id = model or MODEL_ID
+        if str(self.model_id).startswith(("codex-cli/", "claude-cli/")):
+            raise ValueError(
+                "CLI completion backends are text-only and cannot power ToolSmolAgent"
+            )
         self.memory_folder = MEMORY_PATH
         self.engine_name = ENGINE_NAME
         self.system_prompt = SYSTEM_PROMPT
@@ -140,6 +144,8 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
+        self.api_base = globals().get("API_BASE", None)
+        self.api_key_env = globals().get("API_KEY_ENV", None)
         # Request token logprobs and save them with memory (for ablations).
         # Only the litellm engine forwards the request, and only when the
         # provider accepts the params (litellm raises UnsupportedParamsError
@@ -244,6 +250,10 @@ class SmolAgentFactory:
             return # use original system prompt by smolagents
 
     def get_engine(self):
+        if str(self.model_id).startswith(("codex-cli/", "claude-cli/")):
+            raise ValueError(
+                "CLI completion backends are text-only and cannot power ToolSmolAgent"
+            )
         if self.engine_name == "mlx":
             return MLXModel(
                 model_id=self.model_id,
@@ -260,6 +270,18 @@ class SmolAgentFactory:
             )
         elif self.engine_name == "litellm":
             extra_kwargs = dict(self.logprobs_kwargs)
+            api_base = getattr(self, "api_base", None)
+            api_key_env = getattr(self, "api_key_env", None)
+            if api_base and str(self.model_id).startswith("openai/"):
+                extra_kwargs["api_base"] = api_base
+            if api_key_env and str(self.model_id).startswith("openai/"):
+                api_key = os.getenv(api_key_env)
+                if not api_key:
+                    raise ValueError(
+                        "Configured API key environment variable is not set: "
+                        f"{api_key_env}"
+                    )
+                extra_kwargs["api_key"] = api_key
             if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
                 order = (
                     [self.openrouter_provider]
