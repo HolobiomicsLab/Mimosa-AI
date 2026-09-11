@@ -48,18 +48,67 @@ dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
 # Fallback: user-level env file (shell env and a CWD .env take precedence).
 dotenv.load_dotenv(paths.user_env_file())
 
-def validate_environment() -> None:
-    """Validate required environment configuration."""
-    key_found = False
-    envs_key = ['ANTHROPIC_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'HF_TOKEN', 'OPENROUTER_API_KEY']
-    for key in envs_key:
-        if os.getenv(key):
-            print_ok(f"Found environment variable: {key}")
-            key_found = True
-    if not key_found:
+def validate_environment(config: Config | None = None) -> None:
+    """Validate credentials only for the completion routes in use."""
+    default_key_envs = [
+        "ANTHROPIC_API_KEY",
+        "MISTRAL_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OPENAI_API_KEY",
+        "HF_TOKEN",
+        "OPENROUTER_API_KEY",
+    ]
+    if config is None:
+        if not any(os.getenv(name) for name in default_key_envs):
+            raise ValueError("No supported API key environment variable is set")
+        return
+    config.validate_completion_backend_config()
+    models = [
+        config.planner_llm_model,
+        config.workflow_llm_model,
+        config.judge_model,
+        config.judge_extraction_model,
+        config.capsule_namer_model,
+    ]
+    tool_models = (
+        config.smolagent_model_id
+        if isinstance(config.smolagent_model_id, list)
+        else [config.smolagent_model_id]
+    )
+    models.extend(tool_models)
+    providers = [
+        model.split("/", 1)[0] if "/" in model else "anthropic"
+        for model in models
+        if model
+    ]
+    cli_providers = {"codex-cli", "claude-cli"}
+    if any(provider in cli_providers for provider in providers):
+        if not os.getenv("HARNESS_COMPLETION_BRIDGE"):
+            raise ValueError(
+                "HARNESS_COMPLETION_BRIDGE is required for CLI completion models"
+            )
+    if config.harness_auth_mode == "api_key" and any(
+        provider == "claude-cli" for provider in providers
+    ):
+        if not config.api_key_env:
+            raise ValueError("claude-cli api_key auth requires api_key_env")
+    uses_named_key = config.api_key_env and any(
+        provider == "openai"
+        or (provider == "claude-cli" and config.harness_auth_mode == "api_key")
+        for provider in providers
+    )
+    if uses_named_key and not os.getenv(config.api_key_env):
         raise ValueError(
-            "No valid API key environment variable found. Please set one of the supported API keys. Supported keys: " + ", ".join(envs_key)
+            f"Configured API key environment variable is not set: {config.api_key_env}"
         )
+    api_required = any(
+        provider not in cli_providers and provider != "mlx-community"
+        for provider in providers
+    )
+    if api_required and not uses_named_key and not any(
+        os.getenv(name) for name in default_key_envs
+    ):
+        raise ValueError("No API key is set for the configured API completion route")
 
 def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> None:
     """Add additional CLI arguments for config parameters that can be overridden."""
@@ -354,7 +403,7 @@ async def main():
     # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
 
-    validate_environment()
+    validate_environment(config)
 
     config.create_paths()
     config.validate_paths()

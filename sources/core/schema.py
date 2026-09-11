@@ -74,6 +74,8 @@ class IndividualRun:
     # persisted via sources.core.lineage.record_lineage afterwards.
     parent_uuids: list[str] = field(default_factory=list)
     evolution_kind: str = "seed"  # "seed" | "mutation" | "crossover"
+    cost_incomplete: bool = False
+    unknown_cli_completion_count: int = 0
 
     def __str__(self) -> str:
         """Return a verbose, debug-style summary of the run."""

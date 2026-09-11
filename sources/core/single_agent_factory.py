@@ -54,6 +54,10 @@ class SingleAgentFactory(Factory):
         # runs one model, so resolve to the primary (first) for the engine,
         # provider lookup and cost tracking below.
         model_id = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        if str(model_id).startswith(("codex-cli/", "claude-cli/")):
+            raise ValueError(
+                "CLI completion backends are text-only and cannot power ToolSmolAgent"
+            )
         max_tokens = getattr(self.config, 'max_tokens', 8192)
         provider, _ = extract_model_pattern(model_id)
         token = os.getenv("HF_TOKEN") if provider == "huggingface" else None
@@ -109,6 +113,8 @@ provider = {provider!r}
 token = {token!r}
 engine_name = {engine!r}
 openrouter_provider = {self.config.openrouter_provider_for(model_id)!r}
+api_base = {getattr(self.config, 'api_base', None)!r}
+api_key_env = {getattr(self.config, 'api_key_env', None)!r}
 SAVE_LOGPROBS = {self.config.save_logprobs!r}
 TOP_LOGPROBS = 5  # keep in sync with smolagent_factory.TOP_LOGPROBS
 
@@ -162,6 +168,13 @@ elif engine_name == "inference_client":
     )
 elif engine_name == "litellm":
     _litellm_extra = dict(logprobs_kwargs)
+    if api_base and str(model_id).startswith("openai/"):
+        _litellm_extra["api_base"] = api_base
+    if api_key_env and str(model_id).startswith("openai/"):
+        _api_key = os.getenv(api_key_env)
+        if not _api_key:
+            raise ValueError(f"Configured API key environment variable is not set: {{api_key_env}}")
+        _litellm_extra["api_key"] = _api_key
     if openrouter_provider and str(model_id).startswith("openrouter/"):
         _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
         _litellm_extra["extra_body"] = {{

@@ -479,6 +479,8 @@ class EvolutionEngine:
         on_error = False
         uuid = None
         current_iteration_cost = 0.0  # Cost for this iteration only, not cumulative
+        current_iteration_cost_incomplete = False
+        current_unknown_cli_completion_count = 0
         verdict: dict | None = None  # populated only when survivor validation runs
 
         # ── Reset workspace to the initial state before each run ─────
@@ -518,6 +520,14 @@ class EvolutionEngine:
             # Evaluate and calculate costs
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
+            )
+            cost_metadata = self.pricing.last_cost_metadata
+            current_iteration_cost_incomplete = bool(
+                cost_metadata.get("has_unknown_unbilled_cli_cost")
+            )
+            current_unknown_cli_completion_count = sum(
+                record.get("cost_usd") is None
+                for record in cost_metadata.get("cli_completions", [])
             )
             runs[-1].reward = wf_info.overall_score
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
@@ -580,11 +590,23 @@ class EvolutionEngine:
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
+        runs[-1].cost_incomplete = (
+            getattr(runs[-1], "cost_incomplete", False)
+            or current_iteration_cost_incomplete
+        )
+        runs[-1].unknown_cli_completion_count = (
+            getattr(runs[-1], "unknown_cli_completion_count", 0)
+            + current_unknown_cli_completion_count
+        )
 
         # Persist per-iteration metrics & QD verdict to disk.
         ctx = {
             "verdict": verdict,
             "iteration_cost": current_iteration_cost,
+            "iteration_cost_incomplete": current_iteration_cost_incomplete,
+            "iteration_unknown_cli_completion_count": (
+                current_unknown_cli_completion_count
+            ),
             "iteration_start_time": iteration_start_time,
             "on_error": on_error,
         }
@@ -600,7 +622,10 @@ class EvolutionEngine:
         if wf_info:
             self._log_iteration_completion(
                 runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-                wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+                wf_info.overall_score, current_iteration_cost,
+                current_iteration_cost_incomplete,
+                current_unknown_cli_completion_count,
+                runs[-1].goal, uuid, wf_info.state_result, rewards_history
             )
 
         # Check termination conditions
@@ -678,6 +703,8 @@ class EvolutionEngine:
             goal=runs[-1].goal,
             prompt=runs[-1].prompt,
             cost=runs[-1].cost,  # Correct cumulative cost
+            cost_incomplete=runs[-1].cost_incomplete,
+            unknown_cli_completion_count=runs[-1].unknown_cli_completion_count,
             current_uuid=uuid,
             template_uuid=None,
             workflow_template=runs[-1].workflow_template if (wf_info and wf_info.state_result) else None,
@@ -889,7 +916,8 @@ class EvolutionEngine:
 
     def _log_iteration_completion(
         self, iteration_count: int, max_depth: int, iteration_start_time: float,
-        wf_rewards: float, exec_cost: float, goal: str, uuid: str,
+        wf_rewards: float, exec_cost: float, cost_incomplete: bool,
+        unknown_cli_completion_count: int, goal: str, uuid: str,
         wf_state: Any, rewards_history: list,
     ) -> None:
         """Log iteration completion and send notification.
@@ -899,7 +927,9 @@ class EvolutionEngine:
             max_depth: Total planned iterations.
             iteration_start_time: ``time.time()`` taken at iteration start.
             wf_rewards: Reward achieved this iteration.
-            exec_cost: USD cost spent this iteration.
+            exec_cost: Known USD cost spent this iteration.
+            cost_incomplete: Whether an unpriced CLI completion is excluded.
+            unknown_cli_completion_count: Number of excluded CLI completions.
             goal: Task description, included in the notification body.
             uuid: Workflow UUID just completed.
             wf_state: Workflow state used to extract agent answers.
@@ -907,22 +937,36 @@ class EvolutionEngine:
         """
         logger = logging.getLogger(__name__)
         iteration_time = time.time() - iteration_start_time
+        cost_label = "Known cost" if cost_incomplete else "Cost"
+        cost_note = (
+            f"; {unknown_cli_completion_count} CLI completion cost(s) unknown/unbilled"
+            if cost_incomplete
+            else ""
+        )
         logger.info(
             f"[ITERATION END] {iteration_count}/{max_depth} completed in {iteration_time:.3f}s - "
-            f"Rewards: {wf_rewards:.1f}, Cost: {exec_cost:.3f} USD"
+            f"Rewards: {wf_rewards:.1f}, {cost_label}: {exec_cost:.3f} USD{cost_note}"
         )
+        summary_rows = [
+            ("Rewards", f"{wf_rewards:.1f}"),
+            (cost_label.title(), f"${exec_cost:.6f}"),
+        ]
+        if cost_incomplete:
+            summary_rows.append(
+                (
+                    "CLI Cost",
+                    f"unknown/unbilled ({unknown_cli_completion_count} completion(s))",
+                )
+            )
+        summary_rows.append(("Time", f"{iteration_time:.3f}s"))
         print_summary(
             f"ITERATION {iteration_count}/{max_depth} COMPLETE",
-            [
-                ("Rewards", f"{wf_rewards:.1f}"),
-                ("Cost", f"${exec_cost:.6f}"),
-                ("Time", f"{iteration_time:.3f}s"),
-            ],
+            summary_rows,
         )
         self.notifier.send_message(
             f"Iteration {iteration_count + 1} completed.\n"
             f"Goal: {goal[:128]}...\n"
-            f"Cost: {exec_cost:.6f} USD.\n"
+            f"{cost_label.title()}: {exec_cost:.6f} USD{cost_note}.\n"
             f"Rewards history: {rewards_history}"
             f"Answers: {self.extract_agents_behavior(wf_state)}\n",
             title=f"Workflow {uuid} completed.",
@@ -1021,6 +1065,18 @@ class EvolutionEngine:
             "iteration_wall_time_s": round(time.time() - ctx["iteration_start_time"], 3),
             "iteration_cost_usd": float(ctx["iteration_cost"]),
             "cumulative_cost_usd": float(run.cost),
+            "iteration_cost_incomplete": bool(
+                ctx.get("iteration_cost_incomplete", False)
+            ),
+            "cumulative_cost_incomplete": bool(
+                getattr(run, "cost_incomplete", False)
+            ),
+            "iteration_unknown_cli_completion_count": int(
+                ctx.get("iteration_unknown_cli_completion_count", 0)
+            ),
+            "cumulative_unknown_cli_completion_count": int(
+                getattr(run, "unknown_cli_completion_count", 0)
+            ),
             "overall_score": _scalar(wf_info.overall_score),
             "overall_score_uncapped": _scalar(wf_info.overall_score_uncapped),
             "on_error": bool(ctx["on_error"]),

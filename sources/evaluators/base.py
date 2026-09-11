@@ -327,6 +327,7 @@ class BaseEvaluator:
             A configured :class:`LLMConfig` for that model.
         """
         provider, model = model_id.split("/", 1) if "/" in model_id else ("openai", model_id)
+        api_base, api_key_env = config.completion_endpoint_for(model_id)
         return LLMConfig().from_dict({
             "model": model,
             "provider": provider,
@@ -335,6 +336,9 @@ class BaseEvaluator:
             "max_tokens": getattr(config, 'max_tokens', 8192),
             "openrouter_provider": config.openrouter_provider_for(model_id),
             "openrouter_quantizations": config.openrouter_quantizations_for(model_id),
+            "api_base": api_base,
+            "api_key_env": api_key_env,
+            "harness_auth_mode": config.harness_auth_mode,
         })
 
     def _call_judge(self, uuid: str, agent_name: str, prompt: str,

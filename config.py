@@ -1,7 +1,9 @@
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from sources.utils import paths
 from sources.utils.pricing import OpenRouterPricingClient
@@ -155,6 +157,11 @@ class Config:
         self.reasoning_effort: str = "medium"
         # max_tokens: Maximum number of tokens to generate for LLM responses
         self.max_tokens: int = 8192
+        # Optional OpenAI-compatible endpoint. It is applied only to explicit
+        # `openai/` API roles, or to `claude-cli/` when api-key auth is selected.
+        self.api_base: str | None = None
+        self.api_key_env: str | None = None
+        self.harness_auth_mode: str = "subscription"
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
         # openrouter providers
@@ -255,6 +262,73 @@ class Config:
         if model_id and model_id in self.openrouter_provider_by_model:
             return self.openrouter_provider_by_model[model_id]
         return self.openrouter_provider
+
+    def completion_endpoint_for(self, model_id: str | None) -> tuple[str | None, str | None]:
+        """Return the configured endpoint only for its explicit service route."""
+        self.validate_completion_backend_config()
+        if not model_id:
+            return None, None
+        provider = model_id.split("/", 1)[0] if "/" in model_id else "anthropic"
+        uses_endpoint = provider == "openai" or (
+            provider == "claude-cli" and self.harness_auth_mode == "api_key"
+        )
+        if not uses_endpoint:
+            return None, None
+        return self.api_base, self.api_key_env
+
+    def validate_completion_backend_config(self) -> None:
+        """Validate nonsecret endpoint and harness authentication settings."""
+        if self.harness_auth_mode not in {"subscription", "api_key"}:
+            raise ValueError("harness_auth_mode must be 'subscription' or 'api_key'")
+        if self.api_key_env and not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", self.api_key_env
+        ):
+            raise ValueError("api_key_env must be an environment variable name")
+        if self.api_base and not self.api_key_env:
+            raise ValueError("api_base requires api_key_env")
+        text_models = [
+            self.planner_llm_model,
+            self.workflow_llm_model,
+            self.judge_model,
+            self.judge_extraction_model,
+            self.capsule_namer_model,
+        ]
+        text_providers = {
+            model.split("/", 1)[0]
+            for model in text_models
+            if model and "/" in model
+        }
+        tool_models = (
+            self.smolagent_model_id
+            if isinstance(self.smolagent_model_id, list)
+            else [self.smolagent_model_id]
+        )
+        unsupported_tools = [
+            model
+            for model in tool_models
+            if model and model.split("/", 1)[0] in {"codex-cli", "claude-cli"}
+        ]
+        if unsupported_tools:
+            raise ValueError(
+                "CLI completion backends are text-only and cannot power "
+                f"ToolSmolAgent: {unsupported_tools}"
+            )
+        if "codex-cli" in text_providers and self.harness_auth_mode != "subscription":
+            raise ValueError("codex-cli supports subscription authentication only")
+        if "claude-cli" in text_providers and self.harness_auth_mode == "api_key":
+            if not self.api_base or not self.api_key_env:
+                raise ValueError(
+                    "claude-cli api_key auth requires api_base and api_key_env"
+                )
+        if not self.api_base:
+            return
+        parsed = urlsplit(self.api_base)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError("api_base must be an absolute HTTPS URL")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("api_base must not contain user information")
+        if parsed.query or parsed.fragment:
+            raise ValueError("api_base must not contain a query or fragment")
 
     def openrouter_quantizations_for(self, model_id: str | None) -> list[str] | None:
         """Return the OpenRouter `quantizations` filter to apply for `model_id`.
@@ -379,6 +453,9 @@ class Config:
             "prompt_smolagent": portable_resources["prompt_smolagent"],
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
+            "api_base": self.api_base,
+            "api_key_env": self.api_key_env,
+            "harness_auth_mode": self.harness_auth_mode,
             "learned_score_threshold": self.learned_score_threshold,
             "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
@@ -492,6 +569,11 @@ class Config:
         )
         self.reasoning_effort = data.get("reasoning_effort", self.reasoning_effort)
         self.max_tokens = data.get("max_tokens", self.max_tokens)
+        self.api_base = data.get("api_base", self.api_base)
+        self.api_key_env = data.get("api_key_env", self.api_key_env)
+        self.harness_auth_mode = data.get(
+            "harness_auth_mode", self.harness_auth_mode
+        )
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )

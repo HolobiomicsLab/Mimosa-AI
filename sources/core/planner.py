@@ -86,12 +86,18 @@ class Planner:
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         provider, model = extract_model_pattern(self.config.planner_llm_model)
+        api_base, api_key_env = self.config.completion_endpoint_for(
+            self.config.planner_llm_model
+        )
         self.config_llm = LLMConfig(
             model=model,
             provider=provider,
             reasoning_effort=self.config.reasoning_effort,
             max_tokens=getattr(self.config, 'max_tokens', 8192),
             openrouter_provider=None,
+            api_base=api_base,
+            api_key_env=api_key_env,
+            harness_auth_mode=self.config.harness_auth_mode,
         )
         self._workspace_files_before_step: set[str] = set()  # Track files before step execution
         self.visualizer: PlannerVisualizer | None = None

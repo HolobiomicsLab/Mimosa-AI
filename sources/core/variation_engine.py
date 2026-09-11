@@ -54,6 +54,7 @@ class VariationEngine:
             # Anthropic/Claude caps at 1.0; Opus 4.x strips temperature entirely (handled by LLMProvider)
             is_claude = provider == "anthropic" or "claude" in model.lower()
             variation_temperature = min(1.2, 1.0) if is_claude else 1.2
+            api_base, api_key_env = config.completion_endpoint_for(self.judge_model)
             self.llm_config = LLMConfig().from_dict({
                 "model": model,
                 "provider": provider,
@@ -62,6 +63,9 @@ class VariationEngine:
                 "max_tokens": getattr(config, 'max_tokens', 8192),
                 "openrouter_provider": config.openrouter_provider_for(self.judge_model),
                 "openrouter_quantizations": config.openrouter_quantizations_for(self.judge_model),
+                "api_base": api_base,
+                "api_key_env": api_key_env,
+                "harness_auth_mode": config.harness_auth_mode,
             })
         except Exception as e:
             raise Exception(f"Failed to initialize LLM configuration: {str(e)}") from e

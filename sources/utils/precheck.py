@@ -30,6 +30,7 @@ import time
 
 import litellm
 
+from sources.core.completion_backends import is_cli_completion_provider
 from sources.core.llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from sources.utils.openrouter_endpoints import (
     is_model_creator,
@@ -91,10 +92,22 @@ def _normalize_provider_name(name: str) -> str:
 class PreCheck:
     def __init__(self, config):
         self.config = config
+        self.model_check_metadata: dict[str, dict] = {}
 
     def _basic_check(self, name: str, model_id: str) -> bool:
         provider, model = extract_model_pattern(model_id)
-        cfg = LLMConfig(provider=provider, model=model, max_tokens=512)
+        endpoint_for = getattr(self.config, "completion_endpoint_for", None)
+        api_base, api_key_env = endpoint_for(model_id) if endpoint_for else (None, None)
+        cfg = LLMConfig(
+            provider=provider,
+            model=model,
+            max_tokens=512,
+            api_base=api_base,
+            api_key_env=api_key_env,
+            harness_auth_mode=getattr(
+                self.config, "harness_auth_mode", "subscription"
+            ),
+        )
         try:
             llm = LLMProvider("test", system_msg="You are nice and concise.", config=cfg)
             _ = llm("say hello to me. just one word not more.", use_cache=False)
@@ -397,6 +410,27 @@ class PreCheck:
 
     def run(self, check_provider=True) -> None:
         print("🚦 Checking LLM providers...")
+        validate_backends = getattr(
+            self.config, "validate_completion_backend_config", None
+        )
+        if validate_backends:
+            validate_backends()
+        smolagent_models = (
+            self.config.smolagent_model_id
+            if isinstance(self.config.smolagent_model_id, list)
+            else [self.config.smolagent_model_id]
+        )
+        unsupported_tool_models = [
+            model_id
+            for model_id in smolagent_models
+            if model_id
+            and is_cli_completion_provider(extract_model_pattern(model_id)[0])
+        ]
+        if unsupported_tool_models:
+            raise ValueError(
+                "CLI completion backends are text-only and cannot power "
+                f"ToolSmolAgent: {unsupported_tool_models}"
+            )
         required = {
             "planner": self.config.planner_llm_model,
             "workflow": self.config.workflow_llm_model,
@@ -404,13 +438,35 @@ class PreCheck:
             "judge": self.config.judge_model,
             "capsule_namer": self.config.capsule_namer_model,
         }
+        extraction_model = getattr(self.config, "judge_extraction_model", None)
+        if extraction_model and extraction_model != self.config.judge_model:
+            required["judge_extraction"] = extraction_model
 
         for name, model_id in required.items():
-            if "mlx-community" in model_id:
-                continue
             if not model_id:
                 raise ValueError(f"⚠️  No model configured for '{name}'.")
-            if not self._basic_check(name, model_id):
+            provider, _ = extract_model_pattern(model_id)
+            if is_cli_completion_provider(provider):
+                self.model_check_metadata[name] = {
+                    "status": "not_tested",
+                    "method": "metadata_only",
+                    "backend": provider,
+                    "reason": "CLI completion models are not probed through an API",
+                }
+                print(f"ℹ️  {name} ({model_id}): CLI backend, API probe not tested.")
+                continue
+            if "mlx-community" in model_id:
+                self.model_check_metadata[name] = {
+                    "status": "not_tested",
+                    "method": "local_model",
+                }
+                continue
+            passed = self._basic_check(name, model_id)
+            self.model_check_metadata[name] = {
+                "status": "passed" if passed else "failed",
+                "method": "api_probe",
+            }
+            if not passed:
                 raise RuntimeError(f"Required model '{name}' failed basic check.")
         
         if not check_provider:

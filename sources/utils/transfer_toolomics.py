@@ -16,11 +16,17 @@ class LocalTransfer:
         self.workspace_path = workspace_path
         self.runs_capsule_dir = runs_capsule_dir
         provider, model = extract_model_pattern(config.capsule_namer_model)
+        api_base, api_key_env = config.completion_endpoint_for(
+            config.capsule_namer_model
+        )
         # max_tokens kept small (256) — we only need a short folder name.
         self.config_llm = LLMConfig.from_dict({
             "model": model,
             "provider": provider,
             "max_tokens": 256,
+            "api_base": api_base,
+            "api_key_env": api_key_env,
+            "harness_auth_mode": config.harness_auth_mode,
         })
 
     def create_capsule_name(self, goal: str, task_token: str | None = None) -> str:

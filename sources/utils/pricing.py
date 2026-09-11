@@ -3,6 +3,7 @@ OpenRouter API client for real-time model pricing
 """
 
 import json
+import math
 import os
 import re
 import sys
@@ -29,12 +30,57 @@ class PricingCalculator:
         self.memory_dir = Path(config.memory_dir)
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
+        self.last_cost_metadata: dict = {
+            "has_unknown_unbilled_cli_cost": False,
+            "cli_completions": [],
+        }
 
     # Used whenever a model id cannot be matched to the pricing table.
     DEFAULT_PRICING = {"input": 3.0, "output": 15.0}
 
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
+    CLI_COMPLETION_BACKENDS = {"codex_cli", "claude_cli"}
+
+    def _collect_cli_completions(self, memory_path: Path) -> list[dict]:
+        """Collect nonsecret cost provenance from portable CLI call records."""
+        records = []
+        for memory_file in sorted(memory_path.glob("*.json")):
+            try:
+                with open(memory_file) as handle:
+                    data = json.load(handle)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            metadata = data.get("completion_metadata")
+            if not isinstance(metadata, dict) or metadata.get(
+                "backend"
+            ) not in self.CLI_COMPLETION_BACKENDS:
+                continue
+            cost = metadata.get("cost_usd")
+            if cost is not None and (
+                type(cost) not in (int, float)
+                or not math.isfinite(cost)
+                or cost < 0
+            ):
+                cost = None
+            usage = metadata.get("usage")
+            if not isinstance(usage, dict):
+                usage = None
+            records.append(
+                {
+                    "agent": memory_file.stem,
+                    "backend": metadata["backend"],
+                    "requested_model": metadata.get("requested_model"),
+                    "actual_model": metadata.get("actual_model"),
+                    "usage_kind": metadata.get("usage_kind"),
+                    "usage": usage,
+                    "cost_usd": cost,
+                    "cost_kind": metadata.get("cost_kind"),
+                }
+            )
+        return records
 
     def _collect_verifier_calls(self, memory_path: Path) -> list[TokenUsage]:
         """One `TokenUsage` per `verifier_*.json` file in `memory_path`.
@@ -237,6 +283,10 @@ class PricingCalculator:
             float: The total cost in USD
         """
 
+        self.last_cost_metadata = {
+            "has_unknown_unbilled_cli_cost": False,
+            "cli_completions": [],
+        }
         memory_path = Path(self.memory_dir) / uuid
 
         if not memory_path.exists():
@@ -244,6 +294,17 @@ class PricingCalculator:
             return 0.0
 
         llm_calls: list[TokenUsage] = []
+        cli_completions = self._collect_cli_completions(memory_path)
+        unknown_cli_cost = any(
+            record["cost_usd"] is None for record in cli_completions
+        )
+        known_cli_cost = sum(
+            record["cost_usd"] or 0.0 for record in cli_completions
+        )
+        self.last_cost_metadata = {
+            "has_unknown_unbilled_cli_cost": unknown_cli_cost,
+            "cli_completions": cli_completions,
+        }
 
         # Orchestrator and Judge LLM calls (multi-agent mode)
         orchestrator_calls_found = False
@@ -254,6 +315,9 @@ class PricingCalculator:
             orchestrator_calls_found = True
             with open(memory_file) as f:
                 json_call = json.load(f)
+                completion_metadata = json_call.get("completion_metadata") or {}
+                if completion_metadata.get("backend") in self.CLI_COMPLETION_BACKENDS:
+                    continue
                 llm_calls.append(
                     TokenUsage(
                         call,
@@ -276,7 +340,12 @@ class PricingCalculator:
 
         if not workflow_path.exists():
             print(f"❌ Workflow directory not found: {workflow_path}")
-            return 0.0
+            if unknown_cli_cost:
+                print(
+                    "⚠️  CLI completion cost is unknown/unbilled; "
+                    "the known total is incomplete."
+                )
+            return known_cli_cost
 
         model = "unknown"
         try:
@@ -309,7 +378,7 @@ class PricingCalculator:
         else:
             print("📊 Skipping SmolAgent cost calculation")
 
-        total_cost = 0.0
+        total_cost = known_cli_cost
         total_input_tokens = 0
         total_output_tokens = 0
         total_all_tokens = 0
@@ -327,6 +396,16 @@ class PricingCalculator:
             total_input_tokens += call.input_tokens
             total_output_tokens += call.output_tokens
             total_all_tokens += call.total_tokens
+
+        for record in cli_completions:
+            usage = record.get("usage") or {}
+            total_input_tokens += usage.get("input_tokens") or 0
+            total_output_tokens += usage.get("output_tokens") or 0
+            total_all_tokens += usage.get("total_tokens") or 0
+        self.last_cost_metadata = {
+            "has_unknown_unbilled_cli_cost": unknown_cli_cost,
+            "cli_completions": cli_completions,
+        }
 
         from sources.cli.pretty_print import (
             BOLD,
@@ -361,11 +440,38 @@ class PricingCalculator:
             print(f"    {DIM}Cost{RESET}     {cost_color}${cost:.4f}{RESET}")
             print(f"  {DIM}{'·' * (W - 4)}{RESET}")
 
+        for record in cli_completions:
+            label = record["agent"].replace("_", " ").title()
+            model = record.get("actual_model") or record.get("requested_model")
+            print(f"  {BOLD}{MAGENTA}▸ {label}{RESET}")
+            print(f"    {DIM}Model{RESET}    {model}")
+            print(
+                f"    {DIM}Route{RESET}    {record['backend']} "
+                f"({record.get('usage_kind') or 'unknown usage'})"
+            )
+            if record["cost_usd"] is None:
+                print(
+                    f"    {DIM}Cost{RESET}     {YELLOW}unknown/unbilled "
+                    f"(excluded from known total){RESET}"
+                )
+            else:
+                print(
+                    f"    {DIM}Cost{RESET}     {GREEN}${record['cost_usd']:.4f} "
+                    f"({record.get('cost_kind') or 'reported'}){RESET}"
+                )
+            print(f"  {DIM}{'·' * (W - 4)}{RESET}")
+
         # Totals
         print(f"\n  {BOLD}{'Total Tokens':<14}{RESET}  {total_all_tokens:>10,}   "
               f"{DIM}({total_input_tokens:,} in / {total_output_tokens:,} out){RESET}")
         total_color = GREEN if total_cost < 0.05 else (YELLOW if total_cost < 0.50 else CYAN)
-        print(f"  {BOLD}{'Total Cost':<14}{RESET}  {total_color}{BOLD}${total_cost:.4f} USD{RESET}")
+        total_label = "Known Cost" if unknown_cli_cost else "Total Cost"
+        print(f"  {BOLD}{total_label:<14}{RESET}  {total_color}{BOLD}${total_cost:.4f} USD{RESET}")
+        if unknown_cli_cost:
+            print(
+                f"  {YELLOW}{BOLD}CLI Cost{RESET}       "
+                f"{YELLOW}unknown/unbilled; total is incomplete{RESET}"
+            )
         print(f"{CYAN}{'─' * W}{RESET}\n")
 
         return total_cost
