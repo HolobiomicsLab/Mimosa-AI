@@ -66,7 +66,7 @@ class Config:
         self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
         # Vision model for Source G (visual figure inspection).
-        self.vision_judge_model: str | None = "openrouter/moonshot/kimi-k3"
+        self.vision_judge_model: str | None = "openrouter/moonshotai/kimi-k3"
 
         #############
         # Orchestrator Workflow generation options
@@ -133,7 +133,7 @@ class Config:
         # reasoning_effort: "minimal" (GPT-5 only, fastest), "low", "medium" (default), "high"
         self.reasoning_effort: str = "medium"
         # max_tokens: Maximum number of tokens to generate for LLM responses
-        self.max_tokens: int = 8192
+        self.max_tokens: int = 16384
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
         # openrouter providers
@@ -150,7 +150,7 @@ class Config:
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
         self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
-        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v12_model_select.md")
+        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v13_model_select.md")
         self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
 
         # folder paths for workflow pre-defined code

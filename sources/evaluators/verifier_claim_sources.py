@@ -1,11 +1,11 @@
-"""Claim-extraction source registry: the six prompts and their dispatch table.
+"""Claim-extraction source registry: the five prompts and their dispatch table.
 
 Each source = a labelled prompt that elicits a different *kind* of claim
-(literature requirements, user goal, math sanity, reproducibility, statistical
-fingerprint, visual scientific correctness). Adding a seventh source = define one builder and append one entry
+(literature requirements, user goal, math sanity, statistical
+fingerprint, visual scientific correctness). Adding another source = define one builder and append one entry
 to ``SOURCES`` — no edits in the extraction loop.
 
-The shared rules block (``_CLAIM_RULES_BLOCK``) is defined here so all five
+The shared rules block (``_CLAIM_RULES_BLOCK``) is defined here so all
 builders pull from one source of truth.
 """
 
@@ -15,11 +15,15 @@ from dataclasses import dataclass
 from typing import Callable
 
 
-# Rules every source prompt appends verbatim. Kept here so the five builders
-# share one definition rather than five copies that can drift.
+# Rules every source prompt appends verbatim. Kept here so the builders
+# share one definition rather than copies that can drift.
 _CLAIM_RULES_BLOCK = """For each claim, list `likely_relevant_files`: relative
-paths whose contents the verifier would need to read in order to check the
-claim.
+paths of RESULT artefacts the verifier would read to check the claim —
+outputs, tables, figures, reports, and other non-code deliverable files.
+- Do NOT list workflow source files (`.py`, `.R`, `.jl`, `.sh`, notebooks).
+  Claims must be checkable from what the workflow PRODUCED, not from the
+  text of its scripts; a claim only verifiable by reading source code
+  should not be extracted.
 - ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
   Do not invent or guess paths the workflow's answer mentions but that are
   not in the listing.
@@ -121,7 +125,6 @@ correct solution:
 - When the literature grounding lists multiple co-equal preprocessing steps in one bullet (e.g. "normalization, handling missing values, dimensionality reduction"), emit one claim per named step rather than a single composite claim.
 - Do NOT emit hyperparameter-value claims (`n_estimators`, `max_depth`, `learning_rate`, `batch_size`, `n_layers`, `dropout`, `epochs`, `kernel_size`, `n_folds`) unless the goal text literally pins that value.
 - When the goal cites a package or repo, prefer claims that the workflow uses that package's documented API rather than re-implementing the method by hand.
-- On visual deliverables (output is `.png` / `.pdf` / `.svg`): do not prescribe panel count, named plotting methods, or specific overlay types unless the goal literally names them.
 
 MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
 produced the specific scientific deliverable the task requested AND that
@@ -272,52 +275,6 @@ Aim for {ctx.target_min}–{ctx.target_max} claims, but only ones grounded
 in the actual artefacts visible in the workspace listing. Do not invent
 properties for objects the task does not produce.
 """
-
-
-def _build_source_d(ctx: ClaimContext) -> str:
-    """Source D — non-negotiable computational reproducibility / CS practice."""
-    return f"""You are extracting claims for a verification rubric: NON-NEGOTIABLE computational reproducibility requirementsto re-run this work on a fresh machine.
-
-WORKFLOW GOAL:
-{ctx.goal}
-
-WORKSPACE FILES (relative to workspace root):
-{ctx.workspace_listing}
-
-TASK:
-If the goal's deliverable is an image (`.png` / `.pdf` / `.svg`), emit no claims — the visual grader cannot see manifests or pinning.
-Extract claims that capture essential computational-reproducibility
-requirements. The scope is intentionally narrow: only things without
-which a second party CANNOT re-run this work on a fresh machine. The
-bar is "can it be re-run", NOT "is it nicely engineered".
-
-ALLOWED claim shapes (only emit when the workspace listing already contains a manifest file — never emit a manifest-presence claim that would deterministically fail a workspace that has none):
-- The workspace declares its dependencies in a standard manifest
-  (`requirements.txt`, `pyproject.toml`, or `environment.yml`) AND the
-  declared packages cover the third-party imports actually used by the
-  produced code — i.e. the manifest is non-empty and is not missing a
-  library that the workspace's `.py` files import.
-- The dependencies are pinned to specific versions (e.g. `numpy==1.25.3` rather than `numpy>=1.20` or `numpy`).
-- The workspace is not pathologically cluttered with junk (no thousands
-  of unrelated files; no obvious accumulation of failed intermediate
-  dumps that would confuse a re-runner).
-
-EXPLICITLY FORBIDDEN — DO NOT extract claims about any of these:
-- README files, documentation, markdown, or doc presence of any kind.
-- Docstrings, comments, or in-code documentation.
-- Tests, test coverage, or test presence.
-- Code style (PEP8, line length, naming conventions, formatting).
-- Type hints / type annotations.
-- Logging structure, log file presence, or log verbosity.
-This source verifies non-negotiable computer-science PRACTICE — not
-engineering aesthetics.
-
-{_CLAIM_RULES_BLOCK}
-
-Aim for up to {ctx.target_max} Source-D claims, but only as many as the
-workspace actually warrants — fewer is fine. Do not pad.
-"""
-
 
 def _build_source_e(ctx: ClaimContext) -> str:
     """Source E — statistical fingerprint / non-triviality of the result."""
@@ -508,7 +465,6 @@ SOURCES: tuple[ClaimSource, ...] = (
     ClaimSource("a", _build_source_a),
     ClaimSource("b", _build_source_b),
     ClaimSource("c", _build_source_c),
-    ClaimSource("d", _build_source_d),
     ClaimSource("e", _build_source_e),
     ClaimSource("g", _build_source_g),
 )

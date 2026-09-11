@@ -14,8 +14,8 @@
 Mimosa scores each workflow run with a **multi-source, per-claim
 verifier**. The verifier writes and executes **deterministic Python
 programs** in the workspace to confirm what the agents claim they did,
-across six independent vantage points (literature, user goal, agent
-narration, math invariants, computational reproducibility, statistical
+across five independent vantage points (literature, user goal, agent
+narration, math invariants, statistical
 fingerprint). The single signal that flows back to the mutator is a short
 **prompt gradient** that summarizes failure modes without leaking the
 verified claims themselves.
@@ -32,7 +32,7 @@ behaviour descriptor: novelty is measured in genotype-embedding space
 
 The verifier runs four stages per workflow run:
 
-1. **Multi-source claim extraction** — six independent prompts each look at
+1. **Multi-source claim extraction** — five independent prompts each look at
    the run from a different vantage point and emit success-polarity claims.
 2. **Per-claim verification** — for each claim, the judge either writes a
    small Python program that recomputes the asserted value from workspace
@@ -45,7 +45,7 @@ The verifier runs four stages per workflow run:
    scores, or sources, so the mutator cannot turn the verified-claim
    vocabulary back into a rubric to optimize against.
 
-## The six claim sources
+## The five claim sources
 
 Each source is a different definition of "success" — claims from each are
 merged and verified by the same per-claim machinery downstream.
@@ -56,7 +56,6 @@ merged and verified by the same per-claim machinery downstream.
 | **B — User goal** | The literal goal text | Did the agents deliver the deliverable the user spelled out (format, columns, bars, scope)? |
 | **C — Agent narration** | The workflow's self-report | Are the agents telling the truth? Can claimed numbers / artefacts be reproduced from disk? |
 | **D — Math invariants** | The type of object produced | Do the artefacts satisfy mathematical sanity properties (probabilities in [0,1], symmetry, no NaN, shape consistency, conservation)? |
-| **E — Computational reproducibility** | An independent computer scientist re-running this | Are the **non-negotiable** CS practices present (declared deps cover used imports, no absolute paths, seeds on stochastic ops, entrypoint)? |
 | **F — Statistical fingerprint** | A skeptical statistician | Is the result *real*, not vacuous? Does it beat a baseline, avoid degenerate predictions, show no leakage signatures? |
 
 A few important constraints on these sources, enforced via the shared
@@ -67,10 +66,7 @@ A few important constraints on these sources, enforced via the shared
   not passes "the answer is empty".
 - **Discrimination test** — bare file-existence claims are *never* `hard`.
   An artifact claim only counts when chained to a functional property
-  (e.g. "manifest covers the imports actually used by produced code").
-- **Source E exclusions** — Source E explicitly forbids claims about
-  README / docstrings / tests / code style / type hints / logging /
-  module layout. It verifies CS *practice*, not engineering aesthetics.
+  (e.g. "predictions.csv contains a valid probability for every row").
 
 ## Per-claim verification
 
@@ -134,7 +130,7 @@ fingerprint**: a centered vector of per-source pass rates that records
 *how* a candidate fails, not *whether* it failed.
 
 ```python
-# Per source A..F (six entries, always — absent sources get a neutral value).
+# Per source letter (a–g, fixed length — absent sources get a neutral value).
 pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
 presence[s]  = 1.0                                if total[s] > 0  else 0.0
 # Center so the vector encodes profile shape, not quality level.
@@ -169,7 +165,7 @@ After aggregation the verifier composes a single-sentence diagnosis (the
 similar runs. It is the **only** verifier output that reaches the
 mutator, and it is written so it does not leak the verified claims back:
 
-- It does not name specific claims, scores, or which of the six sources
+- It does not name specific claims, scores, or which of the five sources
   raised the issue.
 - It encodes failure modes by short code names (e.g.
   `FALLBACK_ECFP_CLASSIFIER`) so recurring patterns can be tracked across
@@ -196,7 +192,7 @@ verifier pipeline itself:
 | The judge LLM repeats the agent's claims verbatim. | Per-claim deterministic Python recomputation, with anti-tautology tripwires. |
 | The mutator over-fits to a numeric rubric. | Only the prompt gradient is returned — and it does not name the verified claims. |
 | The hard-fail cap collapses ranking among failed runs. | Deliberate: QD ranks on the capped `overall_score`, with ties at the cap broken by novelty; `overall_score_uncapped` is still logged for analysis. |
-| One vantage point misses the failure. | Six independent sources, claims merged. |
+| One vantage point misses the failure. | Five independent sources, claims merged. |
 | Cosmetic hygiene gets gamed as "quality". | Source E only verifies non-negotiable CS practice; docs/tests/style are forbidden. |
 | Artifact existence checks reward "moved files around". | `_CLAIM_RULES_BLOCK` forbids bare-existence as `hard`; max 2 soft artifact claims. |
 | Soft-claim judges hallucinate. | Verdicts are grounded in workspace previews and Perspicacité. |

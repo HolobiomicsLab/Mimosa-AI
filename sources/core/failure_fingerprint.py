@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 # Canonical claim-source order. The verifier emits ``"source_a"`` … through
-# the six independent extractor prompts; expected letters are kept here so
+# the registered extractor prompts; expected letters are kept here so
 # the descriptor stays a fixed-length vector even if a source is silenced.
 SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g")
 DESCRIPTOR_DIM: int = len(SOURCES)

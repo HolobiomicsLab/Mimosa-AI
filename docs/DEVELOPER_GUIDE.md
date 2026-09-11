@@ -41,8 +41,8 @@ evaluation).
 The judge that produces the evolutionary pressure signal is a
 multi-source, per-claim verifier. It writes **deterministic Python
 programs** that recompute the agent's claims from the workspace across
-six vantages (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), and falls back
+five vantages (literature, user goal, agent narration, math invariants,
+statistical fingerprint), and falls back
 to LLM verdicts only when no executable check is possible. The single
 output handed to the mutator is a short **prompt gradient** describing
 what to change next — it does not name the verified claims back, so the
@@ -484,13 +484,10 @@ Source diagram: [`docs/diagrams/verifiers_judge.mermaid`](https://github.com/Hol
 
 For each generation:
 
-1. **Multi-source claim extraction**: six independent prompts emit
+1. **Multi-source claim extraction**: five independent prompts emit
    success-polarity claims from different vantage points — `A` literature
    (Perspicacité), `B` user goal, `C` agent narration (anti-hallucination),
-   `D` math invariants, `E` non-negotiable computational reproducibility
-   (deps manifest covers used imports, no absolute paths, seeds on
-   stochastic ops; **explicitly forbids** README / docs / tests / style /
-   type-hint claims), `F` statistical fingerprint (baseline, degeneracy,
+   `D` math invariants, `F` statistical fingerprint (baseline, degeneracy,
    leakage). Claims are tagged `hard` or `soft`; bare file-existence is
    never `hard`.
 2. **Per-claim verification**: each claim is classified as executable or
@@ -517,7 +514,7 @@ For each generation:
    is the **only** verifier signal the mutator sees, and recent history
    is included so recurring failure modes reuse the same code names
    across generations. The gradient deliberately does not name the
-   verified claims, scores, or which of the six sources raised them — so
+   verified claims, scores, or which of the five sources raised them — so
    the mutator can correct the workflow without being handed a rubric to
    over-fit against.
 

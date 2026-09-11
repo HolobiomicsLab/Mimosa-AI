@@ -30,10 +30,10 @@ class VariationEngine:
         self.llm_config = None
         self.bands = [
             (
-                0.35, "Slight mutation (small step, exploit known good structure)"
+                0.35, "Tweak prompt with slight mutation (small step, exploit known good structure)"
             ),
             (
-                0.50, "Roleplay shift (moderate step, explore new persona or reasoning style)"
+                0.50, "Tweak prompt + slight roleplay prompt shift allowed (moderate step, explore new persona or reasoning style)"
             ),
             (
                 0.65, "Prompt and roleplay shift (moderate step, more explicit instructions, more direct framing, change persona and reasoning mode)"
@@ -310,8 +310,8 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             "Higher boldness mean the same failure more was identified multiple times."
             "Example directive:"
             "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
-            "- 'The agent are subborn, they are not following the instructions. Consider changing the agent's persona to be more compliant.'"
-            "- Tweak the prompt of agent X to put the agent on a more domain-specific manifold, to avoid them to be stuck in the same local minima."
+            "- Add a agent X that will ..."
+            "- Tweak the prompt of agent X to be more domain-specific, to avoid them to be stuck in the same reasoning pattern."
             "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive."
             "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change) and the rationale behind it."
         ])
@@ -393,6 +393,7 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             "- Do not add or remove more than 1 agent at a time, and do not add more agent than suggested.",
             "- Do not change the workflow's overall topology unless the directive explicitly suggests it.",
             "- Do not change prompt instructions outside the scope of the directive.",
+            "- Do not add code sample or overly precise instructions. Let agent reason and do the instructed work."
             "- You must keep 90% of the previous workflow prompts and code unchanged, only modify the parts that are relevant to the directive.",
         ])
 

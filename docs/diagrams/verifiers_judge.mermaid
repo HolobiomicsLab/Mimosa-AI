@@ -12,20 +12,18 @@ flowchart TB
     Lit[/"literature grounding<br/>via Perspicacite (Source A only)"/]
 
     %% ===== Stage 1: multi-source claim extraction =====
-    subgraph Extract["Stage 1 — multi-source claim extraction (6 sources, merged)"]
+    subgraph Extract["Stage 1 — multi-source claim extraction (5 sources, merged)"]
         direction LR
         SA["A · literature<br/>methodology bar"]
         SB["B · user goal<br/>explicit deliverables"]
         SC["C · agent narration<br/>recompute claimed values"]
         SD["D · math invariants<br/>probabilities / shape / NaN / PSD"]
-        SE["E · CS reproducibility<br/>deps · seeds · no abs paths<br/>(no docs/tests/style)"]
         SF["F · statistical fingerprint<br/>baselines · degeneracy · leakage"]
     end
     TaskSpec --> SA
     TaskSpec --> SB
     Run --> SC
     Run --> SD
-    Run --> SE
     Run --> SF
     Lit --> SA
 
@@ -34,7 +32,6 @@ flowchart TB
     SB --> Claims
     SC --> Claims
     SD --> Claims
-    SE --> Claims
     SF --> Claims
 
     %% ===== Stage 2: per-claim verification =====

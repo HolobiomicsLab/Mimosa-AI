@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -69,6 +70,40 @@ _PIP_INSTALL_FLAGS: tuple[str, ...] = (
 _PRINT_TRUNCATE_BYTES = 256
 _STDERR_TAIL_BYTES = 400
 
+# ----- Visual (Source G) image selection --------------------------------------
+# Image extensions accepted by the visual branch. NOTE: PDF/SVG are sent as
+# raw bytes (no rasterization on this path); see the visual-branch docstring.
+_VISUAL_IMAGE_EXTS: frozenset[str] = frozenset(
+    {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".svg"}
+)
+# Cap on how many candidate images are sent to the vision model in one call.
+_MAX_VISUAL_IMAGES = 6
+# Suffixes (and directory names) that mark a file as code/source rather than
+# data or output. Visual candidates and selection fallbacks never include these.
+_CODE_FILE_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".py", ".pyw", ".ipynb", ".r", ".jl", ".sh", ".bash", ".zsh", ".pl",
+        ".rb", ".js", ".jsx", ".ts", ".tsx", ".java", ".c", ".cc", ".cpp",
+        ".h", ".hpp", ".cs", ".go", ".rs", ".sql", ".lua", ".ps1", ".bat",
+        ".cmd", ".do", ".sas", ".m", ".php", ".swift", ".scala",
+    }
+)
+_CODE_PATH_PARTS: frozenset[str] = frozenset(
+    {"src", "source", "sources", "scripts", "script", "code", "notebooks"}
+)
+# Path segments that mark a file as a produced RESULT/OUTPUT rather than an
+# input or dataset file; used to prioritise visual candidates.
+_OUTPUT_PATH_PARTS: frozenset[str] = frozenset(
+    {
+        "pred_results", "pred_result", "out", "output", "outputs",
+        "result", "results", "figure", "figures", "figs", "fig",
+        "plot", "plots", "charts", "chart",
+    }
+)
+_INPUT_PATH_PARTS: frozenset[str] = frozenset(
+    {"data", "dataset", "datasets", "raw", "input", "inputs", "assets"}
+)
+
 VERIFIER_PROMPT_RULES = """
 RULES:
 
@@ -87,24 +122,38 @@ RULES:
 - If the previews are empty or do not show enough of the file to be sure of
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
-- When the claim is about code structure in a workflow script (imports,
-  function calls, class instantiations, assignments), parse the script
-  with the stdlib ``ast`` module.
-- Match on the call target (``ast.Call.func``: e.g. node is a ``Name`` with id
-  ``"RandomForestRegressor"`` or an ``Attribute`` ending in ``.fit``),
-  on the imported symbol (``ast.ImportFrom.module`` / ``.names[*].name``),
-  or on the attribute path. Walk with ``ast.walk(tree)``.
-- Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs).
+- Evidence comes from RESULT artefacts (outputs, tables, figures, reports,
+  manifests) and execution-observable facts — NOT from the workflow's
+  source code. Do NOT read or parse workflow scripts (`.py`, `.R`,
+  notebooks): no `ast`, no regex over script text, no import matching.
+- When the claim is about WHAT the code did (an import, a call, a
+  hyperparameter value), check the observable consequence instead:
+  recompute from the output artefact, compare its schema/contents against
+  the goal's ground-truth schema, or probe the environment
+  (`importlib.util.find_spec`, installed package versions vs a manifest).
+  If neither an artefact nor an environment fact can decide the claim,
+  return ``{"executable": false, ...}`` — never fall back to source parsing.
+- Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs,
+  manifests) — never for `.py`/`.R` source files.
 - If a file the script needs to open to evaluate the claim is MISSING from the
   workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
   Do NOT emit ``status="fail"`` — a missing artefact means the property is
   UNCHECKED, not refuted; the recovery flow regenerates the script when it
   sees the error. (Exception: claims that explicitly check file existence —
   for those, a missing file is the legitimate ``"fail"``.)
+- NEVER substitute a different data object for a claim's target. If the
+  specific object a claim refers to (e.g. the training set actually consumed
+  by the model, an intermediate table, a fitted model) is not present in the
+  workspace as an artifact, treat the claim as NOT executable
+  (``executable=false``) — do not approximate with a raw input file or any
+  other stand-in.
 - When the goal text names an output path with a column or key schema (dataset preview, EXPECTED OUTPUT: block, or explicit 'columns exactly equal to …'), use the goal's schema as the source of truth for column/key literals.
   The file preview shows what the workflow actually produced — which may be wrong. If the preview's schema differs from the goal's, the check must use the goal's schema; the workflow's deviation is exactly what fails the claim
   (eg: Never check AF_TOX_prob when the goal show that AF_TOX is used for columns format)
-- When checking whether a call name or attribute is used, walk the AST for any ast.Call.func whose terminal attribute or .id matches the target, AND also walk for any ast.Attribute chain ending in the target (FQN access). Never compare against a literal ast.List of Constants — if the script needs to find a dropped column or a hyperparameter name, runtime-introspect the produced artefact (read the CSV, import the module, call feature_labels()) instead of parsing the workflow source for literals
+- Never search the workflow source for call names, attributes, or literals.
+  If the script needs to find a dropped column or a hyperparameter name,
+  inspect the produced artefact (read the CSV, compare against the goal's
+  ground-truth schema) instead of parsing the workflow source
 
 ERROR HANDLING:
 
@@ -113,7 +162,7 @@ ERROR HANDLING:
   These trigger recovery and regenerate the script.
 - catch and emit status="fail" for PROPERTY violations — the artefact was present and
   readable, but the claim is not satisfied (wrong value, duplicate found,
-  range exceeded, ast node not found, regex absent in a log).
+  range exceeded, expected content missing, regex absent in a log).
   Do NOT raise these. Do NOT use status="error" for them.
 - Mnemonic: "I could not check" → error/raise; "I checked, the answer is no" → fail.
 
@@ -223,18 +272,19 @@ class _VerifierPerClaimMixin:
         workspace_listing: str,
         grounding: str = "",
         preloaded_spec: dict[str, Any] | None = None,
+        goal: str = "",
     ) -> dict[str, Any]:
         """Generate, execute and score a single claim; return the result dict."""
         t_start = time.time()
         claim = self._resolve_relevant_files(
-            uuid, claim, execution_text, workspace_listing, preloaded_spec
+            uuid, claim, execution_text, workspace_listing, preloaded_spec, goal
         )
         self._print_claim_header(claim)
-        spec = preloaded_spec or self._generate_verifier(
+        spec = preloaded_spec or self._visual_claim_spec(claim) or self._generate_verifier(
             uuid, claim, execution_text, workspace_listing
         )
         spec, scored = self._run_and_score(
-            uuid, claim, spec, execution_text, workspace_listing, grounding
+            uuid, claim, spec, execution_text, workspace_listing, grounding, goal
         )
         scored["claim"] = claim
         scored["spec"] = spec
@@ -249,14 +299,35 @@ class _VerifierPerClaimMixin:
         execution_text: str,
         workspace_listing: str,
         preloaded_spec: dict[str, Any] | None,
+        goal: str = "",
     ) -> dict[str, Any]:
         """Populate ``likely_relevant_files`` via judge call when not anchored."""
         if preloaded_spec is not None:
             return claim
         rel_files = self._llm_select_files(
-            uuid, claim, execution_text
+            uuid, claim, execution_text, goal=goal
         )
         return {**claim, "likely_relevant_files": rel_files}
+
+    @staticmethod
+    def _is_visual_claim(claim: dict[str, Any]) -> bool:
+        """True when the claim belongs to a visual (Source G) source."""
+        return (claim.get("source") or "").endswith("_g")
+
+    @staticmethod
+    def _visual_claim_spec(claim: dict[str, Any]) -> dict[str, Any] | None:
+        """Non-executable stand-in spec for visual claims, else ``None``.
+
+        Visual claims are judged by the vision model; generating a verifier
+        script for them is a wasted LLM call whose output is discarded. When
+        no spec has been preloaded, short-circuit with this marker instead.
+        """
+        if not (claim.get("source") or "").endswith("_g"):
+            return None
+        return {
+            "executable": False,
+            "reason": "visual claim: judged by the vision model; no verifier script",
+        }
 
     @staticmethod
     def _print_claim_header(claim: dict[str, Any]) -> None:
@@ -291,12 +362,13 @@ class _VerifierPerClaimMixin:
         execution_text: str,
         workspace_listing: str,
         grounding: str,
+        goal: str = "",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Dispatch to executable or soft branch; return ``(final_spec, scored)``."""
         # Source G claims → visual branch (vision LLM inspects the figure)
         if (claim.get("source") or "").endswith("_g"):
             return spec, self._run_visual_branch(
-                uuid, claim, spec, execution_text, workspace_listing, grounding
+                uuid, claim, spec, execution_text, workspace_listing, grounding, goal
             )
         if spec.get("executable") and spec.get("code"):
             spec, exec_result = self._run_verifier_with_recovery(
@@ -359,6 +431,103 @@ class _VerifierPerClaimMixin:
     # Visual branch — vision-LLM inspection of figures (Source G)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _is_likely_code_file(rel_path: str) -> bool:
+        """True when *rel_path* looks like a script/source file, not data.
+
+        Matches code suffixes (``.py``, ``.R``, ``.jl``, ``.sh``, ``.ipynb``,
+        ...) and code-looking ancestor directories (``src/``, ``scripts/``,
+        ...). Visual image candidates and selector fallbacks never include
+        files flagged by this predicate.
+        """
+        lowered = str(rel_path).lower().replace("\\", "/")
+        if Path(lowered).suffix in _CODE_FILE_SUFFIXES:
+            return True
+        parts = [p for p in lowered.split("/") if p]
+        return any(p in _CODE_PATH_PARTS for p in parts[:-1])
+
+    @staticmethod
+    def _declared_output_image_names(goal: str) -> set[str]:
+        """Image-like filenames literally named in the goal text.
+
+        Goals routinely carry the declared deliverable path verbatim (e.g.
+        ``"save it to pred_results/spatial_pred.png"``); matching basenames
+        get the top priority tier when collecting visual candidates.
+        """
+        if not goal:
+            return set()
+        pattern = re.compile(
+            r"[\w./\-]+\.(?:png|jpe?g|gif|webp|pdf|svg)\b", re.IGNORECASE
+        )
+        return {
+            Path(m.group(0).replace("\\", "/")).name.lower()
+            for m in pattern.finditer(goal)
+        }
+
+    def _collect_visual_image_candidates(
+        self, claim: dict[str, Any], goal: str = ""
+    ) -> list[str]:
+        """Collect ALL non-code image candidates, result-like paths first.
+
+        Sources, in priority order (highest tier first):
+        3. basename matches a deliverable filename named in the goal text;
+        2. path looks like a produced output (``pred_results/``, ``out/``,
+           ``results/``, ``figures/``, ...);
+        1. image named in the claim's ``likely_relevant_files``;
+        0. any other non-code image in the workspace;
+        -1. input/dataset-looking paths (``data/``, ``dataset/``, ``raw/``,
+           ...), demoted but still eligible.
+
+        The workspace scan walks the FULL tree (the old first-directory
+        ``break`` made whichever directory happened to be visited first —
+        often the input dataset — win over the produced deliverable).
+        """
+        relevant = claim.get("likely_relevant_files") or []
+        claimed = [
+            str(p) for p in relevant
+            if Path(str(p)).suffix.lower() in _VISUAL_IMAGE_EXTS
+        ]
+        claimed_set = set(claimed)
+        seen = set(claimed)
+        ws = Path(self.workspace_dir)
+        if ws.exists():
+            for root, dirs, files in os.walk(str(ws)):
+                dirs[:] = [
+                    d for d in dirs
+                    if d not in {".git", "__pycache__", ".venv", "node_modules"}
+                ]
+                for fname in files:
+                    if Path(fname).suffix.lower() not in _VISUAL_IMAGE_EXTS:
+                        continue
+                    rel = str(Path(root, fname).relative_to(ws))
+                    if rel not in seen:
+                        seen.add(rel)
+                        claimed.append(rel)
+
+        declared = self._declared_output_image_names(goal)
+
+        def tier(rel: str) -> int:
+            parts = [p.lower() for p in rel.replace("\\", "/").split("/") if p]
+            if Path(rel).name.lower() in declared:
+                return 3
+            if any(p in _OUTPUT_PATH_PARTS for p in parts[:-1]):
+                return 2
+            if rel in claimed_set:
+                return 1
+            if any(p in _INPUT_PATH_PARTS for p in parts[:-1]):
+                return -1
+            return 0
+
+        candidates = [
+            c for c in claimed
+            if not self._is_likely_code_file(c)
+            and ".." not in c.split("/")
+            and (ws / c).is_file()
+        ]
+        # Result-like deliverables first; stable alphabetical order per tier.
+        candidates.sort(key=lambda rel: (-tier(rel), rel))
+        return candidates
+
     def _run_visual_branch(
         self,
         uuid: str,
@@ -367,12 +536,19 @@ class _VerifierPerClaimMixin:
         execution_text: str,
         workspace_listing: str,
         grounding: str,
+        goal: str = "",
     ) -> dict[str, Any]:
-        """Run visual verification: send image + claim to a vision-capable LLM.
+        """Run visual verification: send images + claim to a vision-capable LLM.
 
-        Finds the relevant image files in the workspace, encodes them as
-        base64 data URIs, and sends a multimodal prompt to a vision model
-        (e.g., Kimi K3) configured via ``config.vision_judge_model``.
+        Collects ALL non-code image candidates in the workspace (result-like
+        paths first), encodes each as a base64 data URI, and sends one
+        multimodal prompt with every candidate (capped at
+        ``_MAX_VISUAL_IMAGES``) to a vision model (e.g., Kimi K3) configured
+        via ``config.vision_judge_model``.
+
+        NOTE: PDF/SVG files are sent as raw bytes (no rasterization on this
+        path); a vision endpoint that cannot decode them returns an error
+        verdict, which the aggregator now counts against the score.
 
         Args:
             uuid: Workflow identifier.
@@ -382,6 +558,7 @@ class _VerifierPerClaimMixin:
             execution_text: Agent narration / produced output.
             workspace_listing: Rendered listing of workspace files.
             grounding: Optional literature grounding block.
+            goal: The workflow's real task goal (user specification).
 
         Returns:
             Scored result dict with ``score``, ``verifier_kind`` = ``"visual"``,
@@ -392,30 +569,9 @@ class _VerifierPerClaimMixin:
 
         cid = claim.get("id", "unknown")
 
-        # ---- locate image files ----
-        relevant_files = claim.get("likely_relevant_files") or []
-        image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".svg"}
-        image_paths = [
-            p for p in relevant_files
-            if Path(p).suffix.lower() in image_exts
-        ]
-
-        # Broad fallback: scan workspace for any image if claim lists none
-        if not image_paths:
-            ws = Path(self.workspace_dir)
-            if ws.exists():
-                for root, dirs, files in os.walk(str(ws)):
-                    dirs[:] = [
-                        d for d in dirs
-                        if d not in {".git", "__pycache__", ".venv", "node_modules"}
-                    ]
-                    for fname in files:
-                        if Path(fname).suffix.lower() in image_exts:
-                            image_paths.append(
-                                str(Path(root, fname).relative_to(ws))
-                            )
-                    if image_paths:
-                        break
+        # ---- locate image files (claim-named + full-tree scan, no early break)
+        image_paths = self._collect_visual_image_candidates(claim, goal)
+        image_paths = image_paths[:_MAX_VISUAL_IMAGES]
 
         if not image_paths:
             print_box(
@@ -428,35 +584,49 @@ class _VerifierPerClaimMixin:
                 "rationale": "",
             }
 
-        # Use the first (most relevant) image
-        image_path = str(Path(self.workspace_dir) / image_paths[0])
-        try:
-            with open(image_path, "rb") as fh:
-                image_bytes = fh.read()
-        except OSError as exc:
+        # ---- encode every candidate image, skipping unreadable ones ----
+        ws = Path(self.workspace_dir)
+        data_uris: list[str] = []
+        image_labels: list[str] = []
+        for rel in image_paths:
+            image_path = ws / rel
+            try:
+                with open(image_path, "rb") as fh:
+                    image_bytes = fh.read()
+            except OSError as exc:
+                self.logger.warning(
+                    f"skipping unreadable image {rel} for claim {cid}: {exc}"
+                )
+                continue
+            mime, _ = mimetypes.guess_type(str(image_path))
+            if not mime or not mime.startswith("image/"):
+                mime = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
+            data_uris.append(
+                f"data:{mime};base64,{base64.b64encode(image_bytes).decode('ascii')}"
+            )
+            image_labels.append(f"{rel} ({len(image_bytes)} bytes)")
+
+        if not data_uris:
             return {
                 "score": 0.0, "verifier_kind": "visual", "status": "error",
-                "details": f"Cannot read image file {image_paths[0]}: {exc}",
+                "details": f"Cannot read any candidate image file: {', '.join(image_paths[:3])}",
                 "rationale": "",
             }
 
-        mime, _ = mimetypes.guess_type(image_path)
-        if not mime or not mime.startswith("image/"):
-            mime = "image/png" if image_path.endswith(".png") else "image/jpeg"
-        data_uri = f"data:{mime};base64,{base64.b64encode(image_bytes).decode('ascii')}"
-
         # ---- build multimodal prompt ----
         prompt = self._build_visual_check_prompt(
-            claim, execution_text, workspace_listing, grounding
+            claim, execution_text, workspace_listing, grounding, goal,
+            image_labels=image_labels,
         )
         print_box(
-            f"claim: {claim.get('description', '')[:200]}\nimage: {image_paths[0]} ({len(image_bytes)} bytes)",
+            f"claim: {claim.get('description', '')[:200]}\n"
+            f"images ({len(data_uris)}):\n" + "\n".join(image_labels),
             title=f"Visual check · {cid}", color=CYAN,
         )
 
-        # ---- call vision model ----
+        # ---- call vision model (ALL candidate images, not just the first) ----
         verdict_data, err = self._call_vision_judge(
-            uuid, f"verifier_visual_{cid}", prompt, images=[data_uri]
+            uuid, f"verifier_visual_{cid}", prompt, images=data_uris
         )
         if err is not None or not isinstance(verdict_data, dict):
             print_box(
@@ -491,34 +661,49 @@ class _VerifierPerClaimMixin:
         execution_text: str,
         workspace_listing: str,
         grounding: str,
+        goal: str = "",
+        image_labels: list[str] | None = None,
     ) -> str:
-        """Prompt for the vision model to judge a scientific figure.
+        """Prompt for the vision model to judge scientific figure(s).
 
-        The vision model receives this text prompt alongside the image as a
-        data URI. The prompt asks for a targeted scientific judgment, not a
-        general description.
+        The vision model receives this text prompt alongside every candidate
+        image as a data URI. The prompt asks for a targeted scientific
+        judgment, not a general description. The REAL task goal (user
+        specification) is shown under TASK GOAL; the agents' self-reported
+        output is shown separately and explicitly marked UNTRUSTED.
         """
         grounding_block = (
             grounding.strip()[:1500] if grounding else "(no literature grounding)"
         )
-        goal_snippet = (execution_text or "")[:2500]
-        return f"""You are a scientific figure reviewer with domain expertise across chemistry, biology, and physics. Examine the attached image carefully.
+        goal_block = (goal or "").strip()[:2500] or "(no goal text available)"
+        agent_block = (execution_text or "").strip()[-2500:] or "(no agent output)"
+        images_block = (
+            "\n".join(f"- {label}" for label in (image_labels or []))
+            or "(image attached)"
+        )
+        return f"""You are a scientific figure reviewer with domain expertise across chemistry, biology, and physics. Examine the attached image(s) carefully.
 
 CLAIM TO VERIFY:
 {claim.get('description', '')}
 
-SCIENTIFIC CONTEXT (workflow goal):
-{goal_snippet}
+TASK GOAL (the user's specification for the workflow — authoritative):
+{goal_block}
+
+AGENT-REPORTED OUTPUT (untrusted — agents may claim success falsely; context only, never evidence):
+{agent_block}
+
+IMAGES ATTACHED (in send order):
+{images_block}
 
 LITERATURE GROUNDING:
 {grounding_block}
 
 YOUR TASK:
-Judge whether the CLAIM is visibly TRUE or FALSE based solely on what you SEE in the image. Focus on scientific correctness and physical plausibility — not aesthetics.
+Judge whether the CLAIM is visibly TRUE or FALSE based solely on what you SEE in the attached image(s). Focus on scientific correctness and physical plausibility — not aesthetics.
 
 GUIDANCE:
-- "pass" = the figure VISIBLY satisfies the claim. The structure/pattern/property the claim describes is clearly present and scientifically plausible.
-- "fail" = the figure VISIBLY contradicts the claim. Something is wrong that a domain expert would immediately notice (impossible bond geometry, overlapping atoms, broken topology, physically nonsensical values or scale).
+- "pass" = the figure(s) VISIBLY satisfy the claim. The structure/pattern/property the claim describes is clearly present and scientifically plausible.
+- "fail" = the figure(s) VISIBLY contradict the claim. Something is wrong that a domain expert would immediately notice (impossible bond geometry, overlapping atoms, broken topology, physically nonsensical values or scale).
 - "unsure" = the image resolution is too low, the relevant detail is ambiguous, or the figure type is unrecognizable. Default to "unsure" rather than guessing.
 
 Return STRICT JSON only, no markdown, no prose outside the JSON:
@@ -591,17 +776,26 @@ Return STRICT JSON only, no markdown, no prose outside the JSON:
         uuid: str,
         claim: dict[str, Any],
         execution_text: str,
+        goal: str = "",
         max_files: int = 3,
     ) -> list[str]:
-        """Pick workspace files most likely to hold this claim's artefact."""
+        """Pick workspace files most likely to hold this claim's artefact.
+
+        The empty-selection / judge-error fallback never returns code files
+        (``.py``, ``.R``, ``.jl``, ``.sh``, ``.ipynb``, ... or anything under
+        ``src/``-like directories): a degenerate "everything" fallback made
+        of workflow scripts points verifiers at source instead of artefacts.
+        """
         eligible = self._eligible_workspace_files()
         if not eligible:
             return []
+        # Fallback pool for empty/error selections: eligible MINUS code files.
+        non_code = [f for f in eligible if not self._is_likely_code_file(f)]
         eligible_str = "\n".join(
             f"{f}\t{(self.workspace_dir / f).stat().st_size}B" for f in eligible
         )
         prompt = self._build_select_files_prompt(
-            claim, execution_text, eligible_str, max_files
+            claim, execution_text, eligible_str, max_files, goal
         )
         cid = str(claim.get("id", "unknown"))
         parsed, err = self._call_judge_for_json(
@@ -609,12 +803,12 @@ Return STRICT JSON only, no markdown, no prose outside the JSON:
         )
         if err or not isinstance(parsed, dict):
             self.logger.debug(f"file selection failed for {cid}: {err or 'non-dict JSON'}")
-            return eligible
+            return non_code
         selected = self._validate_workspace_paths(
             parsed.get("files"), allowed=set(eligible),
             max_count=max_files, label=cid,
         )
-        return selected or eligible
+        return selected or non_code
 
     @staticmethod
     def _build_select_files_prompt(
@@ -622,14 +816,19 @@ Return STRICT JSON only, no markdown, no prose outside the JSON:
         execution_text: str,
         workspace_listing: str,
         max_files: int,
+        goal: str = "",
     ) -> str:
         """Build the per-claim file-selection prompt sent to the judge."""
+        goal_block = (goal or "").strip()[:3000] or "(none provided)"
         return f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
+
+TASK GOAL (the user's specification — names the deliverables and their exact paths):
+{goal_block}
 
 WORKSPACE FILES (name<TAB>size, relative to workspace root, cwd at runtime):
 {workspace_listing}
 
-AGENT NARRATION (what the agents reported doing — typically names the files they wrote):
+AGENT NARRATION (what the agents reported doing — untrusted; typically names the files they wrote, but they may be wrong):
 {execution_text}
 
 CLAIM TO CHECK:
@@ -638,8 +837,13 @@ CLAIM TO CHECK:
 - expected_artifact_kind:   {claim.get('expected_artifact_kind') or '(unspecified)'}
 - acceptable_variation:     {claim.get('acceptable_variation') or '(none)'}
 
-Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer files the agents explicitly mention writing for this artefact. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
+Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer RESULT artefacts — outputs, tables, figures, reports, manifests — and files the agents explicitly mention writing for this artefact. Do NOT select workflow source files (`.py`, `.R`, `.jl`, `.sh`, notebooks): the verifier checks produced results, not script text. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
 Do not include any tests or debugging files that are unlikely to be part of the final artefact (e.g. "debug.log", "debug_2.py", "tmp_results.jsonl"). Focus on files that are central to the workflow's deliverable.
+
+SELECTION PRIORITY:
+- First prefer files that look like PRODUCED OUTPUTS of the workflow: paths under pred_results/, out/, output/, outputs/, results/, figures/, figs/, plots/, or matching a deliverable filename literally named in the TASK GOAL above.
+- Only pick INPUT/DATASET-looking files (paths under data/, dataset/, datasets/, raw/, input/, inputs/) when the claim is explicitly about the input data itself.
+- The TASK GOAL is authoritative about what the deliverable is; the AGENT NARRATION is not.
 
 Return STRICT JSON only:
   {{"files": ["<relative/path>", ...]}}
@@ -682,11 +886,17 @@ WORKSPACE FILES (relative to workspace root, cwd at runtime):
 {workspace_listing}
 
 WORKFLOW LANGUAGE (heuristic from file extensions): {language}
-- When ``python``: parse workflow scripts with the stdlib ``ast`` module.
-- When ``r``: the workflow scripts are R; do NOT parse them with ``ast``.
-  Verify against on-disk artefacts; if a deterministic check on artefacts is
-  not possible for a code-structure claim, return ``executable=false``.
-- When ``mixed`` or ``unknown``: return ``executable=false``; the verifier cannot assume parsing strategy.
+- Regardless of language, verify against on-disk RESULT artefacts and the
+  goal's ground-truth schema. Do NOT read or parse workflow source files
+  (`.py`, `.R`, notebooks) as evidence — not with `ast`, not with regex.
+- If no artefact or environment fact can decide the claim, return
+  ``executable=false``.
+- NEVER substitute a different data object for a claim's target. If the
+  specific object a claim refers to (e.g. the training set actually consumed
+  by the model, an intermediate table, a fitted model) is not present in the
+  workspace as an artifact, treat the claim as NOT executable
+  (``executable=false``) — do not approximate with a raw input file or any
+  other stand-in.
 
 RELEVANT FILE PREVIEWS (head + tail of files the claim depends on; truncated):
 {previews}
@@ -738,12 +948,25 @@ Return STRICT JSON only, in one of these two shapes:
         workspace_listing: str,
         goal: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Pick relevant files then generate one claim's verifier spec."""
+        """Pick relevant files then generate one claim's verifier spec.
+
+        Visual (Source G) claims skip verifier-spec generation entirely: the
+        generated script was always discarded by the visual branch, so the
+        LLM call was pure waste. They still run file selection (capped at
+        ``_MAX_VISUAL_IMAGES`` files) so the branch gets named candidates.
+        """
+        visual = self._is_visual_claim(claim)
         rel_files = self._llm_select_files(
-            uuid, claim, execution_text
+            uuid, claim, execution_text, goal=goal,
+            max_files=_MAX_VISUAL_IMAGES if visual else 3,
         )
         updated = {**claim, "likely_relevant_files": rel_files}
-        spec = self._generate_verifier(uuid, updated, execution_text, workspace_listing, goal=goal)
+        if visual:
+            spec = self._visual_claim_spec(claim) or {}
+        else:
+            spec = self._generate_verifier(
+                uuid, updated, execution_text, workspace_listing, goal=goal
+            )
         return updated, spec
 
     def _generate_specs_parallel(

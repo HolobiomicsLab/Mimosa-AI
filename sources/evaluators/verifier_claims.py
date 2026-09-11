@@ -1,5 +1,5 @@
 """
-Claim extraction (six independent sources) and importance rating.
+Claim extraction (five independent sources) and importance rating.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ class _VerifierClaimExtractionMixin:
         is_truly_empty: bool,
         grounding: str = "",
     ) -> list[dict[str, Any]]:
-        """Extract atomic claims by polling six independent source prompts.
+        """Extract atomic claims by polling five independent source prompts.
 
         Args:
             uuid: Workflow identifier (used for logging and judge calls).

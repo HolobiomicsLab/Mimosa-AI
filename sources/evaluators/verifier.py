@@ -6,7 +6,7 @@ mechanical steps — extracting claims, generating and running per-claim
 scripts, listing the workspace, rendering file previews — live in sibling
 modules and are mixed in:
 
-* .verifier_claims — claim extraction (six sources) + importance rating.
+* .verifier_claims — claim extraction (five sources) + importance rating.
 * .verifier_per_claim — verifier-script generation, sandbox execution,pass/fail/error scoring.
 * .verifier_workspace — workspace listing, file previews, literature grounding cache.
 """
@@ -134,7 +134,7 @@ class VerifierEvaluator(
                 "provider": provider,
                 "temperature": 0.1,
                 "reasoning_effort": config.reasoning_effort,
-                "max_tokens": 1024,
+                "max_tokens": 2048,  # verdict JSON must not truncate mid-rationale
                 "openrouter_provider": (
                     config.openrouter_provider_for(vision_model)
                     if hasattr(config, "openrouter_provider_for")
@@ -342,6 +342,7 @@ class VerifierEvaluator(
             execution_text,
             workspace_listing,
             grounding,
+            wf_info.goal,
         )
         loop_dt = time.time() - t_loop
         phase_timings.append(
@@ -393,6 +394,7 @@ class VerifierEvaluator(
         execution_text: str,
         workspace_listing: str,
         grounding: str,
+        goal: str = "",
     ) -> list[dict[str, Any]]:
         """Fan claim verification out across ``self.exec_parallelism`` threads.
 
@@ -403,6 +405,7 @@ class VerifierEvaluator(
             execution_text: Agent narration / produced output text.
             workspace_listing: Rendered listing of workspace files.
             grounding: Optional peer-reviewed literature grounding block.
+            goal: The workflow's real task goal (user specification).
 
         Returns:
             Scored per-claim list in the same order as ``claims_to_verify``.
@@ -416,7 +419,7 @@ class VerifierEvaluator(
                 ex.submit(
                     self._verify_one_claim_safe,
                     uuid, claim, generated,
-                    execution_text, workspace_listing, grounding,
+                    execution_text, workspace_listing, grounding, goal,
                 ): idx
                 for idx, claim in enumerate(claims_to_verify)
             }
@@ -433,6 +436,7 @@ class VerifierEvaluator(
         execution_text: str,
         workspace_listing: str,
         grounding: str,
+        goal: str = "",
     ) -> dict[str, Any]:
         """Resolve the right spec for one claim and run ``_verify_claim``.
 
@@ -449,17 +453,25 @@ class VerifierEvaluator(
                 workspace_listing,
                 grounding,
                 preloaded_spec=preloaded_spec,
+                goal=goal,
             )
         except Exception as e:
             self.logger.warning(
                 f"parallel claim verification failed for {cid}: "
                 f"{type(e).__name__}: {e}"
             )
+            # Visual claims must stay "visual" here: the aggregator counts
+            # visual-branch errors (score 0) instead of dropping them.
+            verifier_kind = (
+                "visual"
+                if (target_claim.get("source") or "").endswith("_g")
+                else ("executable" if preloaded_spec.get("executable") else "soft")
+            )
             return {
                 "claim": target_claim,
                 "spec": preloaded_spec,
                 "score": 0.0,
-                "verifier_kind": "executable" if preloaded_spec.get("executable") else "soft",
+                "verifier_kind": verifier_kind,
                 "status": "error",
                 "details": f"verify_claim raised: {type(e).__name__}: {e}",
                 "elapsed_s": 0.0,
@@ -692,12 +704,23 @@ class VerifierEvaluator(
             return self._empty_aggregate_result(n_claims=0)
 
         scored = [c for c in per_claim if c.get("status") != "error"]
+        # Visual-branch errors have no recovery flow (unlike executable
+        # errors, which trigger regeneration), so they are NOT silently
+        # excluded: they enter the weighted mean as score 0 in both the
+        # numerator and the denominator. A figure deliverable whose vision
+        # call failed can therefore no longer leave a perfect score with
+        # zero visual evidence.
+        visual_errors = [
+            c for c in per_claim
+            if c.get("status") == "error" and c.get("verifier_kind") == "visual"
+        ]
+        included = scored + visual_errors
         n_pass = sum(1 for c in per_claim if c["status"] == "pass")
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
 
-        if not scored:
+        if not included:
             return self._empty_aggregate_result(
                 n_claims=len(per_claim),
                 n_pass=n_pass,
@@ -707,15 +730,15 @@ class VerifierEvaluator(
                 skipped_reason="all_verifiers_errored",
             )
 
-        total_w = sum(self._claim_weight(c) for c in scored)
-        base_mean = sum(c["score"] * self._claim_weight(c) for c in scored) / total_w
+        total_w = sum(self._claim_weight(c) for c in included)
+        base_mean = sum(c["score"] * self._claim_weight(c) for c in included) / total_w
         # Pre-cap: clamp to [0, 1] before applying the hard-fail cap
         pre_cap = max(0.0, min(1.0, base_mean))
         # Hard-fail cap fires only on a real refutation of a top-importance claim
         hard_fail = any(
             self._claim_weight(c) >= self._HARD_FAIL_IMPORTANCE
             and c["status"] == "fail"
-            for c in scored
+            for c in included
         )
         overall = min(pre_cap, self.hard_fail_cap) if hard_fail else pre_cap
 
@@ -729,7 +752,9 @@ class VerifierEvaluator(
             "n_fail": n_fail,
             "n_error": n_error,
             "n_unsure": n_unsure,
-            "n_scored": len(scored),
+            "n_visual_error": len(visual_errors),
+            "n_scored": len(included),
+            "visual_evidence_missing": bool(visual_errors),
         }
 
     @staticmethod
@@ -757,7 +782,9 @@ class VerifierEvaluator(
             "n_fail": n_fail,
             "n_error": n_error,
             "n_unsure": n_unsure,
+            "n_visual_error": 0,
             "n_scored": 0,
+            "visual_evidence_missing": False,
         }
         if skipped_reason is not None:
             result["skipped_reason"] = skipped_reason
