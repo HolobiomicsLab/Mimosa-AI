@@ -56,13 +56,16 @@ provider's usual API credential must still be present in the environment.
 {
   "planner_llm_model": "codex-cli/gpt-6-astra",
   "workflow_llm_model": "claude-cli/claude-opus-5",
-  "judge_model": "codex-cli/gpt-6-astra",
+  "judge_model": "openrouter/z-ai/glm-5.3-flash",
   "capsule_namer_model": "claude-cli/claude-opus-5",
   "smolagent_model_id": "openrouter/z-ai/glm-5.3",
   "engine_name": "litellm",
   "harness_auth_mode": "subscription"
 }
 ```
+
+The ASB evaluation campaign keeps its judge on an open-weight OpenRouter model.
+CLI authoring or solver success does not establish scientific acceptance.
 
 For direct GLM access through z.ai's standard OpenAI-compatible API, bind the
 endpoint to a named environment variable. This route does not use the CLI
