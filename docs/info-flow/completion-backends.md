@@ -18,6 +18,33 @@ non-empty. The complete result envelope is retained in
 `last_completion_metadata`. Temperature and max-token settings are omitted,
 warned, and recorded as unsupported controls.
 
+When the bridge supplies `model_identity`, Mimosa validates and preserves its
+three sourced claims. `requested` comes from the request; `configured` records
+the explicit CLI model argument when invocation was attempted; `reported` is
+null unless the CLI supplies attributable identity telemetry. For example:
+
+```json
+{
+  "requested": {"model": "gpt-5.6-terra", "source": "request"},
+  "configured": {"model": "gpt-5.6-terra", "source": "explicit_cli_argument"},
+  "reported": null
+}
+```
+
+The compatibility field `actual_model` must match `reported.model`, or remain
+null with it. A reported model may differ from the requested model; Mimosa
+records that difference. It rejects invented source tags, inconsistent aliases
+and a completed receipt without configured-route evidence. Older protocol-v1
+bridges without this optional object remain supported. The complete object is
+also retained in saved completion receipts.
+
+Codex 0.154.0 normally omits a model identity in its completed-turn event, so
+the configured route is visible while the responding model remains unknown.
+Neither a CLI configuration nor a CLI-reported label is independent provider
+verification. Do not infer identity from model-authored text, a catalogue, or a
+configured thread model. Reasoning effort remains a requested control in the
+call request; this identity object does not claim to measure effective effort.
+
 CLI completion records carry `cache_eligible: false`, and both cache layouts
 skip that marker before comparing messages. Explicit `api_base`/`api_key_env`
 routes also bypass cache reads and mark their records ineligible. Mimosa's
