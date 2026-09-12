@@ -103,6 +103,12 @@ class PlanStep:
     #: populated by ``Planner.run_attempts`` so a caller can tell a step that
     #: delivered from one that merely scored well (issue #196).
     missing_outputs: list[str] = field(default_factory=list)
+    # Opt-in artifact contracts seal these canonical bindings.  Legacy plans
+    # keep the explicit unchecked default for backwards-compatible execution.
+    contract_status: str = "legacy_unchecked"
+    contract_digest: str | None = None
+    input_artifact_ids: list[str] = field(default_factory=list)
+    output_artifact_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate the plan step after initialization.
@@ -123,6 +129,8 @@ class Plan:
     """Represents a complete execution plan with multiple steps."""
     goal: str
     steps: list[PlanStep] = field(default_factory=list)
+    contract_status: str = "legacy_unchecked"
+    contract_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Validate the plan after initialization.
@@ -171,3 +179,10 @@ class Task:
     expected_outputs: list[str] = field(default_factory=list)
     complexity: str = "medium"
     produced_outputs: list[str] = field(default_factory=list)  # Actual outputs produced
+    contract_status: str = "legacy_unchecked"
+    contract_digest: str | None = None
+    input_artifact_ids: list[str] = field(default_factory=list)
+    output_artifact_ids: list[str] = field(default_factory=list)
+    supplied_artifact_ids: list[str] = field(default_factory=list)
+    input_artifact_sha256: dict[str, str] = field(default_factory=dict)
+    output_artifact_sha256: dict[str, str] = field(default_factory=dict)

@@ -113,6 +113,42 @@ def _validate_completed_result(
         raise CompletionBackendError("completion bridge returned malformed cost")
 
 
+def _identity_model(entry: Any, source: str) -> str | None:
+    """Read one sourced model claim without inferring missing telemetry."""
+    if entry is None:
+        return None
+    if (
+        not isinstance(entry, dict)
+        or set(entry) != {"model", "source"}
+        or entry.get("source") != source
+        or not isinstance(entry.get("model"), str)
+        or not entry["model"].strip()
+    ):
+        raise CompletionBackendError("completion bridge returned malformed model identity")
+    return entry["model"]
+
+
+def _validate_model_identity(result: dict[str, Any], request: dict[str, Any]) -> None:
+    """Check optional v1 provenance while accepting older bridge envelopes."""
+    if "model_identity" not in result:
+        return
+    identity = result["model_identity"]
+    if not isinstance(identity, dict) or set(identity) != {"requested", "configured", "reported"}:
+        raise CompletionBackendError("completion bridge returned malformed model identity")
+    requested = _identity_model(identity["requested"], "request")
+    configured = _identity_model(identity["configured"], "explicit_cli_argument")
+    source = "codex.turn.completed.model" if request["backend"] == "codex_cli" else "claude.modelUsage"
+    reported = _identity_model(identity["reported"], source)
+    if (
+        requested != request.get("model")
+        or configured not in (None, requested)
+        or (result["status"] == "completed" and configured is None)
+        or reported != result.get("actual_model")
+        or (reported is not None and configured is None)
+    ):
+        raise CompletionBackendError("completion bridge returned inconsistent model identity")
+
+
 def call_completion_bridge(request: dict[str, Any]) -> dict[str, Any]:
     """Call the configured bridge once and validate its result envelope."""
     result = load_completion_bridge().complete(request)
@@ -131,4 +167,5 @@ def call_completion_bridge(request: dict[str, Any]) -> dict[str, Any]:
         )
     if result["status"] == "completed":
         _validate_completed_result(result, request)
+    _validate_model_identity(result, request)
     return result

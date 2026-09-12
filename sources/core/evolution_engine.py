@@ -346,6 +346,7 @@ class EvolutionEngine:
         original_task: str | None = None,
         single_agent_mode: bool = False,
         mockup_mode: bool = False,
+        reuse_workflows: bool = True,
     ) -> list[IndividualRun]:
         """Start the learning process for achieving a specified goal.
 
@@ -363,10 +364,16 @@ class EvolutionEngine:
             mockup_mode: If True, use existing workflow data from
                 ``select_parent_workflow`` instead of calling
                 ``orchestrate_workflow``. Useful for testing and debugging.
+            reuse_workflows: When false, start from a fresh seed and skip
+                parent selection throughout this evolution call.
 
         Returns:
             The list of :class:`IndividualRun` produced across the evolution.
         """
+        if not reuse_workflows and template_uuid is not None:
+            raise ValueError(
+                "reuse_workflows=False requires template_uuid=None"
+            )
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
 
@@ -377,9 +384,11 @@ class EvolutionEngine:
         self.variation.textual_gradient_history.clear()
         self.variation.agent_count_history.clear()
 
-        parents, _ = self.select_parent_workflow(
-            goal, template_uuid=template_uuid
-        )
+        parents = []
+        if reuse_workflows:
+            parents, _ = self.select_parent_workflow(
+                goal, template_uuid=template_uuid
+            )
         wf = parents[0] if parents else None
 
         if mockup_mode:
@@ -417,6 +426,7 @@ class EvolutionEngine:
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
             workspace_mgr=self.workspace_mgr,
+            reuse_workflows=reuse_workflows,
         )
 
         # ── Restore workspace to the best run's saved state ──────────────────
@@ -454,6 +464,7 @@ class EvolutionEngine:
         enable_evolution: bool = False,
         single_agent_mode: bool = False,
         workspace_mgr: WorkspaceManager | None = None,
+        reuse_workflows: bool = True,
     ) -> list[IndividualRun]:
         """Run one iteration of the evolution loop and recurse if needed.
 
@@ -468,6 +479,8 @@ class EvolutionEngine:
             single_agent_mode: Force single-agent orchestration.
             workspace_mgr: Workspace lifecycle manager; ``None`` skips
                 snapshot/restore plumbing.
+            reuse_workflows: When false, do not select an existing parent for
+                subsequent generations.
 
         Returns:
             The (mutated) runs list, with the final attempt populated and
@@ -660,9 +673,12 @@ class EvolutionEngine:
             return runs
 
         # ── Evolutionary parent selection: mutation or crossover ──────
-        parent_workflows, use_crossover = self.select_parent_workflow(
-            runs[-1].goal, template_uuid=None
-        )
+        parent_workflows: list[WorkflowInfo] = []
+        use_crossover = False
+        if reuse_workflows:
+            parent_workflows, use_crossover = self.select_parent_workflow(
+                runs[-1].goal, template_uuid=None
+            )
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
@@ -730,6 +746,7 @@ class EvolutionEngine:
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
             workspace_mgr=workspace_mgr,
+            reuse_workflows=reuse_workflows,
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
