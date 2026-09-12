@@ -3,17 +3,21 @@ This module provides an asynchronous workflow execution engine for Python code.
 """
 
 import asyncio
+import errno
 import fcntl
 import logging
 import os
 import pty
 import sys
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from .process_lifecycle import OwnedProcessTree
 
 
 class ExecutionStatus(Enum):
@@ -113,6 +117,10 @@ class WorkflowRunner:
         self.execution_dir = execution_dir
         self.logger = logging.getLogger(__name__)
         self._active_processes: dict[str, asyncio.subprocess.Process] = {}
+        self._launching_executions = set()
+        self._process_trees = {}
+        self._termination_locks = {}
+        self._cancelled_executions = set()
         self._python_cmd: list[str] = []  # resolved by _setup_environment
         self._setup_environment()
 
@@ -332,7 +340,7 @@ class WorkflowRunner:
         )
 
         # Use absolute path for script to ensure it's accessible regardless of execution_dir
-        script_path = os.path.abspath(os.path.join(self.config.temp_dir, f"{execution_id}.py"))
+        script_path = os.path.abspath(os.path.join(self.config.temp_dir, f"{execution_id}_{uuid.uuid4().hex}.py"))
         with open(script_path, "w") as f:
             f.write(code)
         cmd = [*self._python_cmd, script_path]
@@ -394,6 +402,13 @@ class WorkflowRunner:
 
         start_time = asyncio.get_event_loop().time()
         master_fd = slave_fd = -1
+        execution_id = execution_id or "command_" + uuid.uuid4().hex
+        if execution_id in self._active_processes or execution_id in self._launching_executions:
+            raise ValueError("Execution identifier is already active")
+        self._launching_executions.add(execution_id)
+        process = None
+        tree = None
+        watcher = None
 
         try:
             env = self._build_color_env()
@@ -408,6 +423,7 @@ class WorkflowRunner:
                     stderr=asyncio.subprocess.PIPE,
                     env=env,
                     cwd=self.execution_dir,
+                    start_new_session=True,
                 )
                 # Parent no longer needs the slave side; the child inherited it.
                 os.close(slave_fd)
@@ -415,6 +431,10 @@ class WorkflowRunner:
 
                 if execution_id:
                     self._active_processes[execution_id] = process
+                tree = OwnedProcessTree(process.pid)
+                self._process_trees[execution_id] = tree
+                self._termination_locks[execution_id] = asyncio.Lock()
+                watcher = asyncio.create_task(self._watch_children(tree))
 
                 stdout_data, stderr_data = await asyncio.wait_for(
                     self._stream_output_pty(process, master_fd, progress_callback),
@@ -429,10 +449,15 @@ class WorkflowRunner:
                     limit=1024 * 1024,
                     env=env,
                     cwd=self.execution_dir,
+                    start_new_session=True,
                 )
 
                 if execution_id:
                     self._active_processes[execution_id] = process
+                tree = OwnedProcessTree(process.pid)
+                self._process_trees[execution_id] = tree
+                self._termination_locks[execution_id] = asyncio.Lock()
+                watcher = asyncio.create_task(self._watch_children(tree))
 
                 stdout_data, stderr_data = await asyncio.wait_for(
                     self._stream_output_pipe(process, progress_callback),
@@ -443,8 +468,12 @@ class WorkflowRunner:
             execution_time = asyncio.get_event_loop().time() - start_time
 
             status = (
-                ExecutionStatus.COMPLETED
+                ExecutionStatus.CANCELLED
+                if execution_id in self._cancelled_executions
+                else ExecutionStatus.COMPLETED
                 if process.returncode == 0
+                else ExecutionStatus.TIMEOUT
+                if process.returncode == 124
                 else ExecutionStatus.FAILED
             )
 
@@ -463,17 +492,38 @@ class WorkflowRunner:
                 ExecutionStatus.TIMEOUT, -1, "", "Execution timed out", 0.0
             )
 
+        except asyncio.CancelledError:
+            if process is not None:
+                await self._kill_process(execution_id)
+            raise
+
         except Exception as e:
             self.logger.error(f"Execution failed: {e}")
             return ExecutionResult(ExecutionStatus.FAILED, -1, "", str(e), 0.0)
 
         finally:
-            if slave_fd >= 0:
-                os.close(slave_fd)
-            if master_fd >= 0:
-                os.close(master_fd)
-            if execution_id and execution_id in self._active_processes:
-                del self._active_processes[execution_id]
+            try:
+                if watcher is not None:
+                    watcher.cancel()
+                    await asyncio.gather(watcher, return_exceptions=True)
+                if process is not None:
+                    await self._kill_process(execution_id)
+            finally:
+                if slave_fd >= 0:
+                    os.close(slave_fd)
+                if master_fd >= 0:
+                    os.close(master_fd)
+                self._active_processes.pop(execution_id, None)
+                self._process_trees.pop(execution_id, None)
+                self._termination_locks.pop(execution_id, None)
+                self._cancelled_executions.discard(execution_id)
+                self._launching_executions.discard(execution_id)
+
+    async def _watch_children(self, tree):
+        """Retain descendant identities across abrupt workflow exits."""
+        while True:
+            tree.capture()
+            await asyncio.sleep(0.05)
 
     # ------------------------------------------------------------------
     # Output streaming helpers
@@ -502,7 +552,7 @@ class WorkflowRunner:
         loop = asyncio.get_event_loop()
         stdout_chunks: list[str] = []
         stderr_lines: list[str] = []
-        stdout_done = asyncio.Event()
+        stdout_done = loop.create_future()
 
         # Make the master fd non-blocking so we can use add_reader.
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
@@ -510,21 +560,30 @@ class WorkflowRunner:
 
         def _on_master_readable() -> None:
             """Called by the event loop when data is available on the PTY."""
+            if stdout_done.done():
+                return
             try:
                 data = os.read(master_fd, 65536)
-                if not data:
-                    loop.remove_reader(master_fd)
-                    stdout_done.set()
+            except BlockingIOError:
+                return
+            except OSError as error:
+                if error.errno != errno.EIO:
+                    stdout_done.set_exception(error)
                     return
+                data = b""
+            if not data:
+                loop.remove_reader(master_fd)
+                stdout_done.set_result(None)
+                return
+            try:
                 text = data.decode("utf-8", errors="replace")
                 stdout_chunks.append(text)
                 if progress_callback:
                     for line in text.splitlines():
                         progress_callback(line)
-            except OSError:
-                # EIO is expected when the slave side is closed (child exited).
+            except Exception as error:
                 loop.remove_reader(master_fd)
-                stdout_done.set()
+                stdout_done.set_exception(error)
 
         loop.add_reader(master_fd, _on_master_readable)
 
@@ -533,7 +592,14 @@ class WorkflowRunner:
                 stderr_lines.append(raw_line.decode("utf-8", errors="replace"))
 
         # Wait for both stdout (PTY) and stderr (pipe) to finish.
-        await asyncio.gather(stdout_done.wait(), _read_stderr())
+        stderr_task = asyncio.create_task(_read_stderr())
+        try:
+            await asyncio.gather(stdout_done, stderr_task)
+        finally:
+            loop.remove_reader(master_fd)
+            stdout_done.cancel()
+            stderr_task.cancel()
+            await asyncio.gather(stdout_done, stderr_task, return_exceptions=True)
 
         return "".join(stdout_chunks), "".join(stderr_lines)
 
@@ -567,7 +633,13 @@ class WorkflowRunner:
             async for line in process.stderr:
                 stderr_lines.append(line.decode("utf-8", errors="replace"))
 
-        await asyncio.gather(read_stdout(), read_stderr())
+        readers = [asyncio.create_task(read_stdout()), asyncio.create_task(read_stderr())]
+        try:
+            await asyncio.gather(*readers)
+        finally:
+            for reader in readers:
+                reader.cancel()
+            await asyncio.gather(*readers, return_exceptions=True)
 
         return "".join(stdout_lines), "".join(stderr_lines)
 
@@ -585,13 +657,11 @@ class WorkflowRunner:
         if execution_id not in self._active_processes:
             return False
 
+        self._cancelled_executions.add(execution_id)
         return await self._kill_process(execution_id)
 
     async def _kill_process(self, execution_id: str) -> bool:
-        """Forcefully terminate a process.
-
-        Sends ``SIGTERM`` first and waits up to five seconds; if the process
-        is still alive it is escalated to ``SIGKILL``.
+        """Kill the registered workflow and its current owned descendants.
 
         Args:
             execution_id: Identifier of the registered process.
@@ -604,13 +674,14 @@ class WorkflowRunner:
         if not process:
             return False
 
-        try:
-            process.terminate()
-            await asyncio.wait_for(process.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            process.kill()
+        tree = self._process_trees.get(execution_id)
+        lock = self._termination_locks.get(execution_id)
+        if tree is None or lock is None:
+            return False
+        async with lock:
+            tree.kill(include_root=process.returncode is None)
             await process.wait()
-
+            await asyncio.to_thread(tree.wait_children)
         return True
 
     async def get_active_executions(self) -> list[str]:
