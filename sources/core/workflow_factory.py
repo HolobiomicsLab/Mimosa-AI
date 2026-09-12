@@ -12,6 +12,7 @@ import uuid
 from sources.modules import state_schema
 
 from .factory import Factory
+from .native_harness import package_native_harness
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .tools_manager import ToolManager
 from sources.cli.pretty_print import (
@@ -343,6 +344,7 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         }
         providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
         engine = "mlx" if "mlx-community/" in default_model else self.config.engine_name
+        native_runtime = package_native_harness(self.config)
         return f"""
 import os
 import sys
@@ -371,6 +373,8 @@ SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 
+{native_runtime}
+
 # Load tools
 {tools_code}
 
@@ -389,7 +393,7 @@ app = workflow.compile()
 initial_state = {initial_state}
 
 try:
-    if WORKFLOW_PATH:
+    if WORKFLOW_PATH and not globals().get("NATIVE_HARNESS_CONFIG"):
         try:
             png = app.get_graph().draw_mermaid_png()
             with open(os.path.join(WORKFLOW_PATH, "workflow_{uuid_str}.png"), "wb") as f:

@@ -80,7 +80,7 @@ def logprobs_kwargs_for(model_id) -> dict:
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
 
-if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
+if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY and not globals().get("NATIVE_HARNESS_CONFIG"):
     LANGFUSE_AUTH=base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
 
     os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel" # EU data region
@@ -129,7 +129,8 @@ class SmolAgentFactory:
         self.tools = [_make_tool_json_aware(t) for t in tools]
         # variable defined by workflow factory
         self.model_id = model or MODEL_ID
-        if str(self.model_id).startswith(("codex-cli/", "claude-cli/")):
+        self.native_harness_config = globals().get("NATIVE_HARNESS_CONFIG")
+        if str(self.model_id).startswith(("codex-cli/", "claude-cli/")) and self.native_harness_config is None:
             raise ValueError(
                 "CLI completion backends are text-only and cannot power ToolSmolAgent"
             )
@@ -153,6 +154,7 @@ class SmolAgentFactory:
         # warning honest.
         logprobs_requested = (
             globals().get("SAVE_LOGPROBS", False) and self.engine_name == "litellm"
+            and self.native_harness_config is None
         )
         self.logprobs_kwargs = (
             logprobs_kwargs_for(self.model_id) if logprobs_requested else {}
@@ -197,7 +199,7 @@ class SmolAgentFactory:
                 tools=self.tools,
                 model=self.engine,
                 name=f"{self.name}_agent",
-                max_steps=max_steps,
+                max_steps=min(max_steps, self.native_harness_config["max_calls"]) if self.native_harness_config is not None else max_steps,
                 step_callbacks=[_context_guard_callback],
                 #planning_interval=planning_interval, # think more before acting
                 # authorized imports are limited to basic python libraries for action-as-code execution.
@@ -250,6 +252,10 @@ class SmolAgentFactory:
             return # use original system prompt by smolagents
 
     def get_engine(self):
+        if getattr(self, "native_harness_config", None) is not None:
+            if self.model_id != MODEL_ID:
+                raise ValueError("Native agent model must match the configured model")
+            return HarnessCompletionModel(self.model_id.split("/", 1)[1], self.native_harness_config, self.name, self.memory_folder)
         if str(self.model_id).startswith(("codex-cli/", "claude-cli/")):
             raise ValueError(
                 "CLI completion backends are text-only and cannot power ToolSmolAgent"
@@ -330,6 +336,9 @@ class SmolAgentFactory:
 
         workspace_dir = globals().get("WORKSPACE_DIR", "")
         workspace_hint = f"Workspace dir: {workspace_dir}" if workspace_dir else ""
+
+        if getattr(self, "native_harness_config", None) is not None:
+            return f"TASK:\n{self.instruct_prompt}\n\n{workspace_hint}\n\n{prev_infos}"
 
         return f"""
 OPERATIONAL CONTEXT:
@@ -508,6 +517,14 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             raise ValueError(f"Failed to load memory: {str(e)}")
 
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
+        if getattr(self, "native_harness_config", None) is not None:
+            try:
+                return run_native_agent(self.agent, instructions, {
+                    "timeout_seconds": self.timeout,
+                    "memory_path": self.memory_folder,
+                })
+            finally:
+                self.save_memories(workflow_uuid=state.get("workflow_uuid"))
         import threading
         workflow_uuid = state.get("workflow_uuid", None)
         if workflow_uuid is not None:

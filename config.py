@@ -165,6 +165,7 @@ class Config:
         self.api_base: str | None = None
         self.api_key_env: str | None = None
         self.harness_auth_mode: str = "subscription"
+        self.native_harness_config: dict[str, Any] | None = None
         self._pricing_client = OpenRouterPricingClient()
         self._model_pricing_cache = None
         # openrouter providers
@@ -225,6 +226,7 @@ class Config:
         ######
         self.runner_requirements: list[str] = [
             "setuptools>=70.0",
+            "psutil>=5.9.0",
             "python-dotenv",
             "fastmcp==2.8.1",
             "requests>=2.31.0",
@@ -311,7 +313,10 @@ class Config:
             for model in tool_models
             if model and model.split("/", 1)[0] in {"codex-cli", "claude-cli"}
         ]
-        if unsupported_tools:
+        if self.native_harness_config is not None:
+            from sources.core.native_harness import validate_native_config
+            validate_native_config(self)
+        elif unsupported_tools:
             raise ValueError(
                 "CLI completion backends are text-only and cannot power "
                 f"ToolSmolAgent: {unsupported_tools}"
@@ -434,6 +439,7 @@ class Config:
             "planner_llm_model": self.planner_llm_model,
             "workflow_llm_model": self.workflow_llm_model,
             "smolagent_model_id": self.smolagent_model_id,
+            "native_harness_config": self.native_harness_config,
             "judge_model": self.judge_model,
             "vision_judge_model": self.vision_judge_model,
             "capsule_namer_model": self.capsule_namer_model,
@@ -523,6 +529,7 @@ class Config:
             "workflow_llm_model", self.workflow_llm_model
         )
         self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
+        self.native_harness_config = data.get("native_harness_config", self.native_harness_config)
         self.judge_model = data.get("judge_model", self.judge_model)
         self.vision_judge_model = data.get(
             "vision_judge_model", self.vision_judge_model

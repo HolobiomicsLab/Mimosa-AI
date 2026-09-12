@@ -10,6 +10,7 @@ import uuid
 
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .factory import Factory
+from .native_harness import package_native_harness
 
 class SingleAgentFactory(Factory):
     """Build executable Python code for a single SmolAgent run.
@@ -54,7 +55,8 @@ class SingleAgentFactory(Factory):
         # runs one model, so resolve to the primary (first) for the engine,
         # provider lookup and cost tracking below.
         model_id = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
-        if str(model_id).startswith(("codex-cli/", "claude-cli/")):
+        native_runtime = package_native_harness(self.config)
+        if str(model_id).startswith(("codex-cli/", "claude-cli/")) and not native_runtime:
             raise ValueError(
                 "CLI completion backends are text-only and cannot power ToolSmolAgent"
             )
@@ -101,6 +103,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+{native_runtime}
+
 MODEL_ID = {model_id!r}
 SYSTEM_PROMPT = {SYSTEM_PROMPT!r}
 INSTRUCTIONS = {INSTRUCTIONS!r}
@@ -146,11 +150,13 @@ def logprobs_kwargs_for(model_id):
 # Only the litellm engine forwards the logprobs request, and only when the
 # provider accepts the params — gating both keeps the missing-logprobs
 # warning honest.
-logprobs_kwargs = logprobs_kwargs_for(model_id) if SAVE_LOGPROBS and engine_name == "litellm" else {{}}
+logprobs_kwargs = logprobs_kwargs_for(model_id) if SAVE_LOGPROBS and engine_name == "litellm" and not globals().get("NATIVE_HARNESS_CONFIG") else {{}}
 save_logprobs = bool(logprobs_kwargs)
 engine = None
 
-if engine_name == "mlx":
+if globals().get("NATIVE_HARNESS_CONFIG") is not None:
+    engine = HarnessCompletionModel(model_id.split("/", 1)[1], NATIVE_HARNESS_CONFIG, "single_agent", MEMORY_PATH)
+elif engine_name == "mlx":
     print("Using MLXModel for local execution.")
     engine = MLXModel(
         model_id=model_id,
@@ -209,7 +215,7 @@ agent = CodeAgent(
     tools=all_tools,
     model=engine,
     name="single_agent",
-    max_steps=256,
+    max_steps=NATIVE_HARNESS_CONFIG["max_calls"] if globals().get("NATIVE_HARNESS_CONFIG") is not None else 256,
     additional_authorized_imports = [
         'requests', 'json', 'requests.exceptions',
         'os', 'sys', 'pathlib', 'shutil', 'glob', 'tempfile', 'argparse',
@@ -285,7 +291,7 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
                     else None
                 )
                 action_step["logprobs"] = extract_logprobs(step)
-                action_step["model"] = self.model_id
+                action_step["model"] = MODEL_ID
                 memories.append(action_step)
 
         if save_logprobs and memories and all(m["logprobs"] is None for m in memories):
@@ -299,7 +305,13 @@ def save_agent_memories(agent, memory_path: str, agent_name: str):
         print(f"⚠️  Failed to save memory: {{{{str(e)}}}}")
 
 # Run agent
-result = agent.run(INSTRUCTIONS)
+if globals().get("NATIVE_HARNESS_CONFIG") is not None:
+    result = run_native_agent(agent, INSTRUCTIONS, {{
+        "timeout_seconds": {getattr(self.config, 'agent_execution_timeout', 3600)!r},
+        "memory_path": MEMORY_PATH,
+    }})
+else:
+    result = agent.run(INSTRUCTIONS)
 
 # Save agent memories for cost tracking
 save_agent_memories(agent, MEMORY_PATH, "single_agent")

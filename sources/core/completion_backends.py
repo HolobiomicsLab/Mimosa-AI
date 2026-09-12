@@ -41,9 +41,9 @@ def is_cli_completion_provider(provider: str) -> bool:
     return provider.lower() in CLI_BACKENDS
 
 
-def load_completion_bridge() -> ModuleType:
+def load_completion_bridge(bridge_path: str | None = None) -> ModuleType:
     """Load the trusted bridge module from its explicit absolute path."""
-    configured_path = os.getenv(BRIDGE_ENV, "")
+    configured_path = bridge_path if bridge_path is not None else os.getenv(BRIDGE_ENV, "")
     if not configured_path:
         raise CompletionBackendError(f"{BRIDGE_ENV} is required for CLI completion models")
     bridge_path = Path(configured_path)
@@ -149,9 +149,12 @@ def _validate_model_identity(result: dict[str, Any], request: dict[str, Any]) ->
         raise CompletionBackendError("completion bridge returned inconsistent model identity")
 
 
-def call_completion_bridge(request: dict[str, Any]) -> dict[str, Any]:
+def call_completion_bridge(
+    request: dict[str, Any], bridge_path: str | None = None
+) -> dict[str, Any]:
     """Call the configured bridge once and validate its result envelope."""
-    result = load_completion_bridge().complete(request)
+    bridge = load_completion_bridge() if bridge_path is None else load_completion_bridge(bridge_path)
+    result = bridge.complete(request)
     if not isinstance(result, dict):
         raise CompletionBackendError("completion bridge returned a non-dictionary result")
     if not RESULT_FIELDS.issubset(result):

@@ -361,11 +361,15 @@ class PricingCalculator:
                         for step in steps:
                             step_usage = step.get("token_usage", None)
                             model = step.get("model", model) or model
+                            if str(model).startswith(("codex-cli/", "claude-cli/")):
+                                continue
                             if token_usage:
                                 token_usage = {
                                     key: token_usage[key] + step_usage[key]
                                     for key in step_usage
                                 }
+                        if str(model).startswith(("codex-cli/", "claude-cli/")):
+                            continue
                         llm_calls.append(
                             TokenUsage(
                                 file.replace("task_", "").replace(".json", ""),
