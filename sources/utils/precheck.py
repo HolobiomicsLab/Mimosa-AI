@@ -426,7 +426,11 @@ class PreCheck:
             if model_id
             and is_cli_completion_provider(extract_model_pattern(model_id)[0])
         ]
-        if unsupported_tool_models:
+        native = getattr(self.config, "native_harness_config", None)
+        if native is not None:
+            from sources.core.native_harness import preflight_native_harness
+            self.model_check_metadata["smolagent"] = preflight_native_harness(self.config)
+        elif unsupported_tool_models:
             raise ValueError(
                 "CLI completion backends are text-only and cannot power "
                 f"ToolSmolAgent: {unsupported_tool_models}"
@@ -443,6 +447,8 @@ class PreCheck:
             required["judge_extraction"] = extraction_model
 
         for name, model_id in required.items():
+            if name == "smolagent" and native is not None:
+                continue
             if not model_id:
                 raise ValueError(f"⚠️  No model configured for '{name}'.")
             provider, _ = extract_model_pattern(model_id)
