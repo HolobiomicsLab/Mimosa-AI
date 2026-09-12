@@ -58,6 +58,9 @@ class Config:
         ##############
         # When True, writes an ASTRA spec YAML after task completion.
         self.export_astra: bool = False
+        # Optional absolute path to a trusted canonical planner contract.
+        # None preserves the historical free-form planner.
+        self.planner_contract_path: str | None = None
 
         ##############
         # LLM Configuration
@@ -481,6 +484,7 @@ class Config:
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
             "export_astra": self.export_astra,
+            "planner_contract_path": self.planner_contract_path,
             "runner_default_python_version": self.runner_default_python_version,
             "runner_default_timeout": self.runner_default_timeout,
             "agent_execution_timeout": self.agent_execution_timeout,
@@ -627,6 +631,9 @@ class Config:
         self.export_astra = bool(
             data.get("export_astra", self.export_astra)
         )
+        self.planner_contract_path = data.get(
+            "planner_contract_path", self.planner_contract_path
+        )
         self.runner_default_python_version = data.get(
             "runner_default_python_version", self.runner_default_python_version
         )
@@ -724,6 +731,7 @@ class Config:
         lines.append(f"  prompt_planner={self.prompt_planner}")
         lines.append(f"  prompt_workflow_creator={self.prompt_workflow_creator}")
         lines.append(f"  prompt_smolagent={self.prompt_smolagent}")
+        lines.append(f"  planner_contract_path={self.planner_contract_path}")
         lines.append(f"  reasoning_effort={self.reasoning_effort}")
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")

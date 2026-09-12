@@ -31,6 +31,12 @@ from sources.utils.perspicacite_client import (
 from sources.utils.planner_visualization import PlannerVisualizer
 
 from . import declared_outputs
+from .artifact_contracts import (
+    ArtifactContract,
+    ArtifactValidationError,
+    ContractValidationError,
+    load_artifact_contract,
+)
 from .evolution_engine import EvolutionEngine
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
@@ -54,6 +60,13 @@ class PlanValidationError(Exception):
 class DependencyError(Exception):
     """Exception raised when task dependencies are not satisfied."""
     pass
+
+
+_CONTRACT_PLANNER_SYSTEM_PROMPT = """You order an already-authorized execution graph.
+Return exactly one JSON object with contract_digest and steps. Each steps entry
+must contain only name. Include every required step exactly once in a valid
+topological order. Do not add, remove, rename, or redefine any step or artifact.
+"""
 
 
 class Planner:
@@ -83,6 +96,8 @@ class Planner:
         self.evolve = EvolutionEngine(config)
         self.task_history: list[Task] = []
         self.current_plan: Plan | None = None
+        self._active_contract: ArtifactContract | None = None
+        self._contract_tasks: dict[str, Task] = {}
         self.wf_selector = WorkflowSelector(self.config)
         self.notifier = PushNotifier(config.pushover_token, config.pushover_user)
         provider, model = extract_model_pattern(self.config.planner_llm_model)
@@ -106,6 +121,37 @@ class Planner:
         self.is_macos: bool = sys.platform == "darwin"  # Detect macOS for threading workaround
         self.is_windows: bool = sys.platform == "win32"  # Detect Windows for path handling
         self.tts = create_tts_service() if enable_tts else None
+
+    def _resolve_artifact_contract(
+        self,
+        contract: ArtifactContract | None = None,
+        contract_path: str | Path | None = None,
+    ) -> ArtifactContract | None:
+        """Resolve an explicit contract or the configured trusted file."""
+        if contract is not None and contract_path is not None:
+            raise ContractValidationError("Pass a contract object or path, not both")
+        if contract is not None:
+            return contract
+        selected = contract_path
+        if selected is None:
+            selected = getattr(self.config, "planner_contract_path", None)
+        return load_artifact_contract(selected) if selected is not None else None
+
+    @staticmethod
+    def _contract_plan_prompt(goal: str, contract: ArtifactContract) -> str:
+        return json.dumps(
+            {
+                "goal": goal,
+                "authoritative_contract": contract.planner_projection(),
+                "response_shape": {
+                    "contract_digest": contract.digest,
+                    "steps": [{"name": "canonical_step_name"}],
+                },
+            },
+            indent=2,
+            sort_keys=True,
+            allow_nan=False,
+        )
 
     def perspicacite_grounding(self, goal: str) -> str:
         """Query Perspicacite-AI for literature-grounded planning guidance.
@@ -183,7 +229,13 @@ You must generate a plan for goal:\n
 Important: Every task description should be very detailled and specific with the full path of all input output files specified.
 """
 
-    def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
+    def make_plan(
+        self,
+        system_prompt: str,
+        goal_prompt: str,
+        max_retries: int = 3,
+        contract: ArtifactContract | None = None,
+    ) -> Plan:
         """
         Generate a workflow plan using the LLM with retry logic and multiple parsing strategies.
         Args:
@@ -201,14 +253,20 @@ Important: Every task description should be very detailled and specific with the
             raise ValueError("❌ Planner: goal_prompt must be a non-empty string")
 
         last_error = None
-
-        prompt = self.make_scientific_grounded_prompt(goal_prompt)
+        contract = self._resolve_artifact_contract(contract)
+        if contract is not None:
+            system_prompt = _CONTRACT_PLANNER_SYSTEM_PROMPT
+            prompt = self._contract_plan_prompt(goal_prompt, contract)
+        else:
+            prompt = self.make_scientific_grounded_prompt(goal_prompt)
         for attempt in range(1, max_retries + 1):
             try:
                 print_info(f"Plan generation attempt {attempt}/{max_retries}")
 
                 memory_path = self.config.memory_dir
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(
+                    prompt, use_cache=contract is None
+                )
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -217,7 +275,7 @@ Important: Every task description should be very detailled and specific with the
                 plan_dict = self._extract_json_from_code_block(raw_plan)
                 if plan_dict is None:
                     raise ValueError("Failed to extract valid JSON from LLM response\n")
-                plan = self._parse_and_validate_plan(plan_dict, goal_prompt)
+                plan = self._parse_and_validate_plan(plan_dict, goal_prompt, contract)
                 print_ok(f"Plan generated and validated — {len(plan.steps)} step(s)")
                 return plan
 
@@ -260,7 +318,12 @@ Important: Every task description should be very detailled and specific with the
         )
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
-    def _parse_and_validate_plan(self, plan_dict: dict[str, Any], goal: str) -> Plan:
+    def _parse_and_validate_plan(
+        self,
+        plan_dict: dict[str, Any],
+        goal: str,
+        contract: ArtifactContract | None = None,
+    ) -> Plan:
         """
         Parse and validate a plan dictionary into a Plan object.
 
@@ -276,6 +339,10 @@ Important: Every task description should be very detailled and specific with the
         Raises:
             PlanValidationError: If plan validation fails.
         """
+        if contract is not None:
+            return contract.project_plan(plan_dict, goal)
+        if not isinstance(plan_dict, dict):
+            raise PlanValidationError("❌ Planner: Plan must be a JSON object")
         if "steps" not in plan_dict:
             raise PlanValidationError("❌ Planner: No steps found in the generated plan")
 
@@ -462,6 +529,9 @@ Original request:
         """
         print_phase("📋 EXECUTION PLAN")
         print(f"  {BOLD}Goal:{RESET} {plan.goal}\n")
+        print(f"  {BOLD}Artifact contract:{RESET} {plan.contract_status}")
+        if plan.contract_digest:
+            print(f"  {DIM}Digest: {plan.contract_digest}{RESET}\n")
         for i, step in enumerate(plan.steps, 1):
             print(f"  {CYAN}{BOLD}{i}. {step.name.upper()}{RESET}  {DIM}[{step.complexity}]{RESET}")
             print(f"     {step.task}")
@@ -499,7 +569,12 @@ Original request:
             print_info("Regenerating plan based on your feedback…")
             return False, user_input
 
-    def _generate_plan_with_human_validation(self, goal: str, human_approve: bool = False) -> Plan:
+    def _generate_plan_with_human_validation(
+        self,
+        goal: str,
+        human_approve: bool = False,
+        contract: ArtifactContract | None = None,
+    ) -> Plan:
         """
         Generate a plan with iterative human validation and feedback loop.
 
@@ -523,7 +598,7 @@ Original request:
             current_goal = goal
             if human_feedback:
                 current_goal = f"{goal}\n\nHUMAN FEEDBACK ON PREVIOUS PLAN:\n{human_feedback}\n\nPlease address this feedback in the new plan."
-            plan = self.make_plan(system_prompt, current_goal)
+            plan = self.make_plan(system_prompt, current_goal, contract=contract)
             if plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
             self._display_plan(plan)
@@ -742,6 +817,36 @@ Original request:
         """
         missing_deps = []
 
+        contract = getattr(self, "_active_contract", None)
+        if contract is not None:
+            if getattr(self, "current_plan", None) is None:
+                raise ContractValidationError("Contract execution has no admitted plan")
+            contract.revalidate_plan(self.current_plan)
+            input_hashes = contract.validate_inputs(step, self.workspace_path)
+            contract_tasks = getattr(self, "_contract_tasks", {})
+            for dep_name in step.depends_on:
+                dep_task = contract_tasks.get(dep_name)
+                if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
+                    missing_deps.append(dep_name)
+            spec = contract.steps[step.name]
+            for artifact_id in spec.inputs:
+                if artifact_id in contract.supplied:
+                    continue
+                producer = contract.producer_by_artifact[artifact_id]
+                dep_task = contract_tasks.get(producer)
+                if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
+                    continue
+                expected = dep_task.output_artifact_sha256.get(artifact_id)
+                if expected is None:
+                    missing_deps.append(
+                        f"{producer}[missing_artifact_receipt:{artifact_id}]"
+                    )
+                elif input_hashes[artifact_id] != expected:
+                    missing_deps.append(
+                        f"{producer}[artifact_changed:{artifact_id}]"
+                    )
+            return len(missing_deps) == 0, missing_deps
+
         for dep_name in step.depends_on:
             dep_task = next((task for task in self.task_history if task.name == dep_name), None)
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
@@ -819,6 +924,7 @@ Original request:
         judge: bool,
         cached_wf_allow: bool = True,
         original_task: str | None = None,
+        reuse_workflows: bool = True,
     ) -> list[IndividualRun]:
         """
         Execute Iterative-Learning for a given task.
@@ -830,6 +936,8 @@ Original request:
                 workflows discovered by the workflow selector.
             original_task: Original unwrapped task for similarity matching;
                 used in preference to ``task`` for cache lookup.
+            reuse_workflows: When false, skip both result-cache lookup and
+                parent-workflow reuse for this evolution call.
 
         Returns:
             List[IndividualRun]: List of Evolution runs (possibly a single
@@ -852,7 +960,7 @@ Original request:
             # Check for high-quality cached workflows
             past_wf_lookups = self.wf_selector.select_best_workflows(
                 lookup_task, threshold_similarity=0.98, threshold_score=0.99
-            ) if cached_wf_allow else []
+            ) if cached_wf_allow and reuse_workflows else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]
@@ -878,13 +986,16 @@ Original request:
             if self.evolve is None:
                 raise ValueError("❌ Planner: instance is None")
 
-            runs = await self.evolve.start_workflow_evolution(
-                goal=task,
-                template_uuid=None,
-                judge=judge,
-                enable_evolution=True,
-                original_task=original_task
-            )
+            evolution_kwargs = {
+                "goal": task,
+                "template_uuid": None,
+                "judge": judge,
+                "enable_evolution": True,
+                "original_task": original_task,
+            }
+            if not reuse_workflows:
+                evolution_kwargs["reuse_workflows"] = False
+            runs = await self.evolve.start_workflow_evolution(**evolution_kwargs)
 
             if runs is None:
                 print_warn("Runs is None, returning empty list")
@@ -909,6 +1020,62 @@ Original request:
         run_state_result = getattr(run, 'state_result', None) or {}
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
         return success_list[-1]
+
+    def _complete_contract_attempt(
+        self,
+        contract: ArtifactContract,
+        step: PlanStep,
+        task: Task,
+        input_hashes: dict[str, str],
+        attempt: int,
+        max_attempts: int,
+    ) -> bool:
+        """Validate one contract attempt and record only fresh exact outputs."""
+        try:
+            observed_outputs = contract.snapshot_outputs(step, self.workspace_path)
+            task.output_artifact_sha256 = {
+                artifact_id: digest
+                for artifact_id, digest in observed_outputs.items()
+                if digest is not None
+            }
+            if contract.validate_inputs(step, self.workspace_path) != input_hashes:
+                raise ArtifactValidationError(
+                    "A canonical input changed during workflow execution"
+                )
+            output_hashes = contract.validate_outputs(step, self.workspace_path)
+        except ArtifactValidationError as exc:
+            task.status = TaskStatus.FAILED
+            step.missing_outputs = list(step.expected_outputs)
+            if attempt < max_attempts:
+                contract.remove_outputs_for_retry(step, self.workspace_path)
+                print_warn(
+                    f"Task '{step.name}' violated its artifact contract: {exc} "
+                    f"— retrying ({attempt}/{max_attempts})"
+                )
+            else:
+                step.status = TaskStatus.FAILED
+                print_err(
+                    f"Task '{step.name}' exhausted {max_attempts} attempts with "
+                    f"an invalid contract output: {exc}"
+                )
+            return False
+        except ContractValidationError:
+            task.status = TaskStatus.FAILED
+            step.status = TaskStatus.FAILED
+            raise
+
+        task.status = TaskStatus.COMPLETED
+        task.output_artifact_sha256 = output_hashes
+        task.produced_outputs = list(step.expected_outputs)
+        step.missing_outputs = []
+        step.status = TaskStatus.COMPLETED
+        contract_tasks = getattr(self, "_contract_tasks", None)
+        if contract_tasks is None:
+            contract_tasks = {}
+            self._contract_tasks = contract_tasks
+        contract_tasks[step.name] = task
+        print_ok(f"Task '{step.name}' completed with validated artifacts")
+        return True
 
     async def run_attempts(
         self,
@@ -939,9 +1106,42 @@ Original request:
             print_warn(f"Invalid max_attempts, using default: {max_attempts}")
 
         step_name = getattr(step, 'name', 'unknown_step')
-        goal = getattr(step, 'goal_context', '')
         task = getattr(step, 'task', '')
-        step_task = f"Broader context:{goal}\n---\nYour task:{task}"
+        contract = getattr(self, "_active_contract", None)
+        if contract is not None:
+            if getattr(self, "current_plan", None) is None:
+                raise ContractValidationError("Contract execution has no admitted plan")
+            can_execute, missing_dependencies = self._can_execute_step(step)
+            if not can_execute:
+                raise DependencyError(
+                    f"Contract step {step_name!r} has unsatisfied dependencies: "
+                    f"{missing_dependencies}"
+                )
+            existing_outputs = contract.snapshot_outputs(step, self.workspace_path)
+            preexisting = [
+                artifact_id
+                for artifact_id, digest in existing_outputs.items()
+                if digest is not None
+            ]
+            if preexisting:
+                raise ArtifactValidationError(
+                    "Canonical outputs exist before the first attempt and cannot earn "
+                    "production credit: " + ", ".join(preexisting)
+                )
+            step_task = "Your task:" + task
+            step_task += "\n---\nCanonical artifact interface (authoritative):\n" + json.dumps(
+                contract.execution_projection(step),
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+        elif getattr(step, "contract_status", "legacy_unchecked") == "validated":
+            raise ContractValidationError(
+                "Validated step cannot execute without its active contract"
+            )
+        else:
+            goal = getattr(step, 'goal_context', '')
+            step_task = f"Broader context:{goal}\n---\nYour task:{task}"
         # Carry the plan's declared outputs to the verifier, which is handed a
         # uuid and would otherwise never see them (issue #196). Keyed on the
         # same task text the verifier keys its rubric cache on, so no signature
@@ -960,13 +1160,35 @@ Original request:
                 self.tts.speak(f"now starting task {step_name}", voice_index=0)
 
             try:
-                enhanced_task = self._build_knowledge_aware_task(step_task)
+                input_hashes = (
+                    contract.validate_inputs(step, self.workspace_path)
+                    if contract is not None
+                    else {}
+                )
+                if contract is not None:
+                    remaining_outputs = contract.snapshot_outputs(
+                        step, self.workspace_path
+                    )
+                    if any(digest is not None for digest in remaining_outputs.values()):
+                        raise ArtifactValidationError(
+                            "Canonical output remains before a retry attempt"
+                        )
+                enhanced_task = (
+                    step_task
+                    if contract is not None
+                    else self._build_knowledge_aware_task(step_task)
+                )
                 # Pass both enhanced task and original task for proper workflow matching
+                evolve_kwargs = {
+                    "cached_wf_allow": attempt <= 1 and contract is None,
+                    "original_task": step_task,
+                }
+                if contract is not None:
+                    evolve_kwargs["reuse_workflows"] = False
                 evolve_runs = await self.evolve_runs(
                     enhanced_task,
                     judge,
-                    cached_wf_allow=(attempt<=1),
-                    original_task=step_task  # Pass original for similarity matching
+                    **evolve_kwargs,
                 )
 
                 attempt_cost += sum([r.cost for r in evolve_runs])
@@ -990,18 +1212,50 @@ Original request:
                     final_answers=final_answers,
                     final_uuid=final_uuid,
                     workflow_uuid=workflow_uuid,
-                    status=TaskStatus.COMPLETED if evolve_success else TaskStatus.FAILED,
+                    status=(
+                        TaskStatus.RUNNING
+                        if contract is not None and evolve_success
+                        else TaskStatus.COMPLETED if evolve_success else TaskStatus.FAILED
+                    ),
                     depends_on=getattr(step, 'depends_on', []) or [],
                     required_inputs=getattr(step, 'required_inputs', []) or [],
                     expected_outputs=getattr(step, 'expected_outputs', []) or [],
                     complexity=getattr(step, 'complexity', 'medium'),
-                    produced_outputs=[f for f in self._get_workspace_files() if f not in self._workspace_files_before_step]
+                    produced_outputs=(
+                        []
+                        if contract is not None
+                        else [
+                            f for f in self._get_workspace_files()
+                            if f not in self._workspace_files_before_step
+                        ]
+                    ),
+                    contract_status=getattr(step, "contract_status", "legacy_unchecked"),
+                    contract_digest=getattr(step, "contract_digest", None),
+                    input_artifact_ids=list(getattr(step, "input_artifact_ids", []) or []),
+                    output_artifact_ids=list(getattr(step, "output_artifact_ids", []) or []),
+                    supplied_artifact_ids=(
+                        [item for item in getattr(step, "input_artifact_ids", []) if item in contract.supplied]
+                        if contract is not None else []
+                    ),
+                    input_artifact_sha256=input_hashes,
                 )
 
                 self.task_history.append(task)
 
                 if evolve_success and attempt_score >= 0.7:
                     time.sleep(10) # wait for files update
+                    if contract is not None:
+                        completed = self._complete_contract_attempt(
+                            contract,
+                            step,
+                            task,
+                            input_hashes,
+                            attempt,
+                            max_attempts,
+                        )
+                        if completed:
+                            attempt = max_attempts
+                        continue
                     outputs_produced, missing_outputs = self._verify_expected_outputs(step)
                     if outputs_produced:
                         step.status = TaskStatus.COMPLETED
@@ -1032,6 +1286,18 @@ Original request:
                     )
                     break
                 else:
+                    if contract is not None:
+                        task.status = TaskStatus.FAILED
+                        observed_outputs = contract.snapshot_outputs(
+                            step, self.workspace_path
+                        )
+                        task.output_artifact_sha256 = {
+                            artifact_id: digest
+                            for artifact_id, digest in observed_outputs.items()
+                            if digest is not None
+                        }
+                        if attempt < max_attempts:
+                            contract.remove_outputs_for_retry(step, self.workspace_path)
                     print_err(f"Task {step_name} (uuid: {final_uuid}) failed with score {attempt_score}")
                     if self.tts:
                         self.tts.speak(f"Task {step_name} failure, retrying...", voice_index=0)
@@ -1040,6 +1306,8 @@ Original request:
             except Exception as e:
                 raise e
 
+        if contract is not None and step.status != TaskStatus.COMPLETED:
+            step.status = TaskStatus.FAILED
         step.cost = attempt_cost
         step.score = attempt_score
         self._narrate_step_completion(step_name, attempt_score, attempt_cost, final_answers)
@@ -1092,7 +1360,8 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_task_retry: int = 5
+        max_task_retry: int = 5,
+        contract_path: str | Path | None = None,
     ) -> list[Task]:
         """
         Start the planner with a given goal with comprehensive error handling.
@@ -1108,20 +1377,29 @@ Original request:
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
 
-        goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
+        self._active_contract = self._resolve_artifact_contract(contract_path=contract_path)
+        self._contract_tasks = {}
+        if self._active_contract is not None:
+            self.task_history = []
+        if self._active_contract is None:
+            goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
         print_info(f"Starting planner with goal: {goal[:80]}…")
 
         try:
             # Generate plan with human validation loop
-            self.current_plan = self._generate_plan_with_human_validation(goal)
+            self.current_plan = self._generate_plan_with_human_validation(
+                goal, contract=self._active_contract
+            )
 
             if self.current_plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")
+            if self._active_contract is not None:
+                self._active_contract.revalidate_plan(self.current_plan)
 
             # Initialize visualization after plan is approved
             self._init_visualization(self.current_plan)
             # Check for stop condition
-            if self._check_stop_condition(self.current_plan):
+            if self._active_contract is None and self._check_stop_condition(self.current_plan):
                 print_info("Stop condition found in plan. Exiting.")
                 return self.task_history
 
@@ -1143,7 +1421,7 @@ Original request:
                     f"📋 STEP {step_idx + 1}/{len(self.current_plan.steps)}  ·  {step_name}",
                 )
                 # Check if step can be executed (dependencies satisfied)
-                if lst_step:
+                if self._active_contract is not None or lst_step:
                     can_execute, missing_deps = self._can_execute_step(step)
                     if not can_execute:
                         self.request_user_exit(f"Cannot execute step '{step_name}' — missing dependencies: {missing_deps}")
@@ -1154,7 +1432,10 @@ Original request:
                 max_attempts = max_task_retry
 
                 try:
-                    self._capture_workspace_snapshot()  # Snapshot before execution for output diff
+                    if self._active_contract is None:
+                        self._capture_workspace_snapshot()  # Legacy output diff only.
+                    else:
+                        self._workspace_files_before_step = []
                     step = await self.run_attempts(attempt_counts, max_attempts, step, judge)
                     total_cost += step.cost
                     self._update_visualization(total_cost)  # Update after step completes
