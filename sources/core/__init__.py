@@ -1,37 +1,43 @@
-"""
-Core sub-package for Mimosa-AI.
+"""Core public interfaces, loaded only when their owning component is used.
 
-Contains the central orchestration, planning, workflow management, LLM
-provider abstraction, and evolutionary-improvement machinery that drives
-the agent system.
+Independent core modules must not initialize unrelated CLI, MCP or scientific
+workflow dependencies as a side effect of importing their parent package.
 """
 
-from .llm_provider import LLMConfig, LLMProvider
-from .schema import (
-    TaskStatus,
-    TaskComplexity,
-    SelectionLog,
-    IndividualRun,
-    PlanStep,
-    Plan,
-    Task,
-)
-from .workflow_info import WorkflowInfo
-from .orchestrator import WorkflowOrchestrator
-from .planner import Planner, PlanValidationError, DependencyError
-from .factory import Factory
-from .workflow_factory import WorkflowFactory
-from .single_agent_factory import SingleAgentFactory
-from .workflow_runner import WorkflowRunner, ExecutionStatus, ExecutionResult, RuntimeConfig
-from .workflow_selection import WorkflowSelector
-from .tools_manager import Tool, MCP, ToolManager
-from .selection import (
-    SelectionPressure,
-    SelectionStrategy,
-    PopulationMember,
-)
-from .evolution_engine import EvolutionEngine
-from .variation_engine import VariationEngine
+from importlib import import_module
+
+_EXPORT_MODULES = {
+    'LLMConfig': 'llm_provider',
+    'LLMProvider': 'llm_provider',
+    'TaskStatus': 'schema',
+    'TaskComplexity': 'schema',
+    'SelectionLog': 'schema',
+    'IndividualRun': 'schema',
+    'PlanStep': 'schema',
+    'Plan': 'schema',
+    'Task': 'schema',
+    'WorkflowInfo': 'workflow_info',
+    'WorkflowOrchestrator': 'orchestrator',
+    'Planner': 'planner',
+    'PlanValidationError': 'planner',
+    'DependencyError': 'planner',
+    'Factory': 'factory',
+    'WorkflowFactory': 'workflow_factory',
+    'SingleAgentFactory': 'single_agent_factory',
+    'WorkflowRunner': 'workflow_runner',
+    'ExecutionStatus': 'workflow_runner',
+    'ExecutionResult': 'workflow_runner',
+    'RuntimeConfig': 'workflow_runner',
+    'WorkflowSelector': 'workflow_selection',
+    'Tool': 'tools_manager',
+    'MCP': 'tools_manager',
+    'ToolManager': 'tools_manager',
+    'SelectionPressure': 'selection',
+    'SelectionStrategy': 'selection',
+    'PopulationMember': 'selection',
+    'EvolutionEngine': 'evolution_engine',
+    'VariationEngine': 'variation_engine',
+}
 
 __all__ = [
     # LLM provider
@@ -75,3 +81,18 @@ __all__ = [
     "EvolutionEngine",
     "VariationEngine",
 ]
+
+
+def __getattr__(name):
+    """Resolve and cache an existing public export from its original module."""
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(f".{module_name}", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    """Expose the public interface to introspection without importing it."""
+    return sorted(set(globals()) | set(__all__))
