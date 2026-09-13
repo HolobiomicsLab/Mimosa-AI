@@ -29,6 +29,10 @@ CLEANUP_TIMEOUT = 10
 class ProcessCleanupError(RuntimeError):
     """An owned host process could not be verified stopped."""
 
+    def __init__(self, message, *, cancelled=False):
+        super().__init__(message)
+        self.cancelled = cancelled
+
 
 @dataclass
 class ContainerRuntime:
@@ -153,6 +157,12 @@ async def _owned_process(argv, **kwargs):
         if cancelled:
             raise asyncio.CancelledError
         yield process
+    except asyncio.CancelledError:
+        cancelled = True
+        raise
+    except ProcessCleanupError as error:
+        cancelled = cancelled or error.cancelled
+        raise
     finally:
         try:
             await _finish_despite_cancellation(
@@ -160,7 +170,8 @@ async def _owned_process(argv, **kwargs):
             )
         except Exception as error:
             raise ProcessCleanupError(
-                "owned host process cleanup is unverified"
+                "owned host process cleanup is unverified",
+                cancelled=cancelled or bool(asyncio.current_task().cancelling()),
             ) from error
 
 
@@ -352,8 +363,9 @@ class ContainerWorkflowRunner:
             status = "timeout"
         except asyncio.CancelledError:
             cancelled = True
-        except ProcessCleanupError:
+        except ProcessCleanupError as error:
             status, processes_clean = "cleanup_failed", False
+            cancelled = error.cancelled
         except (OSError, ValueError, RuntimeError) as error:
             status = "failed"
             remaining = MAX_OUTPUT_BYTES - len(self._stdout) - len(self._stderr)
