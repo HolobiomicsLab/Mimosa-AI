@@ -20,17 +20,19 @@ from typing import Any
 
 from sources.cli.pretty_print import (
     CYAN,
-    RED,
     GREEN,
+    RED,
     print_box,
     print_ok,
 )
-
 from sources.core.failure_fingerprint import (
     DESCRIPTOR_DIM as _FP_DIM,
+)
+from sources.core.failure_fingerprint import (
     compute_failure_fingerprint,
 )
 from sources.core.llm_provider import LLMConfig
+from sources.evaluators.grounding import get_perspicacite_grounding
 
 from .base import (
     BaseEvaluator,
@@ -40,7 +42,6 @@ from .base import (
 from .verifier_claims import _VerifierClaimExtractionMixin
 from .verifier_per_claim import _VerifierPerClaimMixin
 from .verifier_workspace import _VerifierWorkspaceMixin
-from sources.evaluators.grounding import get_perspicacite_grounding
 
 # ----- Execution limits -------------------------------------------------------
 _VERIFIER_TIMEOUT_SECONDS = 180
@@ -210,8 +211,24 @@ class VerifierEvaluator(
             "verifier_abstract_textual_gradient",
             prompt,
         )
+        diag = (diag or "").strip()
+        repeats = 0
+        for previous in reversed(self._textual_gradient_history):
+            if (previous or "").strip() == diag:
+                repeats += 1
+            else:
+                break
         self._textual_gradient_history.append(diag)
-        return diag.strip() or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
+        if repeats >= 2:
+            diag = (
+                f"IDENTICAL_DIAGNOSIS_REPEATED_{repeats + 1}X: the failures "
+                "below did not change despite mutations targeting them - "
+                "the underlying claim may be unfixable at the workflow "
+                "level (input-data property or misaligned claim); "
+                "re-examine the claim definition or the provided inputs "
+                "before mutating again.\n" + diag
+            )
+        return diag or "UNDIAGNOSED:No diagnosis could be extracted from the verifier report."
 
     # ------------------------------------------------------------------
     # Literature grounding (Perspicacite)
@@ -573,6 +590,12 @@ class VerifierEvaluator(
 
     _RUBRIC_CACHE_FILENAME_FMT = "rubric_cache_{task_key}.json"
 
+    # Bump when claim-extraction prompts change in a way that must reach
+    # already-seeded tasks. The cache key hashes goal + version, so a bump
+    # invalidates every frozen rubric and forces one fresh extraction per
+    # task (v2: fixability + input→output alignment rules, 2026-09-12).
+    _RUBRIC_VERSION = "v2-fixability-20260912"
+
     @property
     def verifier_temp_root(self) -> Path:
         """Public alias for the verifier scratch root (``_verifier_tmp/``)."""
@@ -580,13 +603,18 @@ class VerifierEvaluator(
 
     @staticmethod
     def _task_cache_key(goal: str) -> str:
-        """Stable 16-hex-char key derived from the task goal text.
+        """Stable 16-hex-char key derived from goal text + rubric version.
 
         Same goal → same key, across runs and machines. Hashing the goal (not
         the workflow uuid) is what makes the cache shared between iterations
-        of the SAME task and distinct between DIFFERENT tasks.
+        of the SAME task and distinct between DIFFERENT tasks. The rubric
+        version salt is included so prompt changes that must re-seed frozen
+        rubrics (fixability rules, alignment rules) invalidate old caches
+        without manual cleanup.
         """
-        return hashlib.sha256((goal or "").encode("utf-8")).hexdigest()[:16]
+        digest = hashlib.sha256((goal or "").encode("utf-8"))
+        digest.update(VerifierEvaluator._RUBRIC_VERSION.encode("utf-8"))
+        return digest.hexdigest()[:16]
 
     def _rubric_cache_path(self, task_key: str) -> Path:
         """On-disk path of the frozen rubric for one task."""

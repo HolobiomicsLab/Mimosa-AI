@@ -21,14 +21,13 @@ if __name__ == "__main__":
     )
 
 from sources.cli.pretty_print import CYAN, DIM, GREEN, RED, YELLOW, print_box
-from sources.core.llm_provider import LLMConfig, LLMProvider
+from sources.core.llm_provider import LLMProvider
 from sources.core.workflow_runner import (
     ExecutionResult,
     ExecutionStatus,
     RuntimeConfig,
     WorkflowRunner,
 )
-
 
 # ----- Verifier helper packages ----------------------------------------------
 # Installed once per process so verifier scripts can rely on them being
@@ -154,6 +153,16 @@ RULES:
   If the script needs to find a dropped column or a hyperparameter name,
   inspect the produced artefact (read the CSV, compare against the goal's
   ground-truth schema) instead of parsing the workflow source
+- INPUT-DATA PROPERTY GUARD. If the claim asserts a property solely of
+  the PROVIDED INPUT files (class balance of a given test set, overlap
+  inside the provided split, dataset size, raw-input schema quirks) and
+  no produced artefact is on the claim's file list, do NOT check it:
+  return {{"executable": false}} with reason "input-data property — not
+  output integrity". A workflow cannot fix its own inputs; scoring such
+  a claim pins the reward forever. Exception: alignment claims that
+  COMPARE a produced artefact against an input schema (identifier
+  columns, label columns, row correspondence) are legitimate and must
+  be checked.
 
 ERROR HANDLING:
 

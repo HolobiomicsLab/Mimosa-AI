@@ -11,9 +11,8 @@ builders pull from one source of truth.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
-
 
 # Rules every source prompt appends verbatim. Kept here so the builders
 # share one definition rather than copies that can drift.
@@ -29,6 +28,28 @@ outputs, tables, figures, reports, and other non-code deliverable files.
   not in the listing.
 - Use `[]` if the claim is purely about the workflow's output text and has
   no on-disk artefact to consult.
+
+FIXABILITY (mandatory). A claim must be satisfiable by changing what the
+workflow PRODUCES or PERSISTS. NEVER assert properties of the PROVIDED
+INPUT files themselves — class balance of the given test set, overlap
+inside the given split, dataset size, or raw-file schema quirks. The
+workflow cannot repair its own inputs, so such claims fail forever no
+matter what the agents do. Input files may appear in
+`likely_relevant_files` ONLY as the reference side of an input→output
+ALIGNMENT check (see below). If an input property looks scientifically
+blocking, do NOT extract it as a claim — it belongs in the diagnosis
+narrative, not in the rubric.
+
+ALIGNMENT CLAIMS. When the goal does not name the output schema, anchor
+it to the input schema: "the prediction file repeats the input dataset's
+identifier and label columns verbatim — same names, same order, no
+renames, no added suffixes such as `_prob`/`_score`/`_pred`". Never
+invent column or key names that appear neither in the goal text nor in
+a dataset preview. When the workflow must EXCLUDE something that the
+provided inputs contain (e.g. overlapping IDs between the given train
+and test files), the claim targets the workflow's persisted,
+post-filter artefact ("the training set saved at `<path>` shares no IDs
+with the test file"), never the provided raw split.
 
 POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
 the workflow ACHIEVED scientifically. A claim is well-formed only if
@@ -204,6 +225,18 @@ shows only a partial row), emit a weaker positional claim instead:
 "The first N columns of `<path>` are exactly `[<visible names>]`" —
 do NOT invent the omitted names.
 
+PREDICTION SCHEMA FROM THE INPUT SCHEMA. When the goal asks for a
+prediction/output file but does NOT name its columns, and a DATASET
+PREVIEW (or dataset structure) shows the input's identifier and label
+columns, anchor the output schema to those input headers verbatim:
+"The prediction file `<output path>` has columns exactly equal to
+`[<identifier column>, <label columns from the input schema>]` (same
+names, same order, no renames, no added suffixes such as `_prob`,
+`_score`, `_pred`)." This input→output alignment claim is mandatory in
+that situation — one claim per deliverable file. The input dataset's
+label columns are the task's ground-truth schema; predictions must
+reuse them, not paraphrase them.
+
 If the goal contains no example data, no deliverable specifications,
 and no named identifiers, skip this section silently. Do not fabricate
 identifiers to fill the quota.
@@ -306,9 +339,15 @@ Look for properties such as:
 - The prediction distribution is not degenerate: not constant, not all
   one class, not a single value repeated, not uniformly 0.5, with non-zero
   variance across rows in continuous outputs.
-- No data-leakage signatures: train and test sets are disjoint (no
-  overlapping IDs or rows); the test set is not a subset of training data;
-  perfect or near-perfect scores on a known-hard task are flagged as
+- No data-leakage signatures in what the workflow CONSUMED. If the
+  provided split itself overlaps, the claim targets the workflow's
+  persisted, post-filter artefact: "the training data actually used for
+  fitting (saved at `<cleaned-train path>`) shares no IDs/rows with the
+  test file". If the workflow persists no consumed-training artefact,
+  emit the output-integrity claim "the workflow saves the training set
+  it actually consumed" instead. NEVER assert disjointness of the
+  provided raw split itself — the workflow cannot fix its own inputs.
+  Perfect or near-perfect scores on a known-hard task are flagged as
   suspect unless the artefact explicitly justifies them.
 - No suspicious hard-coded or fallback patterns in outputs (predictions
   all identical, all integers when probabilities were expected, exact
@@ -329,9 +368,10 @@ Look for properties such as:
   measurements. Sentinel-leakage claims target methodology
   validity and rate importance 8-9 whenever the polluted column
   drives a headline selection, ranking, fit, or figure.
-- Sample sizes are adequate for the test (n above a sensible floor for
-  the statistic being claimed; enough samples per class for stratified
-  metrics).
+- Sample sizes are adequate for the statistic being claimed — but only
+  as a property of the workflow's own persisted split or sampled
+  artefact, never of the provided input files (their class balance is
+  given data the workflow cannot change).
 - Where probabilities are produced, they show inter-class separation
   rather than collapsing to a single point.
 
