@@ -2,15 +2,6 @@
 """
 VariationEngine: prompt assembly and search-state observation for LLM-guided
 workflow evolution.
-
-Mutation magnitude ("how bold") is decided implicitly by the mutation
-directive LLM, informed by a deterministic, read-only ``<search_state>``
-block. The former Rechenberg step-size controller (effective boldness,
-scope bands, RE-SPECIATION gate) was removed: it never actuated a real
-knob — the only channel was advisory prompt text, and realised edit size
-tracked the directive wording, not the scalar. The observer half is kept:
-plateau streak, success rate and score trajectory are still computed and
-exposed to the directive LLM and telemetry.
 """
 
 import numpy as np
@@ -61,7 +52,6 @@ class VariationEngine:
             })
         except Exception as e:
             raise Exception(f"Failed to initialize LLM configuration: {str(e)}") from e
-
 
     def record_offspring_gradient(
         self,
