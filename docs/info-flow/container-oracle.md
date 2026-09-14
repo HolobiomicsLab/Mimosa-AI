@@ -116,7 +116,11 @@ scientific solution. Missing scripts remain incomplete submissions.
 ## Deadlines, failure and cleanup
 
 Global and per-completion deadlines cover asynchronous reads, writes and the host
-completion process. Every terminal path stops owned host processes and removes
+completion process. The private worker watchdog allows five additional seconds
+for startup, bridge termination and receipt settlement; the bridge's requested
+model-call timeout is unchanged. The outer workflow deadline still preempts this
+margin. A stuck worker is killed when its watchdog expires; a missing terminal
+receipt remains unresolved. Every terminal path stops owned host processes and removes
 the named container. Repeated cancellation during spawn waits until the created
 process can be tracked and stopped. Host descendant discovery reuses the existing
 process tracker and is intended for trusted bridge/CLI descendants; polling is

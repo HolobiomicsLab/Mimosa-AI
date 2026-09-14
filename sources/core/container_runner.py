@@ -24,6 +24,7 @@ from .process_lifecycle import OwnedProcessTree
 
 MAX_OUTPUT_BYTES = 4 * MAX_FRAME_BYTES
 CLEANUP_TIMEOUT = 10
+COMPLETION_SETTLEMENT_SECONDS = 5
 
 
 class ProcessCleanupError(RuntimeError):
@@ -279,7 +280,11 @@ class ContainerWorkflowRunner:
         )
         env = {key: os.environ[key] for key in keys if key in os.environ}
         env.update(PYTHONPATH=source_root, PYTHONDONTWRITEBYTECODE="1")
-        async with asyncio.timeout(self.config.settings["call_timeout_seconds"]):
+        # Leave the bridge time to persist its terminal receipt.
+        worker_timeout = (
+            self.config.settings["call_timeout_seconds"] + COMPLETION_SETTLEMENT_SECONDS
+        )
+        async with asyncio.timeout(worker_timeout):
             async with _owned_process(argv, env=env, cwd=source_root) as process:
                 response, _ = await _exchange(process, payload, MAX_FRAME_BYTES)
                 if process.returncode:
