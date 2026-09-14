@@ -189,8 +189,9 @@ async def _read_limited(stream, maximum):
 
 async def _exchange(process, payload, maximum):
     async def write():
-        process.stdin.write(payload)
-        await process.stdin.drain()
+        if payload:
+            process.stdin.write(payload)
+            await process.stdin.drain()
         process.stdin.close()
 
     tasks = [
