@@ -15,7 +15,7 @@ import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .container_completion import FRAME_PREFIX, MAX_FRAME_BYTES, parse_request
@@ -25,6 +25,7 @@ from .process_lifecycle import OwnedProcessTree
 MAX_OUTPUT_BYTES = 4 * MAX_FRAME_BYTES
 CLEANUP_TIMEOUT = 10
 COMPLETION_SETTLEMENT_SECONDS = 5
+CLEANUP_DIAGNOSTIC_LIMIT = 4096
 
 
 class ProcessCleanupError(RuntimeError):
@@ -64,6 +65,7 @@ class ContainerResult:
     cleanup_verified: bool
     container_name: str
     completion_count: int
+    cleanup_diagnostics: list[dict] = field(default_factory=list)
 
 
 def _validated(config):
@@ -217,6 +219,7 @@ class ContainerWorkflowRunner:
         self._completion_count = 0
         self._return_code = None
         self.container_name = None
+        self._cleanup_diagnostics = []
 
     def container_argv(self, name):
         """Build the fixed containment policy; no solver fields reach Docker."""
@@ -332,21 +335,46 @@ class ContainerWorkflowRunner:
                     task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
 
+    def _record_cleanup_error(self, phase, error):
+        """Retain the failed verification phase and bounded exception evidence."""
+        record = {
+            "phase": phase,
+            "error_type": type(error).__name__,
+            "error": str(error)[:CLEANUP_DIAGNOSTIC_LIMIT],
+        }
+        if error.__cause__ is not None:
+            record.update(
+                cause_type=type(error.__cause__).__name__,
+                cause=str(error.__cause__)[:CLEANUP_DIAGNOSTIC_LIMIT],
+            )
+        self._cleanup_diagnostics.append(record)
+
     async def _remove_container(self, name):
-        async def control(args):
+        async def control(args, phase):
             async with _owned_process(
                 [self.config.docker_executable, *args]
             ) as process:
-                stdout, _ = await _exchange(process, b"", MAX_FRAME_BYTES)
+                stdout, stderr = await _exchange(process, b"", MAX_FRAME_BYTES)
+                self._cleanup_diagnostics.append({
+                    "phase": phase,
+                    "return_code": process.returncode,
+                    "stdout": stdout[:CLEANUP_DIAGNOSTIC_LIMIT].decode(errors="replace"),
+                    "stderr": stderr[:CLEANUP_DIAGNOSTIC_LIMIT].decode(errors="replace"),
+                    "stdout_truncated": len(stdout) > CLEANUP_DIAGNOSTIC_LIMIT,
+                    "stderr_truncated": len(stderr) > CLEANUP_DIAGNOSTIC_LIMIT,
+                })
                 return process.returncode, stdout
 
+        phase = "container_remove"
         try:
-            await asyncio.wait_for(control(["rm", "--force", name]), CLEANUP_TIMEOUT)
+            await asyncio.wait_for(control(["rm", "--force", name], phase), CLEANUP_TIMEOUT)
+            phase = "container_inspect"
             code, remaining = await asyncio.wait_for(
-                control(["ps", "-aq", "--filter", f"name=^/{name}$"]), CLEANUP_TIMEOUT
+                control(["ps", "-aq", "--filter", f"name=^/{name}$"], phase), CLEANUP_TIMEOUT
             )
             return code == 0 and not remaining.strip()
-        except (OSError, ValueError, RuntimeError, TimeoutError):
+        except (OSError, ValueError, RuntimeError, TimeoutError) as error:
+            self._record_cleanup_error(phase, error)
             return False
 
     async def execute(self):
@@ -371,6 +399,7 @@ class ContainerWorkflowRunner:
         except ProcessCleanupError as error:
             status, processes_clean = "cleanup_failed", False
             cancelled = error.cancelled
+            self._record_cleanup_error("host_processes", error)
         except (OSError, ValueError, RuntimeError) as error:
             status = "failed"
             remaining = MAX_OUTPUT_BYTES - len(self._stdout) - len(self._stderr)
@@ -400,4 +429,5 @@ class ContainerWorkflowRunner:
             cleanup,
             name,
             self._completion_count,
+            list(self._cleanup_diagnostics),
         )
