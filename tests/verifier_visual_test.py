@@ -22,7 +22,6 @@ from pathlib import Path
 
 import pytest
 
-
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
 
@@ -30,7 +29,6 @@ sys.path.append(str(_REPO_ROOT))
 # other verifier tests in this suite.
 from sources.core.failure_fingerprint import compute_failure_fingerprint  # noqa: E402, F401
 from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
-
 
 # ---------- helpers ----------------------------------------------------------
 
@@ -234,7 +232,14 @@ def test_visual_error_claim_counts_as_zero_in_aggregate(tmp_path: Path):
     assert result["n_scored"] == 2
 
 
-def test_non_visual_error_claims_stay_excluded(tmp_path: Path):
+def test_exhausted_executable_error_claims_score_zero(tmp_path: Path):
+    """Post-recovery executable errors enter the mean as 0 (error exclusion closed).
+
+    Executable errors reaching ``_aggregate`` have already exhausted the
+    bounded retry loop, so excluding them would reward workflows whose
+    artefacts stay unparseable. They now count 0 in numerator AND denominator
+    (same rule visual errors already followed).
+    """
     v = _make_evaluator(tmp_path)
     per_claim = [
         _scored("csv_ok", 10, 1.0, "pass", "executable"),
@@ -244,10 +249,11 @@ def test_non_visual_error_claims_stay_excluded(tmp_path: Path):
 
     assert result["visual_evidence_missing"] is False
     assert result["n_visual_error"] == 0
-    assert result["overall_score"] == pytest.approx(1.0), (
-        "non-visual errors keep the current error-exclusion behavior"
+    assert result["n_error_scored_zero"] == 1
+    assert result["overall_score"] == pytest.approx(0.5), (
+        "exhausted executable errors must be scored as zero, not excluded"
     )
-    assert result["n_scored"] == 1
+    assert result["n_scored"] == 2
 
 
 def test_all_visual_errors_is_zero_not_all_verifiers_errored(tmp_path: Path):

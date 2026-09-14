@@ -6,6 +6,11 @@ explored different approaches land far apart. The QD novelty axis reads
 "how different is this code" by mean cosine distance to prior genotypes
 in this space.
 
+The local MiniLM backend embeds long workflow sources as chunked,
+mean-pooled vectors (see :class:`_LocalMiniLMEmbedder`): the model truncates
+every input at 256 word-pieces, so a single encode() call would only ever
+read the leading boilerplate of a multi-thousand-character genotype.
+
 Default backend: local ``all-MiniLM-L6-v2`` (sentence-transformers) —
 no network at runtime, deterministic, free. Optional backend: OpenAI
 ``text-embedding-3-small`` when both
@@ -16,9 +21,11 @@ set. A degenerate input (``None``, empty, or a backend error) returns
 would be rewarded.
 """
 
+import ast
 import hashlib
 import logging
 import os
+import re
 from typing import Protocol
 
 import numpy as np
@@ -42,14 +49,14 @@ def _cached_snapshot_path(model_name: str) -> str | None:
     """
     try:
         from huggingface_hub import snapshot_download
+
         return snapshot_download(_hub_model_id(model_name), local_files_only=True)
     except Exception:
         return None
 
 
 def load_sentence_transformer(model_name: str):
-    """Load a SentenceTransformer, preferring the local HF cache.
-    """
+    """Load a SentenceTransformer, preferring the local HF cache."""
     from sentence_transformers import SentenceTransformer
 
     snapshot = _cached_snapshot_path(model_name)
@@ -75,16 +82,126 @@ def _l2_normalize(vec: np.ndarray) -> np.ndarray:
     return vec / norm
 
 
+# MiniLM truncates every input at ``max_seq_length = 256`` word-pieces
+# (~950 characters of code: measured 3.7 chars/token on real genotypes).
+# Whole-workflow sources are 1,000-12,000 characters, so a single encode()
+# call would embed only the leading boilerplate and the first ~150 words of
+# the first agent prompt — everything that differentiates two workflows
+# (later agents, routing, tool wiring) would be invisible. Chunks are
+# therefore capped well below that budget.
+_MAX_CHUNK_CHARS = 900
+
+
+def _canonicalise_for_embedding(code: str) -> str:
+    """Drop comment-only and blank lines before embedding.
+
+    Novelty should track code structure and agent prompts, not commenting
+    style or vertical whitespace. Comment *tails* on code lines are kept
+    (removing them would risk joining tokens).
+    """
+    kept = [
+        line
+        for line in code.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    return "\n".join(kept) if kept else code
+
+
+def _split_oversized(text: str, max_chars: int) -> list[str]:
+    """Split one oversized block on paragraph boundaries, then hard by lines."""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return [text]
+    paragraphs = re.split(r"\n\s*\n", text)
+    chunks: list[str] = []
+    current = ""
+    for para in paragraphs:
+        candidate = f"{current}\n\n{para}" if current else para
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+        if len(para) <= max_chars:
+            current = para
+            continue
+        # Hard-split an oversized paragraph on line boundaries.
+        lines, buf = para.splitlines(), ""
+        for line in lines:
+            if len(line) > max_chars:
+                # Unbreakable line (no newlines at all): slice by characters.
+                if buf:
+                    chunks.append(buf)
+                    buf = ""
+                chunks.extend(
+                    line[i : i + max_chars] for i in range(0, len(line), max_chars)
+                )
+                continue
+            if len(buf) + len(line) + 1 > max_chars and buf:
+                chunks.append(buf)
+                buf = line
+            else:
+                buf = f"{buf}\n{line}" if buf else line
+        current = buf
+    if current:
+        chunks.append(current)
+    return [c for c in chunks if c.strip()]
+
+
+def _split_top_level_blocks(code: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
+    """Split source into top-level AST blocks, then cap each block's size.
+
+    Each top-level statement (an agent-instruction string assignment, a
+    ``SmolAgentFactory`` call, a routing block, ...) becomes its own chunk
+    so every part of the workflow contributes to the mean-pooled embedding.
+    Unparsable input falls back to whole-text windowing rather than raising.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return _split_oversized(code, max_chars) or [code]
+    lines = code.splitlines(keepends=True)
+    blocks: list[str] = []
+    for node in tree.body:
+        try:
+            start, end = node.lineno - 1, node.end_lineno  # type: ignore[attr-defined]
+        except AttributeError:  # pragma: no cover - end_lineno always set in 3.8+
+            break
+        segment = "".join(lines[start:end]).strip()
+        if segment:
+            blocks.append(segment)
+    if not blocks:
+        return _split_oversized(code, max_chars) or [code]
+    chunks: list[str] = []
+    for block in blocks:
+        chunks.extend(_split_oversized(block, max_chars))
+    return chunks or [code]
+
+
 class _LocalMiniLMEmbedder:
-    """sentence-transformers all-MiniLM-L6-v2 backend."""
+    """sentence-transformers all-MiniLM-L6-v2 backend.
+
+    Encodes long sources as chunked mean-pooled embeddings: the text is
+    canonicalised (comments/blank lines dropped), split into top-level
+    blocks capped at ``_MAX_CHUNK_CHARS``, each chunk is embedded, and the
+    per-chunk vectors are averaged and re-normalised. This keeps the whole
+    workflow — every agent prompt and the wiring tail — inside the 256
+    word-piece budget per chunk instead of silently truncating at the
+    first ~950 characters.
+    """
 
     def __init__(self, model_name: str = _DEFAULT_LOCAL_MODEL) -> None:
         self._model = load_sentence_transformer(model_name)
 
     def encode(self, text: str) -> np.ndarray:
-        """Encode ``text`` and return an L2-normalised float32 vector."""
-        raw = self._model.encode(text, convert_to_numpy=True, show_progress_bar=False)
-        return _l2_normalize(np.asarray(raw, dtype=np.float32))
+        """Chunk, embed, mean-pool, and L2-normalise ``text``."""
+        canonical = _canonicalise_for_embedding(text)
+        chunks = _split_top_level_blocks(canonical)
+        raw = self._model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
+        arr = np.asarray(raw, dtype=np.float32)
+        if arr.ndim == 2 and arr.shape[0] > 1:
+            arr = arr.mean(axis=0)
+        return _l2_normalize(arr.reshape(-1))
 
 
 class _OpenAIEmbedder:
@@ -92,6 +209,7 @@ class _OpenAIEmbedder:
 
     def __init__(self, model_name: str = _DEFAULT_OPENAI_MODEL) -> None:
         from openai import OpenAI
+
         self._client = OpenAI()
         self._model_name = model_name
 
@@ -152,12 +270,16 @@ class GenotypeEmbedder:
 
 def _select_default_backend() -> _Embedder:
     """Pick MiniLM (default) or OpenAI based on environment variables."""
-    backend = os.environ.get("MIMOSA_GENOTYPE_EMBEDDING_BACKEND", "local").strip().lower()
+    backend = (
+        os.environ.get("MIMOSA_GENOTYPE_EMBEDDING_BACKEND", "local").strip().lower()
+    )
     if backend == "openai" and os.environ.get("OPENAI_API_KEY"):
         try:
             return _OpenAIEmbedder()
         except Exception as exc:
-            logger.warning("OpenAI embedder unavailable, falling back to MiniLM: %s", exc)
+            logger.warning(
+                "OpenAI embedder unavailable, falling back to MiniLM: %s", exc
+            )
     return _LocalMiniLMEmbedder()
 
 
@@ -184,6 +306,7 @@ def reset_default_embedder() -> None:
 
 
 if __name__ == "__main__":
+
     class _StubBackend:
         """Deterministic stub: SHA-1 bytes → 20-dim float vector."""
 

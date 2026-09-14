@@ -5,7 +5,7 @@ These cover the post-criticality refactor:
 - ``_aggregate`` weights claims by importance so a high-importance flip moves
   the score strictly more than a low-importance one (the whole reason for the
   refactor — the old 3-vs-1 step function couldn't express that).
-- The hard-fail cap triggers on refuted ``importance >= 8`` claims.
+- The hard-fail cap triggers on refuted ``importance >= 10`` claims.
 - ``_build_report(min_importance=...)`` produces the filtered view used as the
   gradient builder's input — low-importance claims are suppressed.
 - ``_declare_claim_importance`` returns the input claims with uniform default
@@ -108,7 +108,7 @@ def test_high_importance_flip_moves_score_more_than_low_importance_flip() -> Non
 
 
 def test_hard_fail_cap_triggers_only_on_high_importance_refutation() -> None:
-    """Refuting an importance≥8 claim flips ``hard_fail_capped``; lower does not."""
+    """Refuting an importance≥10 claim flips ``hard_fail_capped``; lower does not."""
     v = _StubVerifier()
     threshold = VerifierEvaluator._HARD_FAIL_IMPORTANCE
 

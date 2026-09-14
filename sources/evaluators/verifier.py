@@ -722,6 +722,20 @@ class VerifierEvaluator(
         smooth gradient: flipping an importance-10 deliverable claim moves the
         score ~5× more than flipping a low-importance hygiene claim.
 
+        Error handling: ``error`` claims of kind ``executable`` or ``visual``
+        enter the weighted mean as score 0.0 in BOTH the numerator and the
+        denominator (tracked as ``n_error_scored_zero``). Executable errors
+        have already exhausted the bounded retry loop in
+        ``_run_verifier_with_recovery`` (up to ``_RECOVERY_MAX_ATTEMPTS``
+        feedback-carrying executions), so keeping them out of the mean would
+        let a workflow raise its score by making artefacts unparseable or
+        slow. Visual errors never had a recovery flow and already followed
+        this rule. Soft-branch errors stay excluded (they carry their own
+        fallback semantics). The hard-fail cap deliberately does NOT fire on
+        these zero-scored errors: an error is a measurement failure, not a
+        refutation — only an explicit ``fail`` of a high-importance claim
+        caps the run.
+
         Args:
             per_claim: List of per-claim scored dicts from ``_verify_claim``.
 
@@ -732,21 +746,26 @@ class VerifierEvaluator(
             return self._empty_aggregate_result(n_claims=0)
 
         scored = [c for c in per_claim if c.get("status") != "error"]
-        # Visual-branch errors have no recovery flow (unlike executable
-        # errors, which trigger regeneration), so they are NOT silently
-        # excluded: they enter the weighted mean as score 0 in both the
-        # numerator and the denominator. A figure deliverable whose vision
-        # call failed can therefore no longer leave a perfect score with
-        # zero visual evidence.
+        # Visual-branch errors have no recovery flow and executable errors
+        # have exhausted theirs; both are counted as score 0 in the weighted
+        # mean instead of being silently excluded.
         visual_errors = [
             c for c in per_claim
             if c.get("status") == "error" and c.get("verifier_kind") == "visual"
         ]
-        included = scored + visual_errors
+        executable_errors = [
+            c for c in per_claim
+            if c.get("status") == "error" and c.get("verifier_kind") == "executable"
+        ]
+        errors_scored_zero = visual_errors + executable_errors
+        included = scored + errors_scored_zero
         n_pass = sum(1 for c in per_claim if c["status"] == "pass")
         n_fail = sum(1 for c in per_claim if c["status"] == "fail")
         n_error = sum(1 for c in per_claim if c["status"] == "error")
         n_unsure = sum(1 for c in per_claim if c["status"] == "unsure")
+        n_recovery_attempts = sum(
+            int(c.get("recovery_attempts") or 0) for c in per_claim
+        )
 
         if not included:
             return self._empty_aggregate_result(
@@ -781,6 +800,8 @@ class VerifierEvaluator(
             "n_error": n_error,
             "n_unsure": n_unsure,
             "n_visual_error": len(visual_errors),
+            "n_error_scored_zero": len(errors_scored_zero),
+            "n_recovery_attempts": n_recovery_attempts,
             "n_scored": len(included),
             "visual_evidence_missing": bool(visual_errors),
         }
@@ -811,6 +832,8 @@ class VerifierEvaluator(
             "n_error": n_error,
             "n_unsure": n_unsure,
             "n_visual_error": 0,
+            "n_error_scored_zero": 0,
+            "n_recovery_attempts": 0,
             "n_scored": 0,
             "visual_evidence_missing": False,
         }
@@ -866,7 +889,9 @@ class VerifierEvaluator(
                 f"Claims: {scores['n_claims']}  pass={scores['n_pass']}  "
                 f"fail={scores['n_fail']}  error={scores.get('n_error', 0)}  "
                 f"unsure={scores.get('n_unsure', 0)}  "
-                f"scored={scores.get('n_scored', 0)}"
+                f"scored={scores.get('n_scored', 0)}  "
+                f"error0={scores.get('n_error_scored_zero', 0)}  "
+                f"retries={scores.get('n_recovery_attempts', 0)}"
             ),
             (
                 f"Overall: {scores['overall_score']:.3f}, "

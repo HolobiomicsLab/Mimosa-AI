@@ -49,15 +49,43 @@ _VERIFIER_INSTALL_LOCK = threading.Lock()
 # ----- Tunables --------------------------------------------------------------
 # Caps applied during the bounded-retry policy so a pathological claim cannot
 # snowball into an open-ended install + regen loop.
+_RECOVERY_MAX_ATTEMPTS = 10
 _RECOVERY_MAX_INSTALL_PACKAGES = 6
 _RECOVERY_INSTALL_TIMEOUT_SECONDS = 300
 _RECOVERY_STDERR_FEEDBACK_LINES = 30
+# How many past attempts the regeneration prompt renders in full; older ones
+# are summarised as a one-line count to keep the prompt bounded.
+_RECOVERY_HISTORY_RENDER = 3
 # Substrings that identify a missing-dependency stderr; anything else is
 # treated as a generated-code bug and routed through script regeneration.
 _RECOVERY_IMPORT_MARKERS: tuple[str, ...] = (
     "ModuleNotFoundError",
     "ImportError: No module named",
     "ImportError: cannot import name",
+)
+# Pass-despite-error guard: markers that make a script-printed pass/fail
+# verdict untrustworthy when they appear in the verifier's OWN stderr (an
+# uncaught exception leaked past the printed JSON verdict).
+_RECOVERY_EXCEPTION_STDERR_MARKERS: tuple[str, ...] = (
+    "Traceback (most recent call last)",
+    "ModuleNotFoundError",
+    "ImportError: No module named",
+    "ImportError: cannot import name",
+    "FileNotFoundError",
+    "PermissionError",
+    "NameError:",
+    "SyntaxError:",
+    "IndentationError",
+)
+# Load/import failure markers that invalidate a printed "pass" when found in
+# the check's own ``details`` — the salvage pattern where a script catches an
+# artefact-load failure, inspects metadata instead, and still prints pass.
+_RECOVERY_SALVAGE_DETAIL_MARKERS: tuple[str, ...] = (
+    "ModuleNotFoundError",
+    "ImportError",
+    "No module named",
+    "UnpicklingError",
+    "cannot unpickle",
 )
 _BASE_INSTALL_TIMEOUT_SECONDS = 600
 _RUNNER_CLEANUP_TIMEOUT = 15
@@ -140,6 +168,13 @@ RULES:
   UNCHECKED, not refuted; the recovery flow regenerates the script when it
   sees the error. (Exception: claims that explicitly check file existence —
   for those, a missing file is the legitimate ``"fail"``.)
+- NO SALVAGE ON LOAD FAILURE. If the claim's target artefact cannot be
+  loaded or parsed with the AVAILABLE libraries (missing package, unreadable
+  pickle, wrong format), the claim is NOT verified: emit ``status="error"`` or
+  let the exception propagate. NEVER reinterpret metadata as a substitute for
+  actually loading the content — no pickle GLOBAL-opcode inspection, no file
+  headers or magic bytes, no filename/naming evidence — and NEVER print
+  ``status="pass"`` after catching such a load failure.
 - NEVER substitute a different data object for a claim's target. If the
   specific object a claim refers to (e.g. the training set actually consumed
   by the model, an intermediate table, a fitted model) is not present in the
@@ -195,7 +230,39 @@ RECOVERY_PROMPT_RULES = """
   see the rule below.)
 - Read files with relative paths (cwd is the workspace).
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
+- Do NOT repeat any pattern already tried in the FAILURE HISTORY below; each
+  attempt lists what failed and what was done about it.
+- NO SALVAGE ON LOAD FAILURE: if the artefact cannot be loaded or parsed with
+  the AVAILABLE libraries, the claim is NOT verified — emit ``status="error"``
+  or let the exception propagate. Never inspect pickle GLOBAL opcodes, file
+  headers, or filenames as a substitute for loading the content, and never
+  print ``status="pass"`` after catching a load failure.
 """
+
+
+def _render_recovery_history(history: list[dict[str, Any]] | None) -> str:
+    """Render accumulated recovery attempts for the regeneration prompt.
+
+    Shows the last ``_RECOVERY_HISTORY_RENDER`` attempts in full (kind,
+    action, short stderr tail) and summarises older ones in one line, so a
+    long loop cannot blow up the prompt while the LLM still sees what was
+    already tried and must not repeat.
+    """
+    if not history:
+        return ""
+    rendered = history[-_RECOVERY_HISTORY_RENDER:]
+    older = len(history) - len(rendered)
+    lines = []
+    if older > 0:
+        lines.append(f"(... {older} earlier attempt(s) already tried and failed)")
+    for entry in rendered:
+        tail = " | ".join((entry.get("stderr_tail") or "").splitlines()[-3:])[:300]
+        lines.append(
+            f"- attempt {entry.get('attempt')}: failed as "
+            f"{entry.get('kind')}; action: {entry.get('action') or '(pending)'}"
+            + (f"; error tail: {tail}" if tail else "")
+        )
+    return "FAILURE HISTORY (do not repeat these patterns):\n" + "\n".join(lines) + "\n"
 
 
 T = TypeVar("T")
@@ -1174,70 +1241,256 @@ Return STRICT JSON only, in one of these two shapes:
         claim: dict[str, Any],
         spec: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Run the verifier with one corrective retry on verifier-side failures.
+        """Run the verifier inside a bounded retry loop with error feedback.
 
-        Import errors trigger an LLM package check + sandbox install. Code bugs
-        (or empty install lists) trigger a single regeneration with traceback
-        feedback. Failures still present after the retry are returned as-is;
-        the aggregator excludes them from the importance-weighted mean.
+        Up to ``_RECOVERY_MAX_ATTEMPTS`` total executions are allowed per
+        claim. Every iteration classifies the failure (``_classify_exec_failure``)
+        and applies a corrective action that FEEDS BACK what went wrong:
+
+        * ``import`` — missing modules are parsed from the traceback, vetted
+          once each through the LLM package check, and sandbox-installed. The
+          vetting result is cached per module, failed installs are remembered,
+          and modules that cannot be made importable are named in the next
+          regeneration prompt as NOT available (``do NOT import``).
+        * ``code_bug`` — the script is regenerated with the accumulated
+          failure history (last tracebacks + actions already tried), an
+          explicit instruction to avoid repeating the failing pattern, and
+          the effective import allow-list (base + successfully installed).
+        * untrustworthy printed verdicts — a pass/fail whose own stderr or
+          details carry hard exception markers is demoted by
+          ``_demote_pass_despite_error`` and rerouted through this loop.
+
+        The loop stops early on the first trustworthy pass/fail. When the
+        attempt budget is exhausted the last error is returned as-is
+        (tagged ``recovery_exhausted``); the aggregator then scores it 0.0
+        in the importance-weighted mean (see ``VerifierEvaluator._aggregate``)
+        instead of excluding it — a workflow cannot raise its score by
+        keeping its artefacts unparseable or slow.
+
+        Returns:
+            ``(final_spec, exec_result)`` where *exec_result* carries the
+            telemetry keys ``recovery_attempts`` and ``recovery_actions``.
         """
         cid = claim["id"]
+        actions: list[str] = []
+        history: list[dict[str, Any]] = []
+        vetted_modules: dict[str, list[str]] = {}
+        unavailable_modules: set[str] = set()
+        failed_installs: set[str] = set()
+        installed_packages: set[str] = set()
+
         exec_result = self._run_verifier(uuid, cid, spec["code"])
-        kind = self._classify_exec_failure(exec_result)
-        if kind == "ok":
-            return spec, exec_result
-        self.logger.info(
-            f"[recovery {cid}] initial run errored as {kind}; "
-            f"attempting one corrective action"
-        )
-        if kind == "import":
-            recovered = self._try_install_and_rerun(uuid, claim, spec, exec_result)
-            if recovered is not None:
-                return spec, recovered
-        return self._regenerate_and_rerun(
-            uuid, claim, spec, exec_result
-        )
+        attempts = 1
+        while True:
+            guarded = self._demote_pass_despite_error(exec_result)
+            if guarded is not exec_result:
+                actions.append(
+                    f"attempt {attempts}: demoted untrustworthy printed status "
+                    f"(exception markers present); rerouting through recovery"
+                )
+                exec_result = guarded
+            kind = self._classify_exec_failure(exec_result)
+            if kind == "ok":
+                break
+            if attempts >= _RECOVERY_MAX_ATTEMPTS:
+                actions.append(
+                    f"gave up: recovery loop exhausted after {attempts} attempts"
+                )
+                exec_result = self._attach_giveup_reason(
+                    exec_result,
+                    f"recovery loop exhausted after {attempts} attempts",
+                )
+                break
+            self.logger.info(
+                f"[recovery {cid}] attempt {attempts}/{_RECOVERY_MAX_ATTEMPTS} "
+                f"failed as {kind}; applying corrective action"
+            )
+            history.append(
+                {
+                    "attempt": attempts,
+                    "kind": kind,
+                    "stderr_tail": self._recovery_stderr_tail(exec_result),
+                    "action": "",
+                }
+            )
+            if kind == "import" and self._install_missing_packages(
+                uuid, claim, exec_result,
+                vetted_modules, failed_installs, installed_packages,
+                unavailable_modules, actions, attempts,
+            ):
+                history[-1]["action"] = "installed missing packages; re-ran script"
+                exec_result = self._run_verifier(uuid, cid, spec["code"])
+                attempts += 1
+                continue
+            new_spec = self._regenerate_verifier_with_feedback(
+                uuid, claim, spec, exec_result,
+                history=history,
+                unavailable_modules=sorted(unavailable_modules),
+                extra_available=sorted(installed_packages),
+            )
+            if not (new_spec.get("executable") and new_spec.get("code")):
+                reason = str(
+                    new_spec.get("reason") or "regenerated spec missing code"
+                )
+                self.logger.info(
+                    f"[recovery {cid}] regeneration produced no executable "
+                    f"code: {reason}"
+                )
+                actions.append(
+                    f"gave up: regeneration produced no executable code ({reason})"
+                )
+                exec_result = self._attach_giveup_reason(exec_result, reason)
+                break
+            history[-1]["action"] = "regenerated script with failure feedback"
+            actions.append(f"attempt {attempts}: regenerated script")
+            spec = new_spec
+            exec_result = self._run_verifier(uuid, cid, spec["code"])
+            attempts += 1
 
-    def _try_install_and_rerun(
+        exec_result["recovery_attempts"] = attempts
+        exec_result["recovery_actions"] = actions
+        exec_result["recovery_exhausted"] = exec_result.get("status") == "error"
+        return spec, exec_result
+
+    def _install_missing_packages(
         self,
         uuid: str,
         claim: dict[str, Any],
-        spec: dict[str, Any],
         exec_result: dict[str, Any],
-    ) -> dict[str, Any] | None:
-        """Install LLM-vetted packages and re-run; ``None`` falls through to regen."""
-        cid = claim["id"]
-        stderr = exec_result.get("raw_stderr", "") or ""
-        packages = self._llm_packages_needed_for_claim(uuid, claim, stderr)
-        if not packages or not self._sandbox_install_packages(packages):
-            self.logger.info(
-                f"[recovery {cid}] no installable packages "
-                f"(LLM returned {packages or 'empty'}); regenerating instead"
-            )
-            return None
-        self.logger.info(f"[recovery {cid}] installed {packages}; re-running script")
-        return self._run_verifier(uuid, cid, spec["code"])
+        vetted_modules: dict[str, list[str]],
+        failed_installs: set[str],
+        installed_packages: set[str],
+        unavailable_modules: set[str],
+        actions: list[str],
+        attempt: int,
+    ) -> bool:
+        """Vet and install the packages for *exec_result*'s missing modules.
 
-    def _regenerate_and_rerun(
-        self,
-        uuid: str,
-        claim: dict[str, Any],
-        spec: dict[str, Any],
-        exec_result: dict[str, Any]
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Regenerate the script once with traceback feedback and re-run it."""
+        The LLM package-need call runs at most once per missing module
+        (results cached in *vetted_modules*); packages whose install already
+        failed are never retried inside this loop. Modules that cannot be
+        made importable are added to *unavailable_modules* so the next
+        regeneration prompt names them as forbidden imports.
+
+        Returns:
+            True when packages were installed and the caller should re-run
+            the SAME script; False when the caller should regenerate instead.
+        """
         cid = claim["id"]
-        new_spec = self._regenerate_verifier_with_feedback(
-            uuid, claim, spec, exec_result
-        )
-        if not (new_spec.get("executable") and new_spec.get("code")):
-            reason = str(new_spec.get("reason") or "regenerated spec missing code")
+        modules = self._missing_modules(exec_result)
+        if not modules:
+            return False
+        stderr = exec_result.get("raw_stderr", "") or ""
+        packages: list[str] = []
+        for module in modules:
+            if module in vetted_modules:
+                packages.extend(vetted_modules[module])
+                continue
+            needed = self._llm_packages_needed_for_claim(uuid, claim, stderr)
+            vetted_modules[module] = needed
+            packages.extend(needed)
+        installable = [
+            p for p in packages
+            if p.lower() not in failed_installs
+            and p.lower() not in {i.lower() for i in installed_packages}
+        ]
+        if not installable:
+            unavailable_modules.update(modules)
             self.logger.info(
-                f"[recovery {cid}] regeneration produced no executable code: {reason}"
+                f"[recovery {cid}] no installable packages for {modules} "
+                f"(vetted={packages or 'empty'}); regenerating without them"
             )
-            return spec, self._attach_giveup_reason(exec_result, reason)
-        retry = self._run_verifier(uuid, cid, new_spec["code"])
-        return new_spec, retry
+            return False
+        if self._sandbox_install_packages(installable):
+            installed_packages.update(installable)
+            actions.append(
+                f"attempt {attempt}: installed {installable}; re-running script"
+            )
+            return True
+        failed_installs.update(p.lower() for p in installable)
+        unavailable_modules.update(modules)
+        actions.append(
+            f"attempt {attempt}: install failed for {installable}; "
+            f"marked unavailable"
+        )
+        return False
+
+    @staticmethod
+    def _missing_modules(exec_result: dict[str, Any]) -> list[str]:
+        """Extract top-level module names from "No module named X" markers.
+
+        Scans the run's stderr and details (the guard may have moved a
+        caught exception into details) and returns unique top-level module
+        names in first-seen order.
+        """
+        blob = "\n".join([
+            exec_result.get("raw_stderr") or "",
+            exec_result.get("details") or "",
+        ])
+        modules: list[str] = []
+        for match in re.finditer(r"No module named '([^']+)'", blob):
+            top = match.group(1).split(".")[0]
+            if top and top not in modules:
+                modules.append(top)
+        return modules
+
+    @staticmethod
+    def _recovery_stderr_tail(exec_result: dict[str, Any]) -> str:
+        """Return the last stderr lines for the failure-history feedback."""
+        stderr = (exec_result.get("raw_stderr") or "").strip()
+        if stderr:
+            return "\n".join(stderr.splitlines()[-3:])
+        return (exec_result.get("details") or "").strip()[:200]
+
+    @classmethod
+    def _demote_pass_despite_error(cls, exec_result: dict[str, Any]) -> dict[str, Any]:
+        """Distrust a printed pass/fail that ships with hard exception markers.
+
+        Two conservative channels, both modelled on the corpus:
+
+        * the verifier's OWN ``raw_stderr`` contains an exception marker on a
+          line the check did not quote in its ``details`` (quoted lines are
+          the check legitimately reporting a target script's failure, e.g.
+          "the workflow script exits non-zero");
+        * the printed status is ``"pass"`` while ``details`` mention a
+          load/import failure (the rdkit salvage pattern: unpickle failed,
+          pickle GLOBAL opcodes inspected instead, pass printed anyway).
+
+        A demoted result keeps its stdout/details for diagnosis but is
+        forced to ``status="error"`` so the recovery loop retries it.
+
+        Returns:
+            The original dict when trustworthy, else a demoted copy.
+        """
+        if exec_result.get("status") not in ("pass", "fail"):
+            return exec_result
+        stderr = exec_result.get("raw_stderr") or ""
+        details = exec_result.get("details") or ""
+        details_norm = " ".join(details.split())
+        channels: list[str] = []
+        for line in stderr.splitlines():
+            stripped = " ".join(line.split())
+            if not stripped or stripped in details_norm:
+                continue  # line the check itself quoted — not our crash
+            if any(marker in stripped for marker in _RECOVERY_EXCEPTION_STDERR_MARKERS):
+                channels.append("stderr")
+                break
+        if exec_result.get("status") == "pass" and any(
+            marker in details for marker in _RECOVERY_SALVAGE_DETAIL_MARKERS
+        ):
+            channels.append("details")
+        if not channels:
+            return exec_result
+        note = (
+            f"(verifier guard: printed status '{exec_result.get('status')}' not "
+            f"trusted — exception markers in {'+'.join(channels)}; "
+            f"claim treated as unchecked)"
+        )
+        return {
+            **exec_result,
+            "status": "error",
+            "details": f"{details} {note}".strip(),
+        }
 
     @staticmethod
     def _attach_giveup_reason(
@@ -1370,10 +1623,35 @@ Rules:
         uuid: str,
         claim: dict[str, Any],
         prev_spec: dict[str, Any],
-        exec_result: dict[str, Any]
+        exec_result: dict[str, Any],
+        history: list[dict[str, Any]] | None = None,
+        unavailable_modules: list[str] | tuple[str, ...] = (),
+        extra_available: list[str] | tuple[str, ...] = (),
     ) -> dict[str, Any]:
-        """Ask the judge to fix the previous script given the traceback."""
-        prompt = self._build_regen_prompt(claim, prev_spec, exec_result)
+        """Ask the judge to fix the previous script given the traceback.
+
+        Args:
+            uuid: Workflow identifier.
+            claim: The claim dict.
+            prev_spec: The spec whose script just failed.
+            exec_result: The failed run's result dict.
+            history: Accumulated recovery attempts (kind, stderr tail,
+                action) so the LLM avoids repeating failed patterns.
+            unavailable_modules: Modules proven NOT installable in this
+                environment; the prompt forbids importing them.
+            extra_available: Packages successfully installed during earlier
+                loop iterations, added to the allowed import list.
+
+        Returns:
+            New verifier spec dict (``executable`` + ``code``) or a
+            non-executable fallback with a ``reason``.
+        """
+        prompt = self._build_regen_prompt(
+            claim, prev_spec, exec_result,
+            history=history,
+            unavailable_modules=unavailable_modules,
+            extra_available=extra_available,
+        )
         return self._call_and_parse_verifier(uuid, claim, prompt, attempt=2)
 
     def _build_regen_prompt(
@@ -1381,8 +1659,17 @@ Rules:
         claim: dict[str, Any],
         prev_spec: dict[str, Any],
         exec_result: dict[str, Any],
+        history: list[dict[str, Any]] | None = None,
+        unavailable_modules: list[str] | tuple[str, ...] = (),
+        extra_available: list[str] | tuple[str, ...] = (),
     ) -> str:
-        """Build the verifier-regeneration prompt fed with the previous traceback."""
+        """Build the verifier-regeneration prompt fed with the failure history.
+
+        Beyond the previous traceback, the prompt carries the accumulated
+        recovery history, the modules that are NOT available (and must not
+        be imported), and the effective import allow-list (base packages
+        plus anything installed during the loop).
+        """
         prev_code = prev_spec.get("code", "")
         stderr_lines = (exec_result.get("raw_stderr") or "").splitlines()[
             -_RECOVERY_STDERR_FEEDBACK_LINES:
@@ -1390,7 +1677,21 @@ Rules:
         stderr_tail = "\n".join(stderr_lines) or "(no stderr captured)"
         details = exec_result.get("details", "") or ""
         previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
-        packages = ", ".join(_VERIFIER_BASE_PACKAGES)
+        available = list(_VERIFIER_BASE_PACKAGES) + list(extra_available)
+        packages = ", ".join(available)
+        history_block = _render_recovery_history(history)
+        unavailable_block = (
+            f"""
+UNAVAILABLE PACKAGES: {', '.join(unavailable_modules)} — these are NOT
+available in the verifier environment and could not be installed. Do NOT
+import them. Verify the claim another way with the preinstalled stack above,
+or emit status="fail"/"error" if the claim cannot be checked without them.
+Never inspect metadata (pickle GLOBAL opcodes, file headers, filenames) as a
+substitute for loading the artefact with the available libraries.
+"""
+            if unavailable_modules
+            else ""
+        )
         return f"""
 Your previous verifier script for ONE atomic claim crashed at runtime. Fix it and resubmit the FULL corrected script.
 
@@ -1410,8 +1711,7 @@ RUNTIME ERROR DETAILS: {details}
 
 STDERR (last {_RECOVERY_STDERR_FEEDBACK_LINES} lines):
 {stderr_tail}
-
-
+{history_block}{unavailable_block}
 AVAILABLE IMPORTS:
 {packages}.
 Do NOT introduce any other third-party imports.
@@ -1486,6 +1786,8 @@ Return STRICT JSON only:
             "raw_stdout": exec_result.get("raw_stdout", ""),
             "raw_stderr": exec_result.get("raw_stderr", ""),
             "exit_status": exec_result.get("exit_status", ""),
+            "recovery_attempts": exec_result.get("recovery_attempts", 1),
+            "recovery_actions": exec_result.get("recovery_actions", []),
         }
 
     _SOFT_VERDICT_SCORE = {"pass": 1.0, "unsure": 0.5, "fail": 0.0}
