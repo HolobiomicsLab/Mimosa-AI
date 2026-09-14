@@ -89,8 +89,12 @@ The contract:
 - Return an `ExecutionResult` containing `stdout`, `stderr`, `state`, and
   status flags.
 
-For a Docker-based sandbox you'd swap the subprocess machinery for a
-container runner.
+For a staged native oracle workflow, the opt-in
+[container runner](../info-flow/container-oracle.md) contains the entire Python
+process while keeping completion credentials and budgets on the host. The
+default runner above still executes on the host; it does not enforce filesystem
+read isolation. The container API requires explicit public staging and a pinned
+runtime image and is not automatically selected by the CLI.
 
 ## Add a notification channel
 
