@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.cli.pretty_print import (
     CYAN,
     GREEN,
@@ -26,7 +27,6 @@ from sources.cli.pretty_print import (
     print_warn,
 )
 from sources.evaluators.evaluator import WorkflowEvaluator
-from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.utils.notify import PushNotifier
 from sources.utils.pricing import PricingCalculator
 from sources.utils.run_metrics import append_jsonl, write_run_metrics
@@ -375,7 +375,8 @@ class EvolutionEngine:
         )
 
         # Reset archive and variation history at session start so each task
-        # starts with a clean slate (prevents boldness contamination across rows).
+        # starts with a clean slate (prevents observer-history contamination
+        # across rows).
         self.selection._archive = []
         self.variation.score_history.clear()
         self.variation.textual_gradient_history.clear()
@@ -444,8 +445,8 @@ class EvolutionEngine:
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
                 self.workspace_mgr.restore_best("")  # triggers fallback 
-        except Exception as e:
-            print_err(f"Unknown error in workspace restauration defaulting to latest workspace state.")
+        except Exception:
+            print_err("Unknown error in workspace restauration defaulting to latest workspace state.")
             pass
 
         return runs
@@ -533,8 +534,8 @@ class EvolutionEngine:
                 or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
             )
             # Best-so-far *before* this offspring contributes; used by the
-            # Rechenberg 1/5 rule in VariationEngine to decide whether
-            # mutation boldness should grow.
+            # VariationEngine observer (plateau streak / success rate) for
+            # the search-state block and telemetry.
             best_before = max(rewards_history) if rewards_history else None
             child_score = (
                 None if is_failure or wf_info.overall_score is None

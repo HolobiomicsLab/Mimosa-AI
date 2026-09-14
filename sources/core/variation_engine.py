@@ -1,50 +1,49 @@
 
 """
-VariationEngine: search-schedule and prompt assembly for LLM-guided workflow evolution.
+VariationEngine: prompt assembly and search-state observation for LLM-guided
+workflow evolution.
+
+Mutation magnitude ("how bold") is decided implicitly by the mutation
+directive LLM, informed by a deterministic, read-only ``<search_state>``
+block. The former Rechenberg step-size controller (effective boldness,
+scope bands, RE-SPECIATION gate) was removed: it never actuated a real
+knob — the only channel was advisory prompt text, and realised edit size
+tracked the directive wording, not the scalar. The observer half is kept:
+plateau streak, success rate and score trajectory are still computed and
+exposed to the directive LLM and telemetry.
 """
-
-import math
-from .workflow_info import WorkflowInfo
-
-from sources.cli.pretty_print import (
-    print_info, print_ok, print_warn, print_err,
-    CYAN, GREEN, YELLOW, RED, DIM, RESET, BOLD,
-)
-from sources.core.llm_provider import LLMConfig, LLMProvider
 
 import numpy as np
 
+from sources.cli.pretty_print import (
+    print_info,
+)
+from sources.core.llm_provider import LLMConfig, LLMProvider
+
+from .workflow_info import WorkflowInfo
+
+
 class VariationEngine:
-    """Assemble mutation/crossover prompts and pick mutation scope from
-    Rechenberg 1/5 success rate and a non-improvement plateau counter."""
+    """Assemble mutation/crossover prompts and expose search-state diagnostics.
+
+    Mutation magnitude is implicit: the directive LLM judges how bold the
+    next change should be from the deterministic ``<search_state>`` block
+    (parent score, iteration progress, plateau streak, success rate,
+    score trajectory). Deterministic guardrails (agent-count caps, the
+    <=1-agent rule, the keep-90% mandate) stay in code.
+    """
 
     def __init__(self, config) -> None:
         """Initialise empty history buffers."""
         self.textual_gradient_history: list[tuple[str, bool]] = []
-        # Per-offspring (child_score, best_before, is_failure) for the Rechenberg 1/5 success rule.
+        # Per-offspring (child_score, best_before, is_failure) for the
+        # search-state observer diagnostics (plateau streak, success rate).
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self.last_variation_state: dict = {}
         self.config = config
         self.llm_config = None
-        self.bands = [
-            (
-                0.35, "Tweak prompt with slight mutation (small step, exploit known good structure)"
-            ),
-            (
-                0.50, "Tweak prompt + slight roleplay prompt shift allowed (moderate step, explore new persona or reasoning style)"
-            ),
-            (
-                0.65, "Prompt and roleplay shift (moderate step, more explicit instructions, more direct framing, change persona and reasoning mode)"
-            ),
-            (
-                0.90, "Topology mutation (larger step, explore new agent arrangement or workflow structure)"
-            ),
-            (
-                1.01, "Bolder mutation (explore new agent persona arrangement or workflow structure)"
-            ),
-        ]
         self.setup_llm(config)
 
     def setup_llm(self, config):
@@ -84,34 +83,72 @@ class VariationEngine:
                 the success-rate signal.
             best_before: Best score achieved across the population *before*
                 this offspring was produced. Used together with
-                ``child_score`` to decide whether the offspring is a "success"
-                in the Rechenberg sense.
+                ``child_score`` to decide whether the offspring improved on
+                the best-so-far (observer diagnostics only).
         """
         text = (gradient or "").strip() or "UNKNOWN_GRADIENT: No feedback captured."
         self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
-    def _sample_agent_count(self, boldness: float, lo: int, hi: int, concentration: float = 4.0) -> int:
-        """Sample a random agent count within ``[lo, hi]``, biased upward by boldness.
+    def _sample_agent_count(self, lo: int, hi: int) -> int:
+        """Sample a uniformly random agent count within ``[lo, hi]``.
+
+        Bounds are clamped to the hard caps ``[1, max_possible_agents]``.
 
         Args:
-            boldness: Boldness level in ``[0, 1]`` pulling the mean toward ``hi``.
             lo: Inclusive lower bound on the agent count.
             hi: Inclusive upper bound on the agent count.
-            concentration: Beta concentration parameter; higher values
-                tighten the sample around the target mean.
 
         Returns:
-            An integer in ``[lo, hi]`` sampled from a Beta-Binomial.
+            An integer in ``[lo, hi]``.
         """
+        lo = max(1, min(lo, self.max_possible_agents))
+        hi = max(lo, min(hi, self.max_possible_agents))
         if lo == hi:
             return lo
-        target_mean = lo + boldness * (hi - lo)
-        p = np.clip((target_mean - lo) / (hi - lo), 0.05, 0.95)
-        alpha = p * concentration
-        beta = (1 - p) * concentration
-        prob = np.random.beta(alpha, beta)
-        return lo + int(np.random.binomial(hi - lo, prob))
+        return int(np.random.randint(lo, hi + 1))
+
+    def _sample_mutation_agent_budget(self, parent_agents: int) -> int:
+        """Sample a mutation agent budget around the PARENT's agent count.
+
+        The window is ``[max(1, parent_agents - 1),
+        min(max_possible_agents, parent_agents + 1)]`` with a uniform draw
+        inside it, so complexity drifts by at most one agent per mutation
+        regardless of any schedule. Appends the sample to
+        ``self.agent_count_history``.
+
+        Args:
+            parent_agents: Number of distinct agents in the parent workflow.
+
+        Returns:
+            The sampled agent budget, within ``[1, max_possible_agents]`` and
+            within one agent of the parent count.
+        """
+        lo = max(1, parent_agents - 1)
+        hi = min(self.max_possible_agents, parent_agents + 1)
+        n_agents = self._sample_agent_count(lo, hi)
+        self.agent_count_history.append(n_agents)
+        return n_agents
+
+    @staticmethod
+    def _count_parent_agents(wf_state: dict | None) -> int | None:
+        """Count distinct agents in the parent's last executed state.
+
+        ``step_name`` may contain repeat visits from retry loops, so the
+        count is over unique names.
+
+        Args:
+            wf_state: Parent ``state_result`` mapping, or ``None``.
+
+        Returns:
+            Number of distinct agents, or ``None`` when unknown.
+        """
+        if not wf_state:
+            return None
+        names = wf_state.get("step_name")
+        if isinstance(names, list) and names:
+            return max(1, len({str(n) for n in names}))
+        return None
 
     def _iters_since_improvement(self) -> int:
         """Length of the current run of scored offspring that did not beat best-so-far.
@@ -128,18 +165,15 @@ class VariationEngine:
             count += 1
         return count
 
-    _SUCCESS_RULE_THRESHOLD = 0.20   # Classical Rechenberg 1/5 rule.
-    _PLATEAU_PATIENCE = 6
-    _RESPECIATION_PATIENCE = 8
-    _RESPECIATION_CLAMP = 0.89       # Just below the 0.90 RE-SPECIATION band.
+    _PLATEAU_PATIENCE = 6   # Observer-only: normalises the plateau streak.
 
     def _compute_success_rate(self, window: int = 5) -> float | None:
         """Fraction of recent scored offspring that improved on best-so-far.
 
-        Implements the success-counting half of Rechenberg's 1/5 success
-        rule (1973): a high fraction of recent improvements means step
-        size is too small; a low fraction means we are stuck and should
-        escalate.
+        Diagnostic observer only (historically the success-counting half
+        of Rechenberg's 1/5 rule): the value is reported in the
+        ``<search_state>`` block and in telemetry; it no longer drives any
+        controller arithmetic.
 
         Offspring marked ``is_failure`` and those without recorded
         scores are excluded.
@@ -162,78 +196,70 @@ class VariationEngine:
         # Strict improvement; tiny epsilon to absorb float noise.
         return sum(1 for c, b in recent if c > b + 1e-6) / len(recent)
 
-    def _get_prompt_step_size(self, parent_score: float = 0.0) -> str:
-        """Pick a boldness level and matching scope band for the next mutation.
+    def _recent_score_trajectory(self, window: int = 5) -> list[float]:
+        """Return the last ``window`` recorded offspring scores.
 
-        Blends two fitness-grounded signals: ``success_rate`` (Rechenberg 1/5)
-        and ``plateau`` (``iters_since_improvement`` over ``_PLATEAU_PATIENCE``).
-        ``parent_score`` enters only as a near-finish damper in the last 5 %
-        of range. The top RE-SPECIATION band is hysteresis-gated: both
-        ``iters_since_improvement >= _RESPECIATION_PATIENCE`` and
-        ``success_rate in {None, 0.0}`` must hold.
+        Failed and unscored offspring are skipped.
 
-        Updates ``self.agent_count_history`` and ``self.last_variation_state``.
+        Args:
+            window: Maximum number of recent scores to return.
+
+        Returns:
+            Recent child scores, oldest first; possibly empty.
+        """
+        return [
+            c for c, _b, fail in self.score_history
+            if not fail and c is not None
+        ][-window:]
+
+    def _search_state_block(
+        self, parent_score: float, iteration_count: int, max_iterations: int,
+    ) -> str:
+        """Assemble the deterministic, read-only search-state block.
+
+        Feeds the directive LLM plain search statistics — parent score,
+        iteration progress, plateau streak, recent success rate and a
+        short score-only trajectory. Contains no rubric or diagnosis text,
+        preserving the verifier's rubric-blindness firewall. Also refreshes
+        ``self.last_variation_state`` for telemetry.
 
         Args:
             parent_score: Parent reward in ``[0, 1]``.
+            iteration_count: Zero-based index of the current attempt.
+            max_iterations: Total planned attempts.
 
         Returns:
-            One-line mutation-scope directive embeddable in the LLM prompt.
+            A multi-line, read-only ``<search_state>`` payload (without the
+            enclosing tags).
         """
         iters_since_improvement = self._iters_since_improvement()
         plateau = min(1.0, iters_since_improvement / self._PLATEAU_PATIENCE)
         success_rate = self._compute_success_rate()
+        trajectory = self._recent_score_trajectory()
         parent_score = float(np.clip(parent_score, 0.0, 1.0))
-
-        thr = self._SUCCESS_RULE_THRESHOLD
-        if success_rate is None:
-            effective = 0.3 * plateau                            # cold start cap
-        elif success_rate >= thr:
-            progress = min(1.0, (success_rate - thr) / (0.80 - thr))
-            effective = plateau * (1.0 - progress)
-        else:
-            deficit = (thr - success_rate) / thr
-            effective = 0.5 * deficit + 0.5 * plateau
-
-        near_finish = max(0.0, (parent_score - 0.95) / 0.05)
-        effective *= (1.0 - 0.5 * near_finish)
-        effective = float(np.clip(effective, 0.0, 1.0))
-
-        respeciation_allowed = (
-            iters_since_improvement >= self._RESPECIATION_PATIENCE
-            and (success_rate is None or success_rate == 0.0)
-        )
-        if not respeciation_allowed:
-            effective = min(effective, self._RESPECIATION_CLAMP)
-
-        curr = self.agent_count_history[-1] if self.agent_count_history else 1
-        budget = curr + round(effective * (self.max_possible_agents - curr))
-        n_agents = self._sample_agent_count(effective, 1, budget)
-        self.agent_count_history.append(n_agents)
-
-        sr_repr = "n/a" if success_rate is None else f"{success_rate:.2f}"
-        msg = (
-            f"Boldness effective={effective:.2f} "
-            f"(plateau={plateau:.2f}, iters_no_improve={iters_since_improvement}, "
-            f"success_rate={sr_repr}, parent_score={parent_score:.2f})."
-        )
-        if effective > 0.5:
-            print_warn(f"{msg} Increasing mutation boldness and agent budget.")
-        else:
-            print_info(f"{msg} Mutation scope and agent budget remain moderate.")
-
-        scope = next(label for threshold, label in self.bands if effective < threshold)
 
         self.last_variation_state = {
             "iters_since_improvement": int(iters_since_improvement),
             "plateau": float(plateau),
             "success_rate": None if success_rate is None else float(success_rate),
-            "effective_boldness": float(effective),
             "parent_score": float(parent_score),
-            "respeciation_gate_open": bool(respeciation_allowed),
-            "agent_budget": int(n_agents),
         }
-        return f"Mutation scope: {scope}. Boldness: {effective*100:.2f}%. Use at most {n_agents} agent(s).\n"
+
+        sr_repr = "n/a" if success_rate is None else f"{success_rate:.2f}"
+        traj_repr = ", ".join(f"{s:.2f}" for s in trajectory) or "n/a"
+        block = (
+            f"parent_score: {parent_score:.2f}\n"
+            f"iteration: {iteration_count + 1} of {max_iterations}\n"
+            f"iterations_since_improvement: {iters_since_improvement} "
+            f"(plateau level {plateau:.2f})\n"
+            f"success_rate_last_5: {sr_repr}\n"
+            f"recent_scores_oldest_first: {traj_repr}"
+        )
+        print_info(
+            f"Search state: parent_score={parent_score:.2f}, "
+            f"iters_no_improve={iters_since_improvement}, success_rate={sr_repr}."
+        )
+        return block
 
     # ── Utility ───────────────────────────────────────────────────────────────
 
@@ -271,26 +297,50 @@ class VariationEngine:
         Returns:
             A prompt suggesting a random topology and a small starting agent budget.
         """
-        n_agents = self._sample_agent_count(0.5, 1, 4)  # start with small random agent count
+        n_agents = self._sample_agent_count(1, 4)  # small random starting count
         return (
             "## First workflow generation\n"
             f"Goal to assemble a workflow for:\n{goal}\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
 
-    def llm_think_mutation_directive(self, agent_answers: str, textual_gradient_block: str, step_block: str, goal: str) -> str:
+    def llm_think_mutation_directive(
+        self,
+        agent_answers: str,
+        textual_gradient_block: str,
+        search_state: str,
+        goal: str,
+    ) -> str:
+        """Ask a dedicated LLM for the next mutation directive.
+
+        The directive decides *implicitly* how bold the next change should
+        be: the system prompt tells the LLM to judge magnitude itself from
+        the deterministic search state (recent improvements -> small tweak;
+        long plateau or 0% success -> bolder restructuring). There is no
+        boldness level or scope band to obey — only the search facts.
+
+        Args:
+            agent_answers: Flattened per-agent answers of the parent run.
+            textual_gradient_block: Rubric-blind diagnosis from the verifier.
+            search_state: Read-only ``<search_state>`` payload built by
+                ``_search_state_block`` (scores only, no rubric text).
+            goal: Task description.
+
+        Returns:
+            The directive text (≤ 3 sentences, one named issue).
+        """
         sys_msg = """
-YOu are an expert at pinpointing the root cause of failures in multi-agent workflows.
+You are an expert at pinpointing the root cause of failures in multi-agent workflows.
 Your task is to analyze these inputs and provide a clear, concise directive for the next mutation step.
 Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
 You will be given the previous workflow's agent answers (agents_answers) and a textual gradient block (diagnosis) that summarizes the failure.
 The diagnosis is a summary of  deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong.
 The diagnosis is trusted and should be used to inform your directive.
 The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
-You will also be given a <boldness> block that indicates how much change incentive you are allowed to suggest for the next workflow iteration.
-Do not suggest changes that exceed the boldness level indicated in the <boldness> block.
-Do not add or remove more than 1 agent at a time, and do not suggest more agent than the maximum allowed by the boldness level.
-Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis+boldness indicates that the current approach is fundamentally flawed.
+You will also be given a read-only <search_state> block with deterministic search statistics: parent score, iteration progress, iterations since the last improvement, recent success rate, and the recent score trajectory.
+You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring.
+Do not add or remove more than 1 agent at a time.
+Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis and the search state indicate that the current approach is fundamentally flawed.
 """
         prompt = ''.join([
             "## GOAL:",
@@ -303,17 +353,16 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             "",
             textual_gradient_block,
             "</diagnosis>",
-            "<boldness>",
-            step_block,
-            "</boldness>",
+            "<search_state>",
+            search_state,
+            "</search_state>",
             "Suggest a mutation directive for the next workflow iteration"
-            "Higher boldness mean the same failure more was identified multiple times."
             "Example directive:"
             "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
             "- Add a agent X that will ..."
             "- Tweak the prompt of agent X to be more domain-specific, to avoid them to be stuck in the same reasoning pattern."
             "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive."
-            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change) and the rationale behind it."
+            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change), its intended magnitude (small tweak, component rewrite, or structural redesign), and the rationale behind it justified by the search state."
         ])
         provider = LLMProvider(
             system_msg=sys_msg,
@@ -364,7 +413,22 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             else (run_stderr or fail_msg).strip()
             or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
         ).replace('_', ' ')[:2048]
-        step_block = self._get_prompt_step_size(parent_score=score)
+        # Deterministic search-state observer (no controller arithmetic).
+        search_state = self._search_state_block(
+            parent_score=score,
+            iteration_count=iteration_count,
+            max_iterations=max_iterations,
+        )
+
+        # Parent-centered agent budget: uniform sample within ±1 agent of
+        # the parent's count, hard-capped to [1, max_possible_agents].
+        parent_agents = self._count_parent_agents(wf_state)
+        if parent_agents is None:
+            parent_agents = (
+                self.agent_count_history[-1] if self.agent_count_history else 1
+            )
+        agent_budget = self._sample_mutation_agent_budget(parent_agents)
+        self.last_variation_state["agent_budget"] = int(agent_budget)
 
         if genotype is None:
             directive = "Previous attempt failed completly. Fix syntax errors."
@@ -372,8 +436,8 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             directive = self.llm_think_mutation_directive(
                 agent_answers=agent_answers,
                 textual_gradient_block=textual_gradient_block,
-                step_block=step_block,
-                goal=goal
+                search_state=search_state,
+                goal=goal,
             )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
@@ -390,7 +454,7 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             "</directive>",
             "## MUTATION INSTRUCTIONS:",
             "- Follow exactly the directive as guideline regarding what to change in the workflow code.",
-            "- Do not add or remove more than 1 agent at a time, and do not add more agent than suggested.",
+            f"- Do not add or remove more than 1 agent at a time, and use at most {agent_budget} agents in total.",
             "- Do not change the workflow's overall topology unless the directive explicitly suggests it.",
             "- Do not change prompt instructions outside the scope of the directive.",
             "- Do not add code sample or overly precise instructions. Let agent reason and do the instructed work."
@@ -424,7 +488,7 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []
         for i, (wf_info, genotype, stderr) in enumerate(
-            zip(wf_infos, genotypes, run_stderrs)
+            zip(wf_infos, genotypes, run_stderrs, strict=False)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
             textual_gradient = wf_info.abstracted_textual_gradient if wf_info else ""
@@ -475,13 +539,24 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
 if __name__ == "__main__":
     np.random.seed(0)
 
+    class _SmokeConfig:
+        workflow_llm_model = "openai/gpt-4o-mini"
+        reasoning_effort = "low"
+        max_tokens = 8192
+
+        def openrouter_provider_for(self, model):
+            return None
+
+        def openrouter_quantizations_for(self, model):
+            return None
+
     # ── _iters_since_improvement: empty history ──────────────────────────
-    ve = VariationEngine()
+    ve = VariationEngine(_SmokeConfig())
     assert ve._iters_since_improvement() == 0
     assert ve._compute_success_rate() is None
 
     # ── _iters_since_improvement: failures and unscored entries skipped ──
-    ve = VariationEngine()
+    ve = VariationEngine(_SmokeConfig())
     for _ in range(4):
         ve.record_offspring_gradient("anything", is_failure=True)
     ve.record_offspring_gradient("no scores attached")  # child_score=None
@@ -489,7 +564,7 @@ if __name__ == "__main__":
     assert ve._compute_success_rate() is None
 
     # ── _iters_since_improvement: counts only consecutive non-improvers ──
-    ve = VariationEngine()
+    ve = VariationEngine(_SmokeConfig())
     ve.record_offspring_gradient("improve", child_score=0.30, best_before=0.20)
     ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
     ve.record_offspring_gradient("flat",    child_score=0.30, best_before=0.30)
@@ -498,16 +573,14 @@ if __name__ == "__main__":
     assert ve._iters_since_improvement() == 3, ve._iters_since_improvement()
 
     # ── _iters_since_improvement: latest improvement resets streak to 0 ──
-    ve = VariationEngine()
+    ve = VariationEngine(_SmokeConfig())
     for _ in range(4):
         ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("up", child_score=0.6, best_before=0.5)
     assert ve._iters_since_improvement() == 0
 
-    # ── Plateau case: 5 non-improving offspring at 0.92.
-    #    Hysteresis gate keeps us out of RE-SPECIATION (iters=5 < 8) but
-    #    boldness must clear the smallest band.
-    ve = VariationEngine()
+    # ── Search-state block: observer fields, no controller fields. ────────
+    ve = VariationEngine(_SmokeConfig())
     for _ in range(5):
         ve.record_offspring_gradient(
             "DATA_LEAKAGE: same diagnosis again",
@@ -515,57 +588,30 @@ if __name__ == "__main__":
             best_before=0.92,
         )
     assert ve._compute_success_rate() == 0.0
-    plateau_step = ve._get_prompt_step_size(parent_score=0.92)
+    block = ve._search_state_block(
+        parent_score=0.92, iteration_count=4, max_iterations=10
+    )
     state = ve.last_variation_state
-    assert state["effective_boldness"] >= 0.35, state
-    assert state["effective_boldness"] < 0.90, state
-    assert state["respeciation_gate_open"] is False, state
+    assert state["iters_since_improvement"] == 5, state
+    assert abs(state["plateau"] - 5 / 6) < 1e-9, state
+    assert state["success_rate"] == 0.0, state
+    assert state["parent_score"] == 0.92, state
+    assert set(state) == {
+        "iters_since_improvement",
+        "plateau",
+        "success_rate",
+        "parent_score",
+    }, state
+    assert "0.92" in block and "iteration: 5 of 10" in block
+    assert "recent_scores_oldest_first: 0.92" in block
 
-    # ── Hysteresis gate opens at iters_since_improvement ≥ 8 + success=0. ──
-    ve = VariationEngine()
-    for _ in range(8):
-        ve.record_offspring_gradient(
-            "stuck", child_score=0.5, best_before=0.5,
-        )
-    deep_stuck_step = ve._get_prompt_step_size(parent_score=0.5)
-    state = ve.last_variation_state
-    assert state["respeciation_gate_open"] is True, state
+    # ── Parent-centered agent budget: within ±1 of the parent count. ──────
+    ve = VariationEngine(_SmokeConfig())
+    budget = ve._sample_mutation_agent_budget(3)
+    assert 2 <= budget <= 4, budget
+    assert ve.agent_count_history[-1] == budget
+    for _ in range(50):
+        assert 1 <= ve._sample_mutation_agent_budget(1) <= 2   # floor cap
+        assert 6 <= ve._sample_mutation_agent_budget(7) <= 7   # ceiling cap
 
-    # ── Real progress: improvements drop boldness to the smallest band. ──
-    ve = VariationEngine()
-    prev_best = 0.5
-    for inc in (0.05, 0.07, 0.09, 0.11, 0.13):
-        ve.record_offspring_gradient(
-            "PROGRESS: different diagnosis " + str(inc),
-            child_score=prev_best + inc,
-            best_before=prev_best,
-        )
-        prev_best += inc
-    assert ve._compute_success_rate() == 1.0
-    progress_step = ve._get_prompt_step_size(parent_score=0.5)
-    assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
-
-    # ── Near-finish floor: at parent=1.0 the damper halves the pre-clamp
-    #    boldness. Use a 3-iter streak so the result stays well below the
-    #    hysteresis clamp at both parent scores — otherwise the clamp
-    #    masks the comparison.
-    ve = VariationEngine()
-    for _ in range(3):
-        ve.record_offspring_gradient(
-            "stuck near finish", child_score=0.5, best_before=0.5,
-        )
-    ve._get_prompt_step_size(parent_score=0.50)
-    bold_low_val = ve.last_variation_state["effective_boldness"]
-    ve._get_prompt_step_size(parent_score=1.00)
-    bold_high_val = ve.last_variation_state["effective_boldness"]
-    assert bold_low_val < 0.89 and bold_high_val < 0.89, (bold_low_val, bold_high_val)
-    assert abs(bold_high_val - 0.5 * bold_low_val) < 1e-6, (bold_high_val, bold_low_val)
-
-    # ── Cold start (no scores supplied): boldness stays ≤ 0.30. ───────────
-    ve = VariationEngine()
-    for g in ("alpha", "beta", "gamma"):
-        ve.record_offspring_gradient(g)
-        step = ve._get_prompt_step_size(parent_score=0.5)
-        assert ve.last_variation_state["effective_boldness"] <= 0.3 + 1e-9, ve.last_variation_state
-        print(f"Cold-start gradient '{g}': {step}")
     print("smoke OK")

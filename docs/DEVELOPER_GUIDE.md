@@ -280,62 +280,51 @@ penalty `÷(1 + n_children_already)` and a hard
 
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
-Prompt assembly for mutation and crossover. Mutation boldness is a
-continuous function of two evidence signals — an
-`iters_since_improvement` plateau counter *and* the Rechenberg 1/5
-success rate of recent offspring — not a fixed phase schedule.
+Prompt assembly for mutation and crossover. There is no step-size
+controller: mutation magnitude is **directive-implicit** — the
+directive LLM judges how bold the next change should be from a
+deterministic, read-only `<search_state>` block; hard guardrails stay
+in code.
 
-- `_iters_since_improvement()` — length of the trailing run of scored
-  offspring that did not strictly beat best-so-far (failures and
-  unscored entries skipped). Normalised as
+- `_iters_since_improvement()` — observer: length of the trailing run
+  of scored offspring that did not strictly beat best-so-far (failures
+  and unscored entries skipped). Normalised as
   `plateau = min(1, iters / _PLATEAU_PATIENCE)` with
   `_PLATEAU_PATIENCE = 6`.
-- `_compute_success_rate(window=5)` — fraction of the last 5 scored
-  offspring that strictly beat the running best at production time.
-  The Rechenberg 1/5 success rule threshold is `0.20`.
-- `_get_prompt_step_size(parent_score)` — combines the two:
-    * cold start (fewer than two comparable scored offspring) —
-      `effective = 0.3 · plateau` (capped ramp),
-    * `success_rate < 0.20` — `effective = 0.5 · deficit + 0.5 · plateau`
-       with `deficit = (0.20 − success_rate) / 0.20` (escalate),
-    * `success_rate ≥ 0.20` — `effective = plateau · (1 − progress)`
-       with `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`
-       (damp boldness in proportion to real progress),
-    * near-finish floor: when `parent_score > 0.95`, multiply by
-       `(1 − 0.5 · (parent_score − 0.95) / 0.05)` so a 0.96 parent isn't
-       gambled away one generation before early-stop,
-    * RE-SPECIATION gate: unless `iters_since_improvement ≥ 8` *and*
-      `success_rate ∈ {None, 0.0}`, `effective` is clamped to
-      `_RESPECIATION_CLAMP = 0.89`, just below the EXPLORATION/
-      RE-SPECIATION boundary at `0.90`.
-  Then it grows the agent budget from the previous generation's count
-  toward `max_possible_agents = 7` proportionally to `effective`, and
-  samples the actual agent count with a Beta-Binomial biased upward by
-  `effective`.
+- `_compute_success_rate(window=5)` — observer: fraction of the last 5
+  scored offspring that strictly beat the running best at production
+  time (`None` with fewer than two comparable scored offspring).
+- `_search_state_block(parent_score, iteration_count, max_iterations)`
+  — assembles the `<search_state>` payload from those signals plus the
+  parent score, iteration progress and a last-5 score trajectory
+  (score-only, no rubric text). Also refreshes
+  `last_variation_state` telemetry (`iters_since_improvement`,
+  `plateau`, `success_rate`, `parent_score`, `agent_budget`).
+- `_sample_mutation_agent_budget(parent_agents)` — parent-centered
+  budget: uniform draw in `[max(1, parent_agents − 1),
+  min(max_possible_agents = 7, parent_agents + 1)]`. The parent's
+  agent count comes from the distinct `step_name` entries of its
+  `state_result` (retry-loop repeats collapsed), falling back to the
+  last sampled budget. Seed generation keeps its `[1, 4]` draw.
 
-| Effective boldness | Mutation scope (advisory)                                                   |
-|--------------------|-----------------------------------------------------------------------------|
-| < 0.35             | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
-| < 0.50             | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
-| < 0.65             | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
-| < 0.90             | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
-| ≥ 0.90             | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
-
-Scope is an advisory line injected into the mutation prompt; the LLM
-may still pick any topology. The hard control is the agent-count
-budget carried in the same block.
+The former Rechenberg arithmetic (`_get_prompt_step_size`, effective
+boldness, five scope bands, RE-SPECIATION hysteresis gate) was
+removed: it never actuated a real knob (temperature is sampled
+randomly at the workflow factory) and measured behaviour was
+noise-dominated — the directive wording predicted realised edit size
+far better than the scalar.
 
 `llm_think_mutation_directive(agent_answers, textual_gradient_block,
-step_block, goal)` runs a dedicated LLM call between
-`_get_prompt_step_size` and the orchestrator. It consumes the
-parent's per-agent answers, the rubric-blind verifier diagnosis, and
-the boldness/scope block, and emits a **≤ 3-sentence directive**
-naming exactly one issue, the kind of mutation it implies (prompt
-tweak, persona change, agent add/remove, topology change), and the
+search_state, goal)` runs a dedicated LLM call before the
+orchestrator. It consumes the parent's per-agent answers, the
+rubric-blind verifier diagnosis, and the search-state block, and emits
+a **≤ 3-sentence directive** naming exactly one issue, the kind of
+mutation it implies (prompt tweak, persona change, agent add/remove,
+topology change), the intended magnitude (small tweak, component
+rewrite, structural redesign) justified by the search state, and the
 rationale. The system prompt fixes trust ranks (verifier diagnosis
 trusted, agent self-reports not), and hard limits (one agent
-add/remove per step, never above the boldness band, default to small
-incremental changes).
+add/remove per step, default to small incremental changes).
 
 `mutation_prompt(...)` is therefore now a thin wrapper: it passes the
 parent code plus that one directive to the orchestrator inside a
