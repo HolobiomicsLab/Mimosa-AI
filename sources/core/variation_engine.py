@@ -343,6 +343,7 @@ Most of the time, suggest small, incremental changes to the workflow. Only sugge
             "",
             textual_gradient_block,
             "</diagnosis>",
+            "The diagnosis contains failure assertions, never report a diagnosis claim as something good, diagnosis only report issues to be fixed."
             "<search_state>",
             search_state,
             "</search_state>",
