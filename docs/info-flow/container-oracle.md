@@ -89,6 +89,30 @@ mounts only public inputs and fresh outputs, and sets CPU/memory/process limits.
 The writable bind mount has no disk quota; size-control output ingestion separately.
 Do not follow solver-created symlinks or ingest special files as result artifacts.
 
+## CodeAgent expressions versus saved Python scripts
+
+CodeAgent's local executor interprets its code blocks; installing CPython in the
+image does not give those blocks complete Python language support. In the tested
+smolagents 1.26.0 runtime, `yield` is unsupported and interpreted work has an
+operation limit. A small arithmetic smoke test does not establish readiness for
+data-processing scripts. Library limits, such as CSV's default field-size cap,
+also remain the script author's responsibility.
+
+For this contained executor, an evaluator may authorize `subprocess` in the
+CodeAgent imports and document the existing route: write a script under `/work`,
+then invoke the container's Python with `subprocess.run`, an argument list, an
+explicit timeout and checked exit status. The script runs inside the same Docker
+boundary with the same mounts and resource limits. This is not permission to
+enable generated subprocesses in an uncontained host executor. Freeze the chosen
+capability and instructions identically across comparison arms before dispatch.
+
+Retain script bytes, invocation, exit status and diagnostic output. Keep model
+observations compact rather than printing whole data rows. A synthetic generator
+and wide-field CSV canary, paired with invalid input that must fail without a
+success artifact, checks this execution route. Fixed-response canaries prove
+runtime capability only; they do not prove that an oracle will submit a valid
+scientific solution. Missing scripts remain incomplete submissions.
+
 ## Deadlines, failure and cleanup
 
 Global and per-completion deadlines cover asynchronous reads, writes and the host
@@ -104,6 +128,11 @@ Cancellation propagates after cleanup; if cleanup cannot be verified, it raises 
 cleanup error instead of hiding that uncertainty behind `CancelledError`.
 `container_name` is available on the runner for inspection even when cancelled.
 Cleanup has its own finite timeout and may extend beyond the execution deadline.
+The current `timeout` status does not distinguish a per-completion deadline from
+the outer workflow deadline. Compare frozen limits and available timing receipts;
+do not infer that the whole workflow allowance elapsed from this status alone.
+Likewise, later Docker absence cannot retroactively establish a failed host
+cleanup check.
 
 No automatic retry or host fallback exists. A runner instance is single-use.
 An interrupted completion may leave a private ledger reservation without a terminal
