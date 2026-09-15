@@ -1,13 +1,4 @@
-"""Claim-extraction source registry: the five prompts and their dispatch table.
-
-Each source = a labelled prompt that elicits a different *kind* of claim
-(literature requirements, user goal, math sanity, statistical
-fingerprint, visual scientific correctness). Adding another source = define one builder and append one entry
-to ``SOURCES`` — no edits in the extraction loop.
-
-The shared rules block (``_CLAIM_RULES_BLOCK``) is defined here so all
-builders pull from one source of truth.
-"""
+"""Claim-extraction source registry: the five prompts and their dispatch table."""
 
 from __future__ import annotations
 
@@ -287,16 +278,6 @@ Look for properties such as:
 - Cardinality / shape consistency (output row count matches input row
   count on a per-row task; predictions equal the test set size; feature
   counts agree across train and test).
-- Image-artefact properties (when the goal asks for a figure, plot,
-  or other rendered image — PNG/PDF/SVG): the file opens with PIL,
-  has non-zero width and height, has pixel variance above a trivial
-  threshold (i.e. not a blank canvas), and — if the goal names a
-  specific plot type or panel layout — has an aspect ratio and panel
-  count consistent with that type. Express each threshold explicitly
-  in the claim ("standard deviation of grayscale pixel values > 5",
-  "image width >= 400 px", "at least 2 horizontally-tiled subregions
-  detected by column-variance scan").
-  Default to single-panel claims; emit multi-panel claims ONLY when the goal literally names a multi-panel helper (e.g. `bio_ecg_plot`, `subplots(N,M)`) or a panel count.
 
 Prefer claims that can be checked with a tiny script reading the relevant
 artefact. Violating a mathematical invariant means the result is not just
@@ -394,6 +375,9 @@ def _build_source_g(ctx: ClaimContext) -> str:
 WORKFLOW GOAL:
 {ctx.goal}
 
+WORKFLOW OUTPUT (agents narration to verify — names the headline they report):
+{ctx.execution_text}
+
 WORKSPACE FILES (relative to workspace root):
 {ctx.workspace_listing}
 
@@ -414,33 +398,20 @@ PRIORITY — extract domain-specific correctness claims. The claims
 below are examples by domain; adapt to whatever discipline the goal
 belongs to:
 
-CHEMISTRY / MOLECULAR STRUCTURE (3D renders, ball-and-stick, space-filling):
+CHEMISTRY EXAMPLE:
 - ATOMIC CONNECTIVITY: "hydrogen atoms are each bonded to exactly one
   heavier atom (C, N, O, S, P), never to another hydrogen"
 - BOND GEOMETRY: "carbon atoms show approximately tetrahedral (~109°),
   trigonal planar (~120°), or linear (~180°) geometry consistent with
   their hybridization; no carbon has five bonds"
-- VAN DER WAALS CONTACT: "non-bonded atoms do not interpenetrate each
-  other's van der Waals radii (no fused/overlapping atom spheres)"
-- VALENCE: "no atom exceeds its standard valence (C=4, N=3 or 4,
-  O=2, H=1, S=2/4/6, P=3/5) in the displayed connectivity"
 - RING PLAUSIBILITY: "any ring system shown is chemically feasible
   (no triangle of sp² carbons at 60°, no planar cyclooctyne without
   visible distortion, aromatic rings are flat)"
-- CHIRALITY: "if the goal names a specific enantiomer or chiral center,
-  the 3D arrangement of substituents around that center matches the
-  named configuration (R/S, D/L)"
-- COORDINATION: "any metal center shows a recognizable coordination
-  geometry (octahedral, tetrahedral, square-planar, etc.) with
-  plausible bond lengths to its ligands"
 - CONFORMATION: "the displayed conformer does not show impossible
   torsional strain (e.g., two methyl groups eclipsed at 0° without
   visible distortion, a peptide bond in cis unless glycine/proline)"
-- HYDROGEN BONDING: "hydrogen bond donors and acceptors are positioned
-  at plausible distances and angles (H···A distance ~1.5–2.5 Å,
-  D–H···A angle > 120°)"
 
-BIOLOGY (phylogenetic trees, molecular networks, protein structures):
+BIOLOGY EXAMPLE :
 - TREE TOPOLOGY: "the phylogenetic tree shows a rooted hierarchy with
   no cycles, no disconnected components, and leaf labels matching the
   taxa named in the goal"
@@ -450,36 +421,31 @@ BIOLOGY (phylogenetic trees, molecular networks, protein structures):
   secondary structure elements (alpha-helices as coils/cylinders,
   beta-strands as arrows) in a physically plausible arrangement —
   no helices passing through each other, no impossibly tangled loops"
-- BINDING POCKET: "if the goal describes a ligand binding mode, the
-  ligand is positioned within a surface pocket of the protein, not
-  floating in solvent or buried in the protein core without a cavity"
 
-PHYSICS / MATERIALS (crystal structures, phase diagrams, band structures):
-- CRYSTAL LATTICE: "the unit cell shows atoms at physically plausible
-  positions — no atomic overlap, reasonable coordination numbers,
-  symmetry consistent with the space group if stated"
-- PHASE BOUNDARIES: "phase boundaries in the diagram are continuous
-  curves, not crossing each other in thermodynamically impossible ways
-  (no three-phase coexistence lines meeting at a point that is not a
-  triple point)"
-- BAND GAP: "if the goal asks for a band structure, the valence and
-  conduction bands are visually distinguishable and the gap is not
-  negative (bands do not cross the Fermi level in an insulator)"
-
-GENERAL (applies across disciplines):
+PRESENTATION CONVENTIONS:
+- DESCRIPTIVE TITLE: "the figure has a title that names the plotted
+  quantity and its scope (not blank, not a bare filename)"
+- AXIS SEMANTICS: "each axis carries a label naming the quantity it
+  represents, with units where the quantity has them"
+- NORMALIZATION LABELED AND CONSISTENT: "the y-axis (or colorbar) states
+  whether it shows counts or a normalized density/fraction, and the
+  drawn numeric scale is consistent with that statement (counts of N
+  items reach magnitudes ≈ N; a density stays within the quantity's
+  support — a 'probability density' axis whose values reach 10^6 fails)"
+- FIGURE-TYPE FIDELITY: "the figure type matches the deliverable named
+  in the goal (a 'histogram' is binned frequency bars — not a line
+  trace, scatter, heatmap or table-plot)"
+- ENCODING LEGEND: "any color/marker encoding of categories has a
+  visible legend or direct label"
 - PHYSICAL UNITS: "any numerical labels, axis ticks, or annotations
   on the figure use physically plausible magnitudes (e.g., a bond
   length labeled '1.4 Å', not '140 Å' or '0.001 Å')"
-- SCALE CONSISTENCY: "objects drawn to scale are consistent with each
-  other — you cannot have a sodium ion drawn larger than a protein
-  domain unless it's an explicit close-up"
-- COLOR-TO-VALUE: "if a color scale/colorbar is shown, the mapping from
-  color to numeric value is monotonic and the range endpoints make
-  physical sense for the quantity being plotted (e.g., a probability
-  colormap ranges 0–1, not 0–350)"
-- 3D PERSPECTIVE: "in a 3D rendering, occlusion and depth ordering are
-  physically consistent — a background object does not appear in front
-  of a foreground object at the same pixel"
+
+FIGURE-DATA CONSISTENCY:
+- SUPPORT MATCH: "the plotted distribution is consistent with the
+  reported statistics (e.g., if the workflow reports N pairwise values,
+  mean ≈ m, min = lo, the histogram's bin heights/locations visibly
+  agree: the peak sits near m, the x-range covers [lo, max])"
 
 WHAT NOT TO EXTRACT:
 - File-existence claims ("the PNG file exists and is non-empty")

@@ -13,9 +13,6 @@ from typing import Any
 
 # ----- Importance rating fan-out ---------------------------------------------
 # Phase B (rating) is split into batches of this size and run in a thread pool.
-# Single-shot rating on 30+ claims with rationales is the slowest verifier step
-# because it generates one big structured JSON output; fanning it out collapses
-# wall-clock without changing the rubric.
 _IMPORTANCE_BATCH_SIZE = 10
 _IMPORTANCE_PARALLELISM = 4
 
@@ -31,9 +28,7 @@ from sources.evaluators.base import LLMEvaluationError
 from sources.evaluators.verifier_claim_sources import ClaimContext, SOURCES
 
 
-# Importance anchors shown to the rater LLM so it doesn't collapse to
-# the middle of the scale. Kept short on purpose — long anchors waste
-# tokens and tend to confuse small judges.
+# Importance anchors shown to the rater LLM so it doesn't collapse to the middle of the scale.
 _IMPORTANCE_ANCHOR_BLOCK = """
 Anchored scale (for all other claims):
 - 10  The deliverable named in the goal does not exist or is wrong without this.

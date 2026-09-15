@@ -60,11 +60,11 @@ class Config:
         ##############
         # LLM Configuration
         ##############
-        self.planner_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
-        self.workflow_llm_model: str = "openrouter/deepseek/deepseek-v4-pro"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash"
-        self.judge_model = "openrouter/deepseek/deepseek-v4-flash"
-        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4-flash"
+        self.planner_llm_model: str = "openrouter/z-ai/glm-5.3"
+        self.workflow_llm_model: str = "openrouter/z-ai/glm-5.3"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
+        self.judge_model = "openrouter/deepseek/deepseek-v4.1-flash"
+        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4.1-flash"
         # Vision model for Source G (visual figure inspection).
         self.vision_judge_model: str | None = "openrouter/moonshotai/kimi-k3"
 
@@ -104,17 +104,17 @@ class Config:
         self.selection_strategy = "qd"
         # learning parameters
         self.learned_score_threshold = 0.9
-        self.max_learning_evolve_iterations = 20
+        self.max_learning_evolve_iterations = 16
         # KNN settings for novelty
         self.novelty_comparison: str = "archive_knn"
-        self.novelty_previous_n: int = 15
+        self.novelty_previous_n: int = 16
         # Length penalty: genotype size at which the penalty starts to grow
         self.length_penalty_baseline_chars: int = 8000
         self.length_penalty_lambda: float = 0.05
         # Selection pressure / archive settings
         self.min_improvement_threshold: float = 0.01
-        self.population_size: int = 20
-        self.novelty_k_neighbours: int = 15
+        self.population_size: int = 16
+        self.novelty_k_neighbours: int = 16
         self.novelty_weight: float = 0.25
         self.admit_threshold: float = 0.3
         # Cold-start / parent-selection settings
@@ -150,7 +150,7 @@ class Config:
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
         self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
-        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v13_model_select.md")
+        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v14_freedom.md")
         self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
 
         # folder paths for workflow pre-defined code

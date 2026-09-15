@@ -150,24 +150,15 @@ RULES:
   the format, prefer permissive parsing (try several reasonable splits, skip
   unparseable lines) over a strict format that may misjudge the file.
 - Evidence comes from RESULT artefacts (outputs, tables, figures, reports,
-  manifests) and execution-observable facts — NOT from the workflow's
+  manifests, logs) and execution-observable facts — NOT from the workflow's
   source code. Do NOT read or parse workflow scripts (`.py`, `.R`,
   notebooks): no `ast`, no regex over script text, no import matching.
 - When the claim is about WHAT the code did (an import, a call, a
-  hyperparameter value), check the observable consequence instead:
-  recompute from the output artefact, compare its schema/contents against
-  the goal's ground-truth schema, or probe the environment
-  (`importlib.util.find_spec`, installed package versions vs a manifest).
-  If neither an artefact nor an environment fact can decide the claim,
-  return ``{"executable": false, ...}`` — never fall back to source parsing.
+  hyperparameter value), check the observable consequence.
 - Regex  ``re`` can ONLY be used for unstructured text (logs, READMEs,
   manifests) — never for `.py`/`.R` source files.
 - If a file the script needs to open to evaluate the claim is MISSING from the
-  workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
-  Do NOT emit ``status="fail"`` — a missing artefact means the property is
-  UNCHECKED, not refuted; the recovery flow regenerates the script when it
-  sees the error. (Exception: claims that explicitly check file existence —
-  for those, a missing file is the legitimate ``"fail"``.)
+  workspace (such as logs) emit ``status="fail"`` along with ``details='explain what's missing'``
 - NO SALVAGE ON LOAD FAILURE. If the claim's target artefact cannot be
   loaded or parsed with the AVAILABLE libraries (missing package, unreadable
   pickle, wrong format), the claim is NOT verified: emit ``status="error"`` or
@@ -175,14 +166,8 @@ RULES:
   actually loading the content — no pickle GLOBAL-opcode inspection, no file
   headers or magic bytes, no filename/naming evidence — and NEVER print
   ``status="pass"`` after catching such a load failure.
-- NEVER substitute a different data object for a claim's target. If the
-  specific object a claim refers to (e.g. the training set actually consumed
-  by the model, an intermediate table, a fitted model) is not present in the
-  workspace as an artifact, treat the claim as NOT executable
-  (``executable=false``) — do not approximate with a raw input file or any
-  other stand-in.
 - When the goal text names an output path with a column or key schema (dataset preview, EXPECTED OUTPUT: block, or explicit 'columns exactly equal to …'), use the goal's schema as the source of truth for column/key literals.
-  The file preview shows what the workflow actually produced — which may be wrong. If the preview's schema differs from the goal's, the check must use the goal's schema; the workflow's deviation is exactly what fails the claim
+- The file preview shows what the workflow actually produced — which may be wrong. If the preview's schema differs from the goal's, the check must use the goal's schema; the workflow's deviation is exactly what fails the claim
   (eg: Never check AF_TOX_prob when the goal show that AF_TOX is used for columns format)
 - Never search the workflow source for call names, attributes, or literals.
   If the script needs to find a dropped column or a hyperparameter name,
@@ -222,12 +207,6 @@ RECOVERY_PROMPT_RULES = """
 - Diagnose the failure from the traceback above and emit a corrected script.
 - Keep the output contract: print EXACTLY ONE JSON line to stdout shaped
   {{"claim_id": "<id>", "status": "pass"|"fail", "actual": <value or null>, "details": "<short string>"}}.
-- If a file the script needs to open to evaluate the claim is MISSING from the
-  workspace, let ``FileNotFoundError`` propagate (or emit ``status="error"``).
-  Do NOT emit ``status="fail"`` — a missing artefact leaves the property
-  UNCHECKED, not refuted. (Exception: claims that explicitly check file
-  existence — for those, the file being absent IS the legitimate ``"fail"``;
-  see the rule below.)
 - Read files with relative paths (cwd is the workspace).
 - If the previous failure was an ImportError, rewrite without that package using the available imports and the standard library.
 - Do NOT repeat any pattern already tried in the FAILURE HISTORY below; each
@@ -237,6 +216,7 @@ RECOVERY_PROMPT_RULES = """
   or let the exception propagate. Never inspect pickle GLOBAL opcodes, file
   headers, or filenames as a substitute for loading the content, and never
   print ``status="pass"`` after catching a load failure.
+- If the failure come from the absence of a provenance sources files (such as no logs indicated but only source that contain the information), then add a fail route ``status="fail"`` upon this file absence, with details field of the return json indicating what's missing.
 """
 
 
@@ -545,15 +525,6 @@ class _VerifierPerClaimMixin:
     ) -> list[str]:
         """Collect ALL non-code image candidates, result-like paths first.
 
-        Sources, in priority order (highest tier first):
-        3. basename matches a deliverable filename named in the goal text;
-        2. path looks like a produced output (``pred_results/``, ``out/``,
-           ``results/``, ``figures/``, ...);
-        1. image named in the claim's ``likely_relevant_files``;
-        0. any other non-code image in the workspace;
-        -1. input/dataset-looking paths (``data/``, ``dataset/``, ``raw/``,
-           ...), demoted but still eligible.
-
         The workspace scan walks the FULL tree (the old first-directory
         ``break`` made whichever directory happened to be visited first —
         often the input dataset — win over the produced deliverable).
@@ -615,16 +586,6 @@ class _VerifierPerClaimMixin:
         goal: str = "",
     ) -> dict[str, Any]:
         """Run visual verification: send images + claim to a vision-capable LLM.
-
-        Collects ALL non-code image candidates in the workspace (result-like
-        paths first), encodes each as a base64 data URI, and sends one
-        multimodal prompt with every candidate (capped at
-        ``_MAX_VISUAL_IMAGES``) to a vision model (e.g., Kimi K3) configured
-        via ``config.vision_judge_model``.
-
-        NOTE: PDF/SVG files are sent as raw bytes (no rasterization on this
-        path); a vision endpoint that cannot decode them returns an error
-        verdict, which the aggregator now counts against the score.
 
         Args:
             uuid: Workflow identifier.
@@ -913,12 +874,13 @@ CLAIM TO CHECK:
 - expected_artifact_kind:   {claim.get('expected_artifact_kind') or '(unspecified)'}
 - acceptable_variation:     {claim.get('acceptable_variation') or '(none)'}
 
-Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer RESULT artefacts — outputs, tables, figures, reports, manifests — and files the agents explicitly mention writing for this artefact. Do NOT select workflow source files (`.py`, `.R`, `.jl`, `.sh`, notebooks): the verifier checks produced results, not script text. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
+Pick up to {max_files} paths from the WORKSPACE FILES listing whose contents are most likely to let a deterministic script verify this claim. Prefer RESULT artefacts — outputs, tables, figures, reports, manifests, logs — and files the agents explicitly mention writing for this artefact. Do NOT select workflow source files (`.py`, `.R`, `.jl`, `.sh`, notebooks): the verifier checks produced results, not script text. List nothing the workspace doesn't contain — never invent. If no workspace file plausibly holds the artefact, return an empty list.
 Do not include any tests or debugging files that are unlikely to be part of the final artefact (e.g. "debug.log", "debug_2.py", "tmp_results.jsonl"). Focus on files that are central to the workflow's deliverable.
 
 SELECTION PRIORITY:
 - First prefer files that look like PRODUCED OUTPUTS of the workflow: paths under pred_results/, out/, output/, outputs/, results/, figures/, figs/, plots/, or matching a deliverable filename literally named in the TASK GOAL above.
 - Only pick INPUT/DATASET-looking files (paths under data/, dataset/, datasets/, raw/, input/, inputs/) when the claim is explicitly about the input data itself.
+- Select any logs files that are likely relevant (eg: train.log when the claim is about loss)
 - The TASK GOAL is authoritative about what the deliverable is; the AGENT NARRATION is not.
 
 Return STRICT JSON only:

@@ -722,20 +722,6 @@ class VerifierEvaluator(
         smooth gradient: flipping an importance-10 deliverable claim moves the
         score ~5× more than flipping a low-importance hygiene claim.
 
-        Error handling: ``error`` claims of kind ``executable`` or ``visual``
-        enter the weighted mean as score 0.0 in BOTH the numerator and the
-        denominator (tracked as ``n_error_scored_zero``). Executable errors
-        have already exhausted the bounded retry loop in
-        ``_run_verifier_with_recovery`` (up to ``_RECOVERY_MAX_ATTEMPTS``
-        feedback-carrying executions), so keeping them out of the mean would
-        let a workflow raise its score by making artefacts unparseable or
-        slow. Visual errors never had a recovery flow and already followed
-        this rule. Soft-branch errors stay excluded (they carry their own
-        fallback semantics). The hard-fail cap deliberately does NOT fire on
-        these zero-scored errors: an error is a measurement failure, not a
-        refutation — only an explicit ``fail`` of a high-importance claim
-        caps the run.
-
         Args:
             per_claim: List of per-claim scored dicts from ``_verify_claim``.
 
@@ -746,9 +732,7 @@ class VerifierEvaluator(
             return self._empty_aggregate_result(n_claims=0)
 
         scored = [c for c in per_claim if c.get("status") != "error"]
-        # Visual-branch errors have no recovery flow and executable errors
-        # have exhausted theirs; both are counted as score 0 in the weighted
-        # mean instead of being silently excluded.
+        # Visual-branch errors have no recovery flow 
         visual_errors = [
             c for c in per_claim
             if c.get("status") == "error" and c.get("verifier_kind") == "visual"
