@@ -331,6 +331,7 @@ You will also be given a read-only <search_state> block with deterministic searc
 You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring.
 Do not add or remove more than 1 agent at a time.
 Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis and the search state indicate that the current approach is fundamentally flawed.
+If 'no agent answers' were captured, or that you see a python/syntax error, simply instruct to carefully craft the syntax for workflow creation, select tools correctly, and respect the generation guidelines (you do not make guidelines, the system reading your directive will know what it is; never specify what to fix, just give a general hint at fixing the syntax)
 """
         prompt = ''.join([
             "## GOAL:",
