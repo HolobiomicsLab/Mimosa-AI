@@ -10,7 +10,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-
 # ----- Importance rating fan-out ---------------------------------------------
 # Phase B (rating) is split into batches of this size and run in a thread pool.
 _IMPORTANCE_BATCH_SIZE = 10
@@ -25,8 +24,7 @@ from sources.cli.pretty_print import (
     print_warn,
 )
 from sources.evaluators.base import LLMEvaluationError
-from sources.evaluators.verifier_claim_sources import ClaimContext, SOURCES
-
+from sources.evaluators.verifier_claim_sources import SOURCES, ClaimContext
 
 # Importance anchors shown to the rater LLM so it doesn't collapse to the middle of the scale.
 _IMPORTANCE_ANCHOR_BLOCK = """
@@ -113,12 +111,9 @@ class _VerifierClaimExtractionMixin:
             )
             return adapted
 
-        per_source_min, per_source_max = self._per_source_targets(n_sources=len(SOURCES))
         base_ctx = ClaimContext(
             goal=goal,
             workspace_listing=workspace_listing,
-            target_min=per_source_min,
-            target_max=per_source_max,
             grounding=grounding,
             execution_text=execution_text,
         )
@@ -175,22 +170,6 @@ class _VerifierClaimExtractionMixin:
         )
         self._persist_rubric(task_key, ranked)
         return ranked
-
-    def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
-        """Per-source min/max claim targets derived from the global bounds.
-
-        Scaled by the number of extraction sources to ensure the overall target is met.
-
-        Args:
-            n_sources: Number of extraction sources to share the global budget across.
-
-        Returns:
-            Tuple ``(per_source_min, per_source_max)`` of target claim counts.
-        """
-        n_sources = max(1, n_sources)
-        per_min = max(2, self.min_claims // n_sources)
-        per_max = max(per_min, max(2, self.max_claims // n_sources))
-        return per_min, per_max
 
     # ------------------------------------------------------------------
     # Per-source parsing + path validation
@@ -402,9 +381,6 @@ Return STRICT JSON only, in this exact shape:
         grounding: str,
     ) -> str:
         """Render the per-batch rating prompt. Rationale is a short phrase."""
-        grounding_block = (
-            grounding.strip() if grounding else "(no literature grounding available)"
-        )
         claim_lines = "\n".join(
             f"- id={c.get('id')!r}  source={c.get('source', 'unknown')}  "
             f"desc={str(c.get('description', '')).strip()[:300]}"
@@ -416,9 +392,6 @@ question: if this claim turns out false or missing, how much does result break?
 
 WORKFLOW GOAL:
 {goal}
-
-LITERATURE GROUNDING:
-{grounding_block}
 
 {_IMPORTANCE_ANCHOR_BLOCK}
 

@@ -474,7 +474,7 @@ class _VerifierPerClaimMixin:
             title=f"Verifier spec · {cid}", color=YELLOW,
         )
         scored = self._score_soft(
-            uuid, claim, execution_text, workspace_listing, reason, grounding
+            uuid, claim
         )
         verdict_color = GREEN if scored.get("score", 0) >= 0.5 else RED
         print_box(
@@ -1205,23 +1205,6 @@ Return STRICT JSON only, in one of these two shapes:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Run the verifier inside a bounded retry loop with error feedback.
 
-        Up to ``_RECOVERY_MAX_ATTEMPTS`` total executions are allowed per
-        claim. Every iteration classifies the failure (``_classify_exec_failure``)
-        and applies a corrective action that FEEDS BACK what went wrong:
-
-        * ``import`` — missing modules are parsed from the traceback, vetted
-          once each through the LLM package check, and sandbox-installed. The
-          vetting result is cached per module, failed installs are remembered,
-          and modules that cannot be made importable are named in the next
-          regeneration prompt as NOT available (``do NOT import``).
-        * ``code_bug`` — the script is regenerated with the accumulated
-          failure history (last tracebacks + actions already tried), an
-          explicit instruction to avoid repeating the failing pattern, and
-          the effective import allow-list (base + successfully installed).
-        * untrustworthy printed verdicts — a pass/fail whose own stderr or
-          details carry hard exception markers is demoted by
-          ``_demote_pass_despite_error`` and rerouted through this loop.
-
         The loop stops early on the first trustworthy pass/fail. When the
         attempt budget is exhausted the last error is returned as-is
         (tagged ``recovery_exhausted``); the aggregator then scores it 0.0
@@ -1757,15 +1740,11 @@ Return STRICT JSON only:
     def _score_soft(
         self,
         uuid: str,
-        claim: dict[str, Any],
-        execution_text: str,
-        workspace_listing: str,
-        reason: str,
-        grounding: str = "",
+        claim: dict[str, Any]
     ) -> dict[str, Any]:
         """Narrow LLM verdict for one non-executable claim, anchored on grounding."""
         prompt = self._build_soft_check_prompt(
-            claim, execution_text, workspace_listing, reason, grounding
+            claim
         )
         data, err = self._call_judge_for_json(
             uuid, f"verifier_soft_{claim['id']}", prompt
@@ -1788,35 +1767,22 @@ Return STRICT JSON only:
 
     def _build_soft_check_prompt(
         self,
-        claim: dict[str, Any],
-        execution_text: str,
-        workspace_listing: str,
-        reason: str,
-        grounding: str,
+        claim: dict[str, Any]
     ) -> str:
         """Build the soft-check (non-executable verdict) prompt."""
-        grounding_block = grounding.strip() if grounding else "(no literature grounding available)"
+        previews = self._render_relevant_previews(claim.get("likely_relevant_files", []))
         return f"""
 You are checking ONE claim from a multi-agent workflow. The claim is not
 executable in code; please judge it against the concrete context below.
 
-WORKSPACE FILES:
-{workspace_listing}
-
-LITERATURE GROUNDING (peer-reviewed evidence relevant to this task):
-{grounding_block}
-
-WORKFLOW OUTPUT (context only):
-{execution_text}
+PREVIEW:
+{previews}
 
 CLAIM:
 - id: {claim['id']}
 - importance: {claim.get('importance', self._DEFAULT_CLAIM_IMPORTANCE)} (1-10; 10 = literal deliverable)
 - description: {claim['description']}
 - likely_relevant_files: {claim.get('likely_relevant_files', [])}
-
-REASON IT WAS MARKED NON-EXECUTABLE:
-{reason or '(none)'}
 
 Answer ONLY this question: given the workspace, output, and literature
 grounding above, does the claim hold? Use one of three verdicts:
@@ -1826,10 +1792,6 @@ grounding above, does the claim hold? Use one of three verdicts:
              literature gives no clear guidance.
 - "fail"   : the claim is contradicted by the workspace context OR by the
              literature grounding.
-
-If the literature grounding is missing or marked as unavailable, fall back
-to judging against the workspace context alone — do not penalise the claim
-for the absence of grounding.
 
 Return STRICT JSON: {{"verdict": "pass" | "unsure" | "fail", "rationale": "<one sentence>"}}
 """

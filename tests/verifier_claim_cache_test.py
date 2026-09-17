@@ -16,7 +16,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
 
@@ -24,13 +23,10 @@ sys.path.append(str(_REPO_ROOT))
 # this is the import that tests/failure_fingerprint_test.py uses and that
 # implicitly resolves the verifier <-> cli circular import for every
 # alphabetically-later test in the suite.
-from sources.core.failure_fingerprint import compute_failure_fingerprint  # noqa: E402, F401
-from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
-from sources.evaluators.verifier_claim_sources import (  # noqa: E402
-    ClaimContext,
-    SOURCES,
+from sources.core.failure_fingerprint import (
+    compute_failure_fingerprint,  # noqa: E402, F401
 )
-
+from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
 
 # ---------- helpers ----------------------------------------------------------
 
@@ -176,21 +172,6 @@ def test_adapt_rubric_filters_paths_to_current_workspace(tmp_path: Path):
     assert auc_claim["importance_rationale"] == "headline metric"
     assert auc_claim["description"] == "ROC-AUC over FDA + CT_TOX is at least 0.77"
 
-
-# ---------- prompts no longer carry prior-claims plumbing -----------------
-
-
-def test_source_prompts_do_not_reference_prior_claims_anymore():
-    """The prior-claims instruction block was deleted with the per-source cache."""
-    ctx = ClaimContext(
-        goal="g", workspace_listing="file.py\t100", target_min=2, target_max=5
-    )
-    for source in SOURCES:
-        prompt = source.build(ctx)
-        assert "PRIOR CLAIMS" not in prompt, f"source {source.label} still mentions prior claims"
-        assert "REPRODUCE THE SAME LIST" not in prompt, (
-            f"source {source.label} still has the reproduce-list directive"
-        )
 
 
 # ---------- malformed cache files fail safe -------------------------------

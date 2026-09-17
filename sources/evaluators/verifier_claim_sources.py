@@ -10,50 +10,44 @@ from dataclasses import dataclass
 _CLAIM_RULES_BLOCK = """For each claim, list `likely_relevant_files`: relative
 paths of RESULT artefacts the verifier would read to check the claim —
 outputs, tables, figures, reports, and other non-code deliverable files.
-- Do NOT list workflow source files (`.py`, `.R`, `.jl`, `.sh`, notebooks).
-  Claims must be checkable from what the workflow PRODUCED, not from the
-  text of its scripts; a claim only verifiable by reading source code
-  should not be extracted.
+- Do NOT list agents source files (`.py`, `.R`, `.jl`, `.sh`, notebooks).
+  Claims must be checkable from what the agents PRODUCED, not from the
+  text of its scripts. 
 - ONLY use paths that appear verbatim in the WORKSPACE FILES listing above.
-  Do not invent or guess paths the workflow's answer mentions but that are
+  Do not invent or guess paths the agent's answer mentions but that are
   not in the listing.
-- Use `[]` if the claim is purely about the workflow's output text and has
-  no on-disk artefact to consult.
+- If no relevant on-disk artefact for a claim are listed (eg: you want a claim about the loss),
+  then make a claims that assert both the existence of a log file or other non-code files and the claim to verify.
+  (eg: A file `inference.log` exists and contains a AUC > 0.9 when loss was below 0.2)
 
 FIXABILITY (mandatory). A claim must be satisfiable by changing what the
-workflow PRODUCES or PERSISTS. NEVER assert properties of the PROVIDED
+agents PRODUCES. NEVER assert properties of the PROVIDED
 INPUT files themselves — class balance of the given test set, overlap
-inside the given split, dataset size, or raw-file schema quirks. The
-workflow cannot repair its own inputs, so such claims fail forever no
-matter what the agents do. Input files may appear in
-`likely_relevant_files` ONLY as the reference side of an input→output
-ALIGNMENT check (see below). If an input property looks scientifically
-blocking, do NOT extract it as a claim — it belongs in the diagnosis
-narrative, not in the rubric.
+inside the given split, dataset size, or raw-file schema quirks.
+
+Input files may appear in `likely_relevant_files` ONLY as the reference side of an input→output
+ALIGNMENT check (see below). 
 
 ALIGNMENT CLAIMS. When the goal does not name the output schema, anchor
 it to the input schema: "the prediction file repeats the input dataset's
 identifier and label columns verbatim — same names, same order, no
 renames, no added suffixes such as `_prob`/`_score`/`_pred`". Never
 invent column or key names that appear neither in the goal text nor in
-a dataset preview. When the workflow must EXCLUDE something that the
-provided inputs contain (e.g. overlapping IDs between the given train
-and test files), the claim targets the workflow's persisted,
-post-filter artefact ("the training set saved at `<path>` shares no IDs
-with the test file"), never the provided raw split.
+a dataset preview.
+A prediction file is a row-aligned artifact, not a standalone table, one row per test row,
+postional alignment is required (eg: same number of rows for pred and test, no dedup).
 
 POLARITY (mandatory). Every claim is a POSITIVE SUCCESS ASSERTION about what
-the workflow ACHIEVED scientifically. A claim is well-formed only if
-"verified TRUE" is equivalent to "the workflow succeeded at this aspect".
+the agents ACHIEVED scientifically. A claim is well-formed only if
+"verified TRUE" is equivalent to "the agents succeeded at this aspect".
 Never extract a claim that a FAILURE MODE would satisfy. Extract the
-success condition the workflow failed: a workflow that produced no usable
+success condition the agents failed: a agents that produced no usable
 answer should FAIL the claim "produced <the deliverable, meeting <the
 bar>>", not pass the claim "the final answer is empty".
 
-ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are weak
-and easy to game. Extract an artifact claim only when chained to a
-functional property — not "predictions.csv exists" but "predictions.csv
-contains a valid probability in [0,1] for every row of the test set".
+ARTIFACT CLAIMS — STRICT. Bare file-existence or file-size claims are weak.
+Extract an artifact claim only when chained to a functional property  not "predictions.csv exists"
+but "predictions.csv contains a valid probability in [0,1] for every row of the test set".
 
 Return STRICT JSON only, no prose, in this exact form:
 {
@@ -74,10 +68,8 @@ class ClaimContext:
     """Inputs available to every source-prompt builder.
 
     Attributes:
-        goal: Original workflow goal text.
+        goal: Original agents goal text.
         workspace_listing: Rendered listing of workspace files.
-        target_min: Lower bound on the number of claims to elicit.
-        target_max: Upper bound on the number of claims to elicit.
         grounding: Peer-reviewed literature grounding block; consumed by
             source A only. Empty string when unavailable.
         execution_text: Agent narration / produced output; consumed by
@@ -86,8 +78,6 @@ class ClaimContext:
 
     goal: str
     workspace_listing: str
-    target_min: int
-    target_max: int
     grounding: str = ""
     execution_text: str = ""
 
@@ -136,26 +126,24 @@ correct solution:
   (e.g. if the goal explicitly relaxes a standard or dataset preview imply that a method cann't be used, don't extract claims that would require it.)
 - When the literature grounding lists multiple co-equal preprocessing steps in one bullet (e.g. "normalization, handling missing values, dimensionality reduction"), emit one claim per named step rather than a single composite claim.
 - Do NOT emit hyperparameter-value claims (`n_estimators`, `max_depth`, `learning_rate`, `batch_size`, `n_layers`, `dropout`, `epochs`, `kernel_size`, `n_folds`) unless the goal text literally pins that value.
-- When the goal cites a package or repo, prefer claims that the workflow uses that package's documented API rather than re-implementing the method by hand.
+- When the goal cites a package or repo, prefer claims that the agents uses that package's documented API rather than re-implementing the method by hand.
 
-MANDATORY GOAL CLAIM. The first claim MUST assert that the workflow
+MANDATORY GOAL CLAIM. The first claim MUST assert that the agents
 produced the specific scientific deliverable the task requested AND that
 it meets the literature-standard success criterion. If the task names a
 quantitative bar (accuracy ≥ x, energy ≤ y, AUC ≥ z, p < α), this claim
 must encode that bar — not merely "a result exists". Phrase it so a
-workflow that skipped, faked, or left the deliverable empty FAILS it.
+agents that skipped, faked, or left the deliverable empty FAILS it.
 
 {_CLAIM_RULES_BLOCK}
-
-Aim for {ctx.target_min}–{ctx.target_max} claims.
 """
 
 
 def _build_source_b(ctx: ClaimContext) -> str:
     """Source B — what the USER explicitly required in the goal text."""
-    return f"""You are extracting claims for a verification rubric: requirements the user explicitly stated in the workflow goal.
+    return f"""You are extracting claims for a verification rubric: requirements the user explicitly stated in the agents goal.
 
-WORKFLOW GOAL:
+agents GOAL:
 {ctx.goal}
 
 WORKSPACE FILES (relative to workspace root):
@@ -183,7 +171,7 @@ Look for, in the goal:
 
 LITERAL IDENTIFIERS — MINE THEM AGGRESSIVELY. The goal may contain
 several kinds of literal identifiers the user is implicitly or explicitly
-asking the workflow to reproduce. Find every such identifier and emit
+asking the agents to reproduce. Find every such identifier and emit
 ONE CLAIM PER IDENTIFIER, quoted verbatim in backticks. The kinds you
 must scan for, regardless of how the goal is labelled or sectioned:
 
@@ -200,12 +188,6 @@ must scan for, regardless of how the goal is labelled or sectioned:
     phrase becomes a claim of the form
     "The file `<exact/path/from/goal>` exists at the workspace location
     the goal specifies." Quote the path verbatim.
-  * Named library, class, function, model, or dataset identifier —
-    any backticked or capitalised code-identifier-shaped token in the
-    goal body, plus anything introduced by "use X" / "implement with X"
-    / "as defined by X": emit a claim
-    "The workflow uses `<Identifier>` as named in the goal."
-    One claim per distinct identifier.
 
 When DATASET PREVIEW or an explicit output path is present, emit the exact-name and exact-path claims FIRST, before any concept paraphrases.
 Numeric thresholds or cut-offs in the goal (e.g. `>= 0.6`, `top-10`, `5.5km`, `>280K`) are also literal identifiers — emit one claim per value, quoted verbatim, before any paraphrase.
@@ -218,11 +200,9 @@ do NOT invent the omitted names.
 
 PREDICTION SCHEMA FROM THE INPUT SCHEMA. When the goal asks for a
 prediction/output file but does NOT name its columns, and a DATASET
-PREVIEW (or dataset structure) shows the input's identifier and label
-columns, anchor the output schema to those input headers verbatim:
+shows the input's identifier and label columns, anchor the output schema to those input headers verbatim:
 "The prediction file `<output path>` has columns exactly equal to
-`[<identifier column>, <label columns from the input schema>]` (same
-names, same order, no renames, no added suffixes such as `_prob`,
+`[<identifier column>, <label columns from the input schema>]`.
 `_score`, `_pred`)." This input→output alignment claim is mandatory in
 that situation — one claim per deliverable file. The input dataset's
 label columns are the task's ground-truth schema; predictions must
@@ -233,22 +213,23 @@ and no named identifiers, skip this section silently. Do not fabricate
 identifiers to fill the quota.
 
 If the goal is short and contains few explicit requirements, return a
-short list — DO NOT pad with claims the user did not write. It is fine
-to return fewer than {ctx.target_min} claims when the goal is terse; do not
-invent constraints.
+short list — DO NOT pad with claims the user did not write.
 
 {_CLAIM_RULES_BLOCK}
-
-Aim for up to {ctx.target_max} Source-B claims, but only as many as the goal
-text actually warrants.
 """
 
 
 def _build_source_c(ctx: ClaimContext) -> str:
     """Source C — mathematical sanity properties of the produced artefacts."""
+    grounding_block = (
+        ctx.grounding.strip() if ctx.grounding else "(no literature grounding available)"
+    )
     return f"""You are extracting claims for a verification rubric: closed-form mathematical sanity properties.
 
-WORKFLOW GOAL:
+LITERATURE GROUNDING:
+{grounding_block}
+
+agents GOAL:
 {ctx.goal}
 
 WORKSPACE FILES (relative to workspace root):
@@ -285,19 +266,22 @@ suboptimal — it is incorrect.
 
 {_CLAIM_RULES_BLOCK}
 
-Aim for {ctx.target_min}–{ctx.target_max} claims, but only ones grounded
-in the actual artefacts visible in the workspace listing. Do not invent
-properties for objects the task does not produce.
 """
 
 def _build_source_e(ctx: ClaimContext) -> str:
     """Source E — statistical fingerprint / non-triviality of the result."""
+    grounding_block = (
+        ctx.grounding.strip() if ctx.grounding else "(no literature grounding available)"
+    )
     return f"""You are creating a list of verification claims for a verification rubric: statistical-fingerprint and non-triviality checks.
 
-WORKFLOW GOAL:
+LITERATURE GROUNDING:
+{grounding_block}
+
+agents GOAL:
 {ctx.goal}
 
-WORKFLOW OUTPUT (agents narration — names the headline metrics they report):
+agents OUTPUT (agents narration — names the headline metrics they report):
 {ctx.execution_text}
 
 WORKSPACE FILES (relative to workspace root):
@@ -320,27 +304,27 @@ Look for properties such as:
 - The prediction distribution is not degenerate: not constant, not all
   one class, not a single value repeated, not uniformly 0.5, with non-zero
   variance across rows in continuous outputs.
-- No data-leakage signatures in what the workflow CONSUMED. If the
-  provided split itself overlaps, the claim targets the workflow's
+- No data-leakage signatures in what the agents CONSUMED. If the
+  provided split itself overlaps, the claim targets the agents's
   persisted, post-filter artefact: "the training data actually used for
   fitting (saved at `<cleaned-train path>`) shares no IDs/rows with the
-  test file". If the workflow persists no consumed-training artefact,
-  emit the output-integrity claim "the workflow saves the training set
+  test file". If the agents persists no consumed-training artefact,
+  emit the output-integrity claim "the agents saves the training set
   it actually consumed" instead. NEVER assert disjointness of the
-  provided raw split itself — the workflow cannot fix its own inputs.
+  provided raw split itself — the agents cannot fix its own inputs.
   Perfect or near-perfect scores on a known-hard task are flagged as
   suspect unless the artefact explicitly justifies them.
 - No suspicious hard-coded or fallback patterns in outputs (predictions
   all identical, all integers when probabilities were expected, exact
   reproduction of an input column as the "prediction").
-- No dataset-sentinel leakage into the workflow's outputs. If any
-  column the workflow consumes contains values clearly outside the
+- No dataset-sentinel leakage into the agents's outputs. If any
+  column the agents consumes contains values clearly outside the
   expected scientific range for that measurement (e.g. -999, -9999,
   -1 in a non-negative column, NaN, inf, or string markers like
   "missing", "?", "NA", ""), the claim must verify that rows
   carrying those sentinels were filtered BEFORE they entered
   training, slicing (top-k / bottom-k / quantile selection),
-  thresholding, aggregation, or visualisation. A workflow that
+  thresholding, aggregation, or visualisation. A agents that
   feeds sentinel-bearing rows into a min / max / sort, a histogram
   bin, a model fit, or a plot has produced a polluted result even
   if every per-row arithmetic step "succeeded". Sentinel leakage
@@ -350,9 +334,9 @@ Look for properties such as:
   validity and rate importance 8-9 whenever the polluted column
   drives a headline selection, ranking, fit, or figure.
 - Sample sizes are adequate for the statistic being claimed — but only
-  as a property of the workflow's own persisted split or sampled
+  as a property of the agents's own persisted split or sampled
   artefact, never of the provided input files (their class balance is
-  given data the workflow cannot change).
+  given data the agents cannot change).
 - Where probabilities are produced, they show inter-class separation
   rather than collapsing to a single point.
 
@@ -362,20 +346,23 @@ extraction. Skip baseline claims for tasks with no obvious null to
 compare against — do not invent one.
 
 {_CLAIM_RULES_BLOCK}
-
-Aim for {ctx.target_min}–{ctx.target_max} claims, only as many as the
-on-disk artefacts can actually support.
 """
 
 
 def _build_source_g(ctx: ClaimContext) -> str:
     """Source G — visual scientific correctness judged by a vision-capable model."""
+    grounding_block = (
+        ctx.grounding.strip() if ctx.grounding else "(no literature grounding available)"
+    )
     return f"""You are extracting claims for a verification rubric: SCIENTIFIC CORRECTNESS of figure deliverables, judged by visual inspection.
 
-WORKFLOW GOAL:
+LITERATURE GROUNDING:
+{grounding_block}
+
+agents GOAL:
 {ctx.goal}
 
-WORKFLOW OUTPUT (agents narration to verify — names the headline they report):
+agents OUTPUT (agents narration to verify — names the headline they report):
 {ctx.execution_text}
 
 WORKSPACE FILES (relative to workspace root):
@@ -443,14 +430,14 @@ PRESENTATION CONVENTIONS:
 
 FIGURE-DATA CONSISTENCY:
 - SUPPORT MATCH: "the plotted distribution is consistent with the
-  reported statistics (e.g., if the workflow reports N pairwise values,
+  reported statistics (e.g., if the agents reports N pairwise values,
   mean ≈ m, min = lo, the histogram's bin heights/locations visibly
   agree: the peak sits near m, the x-range covers [lo, max])"
 
 WHAT NOT TO EXTRACT:
 - File-existence claims ("the PNG file exists and is non-empty")
 - Pixel-statistic claims ("the image has non-zero standard deviation")
-- Code-property claims ("the workflow used matplotlib")
+- Code-property claims ("the agents used matplotlib")
 - Aesthetic claims ("the font is readable", "colors are colorblind-safe")
 - Generic chart-quality claims unless the goal literally specifies them
 
@@ -461,9 +448,7 @@ BECAUSE those checks cannot see what a figure actually shows.
 
 {_CLAIM_RULES_BLOCK}
 
-Aim for {ctx.target_min}–{ctx.target_max} claims, but only as many as the
-actual figures in the workspace can support. If the workspace has no image
-files matching the goal's expected output, emit an EMPTY claims list.
+If the workspace has no image files matching the goal's expected output, emit an EMPTY claims list.
 """
 
 
@@ -480,8 +465,6 @@ if __name__ == "__main__":
     ctx = ClaimContext(
         goal="dummy goal",
         workspace_listing="(no files)",
-        target_min=2,
-        target_max=5,
         grounding="(dummy)",
         execution_text="(dummy run)",
     )

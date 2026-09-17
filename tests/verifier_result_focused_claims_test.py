@@ -18,9 +18,12 @@ sys.path.append(str(_REPO_ROOT))
 
 # Prime the import chain the same way tests/verifier_claim_cache_test.py does
 # (failure_fingerprint implicitly resolves the verifier <-> cli circular import).
-from sources.core.failure_fingerprint import compute_failure_fingerprint  # noqa: E402, F401
-from sources.evaluators import verifier_claim_sources  # noqa: E402
-from sources.evaluators import verifier_per_claim  # noqa: E402
+from sources.core.failure_fingerprint import (
+    compute_failure_fingerprint,  # noqa: E402, F401
+)
+from sources.evaluators import (
+    verifier_claim_sources,  # noqa: E402
+    )
 from sources.evaluators.verifier_claim_sources import SOURCES  # noqa: E402
 from sources.evaluators.verifier_per_claim import (  # noqa: E402
     VERIFIER_PROMPT_RULES,
@@ -63,9 +66,7 @@ def test_claim_source_d_not_registered():
     # Every remaining source still renders the shared rules block.
     ctx = verifier_claim_sources.ClaimContext(
         goal="dummy goal",
-        workspace_listing="(no files)",
-        target_min=1,
-        target_max=2,
+        workspace_listing="(no files)"
     )
     for s in SOURCES:
         assert "<short_slug>" in s.build(ctx), f"source {s.label} missing rules block"
@@ -97,7 +98,9 @@ def test_verifier_select_files_fallback_excludes_code(tmp_path):
 
     # Judge returns an empty pick -> fallback again, still no code files.
     # (_validate_workspace_paths comes from the workspace mixin at runtime.)
-    from sources.evaluators.verifier_workspace import _VerifierWorkspaceMixin  # noqa: E402
+    from sources.evaluators.verifier_workspace import (
+        _VerifierWorkspaceMixin,  # noqa: E402
+    )
 
     v._validate_workspace_paths = (  # type: ignore[assignment]
         _VerifierWorkspaceMixin._validate_workspace_paths.__get__(v)

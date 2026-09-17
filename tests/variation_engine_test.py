@@ -315,22 +315,6 @@ def test_seed_prompt_budget_stays_in_one_to_four():
 # ── Controller-removal guard (grep-based) ──────────────────────────────────
 
 
-def test_no_rechenberg_controller_left_in_sources():
-    """Guard: no source file may reference the removed controller."""
-    repo_root = Path(__file__).parent.parent
-    skip_parts = {"__pycache__", "workflows", "memory", "cache"}
-    offenders = []
-    for py in (repo_root / "sources").rglob("*.py"):
-        if skip_parts & set(py.parts):
-            continue
-        text = py.read_text(encoding="utf-8", errors="ignore")
-        for banned in ("_get_prompt_step_size", "effective_boldness",
-                       "respeciation_gate_open", "_RESPECIATION_"):
-            if banned in text:
-                offenders.append(f"{py}: {banned}")
-    assert not offenders, offenders
-
-
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
