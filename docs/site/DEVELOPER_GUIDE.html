@@ -2781,8 +2781,8 @@ evaluation).</p>
 <p>The judge that produces the evolutionary pressure signal is a
 multi-source, per-claim verifier. It writes <strong>deterministic Python
 programs</strong> that recompute the agent's claims from the workspace across
-six vantages (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), and falls back
+five vantages (literature, user goal, agent narration, math invariants,
+statistical fingerprint), and falls back
 to LLM verdicts only when no executable check is possible. The single
 output handed to the mutator is a short <strong>prompt gradient</strong> describing
 what to change next — it does not name the verified claims back, so the
@@ -3000,85 +3000,50 @@ gated by the validity check (improvement over baseline or
 penalty <code>÷(1 + n_children_already)</code> and a hard
 <code>MAX_CHILDREN_PER_PARENT = 2</code> cap to spread offspring.</p>
 <h3 id="3-variationengine-sourcescorevariation_enginepy">3. <code>VariationEngine</code> — <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py"><code>sources/core/variation_engine.py</code></a><a class="headerlink" href="#3-variationengine-sourcescorevariation_enginepy" title="Permanent link">&para;</a></h3>
-<p>Prompt assembly for mutation and crossover. Mutation boldness is a
-continuous function of two evidence signals — an
-<code>iters_since_improvement</code> plateau counter <em>and</em> the Rechenberg &#8533;
-success rate of recent offspring — not a fixed phase schedule.</p>
+<p>Prompt assembly for mutation and crossover. There is no step-size
+controller: mutation magnitude is <strong>directive-implicit</strong> — the
+directive LLM judges how bold the next change should be from a
+deterministic, read-only <code>&lt;search_state&gt;</code> block; hard guardrails stay
+in code.</p>
 <ul>
-<li><code>_iters_since_improvement()</code> — length of the trailing run of scored
-  offspring that did not strictly beat best-so-far (failures and
-  unscored entries skipped). Normalised as
+<li><code>_iters_since_improvement()</code> — observer: length of the trailing run
+  of scored offspring that did not strictly beat best-so-far (failures
+  and unscored entries skipped). Normalised as
   <code>plateau = min(1, iters / _PLATEAU_PATIENCE)</code> with
   <code>_PLATEAU_PATIENCE = 6</code>.</li>
-<li><code>_compute_success_rate(window=5)</code> — fraction of the last 5 scored
-  offspring that strictly beat the running best at production time.
-  The Rechenberg &#8533; success rule threshold is <code>0.20</code>.</li>
-<li><code>_get_prompt_step_size(parent_score)</code> — combines the two:<ul>
-<li>cold start (fewer than two comparable scored offspring) —
-  <code>effective = 0.3 · plateau</code> (capped ramp),</li>
-<li><code>success_rate &lt; 0.20</code> — <code>effective = 0.5 · deficit + 0.5 · plateau</code>
-   with <code>deficit = (0.20 − success_rate) / 0.20</code> (escalate),</li>
-<li><code>success_rate ≥ 0.20</code> — <code>effective = plateau · (1 − progress)</code>
-   with <code>progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))</code>
-   (damp boldness in proportion to real progress),</li>
-<li>near-finish floor: when <code>parent_score &gt; 0.95</code>, multiply by
-   <code>(1 − 0.5 · (parent_score − 0.95) / 0.05)</code> so a 0.96 parent isn't
-   gambled away one generation before early-stop,</li>
-<li>RE-SPECIATION gate: unless <code>iters_since_improvement ≥ 8</code> <em>and</em>
-  <code>success_rate ∈ {None, 0.0}</code>, <code>effective</code> is clamped to
-  <code>_RESPECIATION_CLAMP = 0.89</code>, just below the EXPLORATION/
-  RE-SPECIATION boundary at <code>0.90</code>.
-  Then it grows the agent budget from the previous generation's count
-  toward <code>max_possible_agents = 7</code> proportionally to <code>effective</code>, and
-  samples the actual agent count with a Beta-Binomial biased upward by
-  <code>effective</code>.</li>
+<li><code>_compute_success_rate(window=5)</code> — observer: fraction of the last 5
+  scored offspring that strictly beat the running best at production
+  time (<code>None</code> with fewer than two comparable scored offspring).</li>
+<li><code>_search_state_block(parent_score, iteration_count, max_iterations)</code>
+  — assembles the <code>&lt;search_state&gt;</code> payload from those signals plus the
+  parent score, iteration progress and a last-5 score trajectory
+  (score-only, no rubric text). Also refreshes
+  <code>last_variation_state</code> telemetry (<code>iters_since_improvement</code>,
+  <code>plateau</code>, <code>success_rate</code>, <code>parent_score</code>, <code>agent_budget</code>).</li>
+<li><code>_sample_mutation_agent_budget(parent_agents)</code> — parent-centered
+  budget: uniform draw in <code>[max(1, parent_agents − 1),
+  min(max_possible_agents = 7, parent_agents + 1)]</code>. The parent's
+  agent count comes from the distinct <code>step_name</code> entries of its
+  <code>state_result</code> (retry-loop repeats collapsed), falling back to the
+  last sampled budget. Seed generation keeps its <code>[1, 4]</code> draw.</li>
 </ul>
-</li>
-</ul>
-<table>
-<thead>
-<tr>
-<th>Effective boldness</th>
-<th>Mutation scope (advisory)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&lt; 0.35</td>
-<td><code>EXPLOITATION</code> — point mutation: minor phrasing / prompt-adjective tweaks</td>
-</tr>
-<tr>
-<td>&lt; 0.50</td>
-<td><code>ALIGNMENT</code> — interface optimization: refine handoff prompts, IO contracts</td>
-</tr>
-<tr>
-<td>&lt; 0.65</td>
-<td><code>ADAPTATION</code> — component overhaul: rewrite lagging agent prompts, swap tools</td>
-</tr>
-<tr>
-<td>&lt; 0.90</td>
-<td><code>EXPLORATION</code> — macro structural mutation: add/merge agents, change routing</td>
-</tr>
-<tr>
-<td>≥ 0.90</td>
-<td><code>RE-SPECIATION</code> — clean-slate redesign of the multi-agent architecture</td>
-</tr>
-</tbody>
-</table>
-<p>Scope is an advisory line injected into the mutation prompt; the LLM
-may still pick any topology. The hard control is the agent-count
-budget carried in the same block.</p>
+<p>The former step-size arithmetic (<code>_get_prompt_step_size</code>, effective
+boldness, five scope bands, RE-SPECIATION hysteresis gate) was
+removed: it never actuated a real knob (temperature is sampled
+randomly at the workflow factory) and measured behaviour was
+noise-dominated — the directive wording predicted realised edit size
+far better than the scalar.</p>
 <p><code>llm_think_mutation_directive(agent_answers, textual_gradient_block,
-step_block, goal)</code> runs a dedicated LLM call between
-<code>_get_prompt_step_size</code> and the orchestrator. It consumes the
-parent's per-agent answers, the rubric-blind verifier diagnosis, and
-the boldness/scope block, and emits a <strong>≤ 3-sentence directive</strong>
-naming exactly one issue, the kind of mutation it implies (prompt
-tweak, persona change, agent add/remove, topology change), and the
+search_state, goal)</code> runs a dedicated LLM call before the
+orchestrator. It consumes the parent's per-agent answers, the
+rubric-blind verifier diagnosis, and the search-state block, and emits
+a <strong>≤ 3-sentence directive</strong> naming exactly one issue, the kind of
+mutation it implies (prompt tweak, persona change, agent add/remove,
+topology change), the intended magnitude (small tweak, component
+rewrite, structural redesign) justified by the search state, and the
 rationale. The system prompt fixes trust ranks (verifier diagnosis
 trusted, agent self-reports not), and hard limits (one agent
-add/remove per step, never above the boldness band, default to small
-incremental changes).</p>
+add/remove per step, default to small incremental changes).</p>
 <p><code>mutation_prompt(...)</code> is therefore now a thin wrapper: it passes the
 parent code plus that one directive to the orchestrator inside a
 <code>&lt;directive&gt;...&lt;/directive&gt;</code> block, with explicit instructions to
@@ -3230,13 +3195,10 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
 <p>Source diagram: <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/docs/diagrams/verifiers_judge.mermaid"><code>docs/diagrams/verifiers_judge.mermaid</code></a>.</p>
 <p>For each generation:</p>
 <ol>
-<li><strong>Multi-source claim extraction</strong>: six independent prompts emit
+<li><strong>Multi-source claim extraction</strong>: five independent prompts emit
    success-polarity claims from different vantage points — <code>A</code> literature
    (Perspicacité), <code>B</code> user goal, <code>C</code> agent narration (anti-hallucination),
-   <code>D</code> math invariants, <code>E</code> non-negotiable computational reproducibility
-   (deps manifest covers used imports, no absolute paths, seeds on
-   stochastic ops; <strong>explicitly forbids</strong> README / docs / tests / style /
-   type-hint claims), <code>F</code> statistical fingerprint (baseline, degeneracy,
+   <code>D</code> math invariants, <code>F</code> statistical fingerprint (baseline, degeneracy,
    leakage). Claims are tagged <code>hard</code> or <code>soft</code>; bare file-existence is
    never <code>hard</code>.</li>
 <li><strong>Per-claim verification</strong>: each claim is classified as executable or
@@ -3262,7 +3224,7 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
    is the <strong>only</strong> verifier signal the mutator sees, and recent history
    is included so recurring failure modes reuse the same code names
    across generations. The gradient deliberately does not name the
-   verified claims, scores, or which of the six sources raised them — so
+   verified claims, scores, or which of the five sources raised them — so
    the mutator can correct the workflow without being handed a rubric to
    over-fit against.</li>
 </ol>

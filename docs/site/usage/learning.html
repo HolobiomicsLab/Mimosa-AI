@@ -2183,44 +2183,19 @@ the run's final state.</p>
 </ul>
 </div>
 <h2 id="what-evolves-between-generations">What evolves between generations<a class="headerlink" href="#what-evolves-between-generations" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Effective boldness</th>
-<th>Mutation scope</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&lt; 0.35</td>
-<td><code>EXPLOITATION</code> — point mutation: minor phrasing / prompt-adjective tweaks</td>
-</tr>
-<tr>
-<td>&lt; 0.50</td>
-<td><code>ALIGNMENT</code> — interface optimization: refine handoff prompts, IO contracts</td>
-</tr>
-<tr>
-<td>&lt; 0.65</td>
-<td><code>ADAPTATION</code> — component overhaul: rewrite lagging agent prompts, swap tools</td>
-</tr>
-<tr>
-<td>&lt; 0.90</td>
-<td><code>EXPLORATION</code> — macro structural mutation: add/merge agents, change routing</td>
-</tr>
-<tr>
-<td>≥ 0.90</td>
-<td><code>RE-SPECIATION</code> — clean-slate redesign of the multi-agent architecture</td>
-</tr>
-</tbody>
-</table>
-<p>Effective boldness is computed from two signals: a plateau counter
-(<code>iters_since_improvement / 6</code>) over recent scored offspring, and the
-Rechenberg &#8533; success rate of the last 5 scored offspring (below <code>0.20</code>
-the search escalates, above it boldness damps; at <code>≥ 0.80</code> it collapses
-regardless of plateau). Only in the last 5 % of the score range does
-the parent's absolute score re-enter, as a near-finish damper, so
-near-winners aren't gambled away one generation before early-stop. The
-agent budget grows with boldness up to a hard ceiling of <code>7</code>.</p>
+<p>Mutation magnitude is <strong>directive-implicit</strong>: there is no step-size
+controller. Each mutation assembles a deterministic, read-only
+<code>&lt;search_state&gt;</code> block — parent score, iteration progress, a plateau
+counter (<code>iters_since_improvement / 6</code>) over recent scored offspring,
+the success rate of the last 5 scored offspring, and a short
+score-only trajectory — and the directive LLM judges how bold the next
+change should be (small tweak vs component rewrite vs structural
+redesign) from those facts: recent improvements call for small tweaks,
+a long plateau or a 0 % success rate calls for bolder restructuring.
+Hard guardrails stay in code: the mutation agent budget is sampled
+parent-centered — within ±1 agent of the parent's count, hard-capped
+at <code>[1, 7]</code> — at most one agent may be added or removed per mutation,
+and 90 % of the previous workflow must stay unchanged.</p>
 <p>By default <code>~40 %</code> of generations do <strong>crossover</strong> instead of mutation
 (<code>crossover_rate = 0.4</code>) — two parents combined, best-parent-first, with
 the offspring hard-capped at the highest parent agent count.</p>

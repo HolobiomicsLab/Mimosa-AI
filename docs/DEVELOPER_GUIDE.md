@@ -307,7 +307,7 @@ in code.
   `state_result` (retry-loop repeats collapsed), falling back to the
   last sampled budget. Seed generation keeps its `[1, 4]` draw.
 
-The former Rechenberg arithmetic (`_get_prompt_step_size`, effective
+The former step-size arithmetic (`_get_prompt_step_size`, effective
 boldness, five scope bands, RE-SPECIATION hysteresis gate) was
 removed: it never actuated a real knob (temperature is sampled
 randomly at the workflow factory) and measured behaviour was

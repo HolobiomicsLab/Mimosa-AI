@@ -236,7 +236,7 @@ z
     <text style="font-weight: 700; font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #8a73cf" x="178.816771" y="180.750874" transform="rotate(-0 178.816771 180.750874)">VARY</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 6.6px; font-family: 'DejaVu Sans'; fill: #1a1240" transform="translate(136.858302 194.87729)">Rechenberg-1/5 boldness</text>
+    <text style="font-size: 6.6px; font-family: 'DejaVu Sans'; fill: #1a1240" transform="translate(136.858302 194.87729)">search-informed boldness</text>
     <text style="font-size: 6.6px; font-family: 'DejaVu Sans'; fill: #1a1240" transform="translate(140.936896 202.669043)">→ mutation / crossover</text>
    </g>
    <g id="text_16">

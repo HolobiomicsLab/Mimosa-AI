@@ -887,10 +887,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-six-claim-sources" class="md-nav__link">
+  <a href="#the-five-claim-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The six claim sources
+        The five claim sources
       
     </span>
   </a>
@@ -2034,10 +2034,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-six-claim-sources" class="md-nav__link">
+  <a href="#the-five-claim-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The six claim sources
+        The five claim sources
       
     </span>
   </a>
@@ -2215,8 +2215,8 @@ and <a href="../papers_bench_evaluation.html">PaperBench evaluation</a>.</p>
 <p>Mimosa scores each workflow run with a <strong>multi-source, per-claim
 verifier</strong>. The verifier writes and executes <strong>deterministic Python
 programs</strong> in the workspace to confirm what the agents claim they did,
-across six independent vantage points (literature, user goal, agent
-narration, math invariants, computational reproducibility, statistical
+across five independent vantage points (literature, user goal, agent
+narration, math invariants, statistical
 fingerprint). The single signal that flows back to the mutator is a short
 <strong>prompt gradient</strong> that summarizes failure modes without leaking the
 verified claims themselves.</p>
@@ -2229,7 +2229,7 @@ behaviour descriptor: novelty is measured in genotype-embedding space
 <h2 id="the-pipeline">The pipeline<a class="headerlink" href="#the-pipeline" title="Permanent link">&para;</a></h2>
 <p>The verifier runs four stages per workflow run:</p>
 <ol>
-<li><strong>Multi-source claim extraction</strong> — six independent prompts each look at
+<li><strong>Multi-source claim extraction</strong> — five independent prompts each look at
    the run from a different vantage point and emit success-polarity claims.</li>
 <li><strong>Per-claim verification</strong> — for each claim, the judge either writes a
    small Python program that recomputes the asserted value from workspace
@@ -2242,7 +2242,7 @@ behaviour descriptor: novelty is measured in genotype-embedding space
    scores, or sources, so the mutator cannot turn the verified-claim
    vocabulary back into a rubric to optimize against.</li>
 </ol>
-<h2 id="the-six-claim-sources">The six claim sources<a class="headerlink" href="#the-six-claim-sources" title="Permanent link">&para;</a></h2>
+<h2 id="the-five-claim-sources">The five claim sources<a class="headerlink" href="#the-five-claim-sources" title="Permanent link">&para;</a></h2>
 <p>Each source is a different definition of "success" — claims from each are
 merged and verified by the same per-claim machinery downstream.</p>
 <table>
@@ -2275,11 +2275,6 @@ merged and verified by the same per-claim machinery downstream.</p>
 <td>Do the artefacts satisfy mathematical sanity properties (probabilities in [0,1], symmetry, no NaN, shape consistency, conservation)?</td>
 </tr>
 <tr>
-<td><strong>E — Computational reproducibility</strong></td>
-<td>An independent computer scientist re-running this</td>
-<td>Are the <strong>non-negotiable</strong> CS practices present (declared deps cover used imports, no absolute paths, seeds on stochastic ops, entrypoint)?</td>
-</tr>
-<tr>
 <td><strong>F — Statistical fingerprint</strong></td>
 <td>A skeptical statistician</td>
 <td>Is the result <em>real</em>, not vacuous? Does it beat a baseline, avoid degenerate predictions, show no leakage signatures?</td>
@@ -2294,10 +2289,7 @@ merged and verified by the same per-claim machinery downstream.</p>
   not passes "the answer is empty".</li>
 <li><strong>Discrimination test</strong> — bare file-existence claims are <em>never</em> <code>hard</code>.
   An artifact claim only counts when chained to a functional property
-  (e.g. "manifest covers the imports actually used by produced code").</li>
-<li><strong>Source E exclusions</strong> — Source E explicitly forbids claims about
-  README / docstrings / tests / code style / type hints / logging /
-  module layout. It verifies CS <em>practice</em>, not engineering aesthetics.</li>
+  (e.g. "predictions.csv contains a valid probability for every row").</li>
 </ul>
 <h2 id="per-claim-verification">Per-claim verification<a class="headerlink" href="#per-claim-verification" title="Permanent link">&para;</a></h2>
 <p>The verifier prefers a deterministic Python program for every claim and
@@ -2355,7 +2347,7 @@ previews and literature grounding, with three outcomes:</p>
 <p>The verifier also projects the same per-claim verdicts into a <strong>failure
 fingerprint</strong>: a centered vector of per-source pass rates that records
 <em>how</em> a candidate fails, not <em>whether</em> it failed.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Per source A..F (six entries, always — absent sources get a neutral value).</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Per source letter (a–g, fixed length — absent sources get a neutral value).</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pass_rate</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">=</span> <span class="n">passes</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">/</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>              <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.5</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">presence</span><span class="p">[</span><span class="n">s</span><span class="p">]</span>  <span class="o">=</span> <span class="mf">1.0</span>                                <span class="k">if</span> <span class="n">total</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>  <span class="k">else</span> <span class="mf">0.0</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Center so the vector encodes profile shape, not quality level.</span>
@@ -2387,7 +2379,7 @@ Full info-flow audit of the QD behaviour descriptor:
 similar runs. It is the <strong>only</strong> verifier output that reaches the
 mutator, and it is written so it does not leak the verified claims back:</p>
 <ul>
-<li>It does not name specific claims, scores, or which of the six sources
+<li>It does not name specific claims, scores, or which of the five sources
   raised the issue.</li>
 <li>It encodes failure modes by short code names (e.g.
   <code>FALLBACK_ECFP_CLASSIFIER</code>) so recurring patterns can be tracked across
@@ -2428,7 +2420,7 @@ verifier pipeline itself:</p>
 </tr>
 <tr>
 <td>One vantage point misses the failure.</td>
-<td>Six independent sources, claims merged.</td>
+<td>Five independent sources, claims merged.</td>
 </tr>
 <tr>
 <td>Cosmetic hygiene gets gamed as "quality".</td>

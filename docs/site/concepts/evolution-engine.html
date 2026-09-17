@@ -898,15 +898,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
+  <a href="#variation-directive-implicit-mutation-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
+        Variation: directive-implicit mutation scope
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+    <nav class="md-nav" aria-label="Variation: directive-implicit mutation scope">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2096,15 +2096,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" class="md-nav__link">
+  <a href="#variation-directive-implicit-mutation-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)
+        Variation: directive-implicit mutation scope
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+    <nav class="md-nav" aria-label="Variation: directive-implicit mutation scope">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2261,7 +2261,7 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
     Seed -- no --&gt; Pick[Pick parents via QD-roulette&lt;br/&gt;fallback to disk similarity scan]
     SeedPrompt --&gt; Orch[Orchestrate workflow&lt;br/&gt;LLM → sandbox]
     Pick --&gt; Decide{Crossover ≈ 0.4?}
-    Decide -- mutation --&gt; Think[Directive LLM&lt;br/&gt;diagnosis + boldness&lt;br/&gt;→ 3-sentence directive]
+    Decide -- mutation --&gt; Think[Directive LLM&lt;br/&gt;diagnosis + search state&lt;br/&gt;→ 3-sentence directive]
     Decide -- crossover --&gt; Cross[Crossover prompt&lt;br/&gt;best-parent-first]
     Think --&gt; Mut[Mutation prompt&lt;br/&gt;parent code + directive]
     Mut --&gt; Orch
@@ -2376,97 +2376,51 @@ but only as a diagnostic — selection no longer reads it. The structural
 descriptor is gone entirely; <code>code_features.py</code> is now the
 genotype-embedding shim.</p>
 </blockquote>
-<h2 id="variation-evidence-driven-mutation-scope-rechenberg-15-rule">Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)<a class="headerlink" href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" title="Permanent link">&para;</a></h2>
+<h2 id="variation-directive-implicit-mutation-scope">Variation: directive-implicit mutation scope<a class="headerlink" href="#variation-directive-implicit-mutation-scope" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py"><code>VariationEngine</code></a>
-assembles mutation and crossover prompts. There is no fixed phase
-schedule by iteration progress; mutation boldness is a continuous
-function of two evidence signals — how long the lineage has been
-failing to improve, <em>and</em> how often recent offspring actually beat the
-best-so-far.</p>
-<p><strong>Plateau signal.</strong> <code>_iters_since_improvement()</code> counts the run of
-trailing scored offspring (failures and unscored entries skipped) that
-did not strictly beat the best-so-far at the moment they were
-produced. It is normalised to <code>plateau = min(1, iters / _PLATEAU_PATIENCE)</code>
-with <code>_PLATEAU_PATIENCE = 6</code>.</p>
-<p><strong>Success-rate signal.</strong> <code>_compute_success_rate(window=5)</code> counts the
-fraction of the last 5 scored offspring whose <code>overall_score</code> strictly
-beat the running best at the moment they were produced. The classical
-Rechenberg &#8533; success rule (1973) is the threshold: below <code>0.20</code>
-the search is "stuck" and step size must grow; above it, real progress
-is happening and step size should be damped.</p>
-<p><strong>Effective boldness.</strong> Combining the two signals:</p>
-<ul>
-<li><strong>Cold start</strong> (fewer than two comparable scored offspring) —
-  <code>effective = 0.3 · plateau</code>. A capped cold-start ramp avoids jumping
-  straight into RE-SPECIATION before any feedback has accumulated.</li>
-<li><strong>Below &#8533;</strong> (<code>success_rate &lt; 0.20</code>) — average the deficit and the
-  plateau: <code>effective = 0.5 · deficit + 0.5 · plateau</code>, where
-  <code>deficit = (0.20 − success_rate) / 0.20</code>. A run of no-improvements
-  and a stalling success rate both push scope up.</li>
-<li><strong>Above &#8533;</strong> — damp boldness in proportion to how far above
-  threshold we are: <code>effective = plateau · (1 − progress)</code>, where
-  <code>progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))</code>. At
-  <code>success_rate ≥ 0.80</code> boldness collapses regardless of plateau.</li>
-<li><strong>Near-finish floor</strong> — only in the last 5 % of the score range,
-  <code>effective</code> is multiplied by <code>(1 − 0.5 · near_finish)</code> where
-  <code>near_finish = max(0, (parent_score − 0.95) / 0.05)</code>. This is the
-  <em>only</em> point where the parent's absolute score re-enters the boldness
-  calculation, so a 0.96 parent isn't gambled away one generation
-  before early-stop.</li>
-<li><strong>RE-SPECIATION gate.</strong> The top band is hysteresis-gated: unless
-  <code>iters_since_improvement ≥ _RESPECIATION_PATIENCE</code> (default <code>8</code>) <em>and</em>
-  <code>success_rate ∈ {None, 0.0}</code>, <code>effective</code> is clamped to
-  <code>_RESPECIATION_CLAMP = 0.89</code> — just below the EXPLORATION/RE-SPECIATION
-  boundary at <code>0.90</code>.</li>
-</ul>
-<p>Notably, <code>parent_score</code> no longer multiplies the whole signal — that
-older behaviour locked high-score lineages into "tiny tweak" mode even
-when offspring kept failing identically.</p>
-<p><strong>Agent budget.</strong> The current agent count grows toward
-<code>max_possible_agents = 7</code> proportionally to <code>effective</code>, then a
-Beta-Binomial draw samples the actual count inside that window
-(biased upward by <code>effective</code>). The seed generation samples agents
-from <code>[1, 4]</code> with a <code>0.5</code> boldness prior.</p>
-<p><strong>Scope band.</strong> A single advisory line is added to the mutation prompt,
-chosen by <code>effective</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Effective boldness</th>
-<th>Mutation scope</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&lt; 0.35</td>
-<td><code>EXPLOITATION</code> — point mutation: minor phrasing / prompt-adjective tweaks</td>
-</tr>
-<tr>
-<td>&lt; 0.50</td>
-<td><code>ALIGNMENT</code> — interface optimization: refine handoff prompts, IO contracts</td>
-</tr>
-<tr>
-<td>&lt; 0.65</td>
-<td><code>ADAPTATION</code> — component overhaul: rewrite lagging agent prompts, swap tools</td>
-</tr>
-<tr>
-<td>&lt; 0.90</td>
-<td><code>EXPLORATION</code> — macro structural mutation: add/merge agents, change routing</td>
-</tr>
-<tr>
-<td>≥ 0.90</td>
-<td><code>RE-SPECIATION</code> — clean-slate redesign of the multi-agent architecture</td>
-</tr>
-</tbody>
-</table>
-<p>The bands are advisory text steered to the LLM, not hard gates: the
-LLM can still pick any topology. The hard control is the agent-count
-budget passed in the same prompt block.</p>
+assembles mutation and crossover prompts. There is <strong>no step-size
+controller any more</strong>: mutation magnitude ("how bold") is decided
+implicitly by the directive LLM, informed by a deterministic,
+read-only <code>&lt;search_state&gt;</code> block assembled in code.</p>
+<p>An earlier design computed an "effective boldness" scalar from a
+success-rate rule blended with a plateau counter, mapped it onto five
+advisory scope bands (EXPLOITATION → RE-SPECIATION), and grew the
+agent budget with it. That controller was removed because it
+never actuated a real knob: generation temperature is sampled
+randomly at the workflow factory, the band text reached only the
+directive LLM as prose, and offline measurement showed the scalar's
+influence on realised edit size was noise-dominated — directive
+word-choice predicted the outcome far better than the boldness value
+itself.</p>
+<p>What survived is the <strong>observer</strong>. For every mutation the engine
+assembles a <code>&lt;search_state&gt;</code> block from recorded history: the parent
+score, the iteration progress (<code>iteration / max_iterations</code>), the
+plateau streak <code>_iters_since_improvement()</code> (scored offspring since
+the last strict improvement, normalised by <code>_PLATEAU_PATIENCE = 6</code>),
+the success rate <code>_compute_success_rate(window=5)</code> over the last 5
+scored offspring, and a short score-only trajectory (last 5 child
+scores). The block deliberately contains no rubric or diagnosis text,
+so the verifier's rubric-blindness firewall is preserved. The same
+fields are written to <code>variation_state</code> telemetry.</p>
+<p>Magnitude guidance lives in the directive prompt instead: the LLM
+judges for itself how bold the next change should be — small tweak vs
+component rewrite vs structural redesign — justified by the search
+state (recent improvements and a rising trajectory call for small
+tweaks; a long plateau, a 0 % success rate, or repeated identical
+failures call for bolder restructuring). Hard guardrails remain in
+code, not prose: the mutation agent budget is sampled
+<strong>parent-centered</strong> — uniformly within ±1 agent of the parent's agent
+count, hard-capped to <code>[1, max_possible_agents = 7]</code> (seed generation
+still draws from <code>[1, 4]</code>; crossover is still capped at the highest
+parent agent count) — and the mutation prompt keeps the deterministic
+mandates: add or remove at most 1 agent, do not change topology unless
+the directive explicitly suggests it, keep 90 % of the previous
+workflow prompts and code unchanged.</p>
 <h3 id="mutation-directive-offloading-reasoning-from-the-orchestrator">Mutation directive: offloading reasoning from the orchestrator<a class="headerlink" href="#mutation-directive-offloading-reasoning-from-the-orchestrator" title="Permanent link">&para;</a></h3>
 <p>The orchestrator LLM has one job: write the next workflow's Python
-code. Earlier revisions dumped the raw diagnosis, the per-agent
-answers, <em>and</em> the boldness/scope band into the orchestrator prompt and
-asked it to figure out the right intervention while also coding it.
+code. Earlier revisions dumped the raw diagnosis and the per-agent
+answers into the orchestrator prompt and asked it to figure out the
+right intervention while also coding it.
 That mixed two very different kinds of reasoning into one call —
 diagnosis ("what went wrong, and what kind of change does that imply?")
 and synthesis ("emit valid LangGraph + agent code") — and the
@@ -2480,18 +2434,20 @@ call reads:</p>
 <li>the parent's per-agent answers (<code>&lt;agents_answers&gt;</code>),</li>
 <li>the rubric-blind textual gradient from the verifier
   (<code>&lt;diagnosis&gt;</code> — trusted as ground truth),</li>
-<li>the boldness/scope block produced by <code>_get_prompt_step_size</code>
-  (<code>&lt;boldness&gt;</code> — caps how big a change is allowed),</li>
+<li>the read-only search-state block produced by <code>_search_state_block</code>
+  (<code>&lt;search_state&gt;</code> — plain search statistics: parent score, iteration
+  progress, plateau streak, success rate, score trajectory),</li>
 <li>and the goal,</li>
 </ul>
 <p>and emits a <strong>≤ 3-sentence directive</strong> that names exactly one issue,
 the kind of mutation it implies (prompt tweak, persona change, agent
-add/remove, topology change), and the rationale. The system prompt is
-explicit about trust ranks — the verifier diagnosis is trusted; agent
-self-reports may mislead — and about action limits — add or remove at
-most one agent per step, do not exceed the boldness band, and prefer
-small incremental changes unless the diagnosis says the approach is
-fundamentally flawed.</p>
+add/remove, topology change), the <strong>intended magnitude</strong> (small tweak,
+component rewrite, structural redesign) justified by the search state,
+and the rationale. The system prompt is explicit about trust ranks —
+the verifier diagnosis is trusted; agent self-reports may mislead —
+and about action limits — add or remove at most one agent per step,
+and prefer small incremental changes unless the diagnosis and search
+state say the approach is fundamentally flawed.</p>
 <p>The orchestrator then receives only the parent code and that single
 directive, wrapped in <code>&lt;directive&gt;...&lt;/directive&gt;</code> with hard
 instructions:</p>
@@ -2504,11 +2460,11 @@ instructions:</p>
 <li><strong>keep ≥ 90 % of the previous workflow code and prompts unchanged</strong>.</li>
 </ul>
 <p>The pre-digested directive is grounded — every claim it makes is
-sourced from the boldness signals and the verifier diagnosis, never
+sourced from the search state and the verifier diagnosis, never
 from the orchestrator's own re-reading of the rubric — and precise —
 the orchestrator is no longer asked to weigh evidence, only to
 implement one named change. This consistently reduces drift between
-generations and prevents the boldness budget from leaking into
+generations and prevents the change mandate from leaking into
 unintended structural rewrites.</p>
 <h2 id="crossover">Crossover<a class="headerlink" href="#crossover" title="Permanent link">&para;</a></h2>
 <p>With probability <code>crossover_rate</code> per generation (default <code>0.4</code>, and only
@@ -2527,7 +2483,7 @@ Combined with <code>evolution_prompt_&lt;uuid&gt;.md</code> (the exact LLM promp
 runs are fully reproducible — same prompt, same code path, same seed
 yields the same code.</p>
 <h2 id="watching-evolution-happen">Watching evolution happen<a class="headerlink" href="#watching-evolution-happen" title="Permanent link">&para;</a></h2>
-<p>The Rechenberg schedule, the directive-LLM, the QD archive, the
+<p>The directive LLM, the QD archive, the
 crossover roll — none of it is visible inside a single generation.
 The shape of the search only emerges when you step back across a
 whole run, and that's what the lineage tree in
@@ -2548,9 +2504,9 @@ children, those crossing over into the 0.67/0.69 generation, then a
 dashed edges that span the tree horizontally: those are the
 recombinations that pulled in a structural idea the local mutation
 chain wouldn't have reached on its own. Long mutation runs at the
-same colour are the plateau signal feeding back into the boldness
-schedule; the colour jump that follows them is what an unstuck
-EXPLORATION-band mutation actually looks like.</p>
+same colour are the plateau the directive LLM sees in its search
+state; the colour jump that follows them is what a deliberately bolder
+mutation looks like.</p>
 <h2 id="run-metrics-artifacts">Run metrics artifacts<a class="headerlink" href="#run-metrics-artifacts" title="Permanent link">&para;</a></h2>
 <p>Each iteration also writes structured metrics for post-hoc analysis:</p>
 <ul>
@@ -2560,16 +2516,17 @@ EXPLORATION-band mutation actually looks like.</p>
   <code>overall_score{,_uncapped}</code>, <code>qd_descriptor</code>, <code>qd_score</code>,
   <code>novelty_score</code>, the <code>selection_log</code>, and the
   <code>variation_state</code> (<code>iters_since_improvement</code>, <code>plateau</code>,
-  <code>success_rate</code>, <code>effective_boldness</code>, <code>parent_score</code>,
-  <code>respeciation_gate_open</code>, , <code>agent_budget</code>) that produced
-  this offspring.</li>
+  <code>success_rate</code>, <code>parent_score</code>, and the parent-centered
+  <code>agent_budget</code> sample) that produced this offspring. Historical files
+  from before the controller removal may additionally hold
+  <code>effective_boldness</code> / <code>respeciation_gate_open</code>.</li>
 <li><code>sources/workflows/qd_archive.jsonl</code> — append-only, one line per
   <code>validate_survivor</code> call. Records the candidate's descriptor,
   <code>qd_score</code>, <code>novelty_score</code>, admission verdict, and the <code>evicted_uuid</code>
   (if the archive was at capacity).</li>
 <li><code>sources/workflows/variation_log.jsonl</code> — append-only, one line per
   mutation/crossover/seed prompt assembled. Lets you retrace the
-  Rechenberg &#8533; step-size schedule without rerunning the engine.</li>
+  search-state observer without rerunning the engine.</li>
 </ul>
 <p>All three are best-effort and fail-soft: an I/O error logs a warning
 but never aborts a run.</p>

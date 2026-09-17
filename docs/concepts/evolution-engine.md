@@ -151,9 +151,9 @@ implicitly by the directive LLM, informed by a deterministic,
 read-only `<search_state>` block assembled in code.
 
 An earlier design computed an "effective boldness" scalar from a
-Rechenberg 1/5 success rate blended with a plateau counter, mapped it
-onto five advisory scope bands (EXPLOITATION → RE-SPECIATION), and
-grew the agent budget with it. That controller was removed because it
+success-rate rule blended with a plateau counter, mapped it onto five
+advisory scope bands (EXPLOITATION → RE-SPECIATION), and grew the
+agent budget with it. That controller was removed because it
 never actuated a real knob: generation temperature is sampled
 randomly at the workflow factory, the band text reached only the
 directive LLM as prose, and offline measurement showed the scalar's

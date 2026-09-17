@@ -1896,7 +1896,7 @@
 
 
 <h1 id="evolution-process-figures">Evolution-process figures<a class="headerlink" href="#evolution-process-figures" title="Permanent link">&para;</a></h1>
-<p>Ten publication-quality figures illustrating how Mimosa-AI evolves a
+<p>Publication-quality figures illustrating how Mimosa-AI evolves a
 multi-agent workflow for a task. Each is emitted as a 320-dpi <code>.png</code> (slides,
 GitHub) and a vector <code>.svg</code> (print, LaTeX, further editing).</p>
 <p>Regenerate all of them:</p>
@@ -1941,18 +1941,6 @@ in <a href="../../concepts/evolution-engine.html"><code>concepts/evolution-engin
 <td>Behaviour descriptor</td>
 </tr>
 <tr>
-<td>5</td>
-<td><code>fig05_rechenberg_boldness</code></td>
-<td>Effective-boldness function vs. success rate / plateau (Rechenberg &#8533;)</td>
-<td>Variation · evidence-driven scope</td>
-</tr>
-<tr>
-<td>6</td>
-<td><code>fig06_scope_ladder</code></td>
-<td>The five mutation-scope bands, EXPLOITATION → RE-SPECIATION</td>
-<td>Variation · scope band table</td>
-</tr>
-<tr>
 <td>7</td>
 <td><code>fig07_variation_operators</code></td>
 <td>Mutation (directive-LLM split) vs. crossover (best-parent-first)</td>
@@ -1973,19 +1961,26 @@ in <a href="../../concepts/evolution-engine.html"><code>concepts/evolution-engin
 <tr>
 <td>10</td>
 <td><code>fig10_reward_progress</code></td>
-<td>Reward-over-generations envelope coupled to the boldness control law</td>
+<td>Reward-over-generations envelope</td>
 <td>Run-metrics artifacts</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Historical figures removed.</strong> The effective-boldness control-law
+figure (fig05) and the scope-ladder figure (fig06) documented the
+retired step-size controller, which was removed from the engine —
+mutation magnitude is now decided implicitly by the directive LLM
+from a <code>&lt;search_state&gt;</code> block (see
+<a href="../../concepts/evolution-engine.html">Variation</a>). The figure files
+were deleted.</p>
+</blockquote>
 <h3 id="notes-on-the-two-illustrative-figures">Notes on the two illustrative figures<a class="headerlink" href="#notes-on-the-two-illustrative-figures" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>fig09</strong> and <strong>fig10</strong> use small hand-authored trajectories to make the
-  mechanics legible on one canvas; they are schematics, not logged runs. The
-  boldness curve in fig10 is computed from its scripted scores with the
-  <em>actual</em> <code>VariationEngine</code> control law (cold-start ramp, Rechenberg &#8533;,
-  plateau patience 6, RE-SPECIATION hysteresis clamp 0.89), so the two panels
-  stay consistent. Real runs write <code>reward_progress.png</code> and <code>evolution_tree.png</code>
+  mechanics legible on one canvas; they are schematics, not logged runs.
+  Real runs write
+  <code>reward_progress.png</code> and <code>evolution_tree.png</code>
   per run under <code>sources/workflows/&lt;uuid&gt;/</code>.</li>
 <li><strong>fig03</strong>/<strong>fig04</strong> scatter points are synthetic but obey the engine's
   invariants (additive QD score, spread-promoting novelty, semantic collapse
