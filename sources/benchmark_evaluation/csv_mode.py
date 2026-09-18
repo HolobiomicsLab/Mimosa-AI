@@ -139,7 +139,8 @@ class CsvEvaluationMode:
     """
 
     def __init__(self, config, csv_runs_limit: int = 103, max_concurrent_tasks: int = 1,
-                 task_start_delay: float = 30.0, run_notes_dir: str | Path = "run_notes"):
+                 task_start_delay: float = 30.0, run_notes_dir: str | Path = "run_notes",
+                 restore_notes_file: str | Path | None = None):
         """
         Initialize CsvEvaluationMode.
 
@@ -151,6 +152,9 @@ class CsvEvaluationMode:
                               Staggers agent starts to avoid overwhelming shell/API resources.
             run_notes_dir: Directory for per-task run notes. Per-run in queued CLI
                               mode so queued runs never restore each other's cache.
+            restore_notes_file: Explicit run-notes JSON to restore statistics from
+                              (e.g. a file from run_notes/evaluations/). When set it
+                              replaces the automatic scan of run_notes_dir.
         """
         self.config = config
         self.csv_runs_limit = csv_runs_limit
@@ -159,6 +163,7 @@ class CsvEvaluationMode:
         self.planner = Planner(config)
         self.run_notes_dir = Path(run_notes_dir)
         self.run_notes_dir.mkdir(parents=True, exist_ok=True)
+        self.restore_notes_file = Path(restore_notes_file) if restore_notes_file else None
         self.done_rows = []
 
         # Concurrency control
@@ -273,6 +278,94 @@ class CsvEvaluationMode:
                 f"[CACHE RECOVERY] Loaded previous run with {max_total_eval} evaluations"
             )
         return best_notes
+
+    def _load_run_notes_from_file(self, notes_file: Path) -> dict | None:
+        """
+        Load and normalise an explicitly chosen run-notes JSON file.
+
+        Accepts both note shapes this project writes:
+
+        - per-task notes (``run_notes/<run>/<task>.json``): flat keys
+          ``model``, ``total_eval``, ``ver_success``, ``sr_success``,
+          ``avg_cbs``, ``total_cost``;
+        - evaluation-queue summaries (``run_notes/evaluations/*.json``,
+          written by EvaluationCLI): metrics nested under ``final_results``
+          (``ver_total`` instead of ``total_eval``, model under
+          ``smolagent_model_id``).
+
+        The nested shape is normalised into the flat one so
+        ``_restore_execution_history_from_cache`` can consume it unchanged.
+
+        Args:
+            notes_file: Path to the run-notes JSON chosen by the operator.
+
+        Returns:
+            Normalised notes dict, or None if the file is unreadable or
+            carries no usable evaluation statistics.
+        """
+        path = Path(notes_file)
+        try:
+            with open(path, encoding='utf-8') as f:
+                notes = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            self.logger.warning(f"[CACHE RECOVERY] Could not load {path}: {e}")
+            print_warn(f"Could not load run notes {path}: {e}")
+            return None
+
+        final = notes.get('final_results')
+        if isinstance(final, dict):
+            total_eval = final.get('ver_total', final.get('steps_evaluated', 0))
+            notes.setdefault('total_eval', total_eval)
+            for key in ('ver_success', 'sr_success', 'avg_cbs', 'total_cost'):
+                notes.setdefault(key, final.get(key, 0))
+            notes.setdefault('model', notes.get('smolagent_model_id', ''))
+
+        if not notes.get('total_eval'):
+            self.logger.warning(f"[CACHE RECOVERY] No evaluation statistics in {path}")
+            print_warn(f"{path.name} contains no evaluation statistics — nothing restored.")
+            return None
+
+        model = notes.get('model', '')
+        if model and self.config.smolagent_model_id and model != self.config.smolagent_model_id:
+            print_warn(
+                f"{path.name} was recorded with model '{model}' but this run "
+                f"uses '{self.config.smolagent_model_id}'. Restoring anyway "
+                "(file chosen explicitly)."
+            )
+        return notes
+
+    async def _maybe_restore_cache(self, restore_cache: bool | None) -> None:
+        """
+        Resolve the cache-restore decision and restore execution history.
+
+        An explicitly configured ``restore_notes_file`` wins over the
+        automatic scan — the operator picked it, so no prompt is issued.
+        Otherwise the previous behaviour applies: scan ``run_notes_dir``
+        for the notes with the highest ``total_eval`` for the configured
+        model, prompting the user when *restore_cache* is None and a cache
+        is found.
+
+        Args:
+            restore_cache: Whether to restore previous run stats; None =
+                prompt the user (automatic scan only).
+        """
+        if self.restore_notes_file is not None:
+            if restore_cache is False:
+                return
+            cached_notes = self._load_run_notes_from_file(self.restore_notes_file)
+            if cached_notes:
+                self._restore_execution_history_from_cache(cached_notes)
+            return
+
+        cached_notes = self._load_previous_run_notes()
+        if cached_notes:
+            if restore_cache is None:
+                restore_input = await _prompt_with_default(
+                    "Restore previous run statistics from cache? (y/n)", default="y"
+                )
+                restore_cache = restore_input.lower() != 'n'
+            if restore_cache:
+                self._restore_execution_history_from_cache(cached_notes)
 
     def _restore_execution_history_from_cache(self, cached_notes: dict) -> None:
         """
@@ -1196,15 +1289,7 @@ EXPECTED OUTPUT:
         print(f"  → starting at row {start_row + 1}")
 
         # Load and restore from cache if available
-        cached_notes = self._load_previous_run_notes()
-        if cached_notes:
-            if restore_cache is None:
-                restore_input = await _prompt_with_default(
-                    "Restore previous run statistics from cache? (y/n)", default="y"
-                )
-                restore_cache = restore_input.lower() != 'n'
-            if restore_cache:
-                self._restore_execution_history_from_cache(cached_notes)
+        await self._maybe_restore_cache(restore_cache)
 
         # Initialize semaphore for concurrency control
         self._semaphore = asyncio.Semaphore(self.max_concurrent_tasks)
@@ -1317,15 +1402,7 @@ EXPECTED OUTPUT:
         print_info(f"→ starting at row {start_row + 1}")
 
         # Load and restore from cache if available
-        cached_notes = self._load_previous_run_notes()
-        if cached_notes:
-            if restore_cache is None:
-                restore_input = await _prompt_with_default(
-                    "Restore previous run statistics from cache? (y/n)", default="y"
-                )
-                restore_cache = restore_input.lower() != 'n'
-            if restore_cache:
-                self._restore_execution_history_from_cache(cached_notes)
+        await self._maybe_restore_cache(restore_cache)
 
         sab_loader = None
         if dataset_type == "science_agent_bench":

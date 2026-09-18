@@ -62,7 +62,7 @@ class Config:
         ##############
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.3"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.3"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v3.2"
+        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash-0731"
         self.judge_model = "openrouter/deepseek/deepseek-v4.1-flash"
         self.capsule_namer_model = "openrouter/deepseek/deepseek-v4.1-flash"
         # Vision model for Source G (visual figure inspection).

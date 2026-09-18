@@ -31,9 +31,8 @@ ALIGNMENT check (see below).
 ALIGNMENT CLAIMS. When the goal does not name the output schema, anchor
 it to the input schema: "the prediction file repeats the input dataset's
 identifier and label columns verbatim — same names, same order, no
-renames, no added suffixes such as `_prob`/`_score`/`_pred`". Never
-invent column or key names that appear neither in the goal text nor in
-a dataset preview.
+renames, no added suffixes such as `_prob`/`_score`/`_pred`". Never emit claims that bans duplicates.
+Never invent column or key names that appear neither in the goal text nor in a dataset preview.
 A prediction file is a row-aligned artifact, not a standalone table, one row per test row,
 postional alignment is required (eg: same number of rows for pred and test, no dedup).
 
@@ -304,6 +303,7 @@ Look for properties such as:
 - The prediction distribution is not degenerate: not constant, not all
   one class, not a single value repeated, not uniformly 0.5, with non-zero
   variance across rows in continuous outputs.
+- High accuracy (per litterature standard if available) (eg: balanced accuracy > 0.70) and below MSE (eg: <0.4) threshold.
 - No data-leakage signatures in what the agents CONSUMED. If the
   provided split itself overlaps, the claim targets the agents's
   persisted, post-filter artefact: "the training data actually used for

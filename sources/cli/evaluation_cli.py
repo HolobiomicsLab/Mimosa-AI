@@ -71,6 +71,9 @@ _EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
 TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
+# Where EvaluationCLI stores its per-run summary notes — also the folder the
+# cache-restore file picker offers files from.
+_EVAL_NOTES_DIR = Path("run_notes") / "evaluations"
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +95,9 @@ class EvalRunSpec:
     # queue can execute unattended — no stdin prompts after launch.
     start_row: int = 0          # 0-based first CSV row to process
     restore_cache: bool = True  # restore stats from previous run notes if found
+    # Run-notes JSON the statistics are restored from (run_notes/evaluations/*.json);
+    # None = automatic detection inside csv_mode.
+    restore_notes_file: str | None = None
     # Populated after execution
     status: str = "pending"
 
@@ -278,7 +284,7 @@ class EvaluationCLI:
         # Step 5 – Number of tasks (csv_runs_limit)
         _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
         csv_runs_limit = self._ask_csv_runs_limit()
-        start_row, restore_cache = self._ask_recovery_options()
+        start_row, restore_cache, restore_notes_file = self._ask_recovery_options()
 
         # Step 6 – Advanced / ablation options (optional)
         _print_step(6, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
@@ -293,6 +299,7 @@ class EvaluationCLI:
             overrides=overrides,
             start_row=start_row,
             restore_cache=restore_cache,
+            restore_notes_file=restore_notes_file,
         )
 
     # ------------------------------------------------------------------
@@ -541,11 +548,13 @@ class EvaluationCLI:
             except ValueError:
                 _warn(f"Invalid number '{raw}'. Please enter a whole number.")
 
-    def _ask_recovery_options(self) -> tuple[int, bool]:
-        """Resolve start-row and cache-restore decisions at configuration time.
+    def _ask_recovery_options(self) -> tuple[int, bool, str | None]:
+        """Resolve start-row, cache-restore and notes-file decisions up front.
 
         csv_mode used to prompt for these when each queued run *started*;
         resolving them here keeps the queue fully unattended after launch.
+        When the user opts to restore statistics, the exact run-notes JSON
+        (from ``run_notes/evaluations/``) is also chosen here.
         """
         print(_wrap(
             "Recovery options: resume from a given CSV row and/or restore "
@@ -561,8 +570,106 @@ class EvaluationCLI:
         restore_cache = _ask_yn(
             "Restore previous run statistics from cache if found?", default=True,
         )
-        _ok(f"Start row: {start_row + 1}, restore cache: {'yes' if restore_cache else 'no'}")
-        return start_row, restore_cache
+        notes_file: str | None = None
+        if restore_cache:
+            notes_file = self._choose_restore_notes_file()
+        summary = f"Start row: {start_row + 1}, restore cache: {'yes' if restore_cache else 'no'}"
+        if restore_cache:
+            summary += f", from {notes_file or 'auto-detected notes'}"
+        _ok(summary)
+        return start_row, restore_cache, notes_file
+
+    def _choose_restore_notes_file(self) -> str | None:
+        """Ask which run-notes JSON to restore statistics from.
+
+        Lists the JSON files in ``run_notes/evaluations/`` newest first and
+        accepts a number, ``a``/``auto`` (keep csv_mode's automatic
+        detection), or a direct filename/path.
+
+        Returns:
+            Chosen file path as a string, or None for automatic detection.
+        """
+        notes_dir = _EVAL_NOTES_DIR
+        try:
+            candidates = sorted(
+                (p for p in notes_dir.glob("*.json") if p.is_file()),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except OSError as exc:
+            _warn(f"Could not list {notes_dir} ({exc}) — falling back to auto-detection.")
+            return None
+
+        if not candidates:
+            _warn(
+                f"No run notes found in {notes_dir} — statistics will be "
+                "auto-detected from the run's own notes folder if present."
+            )
+            return None
+
+        print(_wrap(
+            f"Restore statistics from which run-notes file? "
+            f"({notes_dir}/, newest first)"
+        ))
+        for idx, path in enumerate(candidates, start=1):
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{path.name}{RESET}")
+            print(f"         {GREY}{self._summarise_notes_file(path)}{RESET}")
+        print(f"  {AMBER}[a]{RESET}  {GREY}auto-detect (default csv_mode behaviour){RESET}")
+
+        while True:
+            raw = _ask("File number, 'a' for auto-detect, or a path", default="1").strip()
+            if raw.lower() in ("a", "auto"):
+                return None
+            chosen = self._resolve_notes_choice(raw, candidates, notes_dir)
+            if chosen is not None:
+                _ok(f"Will restore statistics from {chosen}")
+                return str(chosen)
+            _warn(
+                f"Unrecognised choice '{raw}'. Enter a number between 1 and "
+                f"{len(candidates)}, 'a', or an existing JSON file path."
+            )
+
+    @staticmethod
+    def _resolve_notes_choice(raw: str, candidates: list[Path], notes_dir: Path) -> Path | None:
+        """Resolve a numeric or path answer into an existing notes file.
+
+        Numbers index the candidate list; bare names are resolved against
+        *notes_dir*; everything else is taken as a path as given.
+        """
+        try:
+            idx = int(raw) - 1
+            if 0 <= idx < len(candidates):
+                return candidates[idx]
+            return None
+        except ValueError:
+            pass
+        path = Path(raw).expanduser()
+        if not path.is_file():
+            path = notes_dir / raw
+        if path.is_file() and path.suffix.lower() == ".json":
+            return path
+        return None
+
+    @staticmethod
+    def _summarise_notes_file(path: Path) -> str:
+        """One-line preview of a run-notes JSON (model, mode, final metrics)."""
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return "unreadable — cannot preview"
+        parts = [
+            str(data.get("smolagent_model_id") or data.get("model") or "?"),
+            str(data.get("eval_mode") or "?"),
+            str(data.get("status", "?")),
+        ]
+        final = data.get("final_results") or {}
+        if final:
+            parts.append(f"VER {final.get('ver_success', '?')}/{final.get('ver_total', '?')}")
+            parts.append(f"SR {final.get('sr_success', '?')}/{final.get('sr_total', '?')}")
+        else:
+            parts.append(f"{data.get('total_eval', '?')} evals")
+        return " · ".join(parts)
 
     # ------------------------------------------------------------------
     # Step 6 – Advanced / ablation options (optional)
@@ -799,6 +906,8 @@ class EvaluationCLI:
             kv("ports", port_str)
             kv("workspace", spec.config.workspace_dir)
             kv("mcps", str(len(spec.mcp_list)))
+            if spec.restore_cache:
+                kv("restore from", spec.restore_notes_file or "auto-detected notes")
             if spec.overrides:
                 over_str = ", ".join(f"{k}={v}" for k, v in spec.overrides.items())
                 kv("overrides", over_str)
@@ -837,6 +946,9 @@ class EvaluationCLI:
             "judge_model": spec.config.judge_model,
             "eval_mode": spec.eval_mode,
             "csv_runs_limit": spec.csv_runs_limit,
+            "start_row": spec.start_row + 1,
+            "restore_cache": spec.restore_cache,
+            "restore_notes_file": spec.restore_notes_file,
             "discovery_addresses": [
                 {"ip": a.ip, "port_min": a.port_min, "port_max": a.port_max}
                 for a in spec.config.discovery_addresses
@@ -881,7 +993,7 @@ class EvaluationCLI:
         if not notes_path or not notes_path.exists():
             return
         try:
-            with open(notes_path, "r", encoding="utf-8") as fh:
+            with open(notes_path, encoding="utf-8") as fh:
                 data = json.load(fh)
             data.update(updates)
             with open(notes_path, "w", encoding="utf-8") as fh:
@@ -964,6 +1076,7 @@ class EvaluationCLI:
             max_concurrent_tasks=max_concurrent,
             task_start_delay=task_start_delay,
             run_notes_dir=Path("run_notes") / f"run_{spec.run_id}",
+            restore_notes_file=spec.restore_notes_file,
         )
         # Attach the run notes path so csv_mode can write final results there
         evaluator._evaluation_cli_notes_path = spec.notes_path
