@@ -150,7 +150,7 @@ class Config:
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
         self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
-        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v14_freedom.md")
+        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v13_model_select.md")
         self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
 
         # folder paths for workflow pre-defined code
