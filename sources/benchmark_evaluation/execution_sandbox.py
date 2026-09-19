@@ -12,13 +12,12 @@ import hashlib
 import logging
 import os
 import re
+import shutil
 import signal
 import subprocess
-import shutil
 import tempfile
 import threading
 from pathlib import Path
-
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +84,24 @@ SPECIAL_CASE_INSTALLS = {
     "deepchem": [["dgl", "-f", "https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html"]],
     "deeppurpose": [["git+https://github.com/bp-kelley/descriptastorus"]],
     "qsprpred": [["papyrus-scaffold-visualizer", "kaleido"]],
+}
+
+# Sdist-only packages whose PEP 517 BUILD environment must be constrained.
+# pip's isolated build env ignores ``-c`` constraint files, and phonopy 2.x
+# ships no wheels at all while declaring an UNPINNED
+# ``requires = ["scikit-build-core", "nanobind", "numpy"]`` — the build env
+# drifts to the latest backend, and scikit-build-core >= 0.10 removed the
+# ``cmake.verbose`` setting that phonopy 2.29's pyproject still uses. Every
+# phonopy install therefore died at "Getting requirements to build wheel"
+# with "ERROR: Use build.verbose instead of cmake.verbose for
+# scikit-build-core >= 0.10" and the phonon tasks (plot_phonon_dos,
+# plot_phonon_band_structure) were excluded as infra in every campaign from
+# 2026-09-02 to 2026-09-18. ``PIP_CONSTRAINT`` is the one mechanism pip
+# (>= 23.1) honours inside build environments, so these packages install in
+# a dedicated pip call carrying the backend pin; numpy is pinned too so the
+# C extension builds against the same numpy the venv runs.
+SOURCE_BUILD_CONSTRAINTS: dict[str, list[str]] = {
+    "phonopy": ["scikit-build-core<0.10", "numpy<2.0"],
 }
 
 
@@ -373,9 +390,19 @@ class ExecutionSandbox:
                 # pip errors on a requirement named twice in one command.
                 rest_names = {self._req_name(p) for p in rest}
                 merged = rest + [p for p in per_task if self._req_name(p) not in rest_names]
+                # Sdist-only packages needing build-env pins get their own pip
+                # call (see SOURCE_BUILD_CONSTRAINTS) so their backend drift
+                # cannot fail the whole merged transaction.
+                source_pinned = [
+                    p for p in merged if self._req_name(p) in SOURCE_BUILD_CONSTRAINTS
+                ]
+                merged = [
+                    p for p in merged if self._req_name(p) not in SOURCE_BUILD_CONSTRAINTS
+                ]
                 # pip skips already-satisfied packages, so this is cheap after the first task.
                 self.logger.info("[SANDBOX] Ensuring base + per-program packages...")
                 self._install_packages(merged)
+                self._install_source_constrained(source_pinned)
                 self._run_special_case_installs(present)
 
         except Exception as e:
@@ -441,6 +468,52 @@ class ExecutionSandbox:
         except Exception as e:
             self.logger.error(f"[SANDBOX] Package installation failed: {e}")
             raise
+
+    def _install_source_constrained(self, packages: list[str]) -> None:
+        """Install sdist-only packages with constraints applied to their build env.
+
+        PEP 517 build isolation ignores ``-c`` constraint files, but pip
+        honours the ``PIP_CONSTRAINT`` environment variable inside build
+        environments. Each package (a key of SOURCE_BUILD_CONSTRAINTS) is
+        installed in its own pip call carrying the runtime constraints file
+        plus a per-package build-constraints file written next to the shared
+        venv (removed together with it by cleanup_shared_venv).
+
+        Like _install_packages, a non-zero pip return code raises
+        EvalInfraError: a broken environment is not an agent failure, so the
+        task is excluded rather than counted as failed.
+
+        Args:
+            packages: Requirement strings whose canonical names are keys of
+                SOURCE_BUILD_CONSTRAINTS.
+        """
+        for pkg in packages:
+            name = self._req_name(pkg)
+            pins = SOURCE_BUILD_CONSTRAINTS[name]
+            build_cons = self.venv_path.parent / f"build_constraints_{name}.txt"
+            build_cons.write_text("\n".join(pins) + "\n")
+
+            cmd = [str(self.pip_exe), "install", "--quiet"]
+            if self._constraints_file:
+                cmd += ["-c", self._constraints_file]
+            cmd += [pkg]
+            env = os.environ.copy()
+            env["PIP_CONSTRAINT"] = str(build_cons)
+
+            self.logger.info(
+                f"[SANDBOX] Installing {pkg} with build constraints: {', '.join(pins)}"
+            )
+            try:
+                result = self._run_process(cmd, timeout=900, env=env)
+            except subprocess.TimeoutExpired:
+                self.logger.error(f"[SANDBOX] Package installation timed out ({pkg})")
+                raise
+            if result.returncode != 0:
+                raise EvalInfraError(
+                    f"Required package install failed (exit {result.returncode}) "
+                    f"for [{pkg}]: {result.stderr[:500]}"
+                )
+            self.logger.info(f"[SANDBOX] Installed: {pkg}")
 
     def _pip_install_requirements(self, req_file: Path) -> None:
         """pip install -r req_file, capped by the shared constraints file."""

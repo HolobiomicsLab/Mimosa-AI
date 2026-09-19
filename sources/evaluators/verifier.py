@@ -47,7 +47,7 @@ from .verifier_workspace import _VerifierWorkspaceMixin
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 100
 _VERIFIER_MIN_CLAIMS = 10
-_HARD_FAIL_CAP = 0.7
+_HARD_FAIL_CAP = 0.4
 _VERIFIER_GEN_PARALLELISM = 16
 # Per-claim verifier execution fan-out. Capped low because higher concurrency doesn't alway help
 _VERIFIER_EXEC_PARALLELISM = 4
@@ -65,7 +65,7 @@ class VerifierEvaluator(
 
     _DEFAULT_CLAIM_IMPORTANCE = 5
     _GRADIENT_MIN_IMPORTANCE = 3
-    _HARD_FAIL_IMPORTANCE = 10
+    _HARD_FAIL_IMPORTANCE = 8
 
     def __init__(
         self,

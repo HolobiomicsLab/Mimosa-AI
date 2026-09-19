@@ -21,11 +21,7 @@ class WorkflowEval:
         self.csv_runs_limit = csv_runs_limit
         self.orchestrator = WorkflowOrchestrator(config)
         self.model_lists = [
-            "openrouter/deepseek/deepseek-v3.2",
-            "openrouter/openrouter/inception/mercury-2",
-            "openrouter/minimax/minimax-m2.5",
-            "openrouter/moonshotai/kimi-k2.5",
-            "openrouter/moonshotai/kimi-k2-thinking"
+            "openrouter/deepseek/deepseek-v4-flash-0731",
         ]
         self.model_results: Dict[str, List[Tuple[str, bool]]] = {}
         self.model_timeouts: Dict[str, int] = {}
