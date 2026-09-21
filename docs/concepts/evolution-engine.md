@@ -132,8 +132,10 @@ signal as **neutral** (no novelty) rather than max-novel, so broken
 offspring are never rewarded merely for being "different".
 
 > **The failure fingerprint is no longer the novelty signal.** Earlier
-> versions derived QD novelty from a *failure fingerprint* — a 6-D
-> centered vector of per-source verifier pass rates — and, before that,
+> versions derived QD novelty from a *failure fingerprint* — a 7-D
+> centered vector of per-source verifier pass rates (one slot per
+> registered source letter `a`–`g`; the module is now marked deprecated)
+> — and, before that,
 > from a structural descriptor `[n_agents, n_edges, n_branches,
 > prompt_chars]`. Both have been retired as the behaviour descriptor. The
 > failure fingerprint is **still computed and persisted** by the verifier

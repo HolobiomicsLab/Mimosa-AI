@@ -26,7 +26,9 @@ The descriptor therefore reads "how different is the generated approach"
 directly, instead of inferring it from a proxy.
 
 > **History.** Earlier versions derived this descriptor from a *failure
-> fingerprint* (a 6-D centered vector of per-source verifier pass rates)
+> fingerprint* (a 7-D centered vector of per-source verifier pass rates,
+> one slot per registered source letter `a`–`g`; the module is now
+> deprecated)
 > and, before that, from a structural descriptor `[n_agents, n_edges,
 > n_branches, prompt_chars]`. The failure fingerprint is still computed
 > and persisted by the verifier as a diagnostic (see

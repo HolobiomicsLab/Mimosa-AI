@@ -112,16 +112,15 @@ Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-
 
 ### The verifier — what scores actually mean
 
-After each run, six independent claim sources look at the workspace and emit success-polarity claims:
+After each run, five independent claim sources look at the workspace and emit success-polarity claims:
 
 | Source | Vantage |
 |--------|---------|
 | **A** | Peer-reviewed practice (via Perspicacité literature grounding) |
 | **B** | The literal goal text — did the agents deliver what was asked? |
-| **C** | Agent narration — can claimed numbers / artefacts be reproduced from disk? |
-| **D** | Math invariants — probabilities in [0,1], shape consistency, no NaN, conservation |
-| **E** | Computational reproducibility — declared deps cover used imports, no absolute paths, seeds on stochastic ops |
-| **F** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
+| **C** | Math invariants — probabilities in [0,1], shape consistency, no NaN, conservation |
+| **E** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
+| **G** | Visual correctness — a vision-capable judge inspects figure deliverables (only when the goal asks for one) |
 
 Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent.
 

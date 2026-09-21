@@ -135,9 +135,10 @@ If you *did* set them, check Langfuse is actually running
 
 A few likely causes:
 
-- **Verifier hard fails.** If every generation has a refuted hard claim,
-  `hard_fail_capped` flips `true` and `overall_score` is capped at
-  `_HARD_FAIL_CAP` (currently `0.7`). QD selection ranks on this capped
+- **Verifier hard fails.** If every generation has a refuted hard claim
+  (rated importance ≥ 8), `hard_fail_capped` flips `true` and
+  `overall_score` is capped at
+  `_HARD_FAIL_CAP` (currently `0.89`). QD selection ranks on this capped
   score (`overall_score_uncapped` is still logged for analysis), so
   capped runs stay below uncapped improvements. You may have a
   structural mismatch between the task description and what the

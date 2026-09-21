@@ -1,4 +1,5 @@
 *.wav
+experiments_verifiers/
 .claude/*
 docs/support/*
 credentials.json

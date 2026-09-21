@@ -48,7 +48,7 @@ You add new tools without touching Mimosa's core.
 ### :material-magnify-scan: Verifier-driven evaluation
 A multi-source per-claim verifier writes **deterministic Python programs**
 that confirm what the agents claim, against five vantages (literature,
-user goal, agent narration, math invariants, statistical fingerprint). Only a coarse *prompt gradient* — which does not
+user goal, math invariants, statistical fingerprint, visual correctness). Only a coarse *prompt gradient* — which does not
 leak the verified claims — is fed back to the mutator.
 </div>
 

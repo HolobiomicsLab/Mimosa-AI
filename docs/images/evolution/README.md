@@ -22,7 +22,7 @@ in [`concepts/evolution-engine.md`](../../concepts/evolution-engine.md) and
 | 3 | `fig03_qd_archive` | The unstructured Quality-Diversity archive scored by `qd = ¾·quality + ¼·novelty` | Selection: Quality-Diversity |
 | 4 | `fig04_genotype_embedding` | Genotype embedding (MiniLM 384-d) → cosine k-NN novelty, `k = 15` | Behaviour descriptor |
 | 7 | `fig07_variation_operators` | Mutation (directive-LLM split) vs. crossover (best-parent-first) | Mutation directive · Crossover |
-| 8 | `fig08_verifier` | Six claim sources, per-claim Python recompute, rubric-blind firewall | Evaluation pipeline |
+| 8 | `fig08_verifier` | Five claim sources, per-claim Python recompute, rubric-blind firewall | Evaluation pipeline |
 | 9 | `fig09_lineage_tree` | A lineage tree: score climbing red→green, mutation/crossover edges | Watching evolution happen |
 | 10 | `fig10_reward_progress` | Reward-over-generations envelope | Run-metrics artifacts |
 

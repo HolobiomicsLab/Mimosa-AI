@@ -19,7 +19,7 @@ mimosa-ai/
 │   │   ├── workflow_selection.py          # Parent retrieval (archive / disk)
 │   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
 │   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, 6-D centered)
+│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, deprecated, 7-D centered)
 │   │   ├── lineage.py                     # Parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis

@@ -102,12 +102,12 @@ The verifier writes summary scores plus the workflow's final state to
 
 | Field | What it tells you |
 | ----- | ----------------- |
-| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.7`) when a hard claim is refuted. |
+| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.89`) when a claim with importance ≥ 8 is refuted. |
 | `overall_score_uncapped` | Same score pre-cap — recorded for analysis; QD ranking uses the capped `overall_score`. |
-| `base_mean` | Importance-weighted mean over non-error per-claim scores. |
-| `hard_fail_capped` | `true` when a hard claim was refuted (cap fired). |
+| `base_mean` | Importance-weighted mean over pass/fail/unsure claims plus zero-scored executable/visual errors; soft-claim errors are dropped. |
+| `hard_fail_capped` | `true` when an importance ≥ 8 claim was refuted (cap fired). |
 | `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |
-| `abstracted_prompt_gradient` | Code-named diagnostic summary — the only signal the mutator sees. Does not name the verified claims back. |
+| `abstractec_textual_gradient` | Code-named diagnostic summary — the only signal the mutator sees. Does not name the verified claims back. (Key name has an upstream typo: `abstractec_`, not `abstracted_`; the same text is also written to the `textual_gradient.txt` sidecar.) |
 
 The full per-claim detail (status, rationale, stderr tail, recomputed
 values) lives in `sources/workflows/<uuid>/evaluation.txt` alongside the

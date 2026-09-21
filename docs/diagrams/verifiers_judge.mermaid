@@ -9,38 +9,41 @@ flowchart TB
     %% ===== inputs =====
     Run[/"workflow run<br/>state_result.json + workspace files<br/>+ agent narration"/]
     TaskSpec[/"task specification<br/>(user goal / benchmark row)"/]
-    Lit[/"literature grounding<br/>via Perspicacite (Source A only)"/]
+    Lit[/"literature grounding<br/>via Perspicacite (feeds sources A, C, E, G)"/]
 
     %% ===== Stage 1: multi-source claim extraction =====
     subgraph Extract["Stage 1 — multi-source claim extraction (5 sources, merged)"]
         direction LR
         SA["A · literature<br/>methodology bar"]
         SB["B · user goal<br/>explicit deliverables"]
-        SC["C · agent narration<br/>recompute claimed values"]
-        SD["D · math invariants<br/>probabilities / shape / NaN / PSD"]
-        SF["F · statistical fingerprint<br/>baselines · degeneracy · leakage"]
+        SC["C · math invariants<br/>probabilities / shape / NaN"]
+        SE["E · statistical fingerprint<br/>baselines · degeneracy · leakage"]
+        SG["G · visual correctness<br/>vision-model judge, figure goals only"]
     end
     TaskSpec --> SA
     TaskSpec --> SB
     Run --> SC
-    Run --> SD
-    Run --> SF
+    Run --> SE
+    Run --> SG
     Lit --> SA
+    Lit --> SC
+    Lit --> SE
+    Lit --> SG
 
-    Claims["merged claim set<br/>polarity = success assertion<br/>each tagged hard / soft"]
+    Claims["merged claim set<br/>polarity = success assertion<br/>frozen per task after first extraction"]
     SA --> Claims
     SB --> Claims
     SC --> Claims
-    SD --> Claims
-    SF --> Claims
+    SE --> Claims
+    SG --> Claims
 
     %% ===== Stage 2: per-claim verification =====
     subgraph Pipeline["Stage 2 — per-claim verification"]
         direction TB
         Classify{"executable<br/>in code?"}
         GenScript["generate verifier script<br/>(LLM, opens workspace files,<br/>recomputes value;<br/>numpy / pandas / scipy / sklearn)"]
-        AntiTaut["anti-tautology tripwires:<br/>literal/output overlap +<br/>I/O markers check"]
-        Sandbox[["WorkflowRunner sandbox<br/>per-claim execution"]]
+        AntiTaut["anti-tautology rules (prompt-enforced):<br/>never parse workflow source files;<br/>distrust verdicts with stderr exceptions"]
+        Subproc[["host-interpreter subprocess<br/>sys.executable · cwd = workspace<br/>(NOT the SmolAgents AST sandbox;<br/>recovery may pip-install into host)"]]
         Soft["soft LLM verdict<br/>(pass / unsure / fail<br/>→ 1.0 / 0.5 / 0.0)<br/>anchored on previews + grounding"]
         ScoreClaim["per-claim score<br/>+ status (pass / fail / error)"]
     end
@@ -48,15 +51,15 @@ flowchart TB
     Claims --> Classify
     Classify -- yes --> GenScript
     GenScript --> AntiTaut
-    AntiTaut --> Sandbox
-    Sandbox --> ScoreClaim
+    AntiTaut --> Subproc
+    Subproc --> ScoreClaim
     Classify -- no --> Soft
     Soft --> ScoreClaim
 
     %% ===== Stage 3: aggregation =====
     subgraph Aggregate["Stage 3 — aggregation"]
-        Mean["base_mean = importance-weighted mean(non-error claims)"]
-        Cap["hard-fail cap (0.99, soft):<br/>any refuted hard claim flags hard_fail_capped"]
+        Mean["base_mean = importance-weighted mean<br/>(soft errors dropped;<br/>executable/visual errors scored 0 and kept)"]
+        Cap["hard-fail cap (0.89):<br/>any refuted claim with importance ≥ 8<br/>flags hard_fail_capped"]
     end
 
     ScoreClaim --> Mean

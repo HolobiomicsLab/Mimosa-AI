@@ -41,8 +41,8 @@ evaluation).
 The judge that produces the evolutionary pressure signal is a
 multi-source, per-claim verifier. It writes **deterministic Python
 programs** that recompute the agent's claims from the workspace across
-five vantages (literature, user goal, agent narration, math invariants,
-statistical fingerprint), and falls back
+five vantages (literature, user goal, math invariants, statistical
+fingerprint, visual correctness), and falls back
 to LLM verdicts only when no executable check is possible. The single
 output handed to the mutator is a short **prompt gradient** describing
 what to change next — it does not name the verified claims back, so the
@@ -107,7 +107,7 @@ mimosa-ai/
 │   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
 │   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
 │   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, 6-D centered)
+│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, deprecated, 7-D centered)
 │   │   ├── lineage.py                     # parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox pipeline
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
@@ -268,8 +268,9 @@ Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
 (`w = novelty_weight = 0.25`). Quality is sourced from `reward` (the
-capped `overall_score`), so a run that refuted a hard claim ranks at the
-cap (`_HARD_FAIL_CAP`, currently `0.7`) and cannot top the archive on its
+capped `overall_score`), so a run that refuted a hard claim (rated
+importance ≥ 8) ranks at the cap (`_HARD_FAIL_CAP`, currently `0.89`)
+and cannot top the archive on its
 other claims alone; ties at the cap are broken by novelty and the length
 penalty. Admission is
 gated by the validity check (improvement over baseline or
@@ -475,29 +476,42 @@ For each generation:
 
 1. **Multi-source claim extraction**: five independent prompts emit
    success-polarity claims from different vantage points — `A` literature
-   (Perspicacité), `B` user goal, `C` agent narration (anti-hallucination),
-   `D` math invariants, `F` statistical fingerprint (baseline, degeneracy,
-   leakage). Claims are tagged `hard` or `soft`; bare file-existence is
-   never `hard`.
+   (Perspicacité), `B` user goal, `C` math invariants (sanity properties
+   of the produced artefacts), `E` statistical fingerprint (baseline,
+   degeneracy, leakage), `G` visual correctness (vision-model judge, only
+   for figure deliverables). Extraction runs once per task: the first
+   successful extraction is frozen as the rubric (keyed by
+   `sha256(goal + _RUBRIC_VERSION)`) and reused for all later
+   generations; there is no `hard`/`soft` tag — "hard claim" means rated
+   importance ≥ 8.
 2. **Per-claim verification**: each claim is classified as executable or
    soft. Executable claims get an LLM-written verifier script that opens
-   workspace files and recomputes the asserted value; anti-tautology
-   tripwires (literal/output overlap ≥ 80 chars, I/O markers presence)
-   reject scripts that parse the agent's answer back to itself. The
-   verifier runner has `numpy`, `pandas`, `scipy`, and `scikit-learn`
-   pre-installed (lazy one-shot install per process). Soft claims get a
+   workspace files and recomputes the asserted value; the generation
+   prompt and file-selection forbid reading/parsing the workflow's own
+   source files as evidence, and a printed verdict is distrusted when
+   exception markers leak into the verifier's stderr. The verifier runner
+   executes these scripts as plain subprocesses of the **host
+   interpreter** (`sys.executable`, cwd = the agents' workspace) — the
+   SmolAgents AST sandbox applies to workflow agents only, not to
+   verifier checks — with `numpy`, `pandas`, `scipy`, `scikit-learn` and
+   other helpers pre-installed (lazy one-shot install per process, and up
+   to 6 LLM-vetted recovery packages pip-installed into the host
+   environment on missing-dependency errors). Soft claims get a
    `pass/unsure/fail` LLM verdict against workspace previews + literature
    grounding (mapped to `1.0 / 0.5 / 0.0`).
-3. **Behavioral pressure against shortcut workflows** comes from Source
-   C's recompute-from-disk verifiers, the inverted-score "Used fallback"
-   claim type, and the anti-tautology tripwires.
+3. **Behavioral pressure against shortcut workflows** comes from the
+   recompute-from-disk per-claim verifiers, Source E's non-triviality
+   claims (degenerate / hard-coded / fallback outputs fail outright — no
+   score inversion exists), and the anti-tautology rules.
 4. **Aggregation**:
    ```
    overall = clamp(base_mean, 0, 1)
-   if any hard claim refuted:
-       overall = min(overall, 0.7)         # _HARD_FAIL_CAP
+   if any claim with importance >= 8 refuted:
+       overall = min(overall, 0.89)        # _HARD_FAIL_CAP
    ```
-   `base_mean` is the importance-weighted mean of per-claim scores.
+   `base_mean` is the importance-weighted mean over pass/fail/unsure
+   claims plus zero-scored executable/visual errors; soft-claim errors
+   are dropped from the mean.
 5. **Prompt gradient** — plain-language single-sentence diagnosis
    prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`). It
    is the **only** verifier signal the mutator sees, and recent history
