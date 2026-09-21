@@ -328,9 +328,9 @@ The diagnosis is a summary of  deterministic ground truth verification using rub
 The diagnosis is trusted and should be used to inform your directive.
 The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
 You will also be given a read-only <search_state> block with deterministic search statistics: parent score, iteration progress, iterations since the last improvement, recent success rate, and the recent score trajectory.
-You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring.
-Do not add or remove more than 1 agent at a time.
-Most of the time, suggest small, incremental changes to the workflow. Only suggest larger changes if the diagnosis and the search state indicate that the current approach is fundamentally flawed.
+You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring (such as adding agents, rewriting prompt, changing prompt persona, etc...).
+Do not add or remove more than 1 agent at a time. Ask to add an agent whenever decomposition of the problem might help.
+Most of the time, suggest small, incremental changes to the workflow. Suggest large change if the diagnosis and the search state indicate that the current approach is flawed.
 If 'no agent answers' were captured, or that you see a python/syntax error, simply instruct to carefully craft the syntax for workflow creation, select tools correctly, and respect the generation guidelines (you do not make guidelines, the system reading your directive will know what it is; never specify what to fix, just give a general hint at fixing the syntax)
 """
         prompt = ''.join([
@@ -344,7 +344,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "",
             textual_gradient_block,
             "</diagnosis>",
-            "The diagnosis contains failure assertions, never report a diagnosis claim as something good, diagnosis only report issues to be fixed."
+            "The diagnosis contains fail/pass assertions with details, never report passing claims, never leak the exact claim being checked. only  diagnosis the failure and suggest pragmatic switch in approach for fix."
             "<search_state>",
             search_state,
             "</search_state>",

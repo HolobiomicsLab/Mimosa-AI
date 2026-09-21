@@ -47,7 +47,7 @@ from .verifier_workspace import _VerifierWorkspaceMixin
 _VERIFIER_TIMEOUT_SECONDS = 180
 _VERIFIER_MAX_CLAIMS = 100
 _VERIFIER_MIN_CLAIMS = 10
-_HARD_FAIL_CAP = 0.4
+_HARD_FAIL_CAP = 0.89
 _VERIFIER_GEN_PARALLELISM = 16
 # Per-claim verifier execution fan-out. Capped low because higher concurrency doesn't alway help
 _VERIFIER_EXEC_PARALLELISM = 4

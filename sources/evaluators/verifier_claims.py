@@ -30,31 +30,51 @@ from sources.evaluators.verifier_claim_sources import SOURCES, ClaimContext
 _IMPORTANCE_ANCHOR_BLOCK = """
 Anchored scale (for all other claims):
 - 10  The deliverable named in the goal does not exist or is wrong without this.
-     e.g. "the conformation achieves energy -7 or lower" (headline metric);
-            "the lower-bound proof establishes -11 via a valid counting argument"
--  9  Not the named deliverable, but the result is invalid without it — a core
-       methodology step the goal's correctness depends on.
-       e.g. "every step uses the exact 20-mer 'HPHPPHHPHPPHPHHPPHPH'"
--  8  A required methodology step that invalidates or fakes the result if missing AND claims about requirements.txt present and pinned.
-       e.g.  "the search does genuine algorithmic exploration, not a hardcoded coordinate list";
--  7  A literature-required step that materially changes the result if skipped.
-         e.g. "the energy minimisation must converge to a stationary point";
--  6  A required-by-convention property whose absence weakens but does not invalidate the result.
-       e.g. "the conformation is non-degenerate (not a straight line or hairpin)";
--  5  A non-negotiable sanity property — cheap to check, embarrassing if wrong.
-       e.g. "the conformation has exactly 20 coordinates, matching sequence length"
--  4  A literature-recommended best practice that improves trust, not validity.
-        eg. "The used algorithm is Monte Carlo search"
--  3  Advisory / hygiene. Affects maintainability, not the result.
--  2  Nice-to-have, not expected by the goal.
-       e.g. "the workspace is free of pathological clutter / junk-file dumps"
--  1  Tangential.
+      e.g. "filtered DataFrame contains exactly the rows satisfying all four criteria"
+            "test predictions achieve ROC-AUC >= 0.86 and MCC >= 0.60"
+            "the conformation achieves energy -7 or lower"
+- 9   Not the named deliverable, but the result is invalid without it — a core
+      methodology step the goal's correctness depends on.
+      e.g. "every row is byte-identical to the source record matched by ID"
+            "predictions are row-aligned with the test set, same order"
+            "model is the required class (MultitaskClassifier / GCN)"
+            "no test-set leakage: training used train/val split only"
+- 8   A required methodology step that invalidates or fakes the result if missing.
+      Hard requirements explicitly named in the goal, or reproducibility artifacts.
+      e.g. "featurization uses ECFP as instructed"
+            "output column is named exactly 'label'"
+            "file exists at the exact path pred_results/clintox_test_pred.csv"
+            "requirements.txt present and dependencies pinned"
+- 7   A literature-required or goal-required step that materially changes the
+      result if skipped, but the result remains interpretable without it.
+      e.g. "class-weighted loss for imbalanced BBBP data"
+            "probabilities are continuous values in [0,1], not hard labels"
+            "both protein classes represented in filtered output"
+- 6   A required-by-convention property whose absence weakens but does not
+      invalidate the result.
+      e.g. "predictions are non-degenerate (both classes present)"
+            "model targets the correct binary label, not a re-derived cutoff"
+- 5   A non-negotiable sanity property — cheap to check, embarrassing if wrong.
+      e.g. "row count equals test set size"
+            "all values are finite, no NaN or sentinel placeholders"
+            "CSV is well-formed with consistent field counts"
+- 4   A literature-recommended best practice that improves trust, not validity.
+      e.g. "DeepChem GraphConvModel used rather than custom reimplementation"
+            "AUC and MCC both reported, not accuracy alone"
+- 3   Advisory / hygiene. Affects maintainability or interpretability, not the result.
+      e.g. "metrics report includes per-class breakdown"
+- 2   Nice-to-have, not expected by the goal.
+      e.g. "workspace is free of clutter"
+- 1   Tangential.
 
 FIXED-FLOOR CLAIMS
-- Reproducibility artifacts (requirements.txt present, dependencies pinned) = 8.
-  A run without these FAILS, so they are never advisory. Score them 8 regardless of what the goal is about.
+- Exact-path deliverables = 8. The goal names a path; wrong path = missing deliverable.
+- Exact column names required by the goal = 8. 
 
-Use the FULL scale; Goal-alignment dominates."""
+Goal-alignment dominates: when in doubt, ask "does the goal's success
+depend on this claim being true?" The harder it is to satisfy, and the
+more catastrophic its failure, the higher the score.
+"""
 
 
 class _VerifierClaimExtractionMixin:
